@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { TRAVEL_MODE_PHRASE, estimateTravel, osmEmbedUrl } from '../lib/campus'
+import { TRAVEL_MODE_PHRASE, estimateTravel } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl } from '../lib/format'
-import { tflDisruptions, tflLineColor, tflModeIcon, tflRoute } from '../lib/tfl'
+import { tflArrivals, tflDisruptions, tflLineColor, tflModeIcon, tflRoute } from '../lib/tfl'
 import type { TflDisruption, TflRoute } from '../lib/tfl'
 import type { Session, SessionMeta } from '../types'
+import { StaticMap } from './StaticMap'
 
 interface Props {
   session: Session
@@ -54,13 +55,25 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
   // plus current line disruptions filtered to the lines this route uses.
   const [route, setRoute] = useState<TflRoute | null>(null)
   const [disruptions, setDisruptions] = useState<TflDisruption[]>([])
+  const [arrivals, setArrivals] = useState<{ line: string; from: string; mins: number[] } | null>(null)
   useEffect(() => {
     setRoute(null)
     setDisruptions([])
+    setArrivals(null)
     if (travelMode !== 'transit' || !coords || !travel?.location) return
     let cancelled = false
     void tflRoute(coords, travel.location).then((r) => {
-      if (!cancelled) setRoute(r)
+      if (cancelled) return
+      setRoute(r)
+      // Live departures for the first transit leg with a known stop id.
+      const firstTransit = r?.legs.find((l) => l.mode !== 'walking' && l.naptanId)
+      if (firstTransit?.naptanId) {
+        void tflArrivals(firstTransit.naptanId, firstTransit.line).then((mins) => {
+          if (!cancelled && mins.length > 0) {
+            setArrivals({ line: firstTransit.line, from: firstTransit.from, mins })
+          }
+        })
+      }
     })
     void tflDisruptions().then((d) => {
       if (!cancelled) setDisruptions(d)
@@ -156,6 +169,12 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
                 </div>
               )
             })}
+            {arrivals && (
+              <p className="route-departures">
+                🕐 Next {arrivals.line} from {arrivals.from}:{' '}
+                {arrivals.mins.map((m) => (m === 0 ? 'due' : `${m} min`)).join(', ')}
+              </p>
+            )}
           </div>
         )}
         {route && route.legs.length === 0 && travelMode === 'transit' && (
@@ -168,13 +187,7 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
           </p>
         ))}
         {travel?.location && (
-          <iframe
-            className="map-embed"
-            title={`Map of ${travel.building}`}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            src={osmEmbedUrl(travel.location)}
-          />
+          <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} />
         )}
         {session.link && (
           <a className="btn-primary btn-link" href={session.link} target="_blank" rel="noopener noreferrer">

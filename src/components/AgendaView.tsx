@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
 import { toMinutes, weekNumber } from '../lib/format'
@@ -15,6 +15,14 @@ interface Props {
   termStartISO?: string
   coords?: Coords | null
   travelMode?: TravelMode
+  /** limit rendering to a window around today, with show-earlier/show-later controls */
+  windowed?: boolean
+}
+
+function addDaysISO(dateISO: string, days: number): string {
+  const [y, m, d] = dateISO.split('-').map(Number)
+  const date = new Date(y, m - 1, d + days)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 function localTodayISO(): string {
@@ -41,11 +49,14 @@ export function AgendaView({
   termStartISO,
   coords,
   travelMode,
+  windowed,
 }: Props) {
   const todayISO = localTodayISO()
   const anchorRef = useRef<HTMLElement | null>(null)
+  const [pastDays, setPastDays] = useState(7)
+  const [futureDays, setFutureDays] = useState(60)
 
-  const days = useMemo(() => {
+  const allDays = useMemo(() => {
     const byDate = new Map<string, Session[]>()
     for (const s of sessions) {
       const list = byDate.get(s.dateISO) ?? []
@@ -54,6 +65,24 @@ export function AgendaView({
     }
     return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b))
   }, [sessions])
+
+  // Rendering all ~440 sessions at once is heavy on older phones; window around today
+  // and extend on demand. The window always stretches to include a jump target.
+  const { days, hiddenEarlier, hiddenLater } = useMemo(() => {
+    if (!windowed) return { days: allDays, hiddenEarlier: 0, hiddenLater: 0 }
+    let from = addDaysISO(todayISO, -pastDays)
+    let to = addDaysISO(todayISO, futureDays)
+    if (scrollTo) {
+      if (scrollTo < from) from = scrollTo
+      if (scrollTo > to) to = scrollTo
+    }
+    const visible = allDays.filter(([d]) => d >= from && d <= to)
+    return {
+      days: visible,
+      hiddenEarlier: allDays.filter(([d]) => d < from).length,
+      hiddenLater: allDays.filter(([d]) => d > to).length,
+    }
+  }, [allDays, windowed, todayISO, pastDays, futureDays, scrollTo])
 
   // Sessions that overlap another real session on the same day (key dates and
   // self-study excluded) get a clash badge.
@@ -100,6 +129,11 @@ export function AgendaView({
 
   return (
     <div className="agenda">
+      {hiddenEarlier > 0 && (
+        <button type="button" className="btn-window" onClick={() => setPastDays((p) => p + 90)}>
+          ↑ Show earlier ({hiddenEarlier} more days)
+        </button>
+      )}
       {days.map(([dateISO, daySessions]) => {
         const isToday = dateISO === todayISO
         const isPast = dateISO < todayISO
@@ -118,21 +152,47 @@ export function AgendaView({
               {isToday && <span className="badge badge-today">Today</span>}
             </h2>
             <div className="day-sessions">
-              {daySessions.map((s) => (
-                <SessionCard
-                  key={s.id}
-                  session={s}
-                  meta={metaMap?.[sessionKey(s)]}
-                  coords={coords}
-                  travelMode={travelMode}
-                  conflict={conflictIds.has(s.id)}
-                  onSelect={onSelect}
-                />
-              ))}
+              {daySessions.map((s, i) => {
+                // Free-slot finder: surface usable gaps between real sessions.
+                const prev = i > 0 ? daySessions[i - 1] : null
+                let gapMins = 0
+                if (
+                  prev &&
+                  !prev.isKeyDate &&
+                  !s.isKeyDate &&
+                  toMinutes(prev.end) !== null &&
+                  toMinutes(s.start) !== null
+                ) {
+                  gapMins = toMinutes(s.start)! - toMinutes(prev.end)!
+                }
+                return (
+                  <div key={s.id} className="session-slot">
+                    {gapMins >= 45 && (
+                      <div className="free-gap">
+                        ☕ {Math.floor(gapMins / 60) > 0 ? `${Math.floor(gapMins / 60)}h ` : ''}
+                        {gapMins % 60 > 0 ? `${gapMins % 60}m ` : ''}free
+                      </div>
+                    )}
+                    <SessionCard
+                      session={s}
+                      meta={metaMap?.[sessionKey(s)]}
+                      coords={coords}
+                      travelMode={travelMode}
+                      conflict={conflictIds.has(s.id)}
+                      onSelect={onSelect}
+                    />
+                  </div>
+                )
+              })}
             </div>
           </section>
         )
       })}
+      {hiddenLater > 0 && (
+        <button type="button" className="btn-window" onClick={() => setFutureDays((f) => f + 90)}>
+          ↓ Show later ({hiddenLater} more days)
+        </button>
+      )}
       {anchorISO && (
         <button type="button" className="fab-today" onClick={scrollToToday} aria-label="Scroll to today">
           Today

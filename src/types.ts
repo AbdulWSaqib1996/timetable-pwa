@@ -77,6 +77,10 @@ export interface Settings {
   extraTabs?: { sheetId: string; gid: string | null; url: string }[]
   /** colour theme override (default follows the system) */
   theme?: 'system' | 'light' | 'dark'
+  /** base URL of a deployed push worker (enables background notifications) */
+  pushServerBase?: string
+  /** true once this device subscribed to background push */
+  pushEnabled?: boolean
 }
 
 /** One saved timetable (sheet + all its choices). */

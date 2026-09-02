@@ -10,6 +10,7 @@ import { SessionDetail } from './components/SessionDetail'
 import { SettingsSheet } from './components/SettingsSheet'
 import { SetupScreen } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
+import { StatsSheet } from './components/StatsSheet'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
 import type { Coords } from './lib/campus'
@@ -32,6 +33,7 @@ import { parseSheetUrl } from './lib/sheetUrl'
 import { parseShareHash } from './lib/share'
 import { tflDisruptions } from './lib/tfl'
 import type { TflDisruption } from './lib/tfl'
+import { cachedWeatherForHour, weatherForHour } from './lib/weather'
 import {
   clearProfileData,
   clearStore,
@@ -72,7 +74,7 @@ function matchesQuery(s: Session, q: string): boolean {
   return [s.title, s.subject, s.tutor, s.room].some((f) => f && f.toLowerCase().includes(needle))
 }
 
-type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates'
+type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -457,6 +459,7 @@ export default function App() {
 
         // "Time to leave" alerts: leave-by = start − live travel estimate; alert with head start.
         if (leaveOffsets.length > 0 && locEnabled && here && s.room && !s.isSelfStudy) {
+          void weatherForHour(today, Math.floor(start / 60)) // warm the forecast cache
           const est = estimateTravel(s.room, here, mode)
           if (est.minutes !== null) {
             const untilLeave = delta - est.minutes
@@ -471,9 +474,12 @@ export default function App() {
                       .map((d) => `${d.line} ${d.status.toLowerCase()}`)
                       .join(', ')}`
                   : ''
+              const forecast = cachedWeatherForHour(today, Math.floor(start / 60))
+              const weatherNote =
+                forecast && forecast.rainProb >= 50 ? ` · 🌧 ${forecast.rainProb}% rain — allow extra time` : ''
               notify(
                 untilLeave <= 0 ? `Time to leave — ${s.title}` : `Leave in ${formatRemaining(untilLeave)} — ${s.title}`,
-                `≈ ${formatRemaining(est.minutes)} ${TRAVEL_MODE_PHRASE[mode]} to ${est.building ?? shortenRoom(s.room)} · starts ${s.start}${disruptionNote}`
+                `≈ ${formatRemaining(est.minutes)} ${TRAVEL_MODE_PHRASE[mode]} to ${est.building ?? shortenRoom(s.room)} · starts ${s.start}${disruptionNote}${weatherNote}`
               )
               for (const m of leaveDue) notified[`${sessionKey(s)}#leave#${m}`] = Date.now()
               dirty = true
@@ -700,6 +706,7 @@ export default function App() {
           termStartISO={settings.termStartISO}
           coords={coords}
           travelMode={travelMode}
+          windowed
           emptyMessage={
             sessions.length === 0
               ? 'No sessions found in this sheet.'
@@ -758,11 +765,16 @@ export default function App() {
         />
       )}
 
+      {openSheet === 'stats' && (
+        <StatsSheet sessions={exportSessions} metaMap={metaMap} todayISO={todayISO} onClose={() => setOpenSheet('none')} />
+      )}
+
       {openSheet === 'keydates' && (
         <KeyDatesSheet
           keyDates={keyDates}
           todayISO={todayISO}
           configured={!!settings.keyDatesSheetId}
+          metaMap={metaMap}
           onSelect={setSelected}
           onClose={() => setOpenSheet('none')}
         />
@@ -788,6 +800,7 @@ export default function App() {
           metaMap={metaMap}
           todayISO={todayISO}
           onUpdateSettings={updateSettings}
+          onOpenStats={() => setOpenSheet('stats')}
           onRechooseSpecialisms={() => {
             setOpenSheet('none')
             setRechoosing(true)

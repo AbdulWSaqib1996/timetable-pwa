@@ -3,6 +3,7 @@ import { sessionKey } from '../lib/diff'
 import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
 import { parseSheetUrl } from '../lib/sheetUrl'
+import { subscribePush, unsubscribePush } from '../lib/push'
 import { exportBackup, importBackup } from '../lib/storage'
 import type { MetaMap, ProfileStore, Session, Settings } from '../types'
 
@@ -15,6 +16,7 @@ interface Props {
   metaMap: MetaMap
   todayISO: string
   onUpdateSettings: (patch: Partial<Settings>) => void
+  onOpenStats: () => void
   onRechooseSpecialisms: () => void
   onSwitchProfile: (id: string) => void
   onAddProfile: () => void
@@ -68,6 +70,7 @@ export function SettingsSheet({
   metaMap,
   todayISO,
   onUpdateSettings,
+  onOpenStats,
   onRechooseSpecialisms,
   onSwitchProfile,
   onAddProfile,
@@ -79,6 +82,31 @@ export function SettingsSheet({
   const [keyDatesError, setKeyDatesError] = useState(false)
   const [mergeUrl, setMergeUrl] = useState('')
   const [mergeError, setMergeError] = useState(false)
+  const [pushBase, setPushBase] = useState(settings.pushServerBase ?? '')
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushMessage, setPushMessage] = useState<string | null>(null)
+
+  async function handlePush(enable: boolean) {
+    const base = pushBase.trim()
+    if (enable && !base) return
+    setPushBusy(true)
+    setPushMessage(null)
+    try {
+      if (enable) {
+        await subscribePush(base, settings)
+        onUpdateSettings({ pushServerBase: base, pushEnabled: true })
+        setPushMessage('Background push enabled on this device. ✓')
+      } else {
+        await unsubscribePush(settings.pushServerBase ?? base)
+        onUpdateSettings({ pushEnabled: false })
+        setPushMessage('Background push disabled.')
+      }
+    } catch (err) {
+      setPushMessage(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
   const [copied, setCopied] = useState<'feed' | 'share' | null>(null)
   const importInput = useRef<HTMLInputElement | null>(null)
 
@@ -476,6 +504,40 @@ export function SettingsSheet({
           )}
         </section>
 
+        {!settings.demo && (
+          <section className="filter-section">
+            <h3>Background push (works with the app closed)</h3>
+            <p className="filter-hint">
+              Deploy the push worker (see workers/push in the project README), paste its URL here and
+              enable — session and key-date reminders then arrive even when the app isn't open.
+            </p>
+            <div className="feed-row">
+              <input
+                type="url"
+                placeholder="https://timetable-push.<you>.workers.dev"
+                value={pushBase}
+                onChange={(e) => setPushBase(e.target.value)}
+              />
+            </div>
+            <div className="btn-row">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={pushBusy || !pushBase.trim() || settings.pushEnabled}
+                onClick={() => void handlePush(true)}
+              >
+                {pushBusy ? 'Working…' : settings.pushEnabled ? 'Enabled ✓' : 'Enable on this device'}
+              </button>
+              {settings.pushEnabled && (
+                <button type="button" className="btn-secondary" disabled={pushBusy} onClick={() => void handlePush(false)}>
+                  Disable
+                </button>
+              )}
+            </div>
+            {pushMessage && <p className="filter-hint">{pushMessage}</p>}
+          </section>
+        )}
+
         {pastSessions.length > 0 && (
           <section className="filter-section">
             <h3>Attendance</h3>
@@ -495,9 +557,14 @@ export function SettingsSheet({
                 ))}
               </ul>
             )}
-            <button type="button" className="btn-secondary" onClick={downloadAttendanceCSV}>
-              Export attendance CSV
-            </button>
+            <div className="btn-row">
+              <button type="button" className="btn-secondary" onClick={onOpenStats}>
+                📊 Term stats
+              </button>
+              <button type="button" className="btn-secondary" onClick={downloadAttendanceCSV}>
+                Export attendance CSV
+              </button>
+            </div>
           </section>
         )}
 

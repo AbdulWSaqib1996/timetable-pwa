@@ -32,6 +32,20 @@ full plan and architecture.
   feed URL (sheet + your specialism choices) and you paste that into your calendar app's
   "subscribe by URL" option.
 
+## Background push (optional)
+
+`workers/push` is a Cloudflare Worker (free plan) that sends session and key-date reminders
+even when the app is closed. Deploy:
+
+```bash
+cd workers/push
+npx wrangler kv namespace create PUSH   # paste the printed id into wrangler.toml
+npx wrangler deploy
+```
+
+Then paste the printed `*.workers.dev` URL into Settings → Background push and enable. VAPID
+keys generate themselves into KV on first use; the cron runs every 10 minutes.
+
 ## Support
 
 If this app saves you time, you can [buy the developer a coffee on Ko-fi](https://ko-fi.com/awsaqib). ☕

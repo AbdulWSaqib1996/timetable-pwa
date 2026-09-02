@@ -45,7 +45,7 @@ export default defineConfig({
         // still succeeds offline, and periodic background sync (sw-periodic.js) keeps it warm.
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
         navigateFallback: `${base}index.html`,
-        importScripts: ['sw-periodic.js'],
+        importScripts: ['sw-periodic.js', 'sw-push.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/docs\.google\.com\/spreadsheets\/.*\/gviz\//,
@@ -54,6 +54,24 @@ export default defineConfig({
               cacheName: 'gviz-data',
               networkTimeoutSeconds: 8,
               expiration: { maxEntries: 10, maxAgeSeconds: 7 * 24 * 3600 },
+            },
+          },
+          {
+            // campus map tiles keep working offline once seen
+            urlPattern: /^https:\/\/tile\.openstreetmap\.org\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'osm-tiles',
+              expiration: { maxEntries: 120, maxAgeSeconds: 30 * 24 * 3600 },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/api\.open-meteo\.com\//,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'weather',
+              networkTimeoutSeconds: 6,
+              expiration: { maxEntries: 4, maxAgeSeconds: 3 * 3600 },
             },
           },
         ],

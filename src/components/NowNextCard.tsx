@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { formatRemaining, shortenRoom, toMinutes } from '../lib/format'
+import { weatherEmoji, weatherForHour } from '../lib/weather'
+import type { HourWeather } from '../lib/weather'
 import type { Session } from '../types'
 
 interface Props {
@@ -53,6 +55,21 @@ export function NowNextCard({ sessions, onSelect }: Props) {
   })
 
   const session = current ?? next
+  const sessionDate = session?.dateISO
+  const sessionHour = session ? toMinutes(session.start) : null
+  const [weather, setWeather] = useState<HourWeather | null>(null)
+  useEffect(() => {
+    setWeather(null)
+    if (!sessionDate || sessionHour === null) return
+    let cancelled = false
+    void weatherForHour(sessionDate, Math.floor(sessionHour / 60)).then((w) => {
+      if (!cancelled) setWeather(w)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [sessionDate, sessionHour])
+
   if (!session) return null
 
   const endMins = current ? toMinutes(current.end) : null
@@ -69,6 +86,12 @@ export function NowNextCard({ sessions, onSelect }: Props) {
       <span className="nownext-meta">
         {!session.isSelfStudy && session.room && <span>{shortenRoom(session.room)}</span>}
         {session.tutor && session.tutor !== 'Self Study' && <span>{session.tutor}</span>}
+        {weather && (
+          <span title={`Forecast at ${session.start}`}>
+            {weatherEmoji(weather.code)} {Math.round(weather.tempC)}°
+            {weather.rainProb >= 30 ? ` · ${weather.rainProb}% rain` : ''}
+          </span>
+        )}
       </span>
     </button>
   )

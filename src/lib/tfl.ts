@@ -15,6 +15,8 @@ export interface TflLeg {
   from: string
   to: string
   minutes: number
+  /** departure StopPoint id when TfL provides one (enables live arrivals) */
+  naptanId?: string
 }
 
 export interface TflRoute {
@@ -96,7 +98,7 @@ export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | nul
             duration?: number
             mode?: { name?: string }
             routeOptions?: { name?: string }[]
-            departurePoint?: { commonName?: string }
+            departurePoint?: { commonName?: string; naptanId?: string }
             arrivalPoint?: { commonName?: string }
           }[]
         }[]
@@ -114,6 +116,7 @@ export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | nul
             from: cleanStop(leg.departurePoint?.commonName),
             to: cleanStop(leg.arrivalPoint?.commonName),
             minutes: leg.duration ?? 0,
+            naptanId: leg.departurePoint?.naptanId,
           })
           if (line) lines.push(line)
         }
@@ -130,6 +133,22 @@ export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | nul
 /** Back-compat helper: just the live journey minutes. */
 export async function tflTransitMinutes(from: Coords, to: Coords): Promise<number | null> {
   return (await tflRoute(from, to))?.minutes ?? null
+}
+
+/** Next live arrivals (minutes) of a line at a stop, soonest first (max 3). */
+export async function tflArrivals(naptanId: string, line: string): Promise<number[]> {
+  try {
+    const res = await fetch(`https://api.tfl.gov.uk/StopPoint/${encodeURIComponent(naptanId)}/Arrivals`)
+    if (!res.ok) return []
+    const arrivals = (await res.json()) as { lineName?: string; timeToStation?: number }[]
+    return arrivals
+      .filter((a) => !line || (a.lineName ?? '').toLowerCase() === line.toLowerCase())
+      .map((a) => Math.max(0, Math.round((a.timeToStation ?? 0) / 60)))
+      .sort((a, b) => a - b)
+      .slice(0, 3)
+  } catch {
+    return []
+  }
 }
 
 export interface TflDisruption {

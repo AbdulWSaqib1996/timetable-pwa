@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
 import { subjectColor, weekNumber } from '../lib/format'
+import { shareWeekImage } from '../lib/weekImage'
 import type { Session } from '../types'
 import { SessionCard } from './SessionCard'
 
@@ -129,6 +130,23 @@ export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, t
       </button>
       <button type="button" className="btn-icon" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">
         ›
+      </button>
+      <button
+        type="button"
+        className="btn-icon"
+        onClick={() =>
+          void shareWeekImage(
+            weekDays.map((dateISO) => ({
+              label: fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }),
+              sessions: byDay.get(dateISO) ?? [],
+            })),
+            weekLabel
+          )
+        }
+        aria-label="Share week as image"
+        title="Share week as image"
+      >
+        📸
       </button>
     </div>
   )
