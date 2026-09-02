@@ -5,6 +5,7 @@
  *   GET  /vapid        → { publicKey }  (ES256 keypair auto-generated into KV on first call)
  *   POST /subscribe    → { subscription, config } stored in KV
  *   POST /unsubscribe  → { endpoint } removed
+ *   POST /snooze       → { endpoint, title, body, key, fireAt } re-delivered by the cron
  *
  * Cron (every 10 min): for each subscription, fetch its sheet, compute due
  * session reminders (offset minutes before start, London time) and key-date
@@ -267,6 +268,26 @@ const CRON_MINUTES = 10
 
 async function runScheduled(env) {
   const now = londonNow()
+
+  // Deliver due snoozes first.
+  const snoozes = await env.PUSH.list({ prefix: 'snooze:' })
+  for (const entry of snoozes.keys) {
+    const item = await env.PUSH.get(entry.name, 'json')
+    if (!item) continue
+    if (item.fireAt <= Date.now()) {
+      const record = await env.PUSH.get(item.subKey, 'json')
+      if (record?.subscription) {
+        await sendPush(env, record.subscription, {
+          title: item.title,
+          body: item.body,
+          key: item.key,
+          snoozeUrl: item.snoozeUrl,
+        })
+      }
+      await env.PUSH.delete(entry.name)
+    }
+  }
+
   const list = await env.PUSH.list({ prefix: 'sub:' })
   const sheetCache = new Map()
   const getSheet = async (id, gid) => {
@@ -291,6 +312,7 @@ async function runScheduled(env) {
           if (delta > offset - CRON_MINUTES && delta <= offset) {
             due.push({
               dedupe: `${s.dateISO}|${s.start}|${s.title}|${offset}`,
+              key: `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`,
               title: s.title,
               body: `Starts ${s.start}${s.room ? ` · ${s.room}` : ''}`,
             })
@@ -307,6 +329,7 @@ async function runScheduled(env) {
           if (days === d) {
             due.push({
               dedupe: `kd|${kd.dateISO}|${kd.title}|${d}`,
+              key: `${kd.dateISO}|${kd.start}|${kd.title.trim().toLowerCase()}`,
               title: `📌 ${kd.title}`,
               body: days === 0 ? 'Due today' : `Due in ${days} day${days === 1 ? '' : 's'}`,
             })
@@ -318,7 +341,12 @@ async function runScheduled(env) {
     for (const item of due) {
       const sentKey = `sent:${entry.name.slice(4)}:${item.dedupe}`
       if (await env.PUSH.get(sentKey)) continue
-      const result = await sendPush(env, subscription, { title: item.title, body: item.body })
+      const result = await sendPush(env, subscription, {
+        title: item.title,
+        body: item.body,
+        key: item.key,
+        snoozeUrl: record.base,
+      })
       if (result === 'gone') {
         await env.PUSH.delete(entry.name)
         break
@@ -354,7 +382,31 @@ export default {
       if (!body?.subscription?.endpoint || !body?.subscription?.keys?.p256dh || !body?.config?.sheetId) {
         return json({ error: 'invalid subscription' }, 400)
       }
-      await env.PUSH.put(await endpointKey(body.subscription.endpoint), JSON.stringify({ subscription: body.subscription, config: body.config }))
+      await env.PUSH.put(
+        await endpointKey(body.subscription.endpoint),
+        JSON.stringify({ subscription: body.subscription, config: body.config, base: url.origin })
+      )
+      return json({ ok: true })
+    }
+    if (request.method === 'POST' && url.pathname === '/snooze') {
+      const body = await request.json().catch(() => null)
+      if (!body?.endpoint || !body?.title || typeof body?.fireAt !== 'number') {
+        return json({ error: 'invalid snooze' }, 400)
+      }
+      const subKey = await endpointKey(body.endpoint)
+      if (!(await env.PUSH.get(subKey))) return json({ error: 'unknown subscription' }, 404)
+      await env.PUSH.put(
+        `snooze:${subKey.slice(4)}:${Date.now()}`,
+        JSON.stringify({
+          subKey,
+          title: String(body.title).slice(0, 120),
+          body: String(body.body ?? '').slice(0, 300),
+          key: body.key,
+          fireAt: body.fireAt,
+          snoozeUrl: url.origin,
+        }),
+        { expirationTtl: 86400 }
+      )
       return json({ ok: true })
     }
     if (request.method === 'POST' && url.pathname === '/unsubscribe') {

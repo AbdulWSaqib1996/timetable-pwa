@@ -31,7 +31,10 @@ import { fetchGvizTable } from './lib/gviz'
 import { parseTimetable } from './lib/parseTimetable'
 import { parseSheetUrl } from './lib/sheetUrl'
 import { parseShareHash } from './lib/share'
-import { tflDisruptions } from './lib/tfl'
+import { DEFAULT_PUSH_BASE } from './lib/config'
+import { showReminder } from './lib/notify'
+import { drainPendingActions } from './lib/pendingActions'
+import { cachedRouteMinutes, tflDisruptions, tflRoute } from './lib/tfl'
 import type { TflDisruption } from './lib/tfl'
 import { cachedWeatherForHour, weatherForHour } from './lib/weather'
 import {
@@ -197,6 +200,18 @@ export default function App() {
     setMetaMap(loadMeta(active.id))
     setChanges(loadChanges(active.id))
     setKeyDates((cached?.keyDates ?? []).map((k) => ({ ...k, isKeyDate: true })))
+    // Apply "✓ Attended" taps made on notifications while the app was closed.
+    const pid = active.id
+    void drainPendingActions().then((actions) => {
+      const attendedKeys = actions.filter((a) => a.action === 'attended' && a.key).map((a) => a.key)
+      if (attendedKeys.length === 0) return
+      setMetaMap((prev) => {
+        const next = { ...prev }
+        for (const key of attendedKeys) next[key] = { ...next[key], attended: true }
+        saveMeta(pid, next)
+        return next
+      })
+    })
     setSelected(null)
     setJumpDate(null)
     setError(null)
@@ -232,6 +247,31 @@ export default function App() {
       /* unsupported */
     }
   }, [changes])
+
+  // Notification action buttons: the service worker relays "attended"/"snooze"
+  // taps to an open window via postMessage.
+  const activeIdRef = useRef<string | null>(null)
+  activeIdRef.current = active?.id ?? null
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const onMessage = (event: MessageEvent) => {
+      const msg = event.data as { type?: string; action?: string; key?: string; title?: string; body?: string }
+      if (msg?.type !== 'timetable-action' || !msg.key) return
+      if (msg.action === 'attended') {
+        const pid = activeIdRef.current
+        if (!pid) return
+        setMetaMap((prev) => {
+          const next = { ...prev, [msg.key!]: { ...prev[msg.key!], attended: true } }
+          saveMeta(pid, next)
+          return next
+        })
+      } else if (msg.action === 'snooze' && msg.title) {
+        setTimeout(() => showReminder(msg.title!, msg.body ?? '', msg.key, snoozeUrlRef.current), 10 * 60_000)
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [])
 
   // PWA shortcut deep-link (?view=keydates) — consume it once.
   useEffect(() => {
@@ -412,6 +452,8 @@ export default function App() {
   keyDatesRef.current = keyDates
   const travelRef = useRef({ coords, travelMode, locationEnabled })
   travelRef.current = { coords, travelMode, locationEnabled }
+  const snoozeUrlRef = useRef<string | undefined>(undefined)
+  snoozeUrlRef.current = settings?.pushEnabled ? settings.pushServerBase ?? DEFAULT_PUSH_BASE : undefined
   const offsetsKey = JSON.stringify(settings?.reminderOffsets ?? [])
   const leaveKey = JSON.stringify(settings?.leaveAlertOffsets ?? [])
   const kdDaysKey = JSON.stringify(settings?.keyDateReminderDays ?? [])
@@ -424,13 +466,8 @@ export default function App() {
       typeof Notification === 'undefined'
     )
       return
-    const notify = (title: string, body: string) => {
-      try {
-        new Notification(title, { body })
-      } catch {
-        /* notification constructor unavailable (some mobile browsers) */
-      }
-    }
+    const notify = (title: string, body: string, key?: string) =>
+      showReminder(title, body, key, snoozeUrlRef.current)
     const check = () => {
       if (Notification.permission !== 'granted') return
       const now = new Date()
@@ -451,7 +488,8 @@ export default function App() {
         if (due.length > 0) {
           notify(
             s.title,
-            `Starts ${s.start} (in ${formatRemaining(delta)})${s.room && !s.isSelfStudy ? ` · ${shortenRoom(s.room)}` : ''}`
+            `Starts ${s.start} (in ${formatRemaining(delta)})${s.room && !s.isSelfStudy ? ` · ${shortenRoom(s.room)}` : ''}`,
+            sessionKey(s)
           )
           for (const m of due) notified[`${sessionKey(s)}#${m}`] = Date.now()
           dirty = true
@@ -462,7 +500,19 @@ export default function App() {
           void weatherForHour(today, Math.floor(start / 60)) // warm the forecast cache
           const est = estimateTravel(s.room, here, mode)
           if (est.minutes !== null) {
-            const untilLeave = delta - est.minutes
+            // In transit mode, prefer the live TfL journey time (cache warmed here, used
+            // next tick) so disruptions automatically make the alert fire earlier.
+            let travelMins = est.minutes
+            let liveLabel = ''
+            if (mode === 'transit' && est.location) {
+              void tflRoute(here, est.location)
+              const live = cachedRouteMinutes(here, est.location)
+              if (live !== null) {
+                travelMins = live
+                liveLabel = ' (live TfL)'
+              }
+            }
+            const untilLeave = delta - travelMins
             const leaveDue = leaveOffsets.filter(
               (m) => untilLeave <= m && !notified[`${sessionKey(s)}#leave#${m}`]
             )
@@ -479,7 +529,8 @@ export default function App() {
                 forecast && forecast.rainProb >= 50 ? ` · 🌧 ${forecast.rainProb}% rain — allow extra time` : ''
               notify(
                 untilLeave <= 0 ? `Time to leave — ${s.title}` : `Leave in ${formatRemaining(untilLeave)} — ${s.title}`,
-                `≈ ${formatRemaining(est.minutes)} ${TRAVEL_MODE_PHRASE[mode]} to ${est.building ?? shortenRoom(s.room)} · starts ${s.start}${disruptionNote}${weatherNote}`
+                `≈ ${formatRemaining(travelMins)} ${TRAVEL_MODE_PHRASE[mode]}${liveLabel} to ${est.building ?? shortenRoom(s.room)} · starts ${s.start}${disruptionNote}${weatherNote}`,
+                sessionKey(s)
               )
               for (const m of leaveDue) notified[`${sessionKey(s)}#leave#${m}`] = Date.now()
               dirty = true
@@ -499,7 +550,8 @@ export default function App() {
             `📌 ${kd.title}`,
             days === 0
               ? `Due today${kd.start ? ` at ${kd.start}` : ''}`
-              : `Due in ${days} day${days === 1 ? '' : 's'} (${kd.dateISO.split('-').reverse().join('/')})`
+              : `Due in ${days} day${days === 1 ? '' : 's'} (${kd.dateISO.split('-').reverse().join('/')})`,
+            sessionKey(kd)
           )
           for (const d of due) notified[`${sessionKey(kd)}#kd#${d}`] = Date.now()
           dirty = true

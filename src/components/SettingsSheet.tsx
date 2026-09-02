@@ -24,9 +24,7 @@ interface Props {
   onClose: () => void
 }
 
-/** Canonical worker deployments for this app; Settings inputs can override them. */
-const DEFAULT_ICS_FEED_BASE = 'https://timetable-ics.ics-feed.workers.dev'
-const DEFAULT_PUSH_BASE = 'https://timetable-push.ics-feed.workers.dev'
+import { DEFAULT_ICS_FEED_BASE, DEFAULT_PUSH_BASE } from '../lib/config'
 
 function downloadFile(name: string, content: string, type: string) {
   const blob = new Blob([content], { type })

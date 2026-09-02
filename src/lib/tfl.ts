@@ -73,6 +73,15 @@ export function tflLineColor(line: string, mode: string): string {
 
 const routeCache = new Map<string, { at: number; route: TflRoute | null }>()
 
+const routeKey = (from: Coords, to: Coords) =>
+  `${from.lat.toFixed(3)},${from.lng.toFixed(3)}|${to.lat.toFixed(4)},${to.lng.toFixed(4)}`
+
+/** Synchronous cache lookup of a live journey time (for the leave-alert loop). */
+export function cachedRouteMinutes(from: Coords, to: Coords): number | null {
+  const hit = routeCache.get(routeKey(from, to))
+  return hit && Date.now() - hit.at < 10 * 60_000 ? hit.route?.minutes ?? null : null
+}
+
 function cleanStop(name?: string): string {
   let cleaned = (name ?? '').replace(/ (Underground|Rail|DLR) Station$/i, '').trim()
   // TfL returns street addresses in ALL CAPS — title-case those.
@@ -83,7 +92,7 @@ function cleanStop(name?: string): string {
 }
 
 export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | null> {
-  const key = `${from.lat.toFixed(3)},${from.lng.toFixed(3)}|${to.lat.toFixed(4)},${to.lng.toFixed(4)}`
+  const key = routeKey(from, to)
   const hit = routeCache.get(key)
   if (hit && Date.now() - hit.at < 5 * 60_000) return hit.route
   let route: TflRoute | null = null

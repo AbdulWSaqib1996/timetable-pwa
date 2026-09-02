@@ -152,6 +152,8 @@ Ideas building on the app after rounds 1–2 and the TfL work (which now include
 
 ## Future enhancements — round 4 (logged 2 Sep 2026)
 
+**Built (2 Sep 2026, ninth pass): items 4 and 5.** Reminder notifications (in-app and push) now carry "✓ Attended" and "⏰ Snooze 10m" action buttons — attended taps reach an open window via postMessage or queue in IndexedDB for the next launch; snooze re-delivers through the push worker's cron (new /snooze endpoint) with the app closed, or an open window's timer otherwise. Leave alerts in transit mode now use the cached live TfL journey time (labelled "live TfL") instead of the heuristic, so disruptions make alerts fire earlier automatically.
+
 The app now has live worker infrastructure (background push with a 10-min cron + KV, the ICS feed, both deployed), full TfL integration (live routing, per-leg departures, disruptions), weather everywhere, key dates, stats, profiles, share links and backups. Round 4 is mostly about **exploiting the push worker** — it already fetches sheets on a schedule, so several high-value features are now small additions to it. Effort: S (hours), M (a day or two), L (multi-day).
 
 1. **Background timetable-change push (M)** — the cron already fetches each subscriber's sheet; keep a per-subscriber snapshot in KV, diff it, and push "Room changed for Maths 2: 728 → 731" with the app closed. The in-app diff engine already defines the semantics; this moves it server-side. The single most valuable unlock of the deployed worker.

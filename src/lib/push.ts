@@ -38,6 +38,7 @@ export async function subscribePush(base: string, settings: Settings): Promise<v
     groups: settings.myGroups ?? [],
     reminderOffsets: settings.reminderOffsets ?? [],
     keyDateReminderDays: settings.keyDateReminderDays ?? [],
+    base: trim(base),
   }
   const save = await fetch(`${trim(base)}/subscribe`, {
     method: 'POST',
