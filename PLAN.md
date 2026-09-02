@@ -150,6 +150,25 @@ Ideas building on the app after rounds 1–2 and the TfL work (which now include
 
 **Suggested order:** 3 and 8 as quick delights, 5 + 4 as the next real feature pair, 10 before the codebase grows further, 1 when reminders prove popular, 11 only with multi-cohort traction.
 
+## Future enhancements — round 4 (logged 2 Sep 2026)
+
+The app now has live worker infrastructure (background push with a 10-min cron + KV, the ICS feed, both deployed), full TfL integration (live routing, per-leg departures, disruptions), weather everywhere, key dates, stats, profiles, share links and backups. Round 4 is mostly about **exploiting the push worker** — it already fetches sheets on a schedule, so several high-value features are now small additions to it. Effort: S (hours), M (a day or two), L (multi-day).
+
+1. **Background timetable-change push (M)** — the cron already fetches each subscriber's sheet; keep a per-subscriber snapshot in KV, diff it, and push "Room changed for Maths 2: 728 → 731" with the app closed. The in-app diff engine already defines the semantics; this moves it server-side. The single most valuable unlock of the deployed worker.
+2. **Morning briefing push (M)** — one 07:00 push composing what the worker already knows: "First session 09:00 English 1 (Bedford Way) · leave ~08:40 · 🌧 68% rain · 📌 Maths Audit closes in 3 days". Open-Meteo works server-side too.
+3. **Strike-day alerts (S)** — the 07:00 cron run checks TfL line status; severe disruption or strike wording → push before people set off. Complements the in-app banner, which only helps once the app is open.
+4. **Notification action buttons (S/M)** — reminder notifications gain "✓ Mark attended" and "Snooze 10 min" actions (service-worker `notificationclick` with actions); attendance data then builds itself without opening the app.
+5. **Live-TfL leave alerts (M)** — leave alerts currently use the heuristic travel estimate; when the mode is public transport, use the cached live TfL journey time instead, so a disrupted Victoria line automatically makes the alert fire earlier.
+6. **Departures auto-refresh (S)** — the per-leg departure boards refresh every 30s and count down while the detail sheet is open.
+7. **Feed hardening (S)** — now the ICS worker is live: an unguessable token segment in feed URLs, per-IP rate limiting, and a custom calendar name parameter. (Carried from round 1 item 11 — now actionable.)
+8. **Notices tab / cohort broadcasts (S/M)** — a "Notices" tab in the same spreadsheet (date, message, link) rendered as dismissible banners in the app: cohort reps get a broadcast channel with no backend at all, in the same sheet they already maintain.
+9. **Photo notes (M)** — attach a photo to a session note (whiteboard snap, handout) via the camera/file picker, stored locally (IndexedDB) and included in the backup export.
+10. **Auto-backup nudges / Drive export (S/M)** — a monthly "your notes live only on this device — export a backup" reminder, and a one-tap save to the user's own Google Drive via the file picker. Cheap insurance for the attendance/notes data.
+
+**Carried over, still open:** private-sheet OAuth (r1-9); analytics, Sentry, print stylesheet, accessibility pass (r2-10..13); personal-calendar clash check, Playwright E2E in CI, Play Store TWA (r3-6/10/11).
+
+**Suggested order:** 1 → 3 → 2 (each a small addition to the deployed worker, together turning it into a genuine assistant), then 4 and 6 as quick wins, 8 when another cohort member wants to broadcast, 7 before sharing feed URLs widely.
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:
