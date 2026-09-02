@@ -255,6 +255,48 @@ async function fetchTflSevereStatus() {
   }
 }
 
+/* ---------- morning weather (campus, Open-Meteo) ---------- */
+async function fetchMorningWeather() {
+  try {
+    const res = await fetch(
+      'https://api.open-meteo.com/v1/forecast?latitude=51.523&longitude=-0.13&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=1&timezone=Europe%2FLondon'
+    )
+    if (!res.ok) return null
+    const json = await res.json()
+    const hours = new Map()
+    ;(json.hourly?.time ?? []).forEach((t, i) => {
+      hours.set(t, {
+        tempC: json.hourly.temperature_2m?.[i] ?? 0,
+        rainProb: json.hourly.precipitation_probability?.[i] ?? 0,
+        code: json.hourly.weather_code?.[i] ?? 0,
+      })
+    })
+    return hours
+  } catch {
+    return null
+  }
+}
+
+function weatherEmoji(code) {
+  if (code === 0) return '☀️'
+  if (code <= 2) return '🌤️'
+  if (code === 3) return '☁️'
+  if (code <= 48) return '🌫️'
+  if (code <= 67) return '🌧️'
+  if (code <= 77) return '🌨️'
+  if (code <= 86) return '🌧️'
+  return '⛈️'
+}
+
+function shortRoom(room) {
+  return (room || '')
+    .replace(/^IOE\s*[-–]\s*/i, '')
+    .replace(/\s*\(\d+\)\s*/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s*[-–]\s*(?=\d)/g, ' ')
+    .trim()
+}
+
 /* ---------- reminder computation (Europe/London) ---------- */
 function londonNow() {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -323,11 +365,49 @@ async function runScheduled(env) {
   }
   const morningWindow = now.hour === 7 && now.minutes % 60 < CRON_MINUTES
   const tflIssues = morningWindow && list.keys.length > 0 ? await fetchTflSevereStatus() : []
+  let morningWeather = null
+  let morningWeatherFetched = false
   for (const entry of list.keys) {
     const record = await env.PUSH.get(entry.name, 'json')
     if (!record?.subscription?.endpoint || !record?.config?.sheetId) continue
     const { subscription, config } = record
     const due = []
+
+    // Morning briefing: 07:00 London on days with sessions — first session, weather, next deadline.
+    if (morningWindow && config.briefing !== false) {
+      const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
+      const todays = sessions
+        .filter((s) => s.dateISO === now.dateISO && !s.isSelfStudy && toMinutes(s.start) !== null)
+        .sort((a, b) => a.start.localeCompare(b.start))
+      if (todays.length > 0) {
+        const first = todays[0]
+        let body = `First: ${first.start} ${first.title}`
+        if (first.room) body += ` · ${shortRoom(first.room)}`
+        if (!morningWeatherFetched) {
+          morningWeatherFetched = true
+          morningWeather = await fetchMorningWeather()
+        }
+        const w = morningWeather?.get(`${now.dateISO}T${first.start.slice(0, 2)}:00`)
+        if (w) {
+          body += ` · ${weatherEmoji(w.code)} ${Math.round(w.tempC)}°${w.rainProb >= 30 ? ` ${w.rainProb}% rain` : ''}`
+        }
+        if (config.kdGid || config.kdSheetId) {
+          const keyDates = await getSheet(config.kdSheetId || config.sheetId, config.kdGid)
+          const next = keyDates
+            .map((kd) => ({ kd, days: daysBetween(kd.dateISO, now.dateISO) }))
+            .filter((x) => x.days >= 0 && x.days <= 7)
+            .sort((a, b) => a.days - b.days)[0]
+          if (next) {
+            body += ` · 📌 ${next.kd.title} ${next.days === 0 ? 'today' : `in ${next.days}d`}`
+          }
+        }
+        due.push({
+          dedupe: `brief|${now.dateISO}`,
+          title: `Good morning — ${todays.length} session${todays.length === 1 ? '' : 's'} today`,
+          body: body.slice(0, 290),
+        })
+      }
+    }
 
     // Strike-day / severe-disruption alert: 07:00 London, transit users, days with sessions.
     if (tflIssues.length > 0 && (config.travelMode === 'transit' || config.travelMode === undefined)) {

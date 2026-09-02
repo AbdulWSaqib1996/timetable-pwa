@@ -81,6 +81,8 @@ export interface Settings {
   pushServerBase?: string
   /** true once this device subscribed to background push */
   pushEnabled?: boolean
+  /** include the 07:00 morning briefing push (default true) */
+  morningBriefing?: boolean
 }
 
 /** One saved timetable (sheet + all its choices). */

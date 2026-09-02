@@ -538,6 +538,24 @@ export function SettingsSheet({
                 </button>
               )}
             </div>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={settings.morningBriefing !== false}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  onUpdateSettings({ morningBriefing: next })
+                  if (settings.pushEnabled) {
+                    // re-sync the server-side config with the new preference
+                    void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
+                      ...settings,
+                      morningBriefing: next,
+                    }).catch(() => {})
+                  }
+                }}
+              />
+              07:00 morning briefing (first session, weather, next deadline)
+            </label>
             {pushMessage && <p className="filter-hint">{pushMessage}</p>}
           </section>
         )}

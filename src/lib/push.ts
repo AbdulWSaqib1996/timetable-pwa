@@ -39,6 +39,7 @@ export async function subscribePush(base: string, settings: Settings): Promise<v
     reminderOffsets: settings.reminderOffsets ?? [],
     keyDateReminderDays: settings.keyDateReminderDays ?? [],
     travelMode: settings.travelMode ?? 'walking',
+    briefing: settings.morningBriefing !== false,
     base: trim(base),
   }
   const save = await fetch(`${trim(base)}/subscribe`, {
