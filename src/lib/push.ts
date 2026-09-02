@@ -40,6 +40,7 @@ export async function subscribePush(base: string, settings: Settings): Promise<v
     keyDateReminderDays: settings.keyDateReminderDays ?? [],
     travelMode: settings.travelMode ?? 'walking',
     briefing: settings.morningBriefing !== false,
+    changeAlerts: settings.changeAlerts !== false,
     base: trim(base),
   }
   const save = await fetch(`${trim(base)}/subscribe`, {

@@ -220,7 +220,9 @@ async function fetchSessions(sheetId, gid) {
       title,
       dateISO,
       start: colMap.start !== undefined ? parseTimeCell(cells[colMap.start]) : '',
+      end: colMap.end !== undefined ? parseTimeCell(cells[colMap.end]) : '',
       room: get('room'),
+      tutor: get('tutor'),
       groups: get('groups'),
       specialismName: specMatch ? specMatch[1].trim() : undefined,
       isSelfStudy: /^self[- ]?study$/i.test(title),
@@ -321,6 +323,33 @@ const daysBetween = (a, b) => {
   }
   return Math.round((t(a) - t(b)) / 86400000)
 }
+/* ---------- timetable change detection (per-sheet snapshots in KV) ---------- */
+const snapKey = (id, gid) => `snap:${id}|${gid ?? ''}`
+
+function diffSheets(oldSessions, newSessions, todayISO) {
+  const future = (list) => list.filter((s) => s.dateISO >= todayISO)
+  const keyOf = (s) => `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`
+  const oldMap = new Map(future(oldSessions).map((s) => [keyOf(s), s]))
+  const newMap = new Map(future(newSessions).map((s) => [keyOf(s), s]))
+  const out = []
+  newMap.forEach((s, k) => {
+    if (!oldMap.has(k)) out.push({ type: 'added', s })
+  })
+  oldMap.forEach((s, k) => {
+    if (!newMap.has(k)) out.push({ type: 'removed', s })
+  })
+  oldMap.forEach((o, k) => {
+    const n = newMap.get(k)
+    if (!n) return
+    const details = []
+    if ((o.room || '') !== (n.room || '')) details.push(`room ${o.room || '—'} → ${n.room || '—'}`)
+    if ((o.end || '') !== (n.end || '')) details.push(`ends ${o.end || '—'} → ${n.end || '—'}`)
+    if ((o.tutor || '') !== (n.tutor || '')) details.push(`tutor ${o.tutor || '—'} → ${n.tutor || '—'}`)
+    if (details.length > 0) out.push({ type: 'changed', s: n, detail: details.join('; ') })
+  })
+  return out
+}
+
 function filterForConfig(sessions, config) {
   return sessions.filter((s) => {
     if (config.spec?.length > 0 && s.specialismName && !config.spec.includes(s.specialismName)) return false
@@ -358,11 +387,26 @@ async function runScheduled(env) {
 
   const list = await env.PUSH.list({ prefix: 'sub:' })
   const sheetCache = new Map()
-  const getSheet = async (id, gid) => {
+  // Each sheet is fetched once per run; a KV snapshot of its previous state lets us
+  // detect changes (rooms, times, tutors, added/cancelled sessions) and push them.
+  const getSheetInfo = async (id, gid) => {
     const key = `${id}|${gid ?? ''}`
-    if (!sheetCache.has(key)) sheetCache.set(key, await fetchSessions(id, gid))
+    if (!sheetCache.has(key)) {
+      const sessions = await fetchSessions(id, gid)
+      let changes = []
+      let hadSnapshot = false
+      if (sessions.length > 0) {
+        const old = await env.PUSH.get(snapKey(id, gid), 'json')
+        if (old) {
+          hadSnapshot = true
+          changes = diffSheets(old, sessions, now.dateISO)
+        }
+      }
+      sheetCache.set(key, { id, gid, sessions, changes, hadSnapshot })
+    }
     return sheetCache.get(key)
   }
+  const getSheet = async (id, gid) => (await getSheetInfo(id, gid)).sessions
   const morningWindow = now.hour === 7 && now.minutes % 60 < CRON_MINUTES
   const tflIssues = morningWindow && list.keys.length > 0 ? await fetchTflSevereStatus() : []
   let morningWeather = null
@@ -372,6 +416,35 @@ async function runScheduled(env) {
     if (!record?.subscription?.endpoint || !record?.config?.sheetId) continue
     const { subscription, config } = record
     const due = []
+
+    // Timetable-change push: diff of this run vs the stored snapshot, filtered to
+    // this subscriber's specialisms/groups, batched into one notification.
+    if (config.changeAlerts !== false) {
+      const info = await getSheetInfo(config.sheetId, config.gid)
+      // A wholesale wipe (>50 removals) is almost certainly a fetch/parse glitch — skip.
+      const removals = info.changes.filter((c) => c.type === 'removed').length
+      if (info.changes.length > 0 && removals <= 50) {
+        const mine = info.changes.filter((c) => filterForConfig([c.s], config).length > 0)
+        if (mine.length > 0) {
+          const fmtDate = (iso) => {
+            const [, m, d] = iso.split('-')
+            return `${d}/${m}`
+          }
+          const lines = mine.slice(0, 3).map((c) =>
+            c.type === 'changed'
+              ? `${c.s.title} (${fmtDate(c.s.dateISO)}): ${c.detail}`
+              : c.type === 'added'
+                ? `Added: ${c.s.title} (${fmtDate(c.s.dateISO)} ${c.s.start})`
+                : `Cancelled: ${c.s.title} (${fmtDate(c.s.dateISO)})`
+          )
+          due.push({
+            dedupe: `chg|${now.dateISO}|${now.minutes}`,
+            title: mine.length === 1 ? '📋 Timetable change' : `📋 ${mine.length} timetable changes`,
+            body: (lines.join(' · ') + (mine.length > 3 ? ` +${mine.length - 3} more` : '')).slice(0, 290),
+          })
+        }
+      }
+    }
 
     // Morning briefing: 07:00 London on days with sessions — first session, weather, next deadline.
     if (morningWindow && config.briefing !== false) {
@@ -476,6 +549,14 @@ async function runScheduled(env) {
         break
       }
       if (result === 'ok') await env.PUSH.put(sentKey, '1', { expirationTtl: 172800 })
+    }
+  }
+
+  // Persist snapshots (first seeding, or after real changes) so the next run diffs
+  // against today's state.
+  for (const info of sheetCache.values()) {
+    if (info.sessions.length > 0 && (!info.hadSnapshot || info.changes.length > 0)) {
+      await env.PUSH.put(snapKey(info.id, info.gid), JSON.stringify(info.sessions))
     }
   }
 }

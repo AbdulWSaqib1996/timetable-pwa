@@ -556,6 +556,23 @@ export function SettingsSheet({
               />
               07:00 morning briefing (first session, weather, next deadline)
             </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={settings.changeAlerts !== false}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  onUpdateSettings({ changeAlerts: next })
+                  if (settings.pushEnabled) {
+                    void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
+                      ...settings,
+                      changeAlerts: next,
+                    }).catch(() => {})
+                  }
+                }}
+              />
+              Push timetable changes (rooms, times, added/cancelled sessions)
+            </label>
             {pushMessage && <p className="filter-hint">{pushMessage}</p>}
           </section>
         )}

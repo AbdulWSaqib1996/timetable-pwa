@@ -83,6 +83,8 @@ export interface Settings {
   pushEnabled?: boolean
   /** include the 07:00 morning briefing push (default true) */
   morningBriefing?: boolean
+  /** push timetable changes (rooms/times/added/cancelled) in the background (default true) */
+  changeAlerts?: boolean
 }
 
 /** One saved timetable (sheet + all its choices). */
