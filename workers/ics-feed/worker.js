@@ -74,8 +74,44 @@ function parseSessions(table) {
     })
     if (matches >= 3) { headerIndex = r; colMap = map; break }
   }
-  if (headerIndex === -1 || colMap.title === undefined || colMap.date === undefined) {
+  if (headerIndex === -1 || colMap.title === undefined) {
     throw new Error('Could not find a usable header row (needs Title and Date columns).')
+  }
+  // Some sheets leave Date/Start/End header cells blank — infer them from declared column types,
+  // then by sniffing cell values.
+  const width = Math.max(table.cols.length, ...table.rows.map((r) => r.c.length), 0)
+  const taken = new Set(Object.values(colMap))
+  const sniff = (i, test) => {
+    let hits = 0, nonEmpty = 0
+    for (let r = headerIndex + 1; r < Math.min(table.rows.length, headerIndex + 40); r++) {
+      const cell = table.rows[r].c[i]
+      if (!cell || cell.v == null) continue
+      nonEmpty++
+      if (test(cell)) hits++
+    }
+    return nonEmpty > 0 && hits / nonEmpty > 0.5
+  }
+  const findColumn = (declaredTypes, test) => {
+    for (let i = 0; i < width; i++) {
+      if (!taken.has(i) && declaredTypes.includes(table.cols[i]?.type ?? '')) return i
+    }
+    for (let i = 0; i < width; i++) {
+      if (!taken.has(i) && sniff(i, test)) return i
+    }
+    return undefined
+  }
+  for (const [field, types, test] of [
+    ['date', ['date'], (c) => parseDateCell(c) !== null],
+    ['start', ['datetime', 'timeofday'], (c) => parseTimeCell(c) !== ''],
+    ['end', ['datetime', 'timeofday'], (c) => parseTimeCell(c) !== ''],
+  ]) {
+    if (colMap[field] === undefined) {
+      const i = findColumn(types, test)
+      if (i !== undefined) { colMap[field] = i; taken.add(i) }
+    }
+  }
+  if (colMap.date === undefined) {
+    throw new Error('Could not find a date column in the sheet.')
   }
   const sessions = []
   let lastDate = null

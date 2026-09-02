@@ -111,6 +111,66 @@ function detectHeaderRow(table: GvizTable): { headerIndex: number; colMap: Parti
   return null
 }
 
+/**
+ * Some sheets leave the Date/Start/End header cells blank (they come back empty from GViz).
+ * Infer them from GViz's declared column types first, then by sniffing cell values.
+ */
+function inferMissingColumns(
+  table: GvizTable,
+  headerIndex: number,
+  colMap: Partial<Record<Field, number>>
+): void {
+  const width = Math.max(table.cols.length, ...table.rows.map((r) => r.c.length), 0)
+  const taken = new Set(Object.values(colMap) as number[])
+
+  const sniff = (i: number, test: (cell: GvizCell | null) => boolean): boolean => {
+    let hits = 0
+    let nonEmpty = 0
+    for (let r = headerIndex + 1; r < Math.min(table.rows.length, headerIndex + 40); r++) {
+      const cell = table.rows[r].c[i] ?? null
+      if (!cell || cell.v == null) continue
+      nonEmpty++
+      if (test(cell)) hits++
+    }
+    return nonEmpty > 0 && hits / nonEmpty > 0.5
+  }
+
+  const findColumn = (declaredTypes: string[], test: (cell: GvizCell | null) => boolean): number | undefined => {
+    for (let i = 0; i < width; i++) {
+      if (taken.has(i)) continue
+      if (declaredTypes.includes(table.cols[i]?.type ?? '')) return i
+    }
+    for (let i = 0; i < width; i++) {
+      if (taken.has(i)) continue
+      if (sniff(i, test)) return i
+    }
+    return undefined
+  }
+
+  if (colMap.date === undefined) {
+    const i = findColumn(['date'], (cell) => parseDateCell(cell) !== null)
+    if (i !== undefined) {
+      colMap.date = i
+      taken.add(i)
+    }
+  }
+  const isTime = (cell: GvizCell | null) => parseTimeCell(cell) !== ''
+  if (colMap.start === undefined) {
+    const i = findColumn(['datetime', 'timeofday'], isTime)
+    if (i !== undefined) {
+      colMap.start = i
+      taken.add(i)
+    }
+  }
+  if (colMap.end === undefined) {
+    const i = findColumn(['datetime', 'timeofday'], isTime)
+    if (i !== undefined) {
+      colMap.end = i
+      taken.add(i)
+    }
+  }
+}
+
 /** If no column was labelled as the link, find a column whose values are mostly URLs. */
 function detectLinkColumn(table: GvizTable, headerIndex: number, taken: Set<number>): number | undefined {
   const width = Math.max(...table.rows.map((r) => r.c.length), 0)
@@ -143,6 +203,7 @@ export function parseTimetable(table: GvizTable): ParseOutcome {
     )
   }
   const { headerIndex, colMap } = detected
+  inferMissingColumns(table, headerIndex, colMap)
   if (colMap.link === undefined) {
     colMap.link = detectLinkColumn(table, headerIndex, new Set(Object.values(colMap) as number[]))
   }
