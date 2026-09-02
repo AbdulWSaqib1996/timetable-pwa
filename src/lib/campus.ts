@@ -63,9 +63,17 @@ export const TRAVEL_MODE_PHRASE: Record<TravelMode, string> = {
 export interface TravelEstimate {
   /** matched UCL building name, or null when the room isn't recognised */
   building: string | null
-  /** estimated walking minutes from `from`, or null when no location available */
+  /** estimated travel minutes from `from`, or null when no location available */
   minutes: number | null
+  /** matched building coordinates (for the embedded map), or null */
+  location: Coords | null
   mapsUrl: string
+}
+
+/** Keyless OpenStreetMap embed centred on a building with a marker. */
+export function osmEmbedUrl({ lat, lng }: Coords): string {
+  const bbox = [lng - 0.004, lat - 0.002, lng + 0.004, lat + 0.002].join('%2C')
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lng}`
 }
 
 export function matchBuilding(room: string): Building | null {
@@ -93,11 +101,17 @@ export function estimateTravel(room: string, from: Coords | null, mode: TravelMo
   const building = matchBuilding(room)
   if (!building) {
     const query = encodeURIComponent(`${room} UCL London`)
-    return { building: null, minutes: null, mapsUrl: `https://www.google.com/maps/search/?api=1&query=${query}` }
+    return {
+      building: null,
+      minutes: null,
+      location: null,
+      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${query}`,
+    }
   }
   return {
     building: building.name,
     minutes: from ? travelMinutes(from, building, mode) : null,
+    location: { lat: building.lat, lng: building.lng },
     mapsUrl: `https://www.google.com/maps/dir/?api=1&destination=${building.lat},${building.lng}&travelmode=${MODE_PARAMS[mode].mapsMode}`,
   }
 }

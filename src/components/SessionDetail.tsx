@@ -1,4 +1,4 @@
-import { TRAVEL_MODE_PHRASE, estimateTravel } from '../lib/campus'
+import { TRAVEL_MODE_PHRASE, estimateTravel, osmEmbedUrl } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl } from '../lib/format'
 import type { Session, SessionMeta } from '../types'
@@ -95,6 +95,15 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
               Directions ↗
             </a>
           </div>
+        )}
+        {travel?.location && (
+          <iframe
+            className="map-embed"
+            title={`Map of ${travel.building}`}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            src={osmEmbedUrl(travel.location)}
+          />
         )}
         {session.link && (
           <a className="btn-primary btn-link" href={session.link} target="_blank" rel="noopener noreferrer">

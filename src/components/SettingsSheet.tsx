@@ -71,15 +71,15 @@ export function SettingsSheet({
     }
   }
 
-  async function toggleReminder(mins: number) {
-    const current = settings.reminderOffsets ?? []
+  async function toggleOffset(field: 'reminderOffsets' | 'leaveAlertOffsets', mins: number) {
+    const current = settings[field] ?? []
     const next = current.includes(mins)
       ? current.filter((m) => m !== mins)
       : [...current, mins].sort((a, b) => a - b)
     if (next.length > 0 && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       await Notification.requestPermission()
     }
-    onUpdateSettings({ reminderOffsets: next })
+    onUpdateSettings({ [field]: next })
   }
 
   function toggleLocation(enabled: boolean) {
@@ -187,7 +187,7 @@ export function SettingsSheet({
                 type="button"
                 className={`chip${(settings.reminderOffsets ?? []).includes(value) ? ' chip-on' : ''}`}
                 aria-pressed={(settings.reminderOffsets ?? []).includes(value)}
-                onClick={() => void toggleReminder(value)}
+                onClick={() => void toggleOffset('reminderOffsets', value)}
               >
                 {label}
               </button>
@@ -237,6 +237,42 @@ export function SettingsSheet({
             campus). Estimates are approximate — the Directions link gives the exact route. Your
             location never leaves this device.
           </p>
+        </section>
+
+        <section className="filter-section">
+          <h3>Leave alerts</h3>
+          <p className="filter-hint">
+            Notifies you when it's time to set off: session start minus your live travel estimate,
+            with the head start you pick (e.g. "10 min" alerts 10 minutes before you need to leave).
+          </p>
+          {settings.locationEnabled ? (
+            <div className="chip-grid">
+              {(
+                [
+                  { value: 0, label: 'When it’s time to leave' },
+                  { value: 5, label: '5 min head start' },
+                  { value: 10, label: '10 min' },
+                  { value: 15, label: '15 min' },
+                  { value: 30, label: '30 min' },
+                ] as const
+              ).map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`chip${(settings.leaveAlertOffsets ?? []).includes(value) ? ' chip-on' : ''}`}
+                  aria-pressed={(settings.leaveAlertOffsets ?? []).includes(value)}
+                  onClick={() => void toggleOffset('leaveAlertOffsets', value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="filter-hint">Enable travel times above first — leave alerts need your location.</p>
+          )}
+          {settings.locationEnabled && (settings.leaveAlertOffsets ?? []).length === 0 && (
+            <p className="filter-hint">Leave alerts are off.</p>
+          )}
         </section>
 
         <section className="filter-section">

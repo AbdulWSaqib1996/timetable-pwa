@@ -57,6 +57,8 @@ export interface Settings {
   locationEnabled?: boolean
   /** how travel-time estimates are calculated (default walking) */
   travelMode?: 'walking' | 'transit' | 'driving'
+  /** minutes of head start before the computed leave-by time (start − travel) to notify at */
+  leaveAlertOffsets?: number[]
 }
 
 /** One saved timetable (sheet + all its choices). */

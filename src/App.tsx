@@ -12,6 +12,7 @@ import { SpecialismPicker } from './components/SpecialismPicker'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
 import type { Coords } from './lib/campus'
+import { TRAVEL_MODE_PHRASE, estimateTravel } from './lib/campus'
 import { buildDemoSessions } from './lib/demo'
 import { diffSessions, sessionKey } from './lib/diff'
 import {
@@ -278,15 +279,30 @@ export default function App() {
     return q ? exportSessions.filter((s) => matchesQuery(s, q)) : null
   }, [exportSessions, query])
 
-  // Session reminders: check every 30s while the app is running. Multiple offsets are
-  // supported (e.g. 60 and 15 → two notifications); when several offsets are due at once
-  // (say the app was just opened), only the most imminent one fires.
+  // Device location for travel-time estimates (only while enabled in Settings).
+  const locationEnabled = settings?.locationEnabled ?? false
+  const travelMode = settings?.travelMode ?? 'walking'
+
+  // Session reminders + leave alerts: checked every 30s while the app is running.
+  // Multiple offsets are supported (e.g. 60 and 15 → two notifications); when several
+  // offsets are due at once (say the app was just opened), only one fires per session.
   const exportRef = useRef(exportSessions)
   exportRef.current = exportSessions
+  const travelRef = useRef({ coords, travelMode, locationEnabled })
+  travelRef.current = { coords, travelMode, locationEnabled }
   const offsetsKey = JSON.stringify(settings?.reminderOffsets ?? [])
+  const leaveKey = JSON.stringify(settings?.leaveAlertOffsets ?? [])
   useEffect(() => {
     const offsets = (JSON.parse(offsetsKey) as number[]).sort((a, b) => a - b)
-    if (offsets.length === 0 || typeof Notification === 'undefined') return
+    const leaveOffsets = (JSON.parse(leaveKey) as number[]).sort((a, b) => a - b)
+    if ((offsets.length === 0 && leaveOffsets.length === 0) || typeof Notification === 'undefined') return
+    const notify = (title: string, body: string) => {
+      try {
+        new Notification(title, { body })
+      } catch {
+        /* notification constructor unavailable (some mobile browsers) */
+      }
+    }
     const check = () => {
       if (Notification.permission !== 'granted') return
       const now = new Date()
@@ -294,34 +310,50 @@ export default function App() {
       const nowMins = now.getHours() * 60 + now.getMinutes()
       const notified = loadNotified()
       let dirty = false
+      const { coords: here, travelMode: mode, locationEnabled: locEnabled } = travelRef.current
       for (const s of exportRef.current) {
         if (s.dateISO !== today || !s.start) continue
         const start = toMinutes(s.start)
         if (start === null) continue
         const delta = start - nowMins
         if (delta <= 0) continue
+
+        // Fixed "before the session" reminders.
         const due = offsets.filter((m) => delta <= m && !notified[`${sessionKey(s)}#${m}`])
-        if (due.length === 0) continue
-        try {
-          new Notification(s.title, {
-            body: `Starts ${s.start} (in ${formatRemaining(delta)})${s.room && !s.isSelfStudy ? ` · ${shortenRoom(s.room)}` : ''}`,
-          })
-        } catch {
-          /* notification constructor unavailable (some mobile browsers) */
+        if (due.length > 0) {
+          notify(
+            s.title,
+            `Starts ${s.start} (in ${formatRemaining(delta)})${s.room && !s.isSelfStudy ? ` · ${shortenRoom(s.room)}` : ''}`
+          )
+          for (const m of due) notified[`${sessionKey(s)}#${m}`] = Date.now()
+          dirty = true
         }
-        for (const m of due) notified[`${sessionKey(s)}#${m}`] = Date.now()
-        dirty = true
+
+        // "Time to leave" alerts: leave-by = start − live travel estimate; alert with head start.
+        if (leaveOffsets.length > 0 && locEnabled && here && s.room && !s.isSelfStudy) {
+          const est = estimateTravel(s.room, here, mode)
+          if (est.minutes !== null) {
+            const untilLeave = delta - est.minutes
+            const leaveDue = leaveOffsets.filter(
+              (m) => untilLeave <= m && !notified[`${sessionKey(s)}#leave#${m}`]
+            )
+            if (leaveDue.length > 0) {
+              notify(
+                untilLeave <= 0 ? `Time to leave — ${s.title}` : `Leave in ${formatRemaining(untilLeave)} — ${s.title}`,
+                `≈ ${formatRemaining(est.minutes)} ${TRAVEL_MODE_PHRASE[mode]} to ${est.building ?? shortenRoom(s.room)} · starts ${s.start}`
+              )
+              for (const m of leaveDue) notified[`${sessionKey(s)}#leave#${m}`] = Date.now()
+              dirty = true
+            }
+          }
+        }
       }
       if (dirty) saveNotified(notified)
     }
     check()
     const t = setInterval(check, 30_000)
     return () => clearInterval(t)
-  }, [offsetsKey])
-
-  // Device location for travel-time estimates (only while enabled in Settings).
-  const locationEnabled = settings?.locationEnabled ?? false
-  const travelMode = settings?.travelMode ?? 'walking'
+  }, [offsetsKey, leaveKey])
   useEffect(() => {
     if (!locationEnabled || !('geolocation' in navigator)) {
       setCoords(null)
