@@ -17,6 +17,8 @@ export interface Session {
   isSelfStudy: boolean
   /** title contains "(optional)" */
   isOptional: boolean
+  /** entry comes from the key-dates (submissions) tab */
+  isKeyDate?: boolean
 }
 
 export type DateRange = 'today' | 'week' | 'all'
@@ -31,6 +33,8 @@ export interface Filters {
   showSelfStudy: boolean
   /** show sessions marked "(optional)" (default true) */
   showOptional: boolean
+  /** show key dates as highlighted blocks in the timetable (default true) */
+  showKeyDates: boolean
 }
 
 export interface Settings {

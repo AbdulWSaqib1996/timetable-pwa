@@ -13,19 +13,19 @@ interface Props {
 }
 
 export function SessionCard({ session, meta, coords, travelMode = 'walking', onSelect }: Props) {
-  const color = subjectColor(session)
+  const color = session.isKeyDate ? null : subjectColor(session)
   const travel =
     coords && session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
   return (
     <button
       type="button"
-      className={`session-card${session.isSelfStudy ? ' self-study' : ''}`}
+      className={`session-card${session.isSelfStudy ? ' self-study' : ''}${session.isKeyDate ? ' key-date' : ''}`}
       style={color ? { borderLeft: `4px solid ${color}` } : undefined}
       onClick={() => onSelect(session)}
     >
       <div className="session-time">
         <span className="session-start">{session.start || '—'}</span>
-        {session.end && <span className="session-end">{session.end}</span>}
+        {session.end && session.end !== session.start && <span className="session-end">{session.end}</span>}
       </div>
       <div className="session-body">
         <div className="session-title">{session.title}</div>
@@ -38,6 +38,7 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', onS
             </span>
           )}
         </div>
+        {session.isKeyDate && <span className="badge badge-keydate">📌 Key date</span>}
         {session.isSpecialism && session.specialismName && (
           <span className="badge badge-specialism">{session.specialismName}</span>
         )}

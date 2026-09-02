@@ -23,6 +23,7 @@ import {
   deriveOptions,
   getFilters,
   localTodayISO,
+  weekBounds,
 } from './lib/filters'
 import { formatRemaining, shortenRoom, toMinutes } from './lib/format'
 import { fetchGvizTable } from './lib/gviz'
@@ -141,7 +142,7 @@ export default function App() {
         if (s.keyDatesSheetId) {
           try {
             const kdTable = await fetchGvizTable(s.keyDatesSheetId, s.keyDatesGid ?? null)
-            kd = parseTimetable(kdTable).sessions
+            kd = parseTimetable(kdTable).sessions.map((k) => ({ ...k, id: `kd-${k.id}`, isKeyDate: true }))
           } catch {
             kd = prev?.keyDates
           }
@@ -169,7 +170,7 @@ export default function App() {
     setFetchedAt(cached && !active.settings.demo ? cached.fetchedAt : null)
     setMetaMap(loadMeta(active.id))
     setChanges(loadChanges(active.id))
-    setKeyDates(cached?.keyDates ?? [])
+    setKeyDates((cached?.keyDates ?? []).map((k) => ({ ...k, isKeyDate: true })))
     setSelected(null)
     setJumpDate(null)
     setError(null)
@@ -298,8 +299,28 @@ export default function App() {
 
   const searchResults = useMemo(() => {
     const q = query.trim()
-    return q ? exportSessions.filter((s) => matchesQuery(s, q)) : null
-  }, [exportSessions, query])
+    return q ? [...exportSessions, ...keyDates].filter((s) => matchesQuery(s, q)) : null
+  }, [exportSessions, keyDates, query])
+
+  // Day view weaves key dates in as highlighted blocks (toggle in Filters); they follow
+  // the same date-range choice as the rest of the day view.
+  const dayViewSessions = useMemo(() => {
+    if (!settings) return filteredSessions
+    const f = getFilters(settings)
+    if (view !== 'day' || !f.showKeyDates || keyDates.length === 0) return filteredSessions
+    const week = f.dateRange === 'week' ? weekBounds(todayISO) : null
+    const inRange = keyDates.filter((k) => {
+      if (f.dateRange === 'today') return k.dateISO === todayISO
+      if (week) return k.dateISO >= week.from && k.dateISO <= week.to
+      return true
+    })
+    return [...filteredSessions, ...inRange].sort((a, b) =>
+      (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99'))
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredSessions, keyDates, settings, view, todayISO])
+
+  const keyDateDays = useMemo(() => new Set(keyDates.map((k) => k.dateISO)), [keyDates])
 
   // Device location for travel-time estimates (only while enabled in Settings).
   const locationEnabled = settings?.locationEnabled ?? false
@@ -541,6 +562,7 @@ export default function App() {
         <MonthView
           sessions={filteredSessions}
           todayISO={todayISO}
+          keyDateDays={getFilters(settings).showKeyDates ? keyDateDays : undefined}
           onPickDay={(dateISO) => {
             setJumpDate(dateISO)
             updateSettings({ activeView: 'day' })
@@ -548,7 +570,7 @@ export default function App() {
         />
       ) : (
         <AgendaView
-          sessions={filteredSessions}
+          sessions={dayViewSessions}
           scrollTo={jumpDate}
           onSelect={setSelected}
           metaMap={metaMap}
@@ -597,8 +619,10 @@ export default function App() {
           settings={settings}
           filters={filters}
           options={options}
+          hasKeyDates={keyDates.length > 0}
           onUpdateSettings={updateSettings}
           onUpdateFilters={updateFilters}
+          onOpenKeyDates={() => setOpenSheet('keydates')}
           onClear={() =>
             updateSettings({
               filters: { ...DEFAULT_FILTERS },
@@ -616,6 +640,7 @@ export default function App() {
           keyDates={keyDates}
           todayISO={todayISO}
           configured={!!settings.keyDatesSheetId}
+          onSelect={setSelected}
           onClose={() => setOpenSheet('none')}
         />
       )}

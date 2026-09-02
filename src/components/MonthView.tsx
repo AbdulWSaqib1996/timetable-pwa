@@ -4,6 +4,8 @@ import type { Session } from '../types'
 interface Props {
   sessions: Session[]
   todayISO: string
+  /** days (yyyy-mm-dd) that carry a key date, marked distinctly */
+  keyDateDays?: Set<string>
   onPickDay: (dateISO: string) => void
 }
 
@@ -11,7 +13,7 @@ function iso(y: number, monthIndex: number, d: number): string {
   return `${y}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
 
-export function MonthView({ sessions, todayISO, onPickDay }: Props) {
+export function MonthView({ sessions, todayISO, keyDateDays, onPickDay }: Props) {
   const [ty, tm] = todayISO.split('-').map(Number)
   const [year, setYear] = useState(ty)
   const [month, setMonth] = useState(tm - 1) // 0-based
@@ -77,6 +79,11 @@ export function MonthView({ sessions, todayISO, onPickDay }: Props) {
               onClick={() => onPickDay(dateISO)}
             >
               <span className="month-daynum">{Number(dateISO.slice(-2))}</span>
+              {keyDateDays?.has(dateISO) && (
+                <span className="month-keydate" aria-label="Key date">
+                  📌
+                </span>
+              )}
               {(counts.get(dateISO) ?? 0) > 0 && (
                 <span className="month-dots" aria-label={`${counts.get(dateISO)} sessions`}>
                   {Array.from({ length: Math.min(counts.get(dateISO) ?? 0, 3) }, (_, j) => (

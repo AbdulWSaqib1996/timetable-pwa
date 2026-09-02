@@ -446,6 +446,55 @@ body {
   color: #f08c00;
 }
 
+/* Key-date entries render as solid highlighted blocks in the timetable */
+.session-card.key-date {
+  background: linear-gradient(135deg, #e64980, #c2255c);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(230, 73, 128, 0.35);
+}
+
+.session-card.key-date .session-end,
+.session-card.key-date .session-meta,
+.session-card.key-date .session-chevron {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.badge-keydate {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.month-keydate {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.month-cell {
+  position: relative;
+}
+
+.keydate-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
+.kofi-link {
+  margin-top: 4px;
+}
+
 /* ---------- Key dates ---------- */
 
 .keydate-strip {
@@ -497,12 +546,6 @@ body {
   gap: 12px;
   max-height: 55dvh;
   overflow-y: auto;
-}
-
-.keydate-row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
 }
 
 .keydate-row .kd-chip {

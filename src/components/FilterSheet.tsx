@@ -11,8 +11,10 @@ interface Props {
   settings: Settings
   filters: Filters
   options: FilterOptions
+  hasKeyDates: boolean
   onUpdateSettings: (patch: Partial<Settings>) => void
   onUpdateFilters: (patch: Partial<Filters>) => void
+  onOpenKeyDates: () => void
   onClear: () => void
   onClose: () => void
 }
@@ -51,8 +53,10 @@ export function FilterSheet({
   settings,
   filters,
   options,
+  hasKeyDates,
   onUpdateSettings,
   onUpdateFilters,
+  onOpenKeyDates,
   onClear,
   onClose,
 }: Props) {
@@ -138,6 +142,21 @@ export function FilterSheet({
             />
             Show optional sessions
           </label>
+          {hasKeyDates && (
+            <>
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={filters.showKeyDates}
+                  onChange={(e) => onUpdateFilters({ showKeyDates: e.target.checked })}
+                />
+                Show key dates in the timetable
+              </label>
+              <button type="button" className="btn-secondary" onClick={onOpenKeyDates}>
+                📌 View all key dates
+              </button>
+            </>
+          )}
         </section>
 
         {options.subjects.length > 0 && (

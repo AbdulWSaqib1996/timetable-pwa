@@ -7,6 +7,7 @@ export const DEFAULT_FILTERS: Filters = {
   rooms: [],
   showSelfStudy: true,
   showOptional: true,
+  showKeyDates: true,
 }
 
 export function getFilters(settings: Settings): Filters {
@@ -106,6 +107,7 @@ export function activeFilterCount(settings: Settings): number {
   let count = filters.subjects.length + filters.tutors.length + filters.rooms.length
   if (!filters.showSelfStudy) count++
   if (!filters.showOptional) count++
+  if (!filters.showKeyDates) count++
   if ((settings.mySpecialisms ?? []).length > 0 && settings.hideOtherSpecialisms !== false) count++
   if ((settings.myGroups ?? []).length > 0) count++
   return count

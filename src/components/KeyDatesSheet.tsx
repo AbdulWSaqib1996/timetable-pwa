@@ -4,6 +4,7 @@ interface Props {
   keyDates: Session[]
   todayISO: string
   configured: boolean
+  onSelect: (session: Session) => void
   onClose: () => void
 }
 
@@ -25,7 +26,7 @@ function formatDate(dateISO: string): string {
   })
 }
 
-export function KeyDatesSheet({ keyDates, todayISO, configured, onClose }: Props) {
+export function KeyDatesSheet({ keyDates, todayISO, configured, onSelect, onClose }: Props) {
   const upcoming = keyDates
     .filter((k) => k.dateISO >= todayISO)
     .sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
@@ -54,17 +55,19 @@ export function KeyDatesSheet({ keyDates, todayISO, configured, onClose }: Props
             {upcoming.map((k) => {
               const days = daysUntil(k.dateISO, todayISO)
               return (
-                <li key={k.id} className="keydate-row">
-                  <span className={`kd-chip${days <= 7 ? ' urgent' : ''}`}>
-                    {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `in ${days}d`}
-                  </span>
-                  <div className="change-body">
-                    <span className="change-title">{k.title}</span>
-                    <span className="change-meta">
-                      {formatDate(k.dateISO)}
-                      {k.start && ` · ${k.start}`}
+                <li key={k.id}>
+                  <button type="button" className="keydate-row" onClick={() => onSelect(k)}>
+                    <span className={`kd-chip${days <= 7 ? ' urgent' : ''}`}>
+                      {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `in ${days}d`}
                     </span>
-                  </div>
+                    <div className="change-body">
+                      <span className="change-title">{k.title}</span>
+                      <span className="change-meta">
+                        {formatDate(k.dateISO)}
+                        {k.start && ` · ${k.start}`}
+                      </span>
+                    </div>
+                  </button>
                 </li>
               )
             })}

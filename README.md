@@ -32,6 +32,10 @@ full plan and architecture.
   feed URL (sheet + your specialism choices) and you paste that into your calendar app's
   "subscribe by URL" option.
 
+## Support
+
+If this app saves you time, you can [buy the developer a coffee on Ko-fi](https://ko-fi.com/awsaqib). ☕
+
 ## Development
 
 ```bash

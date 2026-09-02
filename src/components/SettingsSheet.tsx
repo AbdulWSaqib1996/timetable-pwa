@@ -364,6 +364,22 @@ export function SettingsSheet({
           )}
         </section>
 
+        <section className="filter-section">
+          <h3>Support this app</h3>
+          <p className="filter-hint">
+            My Timetable is free and runs on free hosting. If it saves you time, you can buy the
+            developer a coffee.
+          </p>
+          <a
+            className="btn-secondary btn-link kofi-link"
+            href="https://ko-fi.com/awsaqib"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            ☕ Support on Ko-fi ↗
+          </a>
+        </section>
+
         <div className="modal-actions">
           <button type="button" className="btn-primary" onClick={onClose}>
             Done
