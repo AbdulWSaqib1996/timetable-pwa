@@ -3,6 +3,7 @@ import { AgendaView } from './components/AgendaView'
 import { FilterBar } from './components/FilterBar'
 import { FilterSheet } from './components/FilterSheet'
 import { MonthView } from './components/MonthView'
+import { NowNextCard } from './components/NowNextCard'
 import { SessionDetail } from './components/SessionDetail'
 import { SettingsSheet } from './components/SettingsSheet'
 import { SetupScreen } from './components/SetupScreen'
@@ -210,6 +211,10 @@ export default function App() {
           {error}
           {sessions && sessions.length > 0 && ' Showing your last saved timetable.'}
         </div>
+      )}
+
+      {sessions !== null && view === 'day' && (
+        <NowNextCard sessions={exportSessions} onSelect={setSelected} />
       )}
 
       {sessions === null ? (

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { subjectColor } from '../lib/format'
 import type { Session } from '../types'
 import { SessionCard } from './SessionCard'
 
@@ -184,6 +185,7 @@ export function WeekView({ sessions, todayISO, onSelect }: Props) {
               const end = toMinutes(session.end) ?? start + 60
               const top = ((start - minHour * 60) / 60) * HOUR_PX
               const height = Math.max(24, ((end - start) / 60) * HOUR_PX - 2)
+              const color = subjectColor(session)
               return (
                 <button
                   key={session.id}
@@ -194,6 +196,7 @@ export function WeekView({ sessions, todayISO, onSelect }: Props) {
                     height,
                     left: `calc(${(lane / lanes) * 100}% + 1px)`,
                     width: `calc(${100 / lanes}% - 3px)`,
+                    ...(color ? { borderLeftColor: color } : {}),
                   }}
                   onClick={() => onSelect(session)}
                   title={session.title}

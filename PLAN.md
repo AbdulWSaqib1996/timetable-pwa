@@ -1,6 +1,7 @@
 # Plan: Timetable Viewer PWA for Google Sheets (FINAL)
 
-**Status: decisions resolved, ready to build.**
+**Status: P1–P5 built. Live at https://abdulwsaqib1996.github.io/timetable-pwa/ (repo: AbdulWSaqib1996/timetable-pwa).**
+Remaining: P4b needs the user to run `npx wrangler deploy` in `workers/ics-feed` (Cloudflare login required). Future ideas are tracked in **Future enhancements** below.
 
 - Sheet access: **Option A** — the sheet is public ("anyone with the link can view"), so the app fetches it directly from the browser. No backend, no API keys, no accounts.
 - Hosting: **GitHub Pages** — completely free, no card, no usage tiers. Deployed automatically from the repo via GitHub Actions.
@@ -53,10 +54,10 @@ cache { fetchedAt, rows[] }
 
 ## Nice-to-haves (after MVP, in rough priority order)
 
-- Multiple saved sheets/profiles (e.g. next year's timetable, or a friend's group).
-- "Next session" card / countdown at the top.
-- Room-name shortening ("IOE - Bedford Way (20) - 631" → "Bedford Way 631").
-- Colour-coding by subject.
+- ✅ "Next session" card / countdown at the top (P5).
+- ✅ Room-name shortening ("IOE - Bedford Way (20) - 631" → "Bedford Way 631") (P5).
+- ✅ Colour-coding by subject (P5).
+- Multiple saved sheets/profiles — moved to Future enhancements below.
 
 ## Edge cases planned for
 
@@ -68,13 +69,31 @@ cache { fetchedAt, rows[] }
 
 ## Build phases
 
-1. **P1 — Fetch & display**: scaffold Vite + React + TS project, URL input, parse GViz JSON, render the day/agenda view opening on today with scroll-ahead. (Proves the data access works end to end.)
-2. **P2 — Filters & persistence**: specialism detection/picker, general filters, localStorage save/restore, settings screen.
-3. **P3 — Views + PWA + deploy**: week and month views with the segmented switcher; manifest, service worker (`vite-plugin-pwa`), offline cache, install prompt; GitHub repo + Actions workflow deploying to GitHub Pages.
-4. **P4 — ICS export**: (a) client-side .ics file download of the filtered timetable; (b) subscribable feed via a free Cloudflare Worker with filters encoded in the feed URL.
-5. **P5 — Polish/nice-to-haves**: next-session card, styling refinements, remaining backlog items.
+1. ✅ **P1 — Fetch & display**: scaffold Vite + React + TS project, URL input, parse GViz JSON, render the day/agenda view opening on today with scroll-ahead. (Also added later: tap a session for a detail sheet with date/time/duration/location/tutor/Moodle link.)
+2. ✅ **P2 — Filters & persistence**: specialism detection/picker, general filters, localStorage save/restore, settings screen.
+3. ✅ **P3 — Views + PWA + deploy**: week and month views with the segmented switcher (date-range filter moved into the Filters sheet); manifest, service worker (`vite-plugin-pwa`), offline cache; GitHub repo + Actions workflow deploying to GitHub Pages.
+4. ✅ **P4 — ICS export**: (a) client-side .ics file download of the filtered timetable (Settings → Calendar export); (b) subscribable feed worker written in `workers/ics-feed` — deploy with `npx wrangler deploy`, then paste the workers.dev URL into Settings → Calendar feed.
+5. ✅ **P5 — Polish/nice-to-haves**: Now/Next card at the top of the day view (current session with time remaining, or the next upcoming one with a countdown; tap for details), room-name shortening on cards ("IOE - Bedford Way (20) - 631" → "Bedford Way 631", full name kept in the detail sheet), deterministic per-subject colour coding on day cards and week-grid events.
 
 Each phase is independently usable — after P1 the timetable is already viewable.
+
+## Future enhancements (beyond P5)
+
+Ideas that would meaningfully improve the product, roughly ordered by value-for-effort. Effort: S (hours), M (a day or two), L (multi-day / needs new infrastructure).
+
+1. **Share your setup via link (S)** — encode the sheet ID, tab and specialism choices into a URL (`?setup=…`) so a coursemate opens the app fully configured with one tap. Highest-value social feature; pure client-side.
+2. **Change detection & highlights (M)** — on each refresh, diff the new sheet data against the cached copy and badge what changed: "Room changed for Maths 2", added/cancelled sessions, with a small changelog sheet. Turns silent timetable edits into visible alerts.
+3. **Search (S)** — a quick search box across titles, tutors and rooms ("when do I next have KaW?"). Client-side filter over loaded sessions.
+4. **Per-session "Add to calendar" (S)** — a Google Calendar template-URL button in the session detail sheet for one-off adding, complementing the bulk .ics/feed export. No API needed.
+5. **Multiple timetables/profiles (M)** — save more than one sheet (next year's timetable, partner's group) and switch between them; each profile keeps its own filters. Mostly a storage-schema change (array of profiles instead of one settings object).
+6. **Groups-aware filtering (M)** — parse the Groups column (`2` vs `1,2,3,…`) properly so a single mixed-groups tab can be filtered to "my group", making the app work for cohorts whose sheets aren't split per group.
+7. **Week/term awareness (S)** — configurable term start date to show "Week 3" labels in headers and the week view, matching how courses talk about time.
+8. **Session reminders (L)** — true push notifications before sessions need a push backend (another small worker + Web Push subscriptions). Note the pragmatic version already works today: subscribe via the ICS feed and let the calendar app's native alerts do the reminding.
+9. **Private-sheet support (L)** — Google Sheets API + OAuth (the original Option B) for sheets that can't be link-shared. Significant auth complexity; only worth it if a future sheet can't be public.
+10. **Attendance & notes (M)** — tick off attended sessions and attach personal notes per session (localStorage), e.g. "bring PE kit"; optional export.
+11. **ICS feed hardening (S)** — once the worker is deployed: an unguessable token in the feed path (the URL currently encodes only the already-public sheet ID), custom calendar name, and per-subject colour hints where clients support them.
+12. **Background freshness (M)** — Periodic Background Sync (where supported) so the service worker refreshes sheet data before the app is opened; plus an in-app "new version available" toast when the PWA updates.
+13. **Room directions (S)** — link the location in the session detail to Google Maps (building name + "London"), handy in the first weeks on an unfamiliar campus.
 
 ## Resolved decisions (log)
 

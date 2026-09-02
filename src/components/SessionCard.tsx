@@ -1,3 +1,4 @@
+import { shortenRoom, subjectColor } from '../lib/format'
 import type { Session } from '../types'
 
 interface Props {
@@ -6,10 +7,12 @@ interface Props {
 }
 
 export function SessionCard({ session, onSelect }: Props) {
+  const color = subjectColor(session)
   return (
     <button
       type="button"
       className={`session-card${session.isSelfStudy ? ' self-study' : ''}`}
+      style={color ? { borderLeft: `4px solid ${color}` } : undefined}
       onClick={() => onSelect(session)}
     >
       <div className="session-time">
@@ -19,7 +22,7 @@ export function SessionCard({ session, onSelect }: Props) {
       <div className="session-body">
         <div className="session-title">{session.title}</div>
         <div className="session-meta">
-          {!session.isSelfStudy && session.room && <span>{session.room}</span>}
+          {!session.isSelfStudy && session.room && <span>{shortenRoom(session.room)}</span>}
           {session.tutor && session.tutor !== 'Self Study' && <span>{session.tutor}</span>}
         </div>
         {session.isSpecialism && session.specialismName && (
