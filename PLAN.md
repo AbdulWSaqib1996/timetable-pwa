@@ -152,6 +152,8 @@ Ideas building on the app after rounds 1–2 and the TfL work (which now include
 
 ## Future enhancements — round 4 (logged 2 Sep 2026)
 
+**Built (2 Sep 2026, tenth pass): item 3.** The push worker's 07:00 London cron run checks TfL line status; severe disruption (severity ≤ 6: Severe Delays, closures, suspensions) or strike wording in the reason pushes "🚨 Strike action on TfL today" / "⚠ TfL disruption this morning" with the affected lines — only to transit-mode subscribers, only on days they have sessions, once per day. Verified against live data (would currently flag Jubilee Suspended, Weaver Part Closure, Windrush Part Suspended and ignore minor delays).
+
 **Built (2 Sep 2026, ninth pass): items 4 and 5.** Reminder notifications (in-app and push) now carry "✓ Attended" and "⏰ Snooze 10m" action buttons — attended taps reach an open window via postMessage or queue in IndexedDB for the next launch; snooze re-delivers through the push worker's cron (new /snooze endpoint) with the app closed, or an open window's timer otherwise. Leave alerts in transit mode now use the cached live TfL journey time (labelled "live TfL") instead of the heuristic, so disruptions make alerts fire earlier automatically.
 
 The app now has live worker infrastructure (background push with a 10-min cron + KV, the ICS feed, both deployed), full TfL integration (live routing, per-leg departures, disruptions), weather everywhere, key dates, stats, profiles, share links and backups. Round 4 is mostly about **exploiting the push worker** — it already fetches sheets on a schedule, so several high-value features are now small additions to it. Effort: S (hours), M (a day or two), L (multi-day).
