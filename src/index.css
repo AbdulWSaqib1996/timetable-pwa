@@ -14,7 +14,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #101322;
     --surface: #1a1f36;
     --text: #eef0f7;
@@ -27,6 +27,20 @@
     --error-text: #f3b8b8;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #101322;
+  --surface: #1a1f36;
+  --text: #eef0f7;
+  --text-muted: #9aa1b5;
+  --accent: #8da2f0;
+  --accent-soft: #232b4d;
+  --border: #2b3252;
+  --today: #8da2f0;
+  --error-bg: #3a1f1f;
+  --error-text: #f3b8b8;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -493,6 +507,55 @@ body {
 
 .kofi-link {
   margin-top: 4px;
+}
+
+.badge-conflict {
+  background: rgba(230, 73, 128, 0.18);
+  color: #e64980;
+}
+
+.subheading {
+  margin: 14px 0 4px;
+  font-size: 13px;
+}
+
+.merged-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.merged-tab .settings-url {
+  margin: 4px 0;
+}
+
+.attendance-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attendance-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.attendance-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attendance-count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 /* ---------- Key dates ---------- */

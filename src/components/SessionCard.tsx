@@ -9,10 +9,12 @@ interface Props {
   /** device location (when travel times are enabled), for the travel chip */
   coords?: Coords | null
   travelMode?: TravelMode
+  /** overlaps another visible session on the same day */
+  conflict?: boolean
   onSelect: (session: Session) => void
 }
 
-export function SessionCard({ session, meta, coords, travelMode = 'walking', onSelect }: Props) {
+export function SessionCard({ session, meta, coords, travelMode = 'walking', conflict, onSelect }: Props) {
   const color = session.isKeyDate ? null : subjectColor(session)
   const travel =
     coords && session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
@@ -39,6 +41,7 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', onS
           )}
         </div>
         {session.isKeyDate && <span className="badge badge-keydate">📌 Key date</span>}
+        {conflict && <span className="badge badge-conflict">⚠ Clash</span>}
         {session.isSpecialism && session.specialismName && (
           <span className="badge badge-specialism">{session.specialismName}</span>
         )}

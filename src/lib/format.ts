@@ -53,6 +53,15 @@ export function googleCalendarUrl(s: Session): string | null {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
+/** Whole days from todayISO to dateISO (0 = today, negative = past). */
+export function daysUntil(dateISO: string, todayISO: string): number {
+  const toTime = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number)
+    return new Date(y, m - 1, d).getTime()
+  }
+  return Math.round((toTime(dateISO) - toTime(todayISO)) / 86_400_000)
+}
+
 /** 1-based teaching-week number for a date, from the Monday of the term-start week. */
 export function weekNumber(dateISO: string, termStartISO: string): number | null {
   const toDate = (iso: string) => {

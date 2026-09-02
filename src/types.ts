@@ -71,6 +71,12 @@ export interface Settings {
   keyDatesUrl?: string
   keyDatesSheetId?: string
   keyDatesGid?: string | null
+  /** days-before offsets for key-date reminder notifications (e.g. [7, 3, 1]) */
+  keyDateReminderDays?: number[]
+  /** additional timetable tabs merged into this profile's sessions */
+  extraTabs?: { sheetId: string; gid: string | null; url: string }[]
+  /** colour theme override (default follows the system) */
+  theme?: 'system' | 'light' | 'dark'
 }
 
 /** One saved timetable (sheet + all its choices). */

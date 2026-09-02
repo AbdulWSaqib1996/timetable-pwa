@@ -1,11 +1,12 @@
 /**
  * ics-feed worker — serves a subscribable ICS calendar feed for a public Google Sheet timetable.
  *
- * GET /?id=<sheetId>&gid=<tabGid>&spec=Music,PE&selfstudy=0
+ * GET /?id=<sheetId>&gid=<tabGid>&spec=Music,PE&selfstudy=0&kdid=<sheetId>&kdgid=<tabGid>
  *   id        (required) Google Sheet ID — the sheet must be "anyone with the link can view"
  *   gid       (optional) tab gid
  *   spec      (optional) comma-separated specialism names to keep; other specialisms are dropped
  *   selfstudy (optional) "0" to drop Self Study rows
+ *   kdid/kdgid (optional) key-dates tab — its rows are added as 📌 all-day events
  *
  * Deploy (free Cloudflare account):  npx wrangler deploy
  */
@@ -161,12 +162,12 @@ function buildICS(sessions) {
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//timetable-pwa ics-feed//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:My Timetable']
   for (const s of sessions) {
     lines.push('BEGIN:VEVENT', fold(`UID:${s.id}@timetable-pwa`), `DTSTAMP:${stamp}`)
-    if (s.start) {
-      lines.push(`DTSTART:${dt(s.dateISO, s.start)}`, `DTEND:${s.end ? dt(s.dateISO, s.end) : dt(s.dateISO, s.start)}`)
-    } else {
+    if (s.isKeyDate || !s.start) {
       lines.push(`DTSTART;VALUE=DATE:${s.dateISO.replace(/-/g, '')}`)
+    } else {
+      lines.push(`DTSTART:${dt(s.dateISO, s.start)}`, `DTEND:${s.end ? dt(s.dateISO, s.end) : dt(s.dateISO, s.start)}`)
     }
-    lines.push(fold(`SUMMARY:${esc(s.title)}`))
+    lines.push(fold(`SUMMARY:${esc(s.isKeyDate ? `📌 ${s.title}` : s.title)}`))
     if (s.room && !s.isSelfStudy) lines.push(fold(`LOCATION:${esc(s.room)}`))
     const desc = [
       s.tutor && s.tutor !== 'Self Study' ? `Tutor: ${s.tutor}` : '',
@@ -212,6 +213,29 @@ export default {
       sessions = sessions.filter((s) => !s.specialismName || spec.includes(s.specialismName))
     }
     if (dropSelfStudy) sessions = sessions.filter((s) => !s.isSelfStudy)
+
+    // Optional key-dates tab appended as all-day events; failures there don't break the feed.
+    const kdid = url.searchParams.get('kdid') || (url.searchParams.get('kdgid') ? id : null)
+    const kdgid = url.searchParams.get('kdgid')
+    if (kdid && /^[a-zA-Z0-9_-]{20,}$/.test(kdid)) {
+      try {
+        const kdUrl = `https://docs.google.com/spreadsheets/d/${kdid}/gviz/tq?tqx=out:json&headers=0${kdgid ? `&gid=${encodeURIComponent(kdgid)}` : ''}`
+        const kdRes = await fetch(kdUrl)
+        if (kdRes.ok) {
+          const kdText = await kdRes.text()
+          const a = kdText.indexOf('{')
+          const b = kdText.lastIndexOf('}')
+          const kdJson = JSON.parse(kdText.slice(a, b + 1))
+          if (kdJson.table) {
+            sessions = sessions.concat(
+              parseSessions(kdJson.table).map((s) => ({ ...s, id: `kd-${s.id}`, isKeyDate: true }))
+            )
+          }
+        }
+      } catch {
+        /* skip key dates on error */
+      }
+    }
 
     return new Response(buildICS(sessions), {
       headers: {

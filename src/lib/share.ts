@@ -1,4 +1,4 @@
-import type { Settings } from '../types'
+import type { Filters, Settings } from '../types'
 
 interface SharePayload {
   u: string
@@ -7,6 +7,13 @@ interface SharePayload {
   s?: string[]
   h?: boolean
   gr?: string[]
+  /** term start, travel mode, filters, key-dates tab — so a shared setup is complete */
+  t?: string
+  tm?: Settings['travelMode']
+  f?: Filters
+  ki?: string
+  kg?: string | null
+  ku?: string
 }
 
 function b64urlEncode(text: string): string {
@@ -26,6 +33,12 @@ export function buildShareUrl(settings: Settings): string {
     s: settings.mySpecialisms,
     h: settings.hideOtherSpecialisms,
     gr: settings.myGroups,
+    t: settings.termStartISO,
+    tm: settings.travelMode,
+    f: settings.filters,
+    ki: settings.keyDatesSheetId,
+    kg: settings.keyDatesGid,
+    ku: settings.keyDatesUrl,
   }
   return `${location.origin}${import.meta.env.BASE_URL}#setup=${b64urlEncode(JSON.stringify(payload))}`
 }
@@ -45,6 +58,12 @@ export function parseShareHash(hash: string): Settings | null {
       hideOtherSpecialisms: p.h !== false,
       myGroups: Array.isArray(p.gr) ? p.gr.filter((x) => typeof x === 'string') : [],
       specialismsChosen: true,
+      termStartISO: typeof p.t === 'string' ? p.t : undefined,
+      travelMode: p.tm === 'transit' || p.tm === 'driving' ? p.tm : undefined,
+      filters: p.f && typeof p.f === 'object' ? p.f : undefined,
+      keyDatesSheetId: typeof p.ki === 'string' ? p.ki : undefined,
+      keyDatesGid: typeof p.kg === 'string' ? p.kg : undefined,
+      keyDatesUrl: typeof p.ku === 'string' ? p.ku : undefined,
     }
   } catch {
     return null

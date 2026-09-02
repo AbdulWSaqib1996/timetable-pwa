@@ -1,20 +1,37 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { sessionKey } from '../lib/diff'
 import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
 import { parseSheetUrl } from '../lib/sheetUrl'
-import type { ProfileStore, Session, Settings } from '../types'
+import { exportBackup, importBackup } from '../lib/storage'
+import type { MetaMap, ProfileStore, Session, Settings } from '../types'
 
 interface Props {
   settings: Settings
   store: ProfileStore
   /** sessions with the user's filters applied (specialisms etc.), all dates */
   exportSessions: Session[]
+  keyDates: Session[]
+  metaMap: MetaMap
+  todayISO: string
   onUpdateSettings: (patch: Partial<Settings>) => void
   onRechooseSpecialisms: () => void
   onSwitchProfile: (id: string) => void
   onAddProfile: () => void
   onDeleteProfile: (id: string) => void
   onClose: () => void
+}
+
+function downloadFile(name: string, content: string, type: string) {
+  const blob = new Blob([content], { type })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 /** Build the subscribable feed URL for a deployed ics-feed worker. */
@@ -27,6 +44,10 @@ export function buildFeedUrl(base: string, settings: Settings): string {
     url.searchParams.set('spec', specialisms.join(','))
   }
   if (settings.filters?.showSelfStudy === false) url.searchParams.set('selfstudy', '0')
+  if (settings.keyDatesSheetId) {
+    if (settings.keyDatesSheetId !== settings.sheetId) url.searchParams.set('kdid', settings.keyDatesSheetId)
+    if (settings.keyDatesGid) url.searchParams.set('kdgid', settings.keyDatesGid)
+  }
   return url.toString()
 }
 
@@ -43,6 +64,9 @@ export function SettingsSheet({
   settings,
   store,
   exportSessions,
+  keyDates,
+  metaMap,
+  todayISO,
   onUpdateSettings,
   onRechooseSpecialisms,
   onSwitchProfile,
@@ -53,7 +77,60 @@ export function SettingsSheet({
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? '')
   const [keyDatesUrl, setKeyDatesUrl] = useState(settings.keyDatesUrl ?? '')
   const [keyDatesError, setKeyDatesError] = useState(false)
+  const [mergeUrl, setMergeUrl] = useState('')
+  const [mergeError, setMergeError] = useState(false)
   const [copied, setCopied] = useState<'feed' | 'share' | null>(null)
+  const importInput = useRef<HTMLInputElement | null>(null)
+
+  function addMergeTab() {
+    const trimmed = mergeUrl.trim()
+    if (!trimmed) return
+    const parsed = parseSheetUrl(trimmed)
+    if (!parsed) {
+      setMergeError(true)
+      return
+    }
+    setMergeError(false)
+    setMergeUrl('')
+    onUpdateSettings({
+      extraTabs: [...(settings.extraTabs ?? []), { sheetId: parsed.sheetId, gid: parsed.gid, url: trimmed }],
+    })
+  }
+
+  function handleImportFile(file: File) {
+    void file.text().then((text) => {
+      if (importBackup(text)) {
+        window.location.reload()
+      } else {
+        window.alert('That file doesn’t look like a My Timetable backup.')
+      }
+    })
+  }
+
+  // Attendance insights over past sessions (self-study excluded).
+  const pastSessions = exportSessions.filter((s) => s.dateISO <= todayISO && !s.isSelfStudy)
+  const attendedCount = pastSessions.filter((s) => metaMap[sessionKey(s)]?.attended).length
+  const bySubject = new Map<string, { attended: number; total: number }>()
+  for (const s of pastSessions) {
+    const key = s.subject || s.title
+    const entry = bySubject.get(key) ?? { attended: 0, total: 0 }
+    entry.total++
+    if (metaMap[sessionKey(s)]?.attended) entry.attended++
+    bySubject.set(key, entry)
+  }
+  const subjectRows = [...bySubject.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 8)
+
+  function downloadAttendanceCSV() {
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const rows = ['Date,Start,Title,Subject,Room,Attended,Note']
+    for (const s of pastSessions) {
+      const m = metaMap[sessionKey(s)]
+      rows.push(
+        [s.dateISO, s.start, esc(s.title), esc(s.subject || s.title), esc(s.room), m?.attended ? 'yes' : 'no', esc(m?.note ?? '')].join(',')
+      )
+    }
+    downloadFile('attendance.csv', rows.join('\r\n'), 'text/csv;charset=utf-8')
+  }
 
   function saveKeyDatesUrl() {
     const trimmed = keyDatesUrl.trim()
@@ -90,7 +167,7 @@ export function SettingsSheet({
     }
   }
 
-  async function toggleOffset(field: 'reminderOffsets' | 'leaveAlertOffsets', mins: number) {
+  async function toggleOffset(field: 'reminderOffsets' | 'leaveAlertOffsets' | 'keyDateReminderDays', mins: number) {
     const current = settings[field] ?? []
     const next = current.includes(mins)
       ? current.filter((m) => m !== mins)
@@ -155,6 +232,37 @@ export function SettingsSheet({
               {settings.sheetUrl}
             </p>
           )}
+          {!settings.demo && (
+            <>
+              {(settings.extraTabs ?? []).map((tab, i) => (
+                <div className="merged-tab" key={`${tab.sheetId}-${tab.gid}-${i}`}>
+                  <span className="settings-url">merged: {tab.url}</span>
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    aria-label="Remove merged tab"
+                    onClick={() =>
+                      onUpdateSettings({ extraTabs: (settings.extraTabs ?? []).filter((_, j) => j !== i) })
+                    }
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <div className="feed-row">
+                <input
+                  type="url"
+                  placeholder="Merge another tab: paste its URL (with #gid=…)"
+                  value={mergeUrl}
+                  onChange={(e) => setMergeUrl(e.target.value)}
+                />
+              </div>
+              {mergeError && <p className="setup-error">That doesn’t look like a Google Sheets link.</p>}
+              <button type="button" className="btn-secondary" onClick={addMergeTab} disabled={!mergeUrl.trim()}>
+                Merge tab into this timetable
+              </button>
+            </>
+          )}
         </section>
 
         {!settings.demo && (
@@ -190,6 +298,34 @@ export function SettingsSheet({
             {settings.keyDatesSheetId && !keyDatesError && (
               <p className="filter-hint">Key dates connected — they refresh with the timetable.</p>
             )}
+            {settings.keyDatesSheetId && (
+              <>
+                <h3 className="subheading">Key-date reminders</h3>
+                <div className="chip-grid">
+                  {(
+                    [
+                      { value: 7, label: '7 days before' },
+                      { value: 3, label: '3 days' },
+                      { value: 1, label: '1 day' },
+                    ] as const
+                  ).map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`chip${(settings.keyDateReminderDays ?? []).includes(value) ? ' chip-on' : ''}`}
+                      aria-pressed={(settings.keyDateReminderDays ?? []).includes(value)}
+                      onClick={() => void toggleOffset('keyDateReminderDays', value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="filter-hint">
+                  Notifies you the chosen number of days before each deadline, while the app is open
+                  or installed and running.
+                </p>
+              </>
+            )}
           </section>
         )}
 
@@ -203,6 +339,29 @@ export function SettingsSheet({
           <button type="button" className="btn-secondary" onClick={onRechooseSpecialisms}>
             Choose specialisms again
           </button>
+        </section>
+
+        <section className="filter-section">
+          <h3>Theme</h3>
+          <div className="chip-grid">
+            {(
+              [
+                { value: 'system', label: 'System' },
+                { value: 'light', label: '☀️ Light' },
+                { value: 'dark', label: '🌙 Dark' },
+              ] as const
+            ).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                className={`chip${(settings.theme ?? 'system') === value ? ' chip-on' : ''}`}
+                aria-pressed={(settings.theme ?? 'system') === value}
+                onClick={() => onUpdateSettings({ theme: value })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </section>
 
         <section className="filter-section">
@@ -317,20 +476,77 @@ export function SettingsSheet({
           )}
         </section>
 
+        {pastSessions.length > 0 && (
+          <section className="filter-section">
+            <h3>Attendance</h3>
+            <p className="filter-hint">
+              {attendedCount} of {pastSessions.length} past sessions marked attended (
+              {Math.round((attendedCount / pastSessions.length) * 100)}%).
+            </p>
+            {subjectRows.length > 0 && (
+              <ul className="attendance-list">
+                {subjectRows.map(([subject, { attended, total }]) => (
+                  <li key={subject}>
+                    <span className="attendance-subject">{subject}</span>
+                    <span className="attendance-count">
+                      {attended}/{total}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button type="button" className="btn-secondary" onClick={downloadAttendanceCSV}>
+              Export attendance CSV
+            </button>
+          </section>
+        )}
+
         <section className="filter-section">
           <h3>Calendar export</h3>
           <p className="filter-hint">
-            Downloads your filtered timetable ({exportSessions.length} sessions) as an .ics file you
-            can import into Google, Apple or Outlook calendars.
+            Downloads your filtered timetable ({exportSessions.length} sessions
+            {keyDates.length > 0 ? ` + ${keyDates.length} key dates` : ''}) as an .ics file you can
+            import into Google, Apple or Outlook calendars. Key dates export as all-day 📌 events.
           </p>
           <button
             type="button"
             className="btn-secondary"
-            disabled={exportSessions.length === 0}
-            onClick={() => downloadICS(exportSessions, 'My Timetable')}
+            disabled={exportSessions.length === 0 && keyDates.length === 0}
+            onClick={() => downloadICS([...exportSessions, ...keyDates], 'My Timetable')}
           >
             Download .ics file
           </button>
+        </section>
+
+        <section className="filter-section">
+          <h3>Backup</h3>
+          <p className="filter-hint">
+            Everything lives on this device only. Export a backup (timetables, filters, notes,
+            attendance) and import it on a new device or after clearing browser data.
+          </p>
+          <div className="btn-row">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => downloadFile('my-timetable-backup.json', exportBackup(), 'application/json')}
+            >
+              Export backup
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => importInput.current?.click()}>
+              Import backup
+            </button>
+            <input
+              ref={importInput}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleImportFile(file)
+                e.target.value = ''
+              }}
+            />
+          </div>
         </section>
 
         <section className="filter-section">

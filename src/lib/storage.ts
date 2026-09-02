@@ -110,6 +110,27 @@ export function saveChanges(pid: string, changes: SessionChange[]): void {
   writeJSON(changesKey(pid), changes.slice(0, 100))
 }
 
+/** Everything worth keeping, as a downloadable JSON backup. */
+export function exportBackup(): string {
+  const store = readJSON<ProfileStore>(STORE_KEY)
+  const meta: Record<string, MetaMap> = {}
+  for (const p of store?.profiles ?? []) meta[p.id] = loadMeta(p.id)
+  return JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), store, meta }, null, 2)
+}
+
+/** Restore a backup produced by exportBackup. Returns false if the file isn't one. */
+export function importBackup(text: string): boolean {
+  try {
+    const data = JSON.parse(text) as { store?: ProfileStore; meta?: Record<string, MetaMap> }
+    if (!data.store || !Array.isArray(data.store.profiles) || data.store.profiles.length === 0) return false
+    writeJSON(STORE_KEY, data.store)
+    for (const [pid, m] of Object.entries(data.meta ?? {})) writeJSON(metaKey(pid), m)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Reminder bookkeeping: sessionKey → timestamp notified. */
 export function loadNotified(): Record<string, number> {
   return readJSON<Record<string, number>>(NOTIFIED_KEY) ?? {}

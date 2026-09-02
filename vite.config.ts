@@ -27,6 +27,18 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        shortcuts: [
+          {
+            name: 'Today',
+            url: './?view=today',
+            icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Key dates',
+            url: './?view=keydates',
+            icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
       },
       workbox: {
         // App shell is precached; sheet data also gets a NetworkFirst cache so a fetch

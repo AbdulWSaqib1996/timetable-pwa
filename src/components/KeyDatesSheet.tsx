@@ -1,3 +1,4 @@
+import { daysUntil } from '../lib/format'
 import type { Session } from '../types'
 
 interface Props {
@@ -6,14 +7,6 @@ interface Props {
   configured: boolean
   onSelect: (session: Session) => void
   onClose: () => void
-}
-
-export function daysUntil(dateISO: string, todayISO: string): number {
-  const toTime = (iso: string) => {
-    const [y, m, d] = iso.split('-').map(Number)
-    return new Date(y, m - 1, d).getTime()
-  }
-  return Math.round((toTime(dateISO) - toTime(todayISO)) / 86_400_000)
 }
 
 function formatDate(dateISO: string): string {

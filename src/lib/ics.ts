@@ -36,13 +36,16 @@ export function buildICS(sessions: Session[], calendarName: string): string {
     lines.push('BEGIN:VEVENT')
     lines.push(fold(`UID:${s.id}@timetable-pwa`))
     lines.push(`DTSTAMP:${stamp}`)
-    if (s.start) {
+    if (s.isKeyDate) {
+      // Deadlines export as all-day events so they stand out in calendar apps.
+      lines.push(`DTSTART;VALUE=DATE:${s.dateISO.replace(/-/g, '')}`)
+    } else if (s.start) {
       lines.push(`DTSTART:${dtLocal(s.dateISO, s.start)}`)
       lines.push(`DTEND:${s.end ? dtLocal(s.dateISO, s.end) : dtLocal(s.dateISO, s.start)}`)
     } else {
       lines.push(`DTSTART;VALUE=DATE:${s.dateISO.replace(/-/g, '')}`)
     }
-    lines.push(fold(`SUMMARY:${escapeText(s.title)}`))
+    lines.push(fold(`SUMMARY:${escapeText(s.isKeyDate ? `📌 ${s.title}` : s.title)}`))
     if (s.room && !s.isSelfStudy) lines.push(fold(`LOCATION:${escapeText(s.room)}`))
     const descParts = [
       s.tutor && s.tutor !== 'Self Study' ? `Tutor: ${s.tutor}` : '',

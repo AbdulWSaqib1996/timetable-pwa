@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { TRAVEL_MODE_PHRASE, estimateTravel, osmEmbedUrl } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl } from '../lib/format'
+import { tflTransitMinutes } from '../lib/tfl'
 import type { Session, SessionMeta } from '../types'
 
 interface Props {
@@ -46,6 +48,24 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
   const gcalUrl = googleCalendarUrl(session)
   const travel =
     session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
+
+  // Live TfL journey time for public transport (falls back to the heuristic estimate).
+  const [tflMins, setTflMins] = useState<number | null>(null)
+  useEffect(() => {
+    setTflMins(null)
+    if (travelMode !== 'transit' || !coords || !travel?.location) return
+    let cancelled = false
+    void tflTransitMinutes(coords, travel.location).then((mins) => {
+      if (!cancelled) setTflMins(mins)
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [travelMode, coords?.lat, coords?.lng, session.room])
+
+  const shownMinutes = travelMode === 'transit' && tflMins !== null ? tflMins : travel?.minutes ?? null
+  const liveLabel = travelMode === 'transit' && tflMins !== null ? ' (live TfL)' : ''
   const rows: { label: string; value: string }[] = [
     { label: 'Date', value: formatLongDate(session.dateISO) },
     {
@@ -85,8 +105,8 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
           <div className="travel-row">
             <span className="travel-info">
               {travel.building
-                ? travel.minutes !== null
-                  ? `≈ ${formatRemaining(travel.minutes)} ${TRAVEL_MODE_PHRASE[travelMode]} · ${travel.building}`
+                ? shownMinutes !== null
+                  ? `≈ ${formatRemaining(shownMinutes)} ${TRAVEL_MODE_PHRASE[travelMode]}${liveLabel} · ${travel.building}`
                   : locationEnabled
                     ? `${travel.building} (waiting for your location…)`
                     : `${travel.building} — enable travel times in Settings for an estimate`

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
-import { weekNumber } from '../lib/format'
+import { toMinutes, weekNumber } from '../lib/format'
 import type { MetaMap, Session } from '../types'
 import { SessionCard } from './SessionCard'
 
@@ -55,6 +55,28 @@ export function AgendaView({
     return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b))
   }, [sessions])
 
+  // Sessions that overlap another real session on the same day (key dates and
+  // self-study excluded) get a clash badge.
+  const conflictIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const [, list] of days) {
+      const timed = list.filter((s) => !s.isKeyDate && !s.isSelfStudy && toMinutes(s.start) !== null)
+      for (let i = 0; i < timed.length; i++) {
+        for (let j = i + 1; j < timed.length; j++) {
+          const aStart = toMinutes(timed[i].start)!
+          const aEnd = toMinutes(timed[i].end) ?? aStart + 60
+          const bStart = toMinutes(timed[j].start)!
+          const bEnd = toMinutes(timed[j].end) ?? bStart + 60
+          if (aStart < bEnd && bStart < aEnd) {
+            ids.add(timed[i].id)
+            ids.add(timed[j].id)
+          }
+        }
+      }
+    }
+    return ids
+  }, [days])
+
   // The day to scroll to: the requested date (or today), else the next day with sessions.
   const anchorISO = useMemo(() => {
     const target = scrollTo ?? todayISO
@@ -103,6 +125,7 @@ export function AgendaView({
                   meta={metaMap?.[sessionKey(s)]}
                   coords={coords}
                   travelMode={travelMode}
+                  conflict={conflictIds.has(s.id)}
                   onSelect={onSelect}
                 />
               ))}

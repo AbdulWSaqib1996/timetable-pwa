@@ -3,7 +3,7 @@ import { AgendaView } from './components/AgendaView'
 import { ChangesSheet } from './components/ChangesSheet'
 import { FilterBar } from './components/FilterBar'
 import { FilterSheet } from './components/FilterSheet'
-import { KeyDatesSheet, daysUntil } from './components/KeyDatesSheet'
+import { KeyDatesSheet } from './components/KeyDatesSheet'
 import { MonthView } from './components/MonthView'
 import { NowNextCard } from './components/NowNextCard'
 import { SessionDetail } from './components/SessionDetail'
@@ -25,7 +25,7 @@ import {
   localTodayISO,
   weekBounds,
 } from './lib/filters'
-import { formatRemaining, shortenRoom, toMinutes } from './lib/format'
+import { daysUntil, formatRemaining, shortenRoom, toMinutes } from './lib/format'
 import { fetchGvizTable } from './lib/gviz'
 import { parseTimetable } from './lib/parseTimetable'
 import { parseSheetUrl } from './lib/sheetUrl'
@@ -122,7 +122,28 @@ export default function App() {
       setRefreshing(true)
       try {
         const table = await fetchGvizTable(s.sheetId, s.gid)
-        const { sessions: parsed } = parseTimetable(table)
+        let parsed = parseTimetable(table).sessions
+        // Merge any extra tabs into the same timetable, deduplicating identical rows.
+        for (const [i, tab] of (s.extraTabs ?? []).entries()) {
+          try {
+            const extra = await fetchGvizTable(tab.sheetId, tab.gid)
+            parsed = parsed.concat(
+              parseTimetable(extra).sessions.map((x) => ({ ...x, id: `t${i}-${x.id}` }))
+            )
+          } catch {
+            /* a broken extra tab shouldn't take down the main timetable */
+          }
+        }
+        if ((s.extraTabs ?? []).length > 0) {
+          const seen = new Set<string>()
+          parsed = parsed.filter((x) => {
+            const k = `${x.dateISO}|${x.start}|${x.title.toLowerCase()}|${x.room}`
+            if (seen.has(k)) return false
+            seen.add(k)
+            return true
+          })
+          parsed.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
+        }
         const prev = loadCache(pid)
         if (prev) {
           // Diff the user's own view of old vs new (their specialism/group filters applied).
@@ -178,13 +199,43 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
 
-  // Refetch when the key-dates tab is configured or changed in Settings.
+  // Refetch when the key-dates tab or merged tabs change in Settings.
+  const extraTabsKey = JSON.stringify(settings?.extraTabs ?? [])
   useEffect(() => {
-    if (active && sessions !== null && active.settings.keyDatesSheetId) {
+    if (active && sessions !== null && (active.settings.keyDatesSheetId || (active.settings.extraTabs ?? []).length > 0)) {
       void refresh(active.settings, active.id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.keyDatesSheetId, settings?.keyDatesGid])
+  }, [settings?.keyDatesSheetId, settings?.keyDatesGid, extraTabsKey])
+
+  // Manual theme override (default: follow the system).
+  useEffect(() => {
+    const theme = settings?.theme ?? 'system'
+    if (theme === 'system') document.documentElement.removeAttribute('data-theme')
+    else document.documentElement.setAttribute('data-theme', theme)
+  }, [settings?.theme])
+
+  // App-icon badge with the unseen-changes count, where the Badging API exists.
+  useEffect(() => {
+    const n = changes.filter((c) => !c.seen).length
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nav = navigator as any
+    try {
+      if (n > 0) void nav.setAppBadge?.(n)
+      else void nav.clearAppBadge?.()
+    } catch {
+      /* unsupported */
+    }
+  }, [changes])
+
+  // PWA shortcut deep-link (?view=keydates) — consume it once.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('view') === 'keydates') setOpenSheet('keydates')
+    if (params.has('view')) {
+      history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
 
   function updateSettings(patch: Partial<Settings>) {
     setStore((prev) => {
@@ -331,14 +382,22 @@ export default function App() {
   // offsets are due at once (say the app was just opened), only one fires per session.
   const exportRef = useRef(exportSessions)
   exportRef.current = exportSessions
+  const keyDatesRef = useRef(keyDates)
+  keyDatesRef.current = keyDates
   const travelRef = useRef({ coords, travelMode, locationEnabled })
   travelRef.current = { coords, travelMode, locationEnabled }
   const offsetsKey = JSON.stringify(settings?.reminderOffsets ?? [])
   const leaveKey = JSON.stringify(settings?.leaveAlertOffsets ?? [])
+  const kdDaysKey = JSON.stringify(settings?.keyDateReminderDays ?? [])
   useEffect(() => {
     const offsets = (JSON.parse(offsetsKey) as number[]).sort((a, b) => a - b)
     const leaveOffsets = (JSON.parse(leaveKey) as number[]).sort((a, b) => a - b)
-    if ((offsets.length === 0 && leaveOffsets.length === 0) || typeof Notification === 'undefined') return
+    const kdDays = (JSON.parse(kdDaysKey) as number[]).sort((a, b) => a - b)
+    if (
+      (offsets.length === 0 && leaveOffsets.length === 0 && kdDays.length === 0) ||
+      typeof Notification === 'undefined'
+    )
+      return
     const notify = (title: string, body: string) => {
       try {
         new Notification(title, { body })
@@ -391,12 +450,30 @@ export default function App() {
           }
         }
       }
+      // Key-date reminders: N days before each deadline (one notification per offset).
+      if (kdDays.length > 0) {
+        const today = localTodayISO()
+        for (const kd of keyDatesRef.current) {
+          if (kd.dateISO < today) continue
+          const days = daysUntil(kd.dateISO, today)
+          const due = kdDays.filter((d) => days <= d && !notified[`${sessionKey(kd)}#kd#${d}`])
+          if (due.length === 0) continue
+          notify(
+            `📌 ${kd.title}`,
+            days === 0
+              ? `Due today${kd.start ? ` at ${kd.start}` : ''}`
+              : `Due in ${days} day${days === 1 ? '' : 's'} (${kd.dateISO.split('-').reverse().join('/')})`
+          )
+          for (const d of due) notified[`${sessionKey(kd)}#kd#${d}`] = Date.now()
+          dirty = true
+        }
+      }
       if (dirty) saveNotified(notified)
     }
     check()
     const t = setInterval(check, 30_000)
     return () => clearInterval(t)
-  }, [offsetsKey, leaveKey])
+  }, [offsetsKey, leaveKey, kdDaysKey])
   useEffect(() => {
     if (!locationEnabled || !('geolocation' in navigator)) {
       setCoords(null)
@@ -661,6 +738,9 @@ export default function App() {
           settings={settings}
           store={store}
           exportSessions={exportSessions}
+          keyDates={keyDates}
+          metaMap={metaMap}
+          todayISO={todayISO}
           onUpdateSettings={updateSettings}
           onRechooseSpecialisms={() => {
             setOpenSheet('none')
