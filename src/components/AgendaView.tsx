@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import type { Coords, TravelMode } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
 import { weekNumber } from '../lib/format'
 import type { MetaMap, Session } from '../types'
@@ -12,6 +13,8 @@ interface Props {
   scrollTo?: string | null
   metaMap?: MetaMap
   termStartISO?: string
+  coords?: Coords | null
+  travelMode?: TravelMode
 }
 
 function localTodayISO(): string {
@@ -29,7 +32,16 @@ function formatDayHeader(dateISO: string): string {
   })
 }
 
-export function AgendaView({ sessions, emptyMessage, onSelect, scrollTo, metaMap, termStartISO }: Props) {
+export function AgendaView({
+  sessions,
+  emptyMessage,
+  onSelect,
+  scrollTo,
+  metaMap,
+  termStartISO,
+  coords,
+  travelMode,
+}: Props) {
   const todayISO = localTodayISO()
   const anchorRef = useRef<HTMLElement | null>(null)
 
@@ -85,7 +97,14 @@ export function AgendaView({ sessions, emptyMessage, onSelect, scrollTo, metaMap
             </h2>
             <div className="day-sessions">
               {daySessions.map((s) => (
-                <SessionCard key={s.id} session={s} meta={metaMap?.[sessionKey(s)]} onSelect={onSelect} />
+                <SessionCard
+                  key={s.id}
+                  session={s}
+                  meta={metaMap?.[sessionKey(s)]}
+                  coords={coords}
+                  travelMode={travelMode}
+                  onSelect={onSelect}
+                />
               ))}
             </div>
           </section>

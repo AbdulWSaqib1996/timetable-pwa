@@ -319,8 +319,9 @@ export default function App() {
     return () => clearInterval(t)
   }, [offsetsKey])
 
-  // Device location for walking-time estimates (only while enabled in Settings).
+  // Device location for travel-time estimates (only while enabled in Settings).
   const locationEnabled = settings?.locationEnabled ?? false
+  const travelMode = settings?.travelMode ?? 'walking'
   useEffect(() => {
     if (!locationEnabled || !('geolocation' in navigator)) {
       setCoords(null)
@@ -450,6 +451,8 @@ export default function App() {
           onSelect={setSelected}
           metaMap={metaMap}
           termStartISO={settings.termStartISO}
+          coords={coords}
+          travelMode={travelMode}
           emptyMessage={`No sessions match “${query.trim()}”.`}
         />
       ) : view === 'week' ? (
@@ -458,6 +461,8 @@ export default function App() {
           todayISO={todayISO}
           onSelect={setSelected}
           termStartISO={settings.termStartISO}
+          coords={coords}
+          travelMode={travelMode}
         />
       ) : view === 'month' ? (
         <MonthView
@@ -475,6 +480,8 @@ export default function App() {
           onSelect={setSelected}
           metaMap={metaMap}
           termStartISO={settings.termStartISO}
+          coords={coords}
+          travelMode={travelMode}
           emptyMessage={
             sessions.length === 0
               ? 'No sessions found in this sheet.'
@@ -491,6 +498,7 @@ export default function App() {
           meta={metaMap[sessionKey(selected)]}
           coords={coords}
           locationEnabled={locationEnabled}
+          travelMode={travelMode}
           onMeta={(patch) => handleMeta(selected, patch)}
           onClose={() => setSelected(null)}
         />

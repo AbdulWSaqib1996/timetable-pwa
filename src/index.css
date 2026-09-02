@@ -515,6 +515,12 @@ body {
   white-space: nowrap;
 }
 
+.travel-chip {
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* ---------- Now / Next card ---------- */
 
 .nownext {

@@ -210,11 +210,32 @@ export function SettingsSheet({
               checked={settings.locationEnabled ?? false}
               onChange={(e) => toggleLocation(e.target.checked)}
             />
-            Use my location for walking times
+            Use my location for travel times
           </label>
+          <div className="chip-grid">
+            {(
+              [
+                { value: 'walking', label: '🚶 Walking' },
+                { value: 'transit', label: '🚌 Public transport' },
+                { value: 'driving', label: '🚗 Driving' },
+              ] as const
+            ).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                className={`chip${(settings.travelMode ?? 'walking') === value ? ' chip-on' : ''}`}
+                aria-pressed={(settings.travelMode ?? 'walking') === value}
+                onClick={() => onUpdateSettings({ travelMode: value })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <p className="filter-hint">
-            Shows an estimated walk from where you are to each session's UCL building (rooms are
-            matched against the Bloomsbury campus). Your location never leaves this device.
+            Shows an estimated journey from where you are to each session's UCL building, on the
+            timetable cards and in session details (rooms are matched against the Bloomsbury
+            campus). Estimates are approximate — the Directions link gives the exact route. Your
+            location never leaves this device.
           </p>
         </section>
 

@@ -53,8 +53,10 @@ export interface Settings {
   reminderMinutes?: number
   /** minutes-before offsets to fire notifications at (e.g. [60, 15]); empty/unset = off */
   reminderOffsets?: number[]
-  /** use device location to estimate walking time to session locations */
+  /** use device location to estimate travel time to session locations */
   locationEnabled?: boolean
+  /** how travel-time estimates are calculated (default walking) */
+  travelMode?: 'walking' | 'transit' | 'driving'
 }
 
 /** One saved timetable (sheet + all its choices). */

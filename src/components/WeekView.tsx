@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { Coords, TravelMode } from '../lib/campus'
 import { subjectColor, weekNumber } from '../lib/format'
 import type { Session } from '../types'
 import { SessionCard } from './SessionCard'
@@ -8,6 +9,8 @@ interface Props {
   todayISO: string
   onSelect: (session: Session) => void
   termStartISO?: string
+  coords?: Coords | null
+  travelMode?: TravelMode
 }
 
 function iso(d: Date): string {
@@ -70,7 +73,7 @@ function useIsNarrow(): boolean {
 
 const HOUR_PX = 56
 
-export function WeekView({ sessions, todayISO, onSelect, termStartISO }: Props) {
+export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, travelMode }: Props) {
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayISO))
   const isNarrow = useIsNarrow()
   const wkNum = termStartISO ? weekNumber(weekStart, termStartISO) : null
@@ -147,7 +150,7 @@ export function WeekView({ sessions, todayISO, onSelect, termStartISO }: Props) 
               ) : (
                 <div className="day-sessions">
                   {list.map((s) => (
-                    <SessionCard key={s.id} session={s} onSelect={onSelect} />
+                    <SessionCard key={s.id} session={s} coords={coords} travelMode={travelMode} onSelect={onSelect} />
                   ))}
                 </div>
               )}

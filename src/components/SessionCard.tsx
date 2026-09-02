@@ -1,14 +1,21 @@
-import { shortenRoom, subjectColor } from '../lib/format'
+import { TRAVEL_MODE_ICON, estimateTravel } from '../lib/campus'
+import type { Coords, TravelMode } from '../lib/campus'
+import { formatRemaining, shortenRoom, subjectColor } from '../lib/format'
 import type { Session, SessionMeta } from '../types'
 
 interface Props {
   session: Session
   meta?: SessionMeta
+  /** device location (when travel times are enabled), for the travel chip */
+  coords?: Coords | null
+  travelMode?: TravelMode
   onSelect: (session: Session) => void
 }
 
-export function SessionCard({ session, meta, onSelect }: Props) {
+export function SessionCard({ session, meta, coords, travelMode = 'walking', onSelect }: Props) {
   const color = subjectColor(session)
+  const travel =
+    coords && session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
   return (
     <button
       type="button"
@@ -25,6 +32,11 @@ export function SessionCard({ session, meta, onSelect }: Props) {
         <div className="session-meta">
           {!session.isSelfStudy && session.room && <span>{shortenRoom(session.room)}</span>}
           {session.tutor && session.tutor !== 'Self Study' && <span>{session.tutor}</span>}
+          {travel?.minutes != null && (
+            <span className="travel-chip" title={travel.building ?? undefined}>
+              {TRAVEL_MODE_ICON[travelMode]} {formatRemaining(travel.minutes)}
+            </span>
+          )}
         </div>
         {session.isSpecialism && session.specialismName && (
           <span className="badge badge-specialism">{session.specialismName}</span>
