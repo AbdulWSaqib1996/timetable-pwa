@@ -17,6 +17,14 @@ export interface FilterOptions {
   subjects: string[]
   tutors: string[]
   rooms: string[]
+  groups: string[]
+}
+
+export function groupTokens(groups: string): string[] {
+  return groups
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
 }
 
 function distinctSorted(values: (string | undefined)[]): string[] {
@@ -34,6 +42,9 @@ export function deriveOptions(sessions: Session[]): FilterOptions {
     ),
     tutors: distinctSorted(sessions.filter((s) => !s.isSelfStudy).map((s) => s.tutor)),
     rooms: distinctSorted(sessions.filter((s) => !s.isSelfStudy).map((s) => s.room)),
+    groups: [...new Set(sessions.flatMap((s) => groupTokens(s.groups)))].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    ),
   }
 }
 
@@ -66,9 +77,14 @@ export function applyFilters(
   const dateRange = opts.ignoreDateRange ? 'all' : filters.dateRange
   const week = dateRange === 'week' ? weekBounds(todayISO) : null
 
+  const myGroups = settings.myGroups ?? []
   return sessions.filter((s) => {
     if (hideOthers && s.isSpecialism && s.specialismName && !mySpecialisms.includes(s.specialismName)) {
       return false
+    }
+    if (myGroups.length > 0) {
+      const tokens = groupTokens(s.groups)
+      if (tokens.length > 0 && !tokens.some((t) => myGroups.includes(t))) return false
     }
     if (!filters.showSelfStudy && s.isSelfStudy) return false
     if (filters.subjects.length > 0 && !s.isSpecialism && !s.isSelfStudy) {
@@ -88,5 +104,6 @@ export function activeFilterCount(settings: Settings): number {
   let count = filters.subjects.length + filters.tutors.length + filters.rooms.length
   if (!filters.showSelfStudy) count++
   if ((settings.mySpecialisms ?? []).length > 0 && settings.hideOtherSpecialisms !== false) count++
+  if ((settings.myGroups ?? []).length > 0) count++
   return count
 }

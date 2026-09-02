@@ -45,6 +45,42 @@ export interface Settings {
   activeView?: ViewMode
   /** base URL of a deployed ics-feed worker (optional, enables the subscribable feed) */
   icsFeedBase?: string
+  /** group tokens (e.g. "2") to keep when a sheet mixes groups; empty = all */
+  myGroups?: string[]
+  /** term start date enabling "Wk N" labels */
+  termStartISO?: string
+  /** minutes before a session to fire a notification; unset/0 = off */
+  reminderMinutes?: number
+}
+
+/** One saved timetable (sheet + all its choices). */
+export interface ProfileEntry {
+  id: string
+  name: string
+  settings: Settings
+}
+
+export interface ProfileStore {
+  activeId: string
+  profiles: ProfileEntry[]
+}
+
+/** Per-session attendance/note, keyed by sessionKey(). */
+export interface SessionMeta {
+  attended?: boolean
+  note?: string
+}
+
+export type MetaMap = Record<string, SessionMeta>
+
+export interface SessionChange {
+  type: 'added' | 'removed' | 'changed'
+  dateISO: string
+  start: string
+  title: string
+  detail?: string
+  at: number
+  seen: boolean
 }
 
 export interface CachedData {

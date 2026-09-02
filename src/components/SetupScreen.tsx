@@ -4,9 +4,10 @@ import type { FormEvent } from 'react'
 interface Props {
   onSubmit: (url: string) => Promise<void>
   onDemo: () => void
+  onCancel?: () => void
 }
 
-export function SetupScreen({ onSubmit, onDemo }: Props) {
+export function SetupScreen({ onSubmit, onDemo, onCancel }: Props) {
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +56,11 @@ export function SetupScreen({ onSubmit, onDemo }: Props) {
         <button type="button" className="btn-ghost" onClick={onDemo} disabled={busy}>
           Or try it with demo data
         </button>
+        {onCancel && (
+          <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+        )}
       </div>
     </div>
   )

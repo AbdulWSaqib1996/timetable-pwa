@@ -1,7 +1,10 @@
-import type { Session } from '../types'
+import { googleCalendarUrl } from '../lib/format'
+import type { Session, SessionMeta } from '../types'
 
 interface Props {
   session: Session
+  meta?: SessionMeta
+  onMeta: (patch: Partial<SessionMeta>) => void
   onClose: () => void
 }
 
@@ -32,8 +35,9 @@ function formatDuration(start: string, end: string): string | null {
   return rest > 0 ? `${hourPart} ${rest} minutes` : hourPart
 }
 
-export function SessionDetail({ session, onClose }: Props) {
+export function SessionDetail({ session, meta, onMeta, onClose }: Props) {
   const duration = formatDuration(session.start, session.end)
+  const gcalUrl = googleCalendarUrl(session)
   const rows: { label: string; value: string }[] = [
     { label: 'Date', value: formatLongDate(session.dateISO) },
     {
@@ -73,6 +77,28 @@ export function SessionDetail({ session, onClose }: Props) {
             Open in Moodle ↗
           </a>
         )}
+        {gcalUrl && (
+          <a className="btn-secondary btn-link" href={gcalUrl} target="_blank" rel="noopener noreferrer">
+            Add to Google Calendar
+          </a>
+        )}
+        <section className="detail-notes">
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={meta?.attended ?? false}
+              onChange={(e) => onMeta({ attended: e.target.checked })}
+            />
+            Attended
+          </label>
+          <textarea
+            className="note-input"
+            placeholder="Notes for this session (saved on this device)…"
+            rows={2}
+            value={meta?.note ?? ''}
+            onChange={(e) => onMeta({ note: e.target.value })}
+          />
+        </section>
         <div className="modal-actions">
           <button type="button" className="btn-ghost" onClick={onClose}>
             Close

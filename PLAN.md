@@ -81,6 +81,8 @@ Each phase is independently usable — after P1 the timetable is already viewabl
 
 Ideas that would meaningfully improve the product, roughly ordered by value-for-effort. Effort: S (hours), M (a day or two), L (multi-day / needs new infrastructure).
 
+**Built (2 Sep 2026):** items 1–8 and 10 below are implemented — share links (Settings → Share this setup), change detection (bell icon + changes sheet), search (magnifier in the header), per-session Google Calendar buttons, multiple timetable profiles (Settings → Timetables, with migration from the single-profile storage), group filtering (Filters → My group), term-start week numbers (Settings), reminders (Settings → Session reminders; fires while the app is open/installed — the note in item 8 about calendar-app alerts via the ICS feed still applies for guaranteed delivery), and attendance/notes (in each session's detail sheet, with badges on cards). Items 9 and 11–13 remain open.
+
 1. **Share your setup via link (S)** — encode the sheet ID, tab and specialism choices into a URL (`?setup=…`) so a coursemate opens the app fully configured with one tap. Highest-value social feature; pure client-side.
 2. **Change detection & highlights (M)** — on each refresh, diff the new sheet data against the cached copy and badge what changed: "Room changed for Maths 2", added/cancelled sessions, with a small changelog sheet. Turns silent timetable edits into visible alerts.
 3. **Search (S)** — a quick search box across titles, tutors and rooms ("when do I next have KaW?"). Client-side filter over loaded sessions.

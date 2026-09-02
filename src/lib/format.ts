@@ -32,3 +32,35 @@ export function formatRemaining(mins: number): string {
   const rest = mins % 60
   return rest > 0 ? `${h}h ${rest}m` : `${h}h`
 }
+
+/** Google Calendar "add event" template link (times are floating local, as in the ICS export). */
+export function googleCalendarUrl(s: Session): string | null {
+  if (!s.start) return null
+  const dt = (t: string) => `${s.dateISO.replace(/-/g, '')}T${t.replace(':', '')}00`
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: s.title,
+    dates: `${dt(s.start)}/${dt(s.end || s.start)}`,
+  })
+  if (s.room && !s.isSelfStudy) params.set('location', s.room)
+  const details = [
+    s.tutor && s.tutor !== 'Self Study' ? `Tutor: ${s.tutor}` : '',
+    s.link ? `Moodle: ${s.link}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+  if (details) params.set('details', details)
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+
+/** 1-based teaching-week number for a date, from the Monday of the term-start week. */
+export function weekNumber(dateISO: string, termStartISO: string): number | null {
+  const toDate = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  const termMonday = toDate(termStartISO)
+  termMonday.setDate(termMonday.getDate() - ((termMonday.getDay() + 6) % 7))
+  const diff = Math.floor((toDate(dateISO).getTime() - termMonday.getTime()) / (7 * 86_400_000))
+  return diff >= 0 ? diff + 1 : null
+}

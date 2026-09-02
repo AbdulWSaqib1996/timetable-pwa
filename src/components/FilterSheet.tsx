@@ -90,6 +90,20 @@ export function FilterSheet({
           </section>
         )}
 
+        {options.groups.length > 1 && (
+          <section className="filter-section">
+            <h3>My group</h3>
+            <ChipList
+              values={options.groups}
+              selected={settings.myGroups ?? []}
+              onToggle={(v) => onUpdateSettings({ myGroups: toggleValue(settings.myGroups ?? [], v) })}
+            />
+            <p className="filter-hint">
+              Hides sessions not listed for your group. Sessions with no group set are always shown.
+            </p>
+          </section>
+        )}
+
         <section className="filter-section">
           <h3>Date range (day view)</h3>
           <div className="chip-grid">

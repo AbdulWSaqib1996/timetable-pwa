@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
-import type { Session } from '../types'
+import { sessionKey } from '../lib/diff'
+import { weekNumber } from '../lib/format'
+import type { MetaMap, Session } from '../types'
 import { SessionCard } from './SessionCard'
 
 interface Props {
@@ -8,6 +10,8 @@ interface Props {
   onSelect: (session: Session) => void
   /** Scroll target (yyyy-mm-dd); defaults to today / next day with sessions. */
   scrollTo?: string | null
+  metaMap?: MetaMap
+  termStartISO?: string
 }
 
 function localTodayISO(): string {
@@ -25,7 +29,7 @@ function formatDayHeader(dateISO: string): string {
   })
 }
 
-export function AgendaView({ sessions, emptyMessage, onSelect, scrollTo }: Props) {
+export function AgendaView({ sessions, emptyMessage, onSelect, scrollTo, metaMap, termStartISO }: Props) {
   const todayISO = localTodayISO()
   const anchorRef = useRef<HTMLElement | null>(null)
 
@@ -74,11 +78,14 @@ export function AgendaView({ sessions, emptyMessage, onSelect, scrollTo }: Props
           >
             <h2 className="day-header">
               <span>{formatDayHeader(dateISO)}</span>
+              {termStartISO && weekNumber(dateISO, termStartISO) !== null && (
+                <span className="week-badge">Wk {weekNumber(dateISO, termStartISO)}</span>
+              )}
               {isToday && <span className="badge badge-today">Today</span>}
             </h2>
             <div className="day-sessions">
               {daySessions.map((s) => (
-                <SessionCard key={s.id} session={s} onSelect={onSelect} />
+                <SessionCard key={s.id} session={s} meta={metaMap?.[sessionKey(s)]} onSelect={onSelect} />
               ))}
             </div>
           </section>

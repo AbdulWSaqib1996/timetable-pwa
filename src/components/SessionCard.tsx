@@ -1,12 +1,13 @@
 import { shortenRoom, subjectColor } from '../lib/format'
-import type { Session } from '../types'
+import type { Session, SessionMeta } from '../types'
 
 interface Props {
   session: Session
+  meta?: SessionMeta
   onSelect: (session: Session) => void
 }
 
-export function SessionCard({ session, onSelect }: Props) {
+export function SessionCard({ session, meta, onSelect }: Props) {
   const color = subjectColor(session)
   return (
     <button
@@ -29,6 +30,8 @@ export function SessionCard({ session, onSelect }: Props) {
           <span className="badge badge-specialism">{session.specialismName}</span>
         )}
         {session.isSelfStudy && <span className="badge badge-selfstudy">Self study</span>}
+        {meta?.attended && <span className="badge badge-attended">✓ attended</span>}
+        {meta?.note && <span className="badge badge-note">📝 note</span>}
       </div>
       <span className="session-chevron" aria-hidden="true">
         ›

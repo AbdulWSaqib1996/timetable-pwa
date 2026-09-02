@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AgendaView } from './components/AgendaView'
+import { ChangesSheet } from './components/ChangesSheet'
 import { FilterBar } from './components/FilterBar'
 import { FilterSheet } from './components/FilterSheet'
 import { MonthView } from './components/MonthView'
@@ -10,6 +11,7 @@ import { SetupScreen } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
 import { WeekView } from './components/WeekView'
 import { buildDemoSessions } from './lib/demo'
+import { diffSessions, sessionKey } from './lib/diff'
 import {
   DEFAULT_FILTERS,
   activeFilterCount,
@@ -18,11 +20,36 @@ import {
   getFilters,
   localTodayISO,
 } from './lib/filters'
+import { formatRemaining, shortenRoom, toMinutes } from './lib/format'
 import { fetchGvizTable } from './lib/gviz'
 import { parseTimetable } from './lib/parseTimetable'
 import { parseSheetUrl } from './lib/sheetUrl'
-import { clearSettings, loadCache, loadSettings, saveCache, saveSettings } from './lib/storage'
-import type { Filters, Session, Settings, ViewMode } from './types'
+import { parseShareHash } from './lib/share'
+import {
+  clearProfileData,
+  clearStore,
+  loadCache,
+  loadChanges,
+  loadMeta,
+  loadNotified,
+  loadStore,
+  newProfileId,
+  saveCache,
+  saveChanges,
+  saveMeta,
+  saveNotified,
+  saveStore,
+} from './lib/storage'
+import type {
+  Filters,
+  MetaMap,
+  ProfileStore,
+  Session,
+  SessionChange,
+  SessionMeta,
+  Settings,
+  ViewMode,
+} from './types'
 
 function formatAge(fetchedAt: number): string {
   const mins = Math.round((Date.now() - fetchedAt) / 60000)
@@ -33,10 +60,33 @@ function formatAge(fetchedAt: number): string {
   return `${Math.round(hours / 24)}d ago`
 }
 
-type SheetName = 'none' | 'filters' | 'settings'
+function matchesQuery(s: Session, q: string): boolean {
+  const needle = q.toLowerCase()
+  return [s.title, s.subject, s.tutor, s.room].some((f) => f && f.toLowerCase().includes(needle))
+}
+
+type SheetName = 'none' | 'filters' | 'settings' | 'changes'
+
+/** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
+function initStore(): ProfileStore | null {
+  let store = loadStore()
+  const shared = parseShareHash(window.location.hash)
+  if (shared) {
+    const id = newProfileId()
+    const name = `Shared timetable${store ? ` ${store.profiles.length + 1}` : ''}`
+    store = {
+      activeId: id,
+      profiles: [...(store?.profiles ?? []), { id, name, settings: shared }],
+    }
+    saveStore(store)
+    history.replaceState(null, '', window.location.pathname + window.location.search)
+  }
+  return store
+}
 
 export default function App() {
-  const [settings, setSettings] = useState<Settings | null>(() => loadSettings())
+  const [store, setStore] = useState<ProfileStore | null>(initStore)
+  const [addingProfile, setAddingProfile] = useState(false)
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [fetchedAt, setFetchedAt] = useState<number | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -45,47 +95,80 @@ export default function App() {
   const [rechoosing, setRechoosing] = useState(false)
   const [selected, setSelected] = useState<Session | null>(null)
   const [jumpDate, setJumpDate] = useState<string | null>(null)
+  const [metaMap, setMetaMap] = useState<MetaMap>({})
+  const [changes, setChanges] = useState<SessionChange[]>([])
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query, setQuery] = useState('')
 
-  const refresh = useCallback(async (s: Settings) => {
-    if (s.demo) {
-      setSessions(buildDemoSessions())
-      setFetchedAt(Date.now())
-      setError(null)
-      return
-    }
-    setRefreshing(true)
-    try {
-      const table = await fetchGvizTable(s.sheetId, s.gid)
-      const { sessions: parsed } = parseTimetable(table)
-      setSessions(parsed)
-      const now = Date.now()
-      setFetchedAt(now)
-      setError(null)
-      saveCache({ fetchedAt: now, sessions: parsed })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to refresh.')
-    } finally {
-      setRefreshing(false)
-    }
-  }, [])
+  const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
+  const settings = active?.settings ?? null
+  const todayISO = localTodayISO()
 
-  // On startup with a saved sheet: show cached data instantly, then refresh in the background.
+  const refresh = useCallback(
+    async (s: Settings, pid: string) => {
+      if (s.demo) {
+        setSessions(buildDemoSessions())
+        setFetchedAt(Date.now())
+        setError(null)
+        return
+      }
+      setRefreshing(true)
+      try {
+        const table = await fetchGvizTable(s.sheetId, s.gid)
+        const { sessions: parsed } = parseTimetable(table)
+        const prev = loadCache(pid)
+        if (prev) {
+          // Diff the user's own view of old vs new (their specialism/group filters applied).
+          const newChanges = diffSessions(
+            applyFilters(prev.sessions, s, todayISO, { ignoreDateRange: true }),
+            applyFilters(parsed, s, todayISO, { ignoreDateRange: true }),
+            todayISO
+          )
+          if (newChanges.length > 0) {
+            const merged = [...newChanges, ...loadChanges(pid)]
+            saveChanges(pid, merged)
+            setChanges(merged.slice(0, 100))
+          }
+        }
+        setSessions(parsed)
+        const now = Date.now()
+        setFetchedAt(now)
+        setError(null)
+        saveCache(pid, { fetchedAt: now, sessions: parsed })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to refresh.')
+      } finally {
+        setRefreshing(false)
+      }
+    },
+    [todayISO]
+  )
+
+  // When the active profile changes (startup or switch): load its cache/meta/changes, then refresh.
   useEffect(() => {
-    if (!settings) return
-    const cached = loadCache()
-    if (cached && !settings.demo) {
-      setSessions(cached.sessions)
-      setFetchedAt(cached.fetchedAt)
-    }
-    void refresh(settings)
+    if (!active) return
+    const cached = loadCache(active.id)
+    setSessions(cached && !active.settings.demo ? cached.sessions : null)
+    setFetchedAt(cached && !active.settings.demo ? cached.fetchedAt : null)
+    setMetaMap(loadMeta(active.id))
+    setChanges(loadChanges(active.id))
+    setSelected(null)
+    setJumpDate(null)
+    setError(null)
+    void refresh(active.settings, active.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [active?.id])
 
   function updateSettings(patch: Partial<Settings>) {
-    setSettings((prev) => {
+    setStore((prev) => {
       if (!prev) return prev
-      const next = { ...prev, ...patch }
-      saveSettings(next)
+      const next: ProfileStore = {
+        ...prev,
+        profiles: prev.profiles.map((p) =>
+          p.id === prev.activeId ? { ...p, settings: { ...p.settings, ...patch } } : p
+        ),
+      }
+      saveStore(next)
       return next
     })
   }
@@ -93,6 +176,19 @@ export default function App() {
   function updateFilters(patch: Partial<Filters>) {
     if (!settings) return
     updateSettings({ filters: { ...getFilters(settings), ...patch } })
+  }
+
+  function addProfileToStore(newSettings: Settings, name: string): string {
+    const id = newProfileId()
+    setStore((prev) => {
+      const next: ProfileStore = {
+        activeId: id,
+        profiles: [...(prev?.profiles ?? []), { id, name, settings: newSettings }],
+      }
+      saveStore(next)
+      return next
+    })
+    return id
   }
 
   async function handleSetup(url: string) {
@@ -104,37 +200,58 @@ export default function App() {
     const table = await fetchGvizTable(parsed.sheetId, parsed.gid)
     const { sessions: parsedSessions } = parseTimetable(table)
     const s: Settings = { sheetUrl: url, sheetId: parsed.sheetId, gid: parsed.gid }
-    saveSettings(s)
-    const now = Date.now()
-    saveCache({ fetchedAt: now, sessions: parsedSessions })
-    setSettings(s)
-    setSessions(parsedSessions)
-    setFetchedAt(now)
-    setError(null)
+    const name = `Timetable ${(store?.profiles.length ?? 0) + 1}`
+    const id = addProfileToStore(s, name)
+    saveCache(id, { fetchedAt: Date.now(), sessions: parsedSessions })
+    setAddingProfile(false)
   }
 
   function handleDemo() {
-    const s: Settings = { sheetUrl: '', sheetId: '', gid: null, demo: true }
-    saveSettings(s)
-    setSettings(s)
-    setSessions(buildDemoSessions())
-    setFetchedAt(Date.now())
+    addProfileToStore({ sheetUrl: '', sheetId: '', gid: null, demo: true }, 'Demo')
+    setAddingProfile(false)
   }
 
-  function handleChangeSheet() {
-    clearSettings()
-    setSettings(null)
-    setSessions(null)
-    setFetchedAt(null)
-    setError(null)
+  function handleDeleteProfile(id: string) {
+    clearProfileData(id)
+    setStore((prev) => {
+      if (!prev) return prev
+      const remaining = prev.profiles.filter((p) => p.id !== id)
+      if (remaining.length === 0) {
+        clearStore()
+        return null
+      }
+      const next: ProfileStore = {
+        activeId: prev.activeId === id ? remaining[0].id : prev.activeId,
+        profiles: remaining,
+      }
+      saveStore(next)
+      return next
+    })
     setOpenSheet('none')
-    setRechoosing(false)
-    setSelected(null)
-    setJumpDate(null)
+  }
+
+  function handleSwitchProfile(id: string) {
+    setStore((prev) => {
+      if (!prev || prev.activeId === id) return prev
+      const next = { ...prev, activeId: id }
+      saveStore(next)
+      return next
+    })
+  }
+
+  function handleMeta(session: Session, patch: Partial<SessionMeta>) {
+    if (!active) return
+    setMetaMap((prev) => {
+      const key = sessionKey(session)
+      const entry = { ...prev[key], ...patch }
+      const next: MetaMap = { ...prev, [key]: entry }
+      if (!entry.attended && !entry.note) delete next[key]
+      saveMeta(active.id, next)
+      return next
+    })
   }
 
   const options = useMemo(() => deriveOptions(sessions ?? []), [sessions])
-  const todayISO = localTodayISO()
   const view: ViewMode = settings?.activeView ?? 'day'
 
   // Day view honours the date-range filter; week/month navigate dates themselves.
@@ -146,20 +263,79 @@ export default function App() {
     [sessions, settings, todayISO, view]
   )
 
-  // For export: user's filters, all dates.
+  // For export, search, reminders and the Now/Next card: user's filters, all dates.
   const exportSessions = useMemo(
     () =>
       sessions && settings ? applyFilters(sessions, settings, todayISO, { ignoreDateRange: true }) : [],
     [sessions, settings, todayISO]
   )
 
-  if (!settings) {
-    return <SetupScreen onSubmit={handleSetup} onDemo={handleDemo} />
+  const searchResults = useMemo(() => {
+    const q = query.trim()
+    return q ? exportSessions.filter((s) => matchesQuery(s, q)) : null
+  }, [exportSessions, query])
+
+  // Session reminders: check every 30s while the app is running.
+  const exportRef = useRef(exportSessions)
+  exportRef.current = exportSessions
+  const reminderMinutes = settings?.reminderMinutes ?? 0
+  useEffect(() => {
+    if (!reminderMinutes || typeof Notification === 'undefined') return
+    const check = () => {
+      if (Notification.permission !== 'granted') return
+      const now = new Date()
+      const today = localTodayISO()
+      const nowMins = now.getHours() * 60 + now.getMinutes()
+      const notified = loadNotified()
+      let dirty = false
+      for (const s of exportRef.current) {
+        if (s.dateISO !== today || !s.start) continue
+        const start = toMinutes(s.start)
+        if (start === null) continue
+        const delta = start - nowMins
+        const key = sessionKey(s)
+        if (delta > 0 && delta <= reminderMinutes && !notified[key]) {
+          try {
+            new Notification(s.title, {
+              body: `Starts ${s.start} (in ${formatRemaining(delta)})${s.room && !s.isSelfStudy ? ` · ${shortenRoom(s.room)}` : ''}`,
+            })
+          } catch {
+            /* notification constructor unavailable (some mobile browsers) */
+          }
+          notified[key] = Date.now()
+          dirty = true
+        }
+      }
+      if (dirty) saveNotified(notified)
+    }
+    check()
+    const t = setInterval(check, 30_000)
+    return () => clearInterval(t)
+  }, [reminderMinutes])
+
+  if (!active || !settings || addingProfile) {
+    return (
+      <SetupScreen
+        onSubmit={handleSetup}
+        onDemo={handleDemo}
+        onCancel={addingProfile && active ? () => setAddingProfile(false) : undefined}
+      />
+    )
   }
 
   const filters = getFilters(settings)
   const showPicker =
     rechoosing || (!settings.specialismsChosen && sessions !== null && options.specialisms.length > 0)
+  const unseenChanges = changes.filter((c) => !c.seen).length
+
+  function openChanges() {
+    setOpenSheet('changes')
+    if (active && unseenChanges > 0) {
+      const seen = changes.map((c) => ({ ...c, seen: true }))
+      setChanges(seen)
+      saveChanges(active.id, seen)
+    }
+  }
 
   return (
     <div className="app">
@@ -177,7 +353,23 @@ export default function App() {
             <button
               type="button"
               className="btn-icon"
-              onClick={() => refresh(settings)}
+              onClick={() => {
+                setSearchOpen((v) => !v)
+                setQuery('')
+              }}
+              aria-label="Search"
+              title="Search"
+            >
+              🔍
+            </button>
+            <button type="button" className="btn-icon btn-bell" onClick={openChanges} aria-label="Changes" title="Changes">
+              🔔
+              {unseenChanges > 0 && <span className="bell-badge">{unseenChanges}</span>}
+            </button>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={() => refresh(settings, active.id)}
               disabled={refreshing}
               aria-label="Refresh"
               title="Refresh"
@@ -195,6 +387,18 @@ export default function App() {
             </button>
           </div>
         </div>
+        {searchOpen && (
+          <div className="searchbar">
+            <input
+              type="search"
+              placeholder="Search title, tutor or room…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+            />
+            {searchResults && <span className="search-count">{searchResults.length}</span>}
+          </div>
+        )}
         <FilterBar
           view={view}
           activeCount={activeFilterCount(settings)}
@@ -213,14 +417,27 @@ export default function App() {
         </div>
       )}
 
-      {sessions !== null && view === 'day' && (
+      {sessions !== null && view === 'day' && !searchResults && (
         <NowNextCard sessions={exportSessions} onSelect={setSelected} />
       )}
 
       {sessions === null ? (
         <div className="empty-state">Loading timetable…</div>
+      ) : searchResults ? (
+        <AgendaView
+          sessions={searchResults}
+          onSelect={setSelected}
+          metaMap={metaMap}
+          termStartISO={settings.termStartISO}
+          emptyMessage={`No sessions match “${query.trim()}”.`}
+        />
       ) : view === 'week' ? (
-        <WeekView sessions={filteredSessions} todayISO={todayISO} onSelect={setSelected} />
+        <WeekView
+          sessions={filteredSessions}
+          todayISO={todayISO}
+          onSelect={setSelected}
+          termStartISO={settings.termStartISO}
+        />
       ) : view === 'month' ? (
         <MonthView
           sessions={filteredSessions}
@@ -235,6 +452,8 @@ export default function App() {
           sessions={filteredSessions}
           scrollTo={jumpDate}
           onSelect={setSelected}
+          metaMap={metaMap}
+          termStartISO={settings.termStartISO}
           emptyMessage={
             sessions.length === 0
               ? 'No sessions found in this sheet.'
@@ -245,7 +464,14 @@ export default function App() {
         />
       )}
 
-      {selected && <SessionDetail session={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <SessionDetail
+          session={selected}
+          meta={metaMap[sessionKey(selected)]}
+          onMeta={(patch) => handleMeta(selected, patch)}
+          onClose={() => setSelected(null)}
+        />
+      )}
 
       {showPicker && (
         <SpecialismPicker
@@ -270,22 +496,47 @@ export default function App() {
           onUpdateSettings={updateSettings}
           onUpdateFilters={updateFilters}
           onClear={() =>
-            updateSettings({ filters: { ...DEFAULT_FILTERS }, mySpecialisms: [], hideOtherSpecialisms: true })
+            updateSettings({
+              filters: { ...DEFAULT_FILTERS },
+              mySpecialisms: [],
+              hideOtherSpecialisms: true,
+              myGroups: [],
+            })
           }
           onClose={() => setOpenSheet('none')}
         />
       )}
 
-      {openSheet === 'settings' && (
+      {openSheet === 'changes' && (
+        <ChangesSheet
+          changes={changes}
+          onClear={() => {
+            setChanges([])
+            saveChanges(active.id, [])
+          }}
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'settings' && store && (
         <SettingsSheet
           settings={settings}
+          store={store}
           exportSessions={exportSessions}
           onUpdateSettings={updateSettings}
           onRechooseSpecialisms={() => {
             setOpenSheet('none')
             setRechoosing(true)
           }}
-          onChangeSheet={handleChangeSheet}
+          onSwitchProfile={(id) => {
+            handleSwitchProfile(id)
+            setOpenSheet('none')
+          }}
+          onAddProfile={() => {
+            setOpenSheet('none')
+            setAddingProfile(true)
+          }}
+          onDeleteProfile={handleDeleteProfile}
           onClose={() => setOpenSheet('none')}
         />
       )}

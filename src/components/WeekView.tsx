@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { subjectColor } from '../lib/format'
+import { subjectColor, weekNumber } from '../lib/format'
 import type { Session } from '../types'
 import { SessionCard } from './SessionCard'
 
@@ -7,6 +7,7 @@ interface Props {
   sessions: Session[]
   todayISO: string
   onSelect: (session: Session) => void
+  termStartISO?: string
 }
 
 function iso(d: Date): string {
@@ -69,9 +70,10 @@ function useIsNarrow(): boolean {
 
 const HOUR_PX = 56
 
-export function WeekView({ sessions, todayISO, onSelect }: Props) {
+export function WeekView({ sessions, todayISO, onSelect, termStartISO }: Props) {
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayISO))
   const isNarrow = useIsNarrow()
+  const wkNum = termStartISO ? weekNumber(weekStart, termStartISO) : null
 
   const weekDays = useMemo(() => {
     const base = [0, 1, 2, 3, 4].map((i) => addDays(weekStart, i))
@@ -119,6 +121,7 @@ export function WeekView({ sessions, todayISO, onSelect }: Props) {
         title={isCurrentWeek ? undefined : 'Back to this week'}
       >
         {weekLabel}
+        {wkNum !== null && <span className="week-current"> · Wk {wkNum}</span>}
         {isCurrentWeek && <span className="week-current"> · this week</span>}
       </button>
       <button type="button" className="btn-icon" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">
