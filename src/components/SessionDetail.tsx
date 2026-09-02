@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { TRAVEL_MODE_PHRASE, estimateTravel, osmEmbedUrl } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl } from '../lib/format'
-import { tflDisruptions, tflRoute } from '../lib/tfl'
+import { tflDisruptions, tflLineColor, tflModeIcon, tflRoute } from '../lib/tfl'
 import type { TflDisruption, TflRoute } from '../lib/tfl'
 import type { Session, SessionMeta } from '../types'
 
@@ -127,13 +127,38 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
             </a>
           </div>
         )}
-        {route && route.via.length > 0 && (
-          <p className="route-info">
-            Best route now: {route.via.join(' · ')}
-            {route.via.length > 0 && ' · then walk'}
-          </p>
+        {route && route.legs.length > 0 && (
+          <div className="route-steps">
+            <div className="route-steps-head">
+              <span>Best route now</span>
+              <span className="route-total">≈ {formatRemaining(route.minutes)}</span>
+            </div>
+            {route.legs.map((leg, i) => {
+              const color = tflLineColor(leg.line, leg.mode)
+              return (
+                <div className="route-step" key={i} style={{ borderLeftColor: color }}>
+                  <span className="route-step-icon">{tflModeIcon(leg.mode)}</span>
+                  <span className="route-step-body">
+                    {leg.mode === 'walking' ? (
+                      <span className="route-step-title">
+                        Walk{leg.to ? ` to ${leg.to}` : ''}
+                      </span>
+                    ) : (
+                      <span className="route-step-title">
+                        <span className="route-line-badge" style={{ background: color }}>
+                          {leg.line}
+                        </span>{' '}
+                        {leg.from} → {leg.to}
+                      </span>
+                    )}
+                  </span>
+                  {leg.minutes > 0 && <span className="route-step-mins">{formatRemaining(leg.minutes)}</span>}
+                </div>
+              )
+            })}
+          </div>
         )}
-        {route && route.via.length === 0 && travelMode === 'transit' && (
+        {route && route.legs.length === 0 && travelMode === 'transit' && (
           <p className="route-info">Best option now: walk (no transit leg needed).</p>
         )}
         {routeDisruptions.map((d) => (

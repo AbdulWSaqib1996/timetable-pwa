@@ -7,18 +7,76 @@ import type { Coords } from './campus'
  * - Line Status: live disruptions (strikes, closures, delays) for tube/overground/DLR/Elizabeth line.
  */
 
+export interface TflLeg {
+  /** tfl mode: walking, bus, tube, overground, dlr, elizabeth-line, national-rail, tram… */
+  mode: string
+  /** line/route name (e.g. "Victoria", "73"); empty for walking */
+  line: string
+  from: string
+  to: string
+  minutes: number
+}
+
 export interface TflRoute {
   minutes: number
-  /** human route legs, e.g. "Victoria line: King's Cross → Euston" (walking legs omitted) */
-  via: string[]
+  legs: TflLeg[]
   /** line names the route uses, for matching against disruptions */
   lines: string[]
+}
+
+const MODE_ICONS: Record<string, string> = {
+  walking: '🚶',
+  bus: '🚌',
+  tube: '🚇',
+  overground: '🚆',
+  'elizabeth-line': '🚆',
+  'national-rail': '🚆',
+  dlr: '🚈',
+  tram: '🚊',
+  'river-bus': '⛴',
+  cycle: '🚲',
+}
+
+export function tflModeIcon(mode: string): string {
+  return MODE_ICONS[mode] ?? '🚌'
+}
+
+/** Official-ish TfL line colours for the route timeline. */
+const LINE_COLORS: Record<string, string> = {
+  bakerloo: '#B36305',
+  central: '#E32017',
+  circle: '#FFD300',
+  district: '#00782A',
+  'hammersmith & city': '#F3A9BB',
+  jubilee: '#A0A5A9',
+  metropolitan: '#9B0056',
+  northern: '#5c5f66',
+  piccadilly: '#003688',
+  victoria: '#0098D4',
+  'waterloo & city': '#95CDBA',
+  elizabeth: '#6950A1',
+  dlr: '#00A4A7',
+  tram: '#84B817',
+}
+
+export function tflLineColor(line: string, mode: string): string {
+  const key = line.toLowerCase()
+  if (LINE_COLORS[key]) return LINE_COLORS[key]
+  if (mode === 'bus' || /^\w?\d+$/.test(line)) return '#DC241F'
+  if (mode === 'overground' || key.includes('windrush') || key.includes('mildmay') || key.includes('lioness') || key.includes('weaver') || key.includes('suffragette') || key.includes('liberty')) return '#EE7C0E'
+  if (mode === 'walking') return '#9aa1b5'
+  return '#6950A1'
 }
 
 const routeCache = new Map<string, { at: number; route: TflRoute | null }>()
 
 function cleanStop(name?: string): string {
-  return (name ?? '').replace(/ (Underground|Rail|DLR) Station$/i, '').trim()
+  let cleaned = (name ?? '').replace(/ (Underground|Rail|DLR) Station$/i, '').trim()
+  // TfL returns street addresses in ALL CAPS — title-case those.
+  if (cleaned.length > 3 && cleaned === cleaned.toUpperCase()) {
+    cleaned = cleaned.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase())
+  }
+  return cleaned
 }
 
 export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | null> {
@@ -35,6 +93,7 @@ export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | nul
         journeys?: {
           duration?: number
           legs?: {
+            duration?: number
             mode?: { name?: string }
             routeOptions?: { name?: string }[]
             departurePoint?: { commonName?: string }
@@ -44,16 +103,21 @@ export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | nul
       }
       const journey = json.journeys?.[0]
       if (journey && typeof journey.duration === 'number' && journey.duration > 0) {
-        const via: string[] = []
+        const legs: TflLeg[] = []
         const lines: string[] = []
         for (const leg of journey.legs ?? []) {
           const mode = leg.mode?.name ?? ''
-          if (mode === 'walking') continue
-          const line = leg.routeOptions?.[0]?.name || mode
-          via.push(`${line}: ${cleanStop(leg.departurePoint?.commonName)} → ${cleanStop(leg.arrivalPoint?.commonName)}`)
-          lines.push(line)
+          const line = mode === 'walking' ? '' : leg.routeOptions?.[0]?.name || mode
+          legs.push({
+            mode,
+            line,
+            from: cleanStop(leg.departurePoint?.commonName),
+            to: cleanStop(leg.arrivalPoint?.commonName),
+            minutes: leg.duration ?? 0,
+          })
+          if (line) lines.push(line)
         }
-        route = { minutes: journey.duration, via, lines }
+        route = { minutes: journey.duration, legs, lines }
       }
     }
   } catch {

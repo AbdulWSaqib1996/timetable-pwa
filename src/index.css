@@ -548,6 +548,77 @@ body {
   line-height: 1.45;
 }
 
+/* ---------- Route timeline ---------- */
+
+.route-steps {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--bg);
+}
+
+.route-steps-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.route-total {
+  color: var(--accent);
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.route-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--border);
+  padding: 6px 0 6px 10px;
+  margin-left: 4px;
+}
+
+.route-step-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.route-step-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.route-step-title {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.route-line-badge {
+  display: inline-block;
+  color: #fff;
+  border-radius: 5px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
+.route-step-mins {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .route-warning {
   margin: 8px 0 0;
   padding: 8px 10px;

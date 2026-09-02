@@ -109,6 +109,8 @@ Ideas that would meaningfully improve the product, roughly ordered by value-for-
 
 A fresh pass over the app as it now stands. Effort: S (hours), M (a day or two), L (multi-day / new infrastructure).
 
+**Built (2 Sep 2026, seventh pass): visual route timeline.** The session detail's "best route" is now a step-by-step timeline: one row per leg with a mode icon, an official-colour line badge (Victoria blue, bus red, Overground orange…), from → to stops, per-leg minutes, and the live total — replacing the plain-text route line.
+
 **Built (2 Sep 2026, sixth pass): live TfL disruption awareness.** With public transport selected: an amber collapsible banner on the day view lists lines not running good service (strikes, closures, delays — refreshed every 5 min); session details show the live-recommended route ("Best route now: 73: King's Cross St. Pancras → Euston · then walk") which TfL's journey planner already steers around disruptions, plus ⚠ warnings when the recommended route's own lines are disrupted; and leave alerts append a TfL disruption note when firing.
 
 **Built (2 Sep 2026, fifth pass): items 1–9 below.** Key-date reminders (7/3/1-day chips under Settings → Key dates); key dates in the .ics download and worker feed as 📌 all-day events; backup export/import (Settings → Backup, JSON of all profiles + notes/attendance) and the share link now carries term start, travel mode, filters and the key-dates tab; live TfL journey times in session details when the mode is public transport (falls back to the heuristic); ⚠ Clash badges on overlapping sessions in the day view; attendance insights (overall % + per-subject counts + CSV export in Settings); PWA shortcuts (Today / Key dates on long-press) and app-icon badging with the unseen-changes count; multi-tab merge (Settings → Timetables → "Merge tab into this timetable", with deduplication); manual System/Light/Dark theme toggle. Remaining from this list: 10–13 (analytics, error monitoring, print stylesheet, accessibility pass).
@@ -128,6 +130,25 @@ A fresh pass over the app as it now stands. Effort: S (hours), M (a day or two),
 13. **Accessibility pass (M)** — keyboard navigation through cards and sheets, focus trapping in modals, reduced-motion support, and a screen-reader audit; worth doing before promoting the app beyond the cohort.
 
 **Suggested order:** 1 and 2 first (small and high-value, both about deadlines users already asked for), then 3 (data safety), 5 and 7 as polish, 4 when journey accuracy starts to matter, 10/11 before any push to other cohorts.
+
+## Future enhancements — round 3 (logged 2 Sep 2026)
+
+Ideas building on the app after rounds 1–2 and the TfL work (which now includes a visual per-leg route timeline with line colours and timings). Still open from earlier rounds: original 9 (private-sheet OAuth) and 11 (feed hardening, after the worker deploy); round-2 10–13 (analytics, error monitoring, print stylesheet, accessibility pass). Effort: S (hours), M (a day or two), L (multi-day / new infrastructure).
+
+1. **True background push (L)** — the one structural gap: strike alerts, leave alerts and key-date reminders currently need the app open. A small Cloudflare Worker with cron triggers + Web Push subscriptions would deliver them with the app closed. The most-requested-in-spirit item; also unlocks "timetable changed overnight" pushes.
+2. **Live departures (M)** — TfL's Arrivals API: once a route is shown, add "next 205 from King's Cross: 2, 9, 14 min" so you know whether to run for it.
+3. **Weather-aware mornings (S/M)** — Open-Meteo (free, keyless): rain/temperature chip on the Now/Next card and a "rain at 9:00 — consider leaving earlier" note in leave alerts.
+4. **Deadline workload view (M)** — a "next 14 days" pressure summary over key dates (count + list), plus per-key-date notes/checklists ("draft done, references left") reusing the session-notes storage.
+5. **Free-slot finder (M)** — surface gaps between sessions ("2h free after English 1, next session 14:30") in the day view — the natural place to plan library time; pairs with the deadline workload view.
+6. **Personal-calendar clash check (M/L)** — subscribe to the user's own Google Calendar (public ICS address pasted into Settings) and badge timetable sessions that clash with personal events (work shifts, appointments).
+7. **Term stats / "wrapped" (S)** — end-of-term shareable summary from existing data: attendance %, busiest week, most-visited building, total taught hours.
+8. **Share week as image (S)** — render the week grid to a PNG (canvas) for sharing in group chats, where links get ignored but screenshots get read.
+9. **List virtualisation (S/M)** — the day view renders all 443 sessions; virtualise (or window by month) to keep low-end phones smooth as the sheet grows.
+10. **Playwright E2E tests in CI (M)** — the app now has enough surface (parsing, filters, profiles, share links) that regressions are plausible; a smoke suite against the demo data on every push would catch them before deploy.
+11. **Android TWA / Play Store wrapper (L)** — package the PWA as a Trusted Web Activity for the Play Store; gives real install distribution to other cohorts and enables richer notifications on Android. Only worth it alongside the template-sales route.
+12. **Offline map tiles (S)** — cache the handful of OSM tiles around campus in the service worker so the detail-sheet map renders offline too.
+
+**Suggested order:** 3 and 8 as quick delights, 5 + 4 as the next real feature pair, 10 before the codebase grows further, 1 when reminders prove popular, 11 only with multi-cohort traction.
 
 ## Monetisation options (explored 2 Sep 2026)
 
