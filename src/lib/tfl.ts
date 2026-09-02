@@ -15,8 +15,9 @@ export interface TflLeg {
   from: string
   to: string
   minutes: number
-  /** departure StopPoint id when TfL provides one (enables live arrivals) */
-  naptanId?: string
+  /** departure point coordinates (used to find the stop for live departures) */
+  fromLat?: number
+  fromLng?: number
 }
 
 export interface TflRoute {
@@ -98,7 +99,7 @@ export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | nul
             duration?: number
             mode?: { name?: string }
             routeOptions?: { name?: string }[]
-            departurePoint?: { commonName?: string; naptanId?: string }
+            departurePoint?: { commonName?: string; lat?: number; lon?: number }
             arrivalPoint?: { commonName?: string }
           }[]
         }[]
@@ -116,7 +117,8 @@ export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | nul
             from: cleanStop(leg.departurePoint?.commonName),
             to: cleanStop(leg.arrivalPoint?.commonName),
             minutes: leg.duration ?? 0,
-            naptanId: leg.departurePoint?.naptanId,
+            fromLat: leg.departurePoint?.lat,
+            fromLng: leg.departurePoint?.lon,
           })
           if (line) lines.push(line)
         }
@@ -135,19 +137,43 @@ export async function tflTransitMinutes(from: Coords, to: Coords): Promise<numbe
   return (await tflRoute(from, to))?.minutes ?? null
 }
 
-/** Next live arrivals (minutes) of a line at a stop, soonest first (max 3). */
-export async function tflArrivals(naptanId: string, line: string): Promise<number[]> {
+export interface TflDepartures {
+  stop: string
+  mins: number[]
+}
+
+/**
+ * Live departures of a line near a point: find the closest StopPoint that serves the
+ * line (journey legs don't carry a usable stop id), then read its arrivals board.
+ */
+export async function tflDeparturesNear(lat: number, lng: number, line: string): Promise<TflDepartures | null> {
   try {
-    const res = await fetch(`https://api.tfl.gov.uk/StopPoint/${encodeURIComponent(naptanId)}/Arrivals`)
-    if (!res.ok) return []
-    const arrivals = (await res.json()) as { lineName?: string; timeToStation?: number }[]
-    return arrivals
-      .filter((a) => !line || (a.lineName ?? '').toLowerCase() === line.toLowerCase())
+    const stopsRes = await fetch(
+      `https://api.tfl.gov.uk/StopPoint?lat=${lat}&lon=${lng}&stopTypes=NaptanPublicBusCoachTram,NaptanMetroStation,NaptanRailStation&radius=180`
+    )
+    if (!stopsRes.ok) return null
+    const stopsJson = (await stopsRes.json()) as {
+      stopPoints?: { naptanId?: string; commonName?: string; stopLetter?: string; lines?: { name?: string }[] }[]
+    }
+    const stop = (stopsJson.stopPoints ?? []).find((sp) =>
+      (sp.lines ?? []).some((l) => (l.name ?? '').toLowerCase() === line.toLowerCase())
+    )
+    if (!stop?.naptanId) return null
+    const arrRes = await fetch(`https://api.tfl.gov.uk/StopPoint/${encodeURIComponent(stop.naptanId)}/Arrivals`)
+    if (!arrRes.ok) return null
+    const arrivals = (await arrRes.json()) as { lineName?: string; timeToStation?: number }[]
+    const mins = arrivals
+      .filter((a) => (a.lineName ?? '').toLowerCase() === line.toLowerCase())
       .map((a) => Math.max(0, Math.round((a.timeToStation ?? 0) / 60)))
       .sort((a, b) => a - b)
       .slice(0, 3)
+    if (mins.length === 0) return null
+    return {
+      stop: `${stop.commonName ?? 'stop'}${stop.stopLetter ? ` (Stop ${stop.stopLetter})` : ''}`,
+      mins,
+    }
   } catch {
-    return []
+    return null
   }
 }
 

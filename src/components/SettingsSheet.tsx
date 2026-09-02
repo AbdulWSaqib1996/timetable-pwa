@@ -24,6 +24,10 @@ interface Props {
   onClose: () => void
 }
 
+/** Canonical worker deployments for this app; Settings inputs can override them. */
+const DEFAULT_ICS_FEED_BASE = 'https://timetable-ics.ics-feed.workers.dev'
+const DEFAULT_PUSH_BASE = 'https://timetable-push.ics-feed.workers.dev'
+
 function downloadFile(name: string, content: string, type: string) {
   const blob = new Blob([content], { type })
   const url = URL.createObjectURL(blob)
@@ -77,12 +81,12 @@ export function SettingsSheet({
   onDeleteProfile,
   onClose,
 }: Props) {
-  const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? '')
+  const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE)
   const [keyDatesUrl, setKeyDatesUrl] = useState(settings.keyDatesUrl ?? '')
   const [keyDatesError, setKeyDatesError] = useState(false)
   const [mergeUrl, setMergeUrl] = useState('')
   const [mergeError, setMergeError] = useState(false)
-  const [pushBase, setPushBase] = useState(settings.pushServerBase ?? '')
+  const [pushBase, setPushBase] = useState(settings.pushServerBase ?? DEFAULT_PUSH_BASE)
   const [pushBusy, setPushBusy] = useState(false)
   const [pushMessage, setPushMessage] = useState<string | null>(null)
 
@@ -218,8 +222,9 @@ export function SettingsSheet({
   }
 
   const notifBlocked = typeof Notification !== 'undefined' && Notification.permission === 'denied'
-  const feedUrl =
-    !settings.demo && settings.icsFeedBase ? buildFeedUrl(settings.icsFeedBase, settings) : null
+  const feedUrl = !settings.demo
+    ? buildFeedUrl(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE, settings)
+    : null
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -508,8 +513,9 @@ export function SettingsSheet({
           <section className="filter-section">
             <h3>Background push (works with the app closed)</h3>
             <p className="filter-hint">
-              Deploy the push worker (see workers/push in the project README), paste its URL here and
-              enable — session and key-date reminders then arrive even when the app isn't open.
+              Session and key-date reminders arrive even when the app isn't open. The push server is
+              already deployed — just tap Enable (the URL below only needs changing for a different
+              deployment).
             </p>
             <div className="feed-row">
               <input
@@ -623,8 +629,9 @@ export function SettingsSheet({
           ) : (
             <>
               <p className="filter-hint">
-                Deploy the ics-feed worker (see the project README), then paste its URL here to get a
-                feed link your calendar app keeps in sync.
+                Add the feed URL below to your calendar app ("subscribe by URL" / "from internet")
+                and it stays in sync with the sheet — sessions, your specialism choices, and key
+                dates included.
               </p>
               <div className="feed-row">
                 <input

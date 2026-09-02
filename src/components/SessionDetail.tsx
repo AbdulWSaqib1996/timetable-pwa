@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { TRAVEL_MODE_PHRASE, estimateTravel } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl } from '../lib/format'
-import { tflArrivals, tflDisruptions, tflLineColor, tflModeIcon, tflRoute } from '../lib/tfl'
+import { tflDeparturesNear, tflDisruptions, tflLineColor, tflModeIcon, tflRoute } from '../lib/tfl'
 import type { TflDisruption, TflRoute } from '../lib/tfl'
 import type { Session, SessionMeta } from '../types'
 import { StaticMap } from './StaticMap'
@@ -65,12 +65,12 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
     void tflRoute(coords, travel.location).then((r) => {
       if (cancelled) return
       setRoute(r)
-      // Live departures for the first transit leg with a known stop id.
-      const firstTransit = r?.legs.find((l) => l.mode !== 'walking' && l.naptanId)
-      if (firstTransit?.naptanId) {
-        void tflArrivals(firstTransit.naptanId, firstTransit.line).then((mins) => {
-          if (!cancelled && mins.length > 0) {
-            setArrivals({ line: firstTransit.line, from: firstTransit.from, mins })
+      // Live departures for the first transit leg (stop found near its departure point).
+      const firstTransit = r?.legs.find((l) => l.mode !== 'walking' && l.line && l.fromLat != null && l.fromLng != null)
+      if (firstTransit) {
+        void tflDeparturesNear(firstTransit.fromLat!, firstTransit.fromLng!, firstTransit.line).then((dep) => {
+          if (!cancelled && dep) {
+            setArrivals({ line: firstTransit.line, from: dep.stop, mins: dep.mins })
           }
         })
       }
