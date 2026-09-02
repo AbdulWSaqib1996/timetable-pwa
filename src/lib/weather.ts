@@ -16,7 +16,7 @@ let inflight: Promise<void> | null = null
 async function loadForecast(): Promise<void> {
   try {
     const res = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${CAMPUS.lat}&longitude=${CAMPUS.lng}&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=3&timezone=Europe%2FLondon`
+      `https://api.open-meteo.com/v1/forecast?latitude=${CAMPUS.lat}&longitude=${CAMPUS.lng}&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=7&timezone=Europe%2FLondon`
     )
     if (!res.ok) return
     const json = (await res.json()) as {

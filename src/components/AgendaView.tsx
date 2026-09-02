@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
 import { toMinutes, weekNumber } from '../lib/format'
+import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import type { MetaMap, Session } from '../types'
 import { SessionCard } from './SessionCard'
 
@@ -55,6 +56,17 @@ export function AgendaView({
   const anchorRef = useRef<HTMLElement | null>(null)
   const [pastDays, setPastDays] = useState(7)
   const [futureDays, setFutureDays] = useState(60)
+
+  // Warm the 7-day forecast once so per-card lookups are synchronous.
+  const [weatherReady, setWeatherReady] = useState(false)
+  useEffect(() => {
+    void weatherForHour(todayISO, 12).then((w) => setWeatherReady(w !== null))
+  }, [todayISO])
+  const weatherFor = (s: Session) => {
+    if (!weatherReady || s.dateISO < todayISO || !s.start) return null
+    const mins = toMinutes(s.start)
+    return mins === null ? null : cachedWeatherForHour(s.dateISO, Math.floor(mins / 60))
+  }
 
   const allDays = useMemo(() => {
     const byDate = new Map<string, Session[]>()
@@ -179,6 +191,7 @@ export function AgendaView({
                       coords={coords}
                       travelMode={travelMode}
                       conflict={conflictIds.has(s.id)}
+                      weather={weatherFor(s)}
                       onSelect={onSelect}
                     />
                   </div>

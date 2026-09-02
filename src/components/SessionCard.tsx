@@ -1,6 +1,8 @@
 import { TRAVEL_MODE_ICON, estimateTravel } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, shortenRoom, subjectColor } from '../lib/format'
+import { weatherEmoji } from '../lib/weather'
+import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
 
 interface Props {
@@ -11,10 +13,12 @@ interface Props {
   travelMode?: TravelMode
   /** overlaps another visible session on the same day */
   conflict?: boolean
+  /** forecast at the session's start hour (sessions within the 7-day forecast) */
+  weather?: HourWeather | null
   onSelect: (session: Session) => void
 }
 
-export function SessionCard({ session, meta, coords, travelMode = 'walking', conflict, onSelect }: Props) {
+export function SessionCard({ session, meta, coords, travelMode = 'walking', conflict, weather, onSelect }: Props) {
   const color = session.isKeyDate ? null : subjectColor(session)
   const travel =
     coords && session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
@@ -37,6 +41,12 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
           {travel?.minutes != null && (
             <span className="travel-chip" title={travel.building ?? undefined}>
               {TRAVEL_MODE_ICON[travelMode]} {formatRemaining(travel.minutes)}
+            </span>
+          )}
+          {weather && !session.isKeyDate && (
+            <span className="weather-chip" title={`Forecast at ${session.start}`}>
+              {weatherEmoji(weather.code)} {Math.round(weather.tempC)}°
+              {weather.rainProb >= 40 ? ` · ${weather.rainProb}%` : ''}
             </span>
           )}
         </div>

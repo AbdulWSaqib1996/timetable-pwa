@@ -3,7 +3,9 @@ import { TRAVEL_MODE_PHRASE, estimateTravel } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl } from '../lib/format'
 import { tflDeparturesNear, tflDisruptions, tflLineColor, tflModeIcon, tflRoute } from '../lib/tfl'
-import type { TflDisruption, TflRoute } from '../lib/tfl'
+import type { TflDepartures, TflDisruption, TflRoute } from '../lib/tfl'
+import { weatherEmoji, weatherForHour } from '../lib/weather'
+import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
 import { StaticMap } from './StaticMap'
 
@@ -55,25 +57,26 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
   // plus current line disruptions filtered to the lines this route uses.
   const [route, setRoute] = useState<TflRoute | null>(null)
   const [disruptions, setDisruptions] = useState<TflDisruption[]>([])
-  const [arrivals, setArrivals] = useState<{ line: string; from: string; mins: number[] } | null>(null)
+  const [legDeps, setLegDeps] = useState<Record<number, TflDepartures>>({})
   useEffect(() => {
     setRoute(null)
     setDisruptions([])
-    setArrivals(null)
+    setLegDeps({})
     if (travelMode !== 'transit' || !coords || !travel?.location) return
     let cancelled = false
     void tflRoute(coords, travel.location).then((r) => {
       if (cancelled) return
       setRoute(r)
-      // Live departures for the first transit leg (stop found near its departure point).
-      const firstTransit = r?.legs.find((l) => l.mode !== 'walking' && l.line && l.fromLat != null && l.fromLng != null)
-      if (firstTransit) {
-        void tflDeparturesNear(firstTransit.fromLat!, firstTransit.fromLng!, firstTransit.line).then((dep) => {
-          if (!cancelled && dep) {
-            setArrivals({ line: firstTransit.line, from: dep.stop, mins: dep.mins })
-          }
+      // Live departures for every transit leg (bus, tube, Overground, Elizabeth line, DLR —
+      // National Rail boards aren't in TfL's arrivals feed and simply won't show).
+      let fetched = 0
+      r?.legs.forEach((leg, i) => {
+        if (leg.mode === 'walking' || !leg.line || leg.fromLat == null || leg.fromLng == null) return
+        if (fetched++ >= 3) return
+        void tflDeparturesNear(leg.fromLat, leg.fromLng, leg.line).then((dep) => {
+          if (!cancelled && dep) setLegDeps((prev) => ({ ...prev, [i]: dep }))
         })
-      }
+      })
     })
     void tflDisruptions().then((d) => {
       if (!cancelled) setDisruptions(d)
@@ -83,6 +86,29 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [travelMode, coords?.lat, coords?.lng, session.room])
+
+  // Weather for the journey: forecast at the computed leave time (start − travel).
+  const [journeyWeather, setJourneyWeather] = useState<{ at: string; w: HourWeather } | null>(null)
+  const startMins = toMinutes(session.start)
+  const travelMins = travelMode === 'transit' && route ? route.minutes : travel?.minutes ?? null
+  useEffect(() => {
+    setJourneyWeather(null)
+    if (startMins === null || travelMins === null) return
+    const leaveMins = startMins - travelMins
+    if (leaveMins <= 0) return
+    let cancelled = false
+    void weatherForHour(session.dateISO, Math.floor(leaveMins / 60)).then((w) => {
+      if (!cancelled && w) {
+        setJourneyWeather({
+          at: `${String(Math.floor(leaveMins / 60)).padStart(2, '0')}:${String(leaveMins % 60).padStart(2, '0')}`,
+          w,
+        })
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [session.dateISO, startMins, travelMins])
 
   const shownMinutes = travelMode === 'transit' && route ? route.minutes : travel?.minutes ?? null
   const liveLabel = travelMode === 'transit' && route ? ' (live TfL)' : ''
@@ -164,18 +190,24 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
                         {leg.from} → {leg.to}
                       </span>
                     )}
+                    {legDeps[i] && (
+                      <span className="route-step-deps">
+                        🕐 {legDeps[i].mins.map((m) => (m === 0 ? 'due' : `${m}m`)).join(', ')} · {legDeps[i].stop}
+                      </span>
+                    )}
                   </span>
                   {leg.minutes > 0 && <span className="route-step-mins">{formatRemaining(leg.minutes)}</span>}
                 </div>
               )
             })}
-            {arrivals && (
-              <p className="route-departures">
-                🕐 Next {arrivals.line} from {arrivals.from}:{' '}
-                {arrivals.mins.map((m) => (m === 0 ? 'due' : `${m} min`)).join(', ')}
-              </p>
-            )}
           </div>
+        )}
+        {journeyWeather && (
+          <p className="route-info">
+            {weatherEmoji(journeyWeather.w.code)} {Math.round(journeyWeather.w.tempC)}°
+            {journeyWeather.w.rainProb >= 30 ? ` · ${journeyWeather.w.rainProb}% rain` : ''} around your
+            leave time ({journeyWeather.at})
+          </p>
         )}
         {route && route.legs.length === 0 && travelMode === 'transit' && (
           <p className="route-info">Best option now: walk (no transit leg needed).</p>

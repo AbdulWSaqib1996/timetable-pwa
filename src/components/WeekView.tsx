@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
-import { subjectColor, weekNumber } from '../lib/format'
+import { subjectColor, toMinutes as toMins, weekNumber } from '../lib/format'
+import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import { shareWeekImage } from '../lib/weekImage'
 import type { Session } from '../types'
 import { SessionCard } from './SessionCard'
@@ -78,6 +79,16 @@ export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, t
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayISO))
   const isNarrow = useIsNarrow()
   const wkNum = termStartISO ? weekNumber(weekStart, termStartISO) : null
+
+  const [weatherReady, setWeatherReady] = useState(false)
+  useEffect(() => {
+    void weatherForHour(todayISO, 12).then((w) => setWeatherReady(w !== null))
+  }, [todayISO])
+  const weatherFor = (s: Session) => {
+    if (!weatherReady || s.dateISO < todayISO || !s.start) return null
+    const mins = toMins(s.start)
+    return mins === null ? null : cachedWeatherForHour(s.dateISO, Math.floor(mins / 60))
+  }
 
   const weekDays = useMemo(() => {
     const base = [0, 1, 2, 3, 4].map((i) => addDays(weekStart, i))
@@ -168,7 +179,14 @@ export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, t
               ) : (
                 <div className="day-sessions">
                   {list.map((s) => (
-                    <SessionCard key={s.id} session={s} coords={coords} travelMode={travelMode} onSelect={onSelect} />
+                    <SessionCard
+                      key={s.id}
+                      session={s}
+                      coords={coords}
+                      travelMode={travelMode}
+                      weather={weatherFor(s)}
+                      onSelect={onSelect}
+                    />
                   ))}
                 </div>
               )}

@@ -608,11 +608,16 @@ body {
   padding: 1px 5px;
 }
 
-.route-departures {
-  margin: 8px 0 0 4px;
-  font-size: 13px;
+.route-step-deps {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
   color: var(--accent);
   font-weight: 600;
+}
+
+.weather-chip {
+  white-space: nowrap;
 }
 
 .workload-line {
