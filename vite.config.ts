@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['apple-touch-icon.png'],
       manifest: {
         name: 'My Timetable',
@@ -26,9 +26,22 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // App shell is precached; sheet data is cached by the app itself in localStorage.
+        // App shell is precached; sheet data also gets a NetworkFirst cache so a fetch
+        // still succeeds offline, and periodic background sync (sw-periodic.js) keeps it warm.
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
         navigateFallback: '/timetable-pwa/index.html',
+        importScripts: ['sw-periodic.js'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/docs\.google\.com\/spreadsheets\/.*\/gviz\//,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'gviz-data',
+              networkTimeoutSeconds: 8,
+              expiration: { maxEntries: 10, maxAgeSeconds: 7 * 24 * 3600 },
+            },
+          },
+        ],
       },
     }),
   ],

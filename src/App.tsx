@@ -9,7 +9,9 @@ import { SessionDetail } from './components/SessionDetail'
 import { SettingsSheet } from './components/SettingsSheet'
 import { SetupScreen } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
+import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
+import type { Coords } from './lib/campus'
 import { buildDemoSessions } from './lib/demo'
 import { diffSessions, sessionKey } from './lib/diff'
 import {
@@ -99,6 +101,7 @@ export default function App() {
   const [changes, setChanges] = useState<SessionChange[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [coords, setCoords] = useState<Coords | null>(null)
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
   const settings = active?.settings ?? null
@@ -275,12 +278,15 @@ export default function App() {
     return q ? exportSessions.filter((s) => matchesQuery(s, q)) : null
   }, [exportSessions, query])
 
-  // Session reminders: check every 30s while the app is running.
+  // Session reminders: check every 30s while the app is running. Multiple offsets are
+  // supported (e.g. 60 and 15 → two notifications); when several offsets are due at once
+  // (say the app was just opened), only the most imminent one fires.
   const exportRef = useRef(exportSessions)
   exportRef.current = exportSessions
-  const reminderMinutes = settings?.reminderMinutes ?? 0
+  const offsetsKey = JSON.stringify(settings?.reminderOffsets ?? [])
   useEffect(() => {
-    if (!reminderMinutes || typeof Notification === 'undefined') return
+    const offsets = (JSON.parse(offsetsKey) as number[]).sort((a, b) => a - b)
+    if (offsets.length === 0 || typeof Notification === 'undefined') return
     const check = () => {
       if (Notification.permission !== 'granted') return
       const now = new Date()
@@ -293,25 +299,40 @@ export default function App() {
         const start = toMinutes(s.start)
         if (start === null) continue
         const delta = start - nowMins
-        const key = sessionKey(s)
-        if (delta > 0 && delta <= reminderMinutes && !notified[key]) {
-          try {
-            new Notification(s.title, {
-              body: `Starts ${s.start} (in ${formatRemaining(delta)})${s.room && !s.isSelfStudy ? ` · ${shortenRoom(s.room)}` : ''}`,
-            })
-          } catch {
-            /* notification constructor unavailable (some mobile browsers) */
-          }
-          notified[key] = Date.now()
-          dirty = true
+        if (delta <= 0) continue
+        const due = offsets.filter((m) => delta <= m && !notified[`${sessionKey(s)}#${m}`])
+        if (due.length === 0) continue
+        try {
+          new Notification(s.title, {
+            body: `Starts ${s.start} (in ${formatRemaining(delta)})${s.room && !s.isSelfStudy ? ` · ${shortenRoom(s.room)}` : ''}`,
+          })
+        } catch {
+          /* notification constructor unavailable (some mobile browsers) */
         }
+        for (const m of due) notified[`${sessionKey(s)}#${m}`] = Date.now()
+        dirty = true
       }
       if (dirty) saveNotified(notified)
     }
     check()
     const t = setInterval(check, 30_000)
     return () => clearInterval(t)
-  }, [reminderMinutes])
+  }, [offsetsKey])
+
+  // Device location for walking-time estimates (only while enabled in Settings).
+  const locationEnabled = settings?.locationEnabled ?? false
+  useEffect(() => {
+    if (!locationEnabled || !('geolocation' in navigator)) {
+      setCoords(null)
+      return
+    }
+    const id = navigator.geolocation.watchPosition(
+      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => setCoords(null),
+      { enableHighAccuracy: false, maximumAge: 120_000 }
+    )
+    return () => navigator.geolocation.clearWatch(id)
+  }, [locationEnabled])
 
   if (!active || !settings || addingProfile) {
     return (
@@ -468,6 +489,8 @@ export default function App() {
         <SessionDetail
           session={selected}
           meta={metaMap[sessionKey(selected)]}
+          coords={coords}
+          locationEnabled={locationEnabled}
           onMeta={(patch) => handleMeta(selected, patch)}
           onClose={() => setSelected(null)}
         />
@@ -540,6 +563,8 @@ export default function App() {
           onClose={() => setOpenSheet('none')}
         />
       )}
+
+      <UpdateToast />
     </div>
   )
 }

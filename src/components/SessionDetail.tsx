@@ -1,9 +1,14 @@
-import { googleCalendarUrl } from '../lib/format'
+import { estimateTravel } from '../lib/campus'
+import type { Coords } from '../lib/campus'
+import { formatRemaining, googleCalendarUrl } from '../lib/format'
 import type { Session, SessionMeta } from '../types'
 
 interface Props {
   session: Session
   meta?: SessionMeta
+  /** device location when the user enabled travel times, else null */
+  coords: Coords | null
+  locationEnabled: boolean
   onMeta: (patch: Partial<SessionMeta>) => void
   onClose: () => void
 }
@@ -35,9 +40,10 @@ function formatDuration(start: string, end: string): string | null {
   return rest > 0 ? `${hourPart} ${rest} minutes` : hourPart
 }
 
-export function SessionDetail({ session, meta, onMeta, onClose }: Props) {
+export function SessionDetail({ session, meta, coords, locationEnabled, onMeta, onClose }: Props) {
   const duration = formatDuration(session.start, session.end)
   const gcalUrl = googleCalendarUrl(session)
+  const travel = session.room && !session.isSelfStudy ? estimateTravel(session.room, coords) : null
   const rows: { label: string; value: string }[] = [
     { label: 'Date', value: formatLongDate(session.dateISO) },
     {
@@ -72,6 +78,22 @@ export function SessionDetail({ session, meta, onMeta, onClose }: Props) {
             </div>
           ))}
         </dl>
+        {travel && (
+          <div className="travel-row">
+            <span className="travel-info">
+              {travel.building
+                ? travel.minutes !== null
+                  ? `≈ ${formatRemaining(travel.minutes)} walk · ${travel.building}`
+                  : locationEnabled
+                    ? `${travel.building} (waiting for your location…)`
+                    : `${travel.building} — enable travel times in Settings for a walking estimate`
+                : 'Not matched to a UCL campus building'}
+            </span>
+            <a className="travel-link" href={travel.mapsUrl} target="_blank" rel="noopener noreferrer">
+              Directions ↗
+            </a>
+          </div>
+        )}
         {session.link && (
           <a className="btn-primary btn-link" href={session.link} target="_blank" rel="noopener noreferrer">
             Open in Moodle ↗

@@ -49,8 +49,12 @@ export interface Settings {
   myGroups?: string[]
   /** term start date enabling "Wk N" labels */
   termStartISO?: string
-  /** minutes before a session to fire a notification; unset/0 = off */
+  /** legacy single reminder offset — migrated into reminderOffsets on load */
   reminderMinutes?: number
+  /** minutes-before offsets to fire notifications at (e.g. [60, 15]); empty/unset = off */
+  reminderOffsets?: number[]
+  /** use device location to estimate walking time to session locations */
+  locationEnabled?: boolean
 }
 
 /** One saved timetable (sheet + all its choices). */

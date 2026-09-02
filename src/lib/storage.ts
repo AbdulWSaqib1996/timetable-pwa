@@ -38,10 +38,24 @@ export function newProfileId(): string {
   return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 }
 
+/** Migrate the legacy single reminderMinutes field into the reminderOffsets list. */
+function normalizeStore(store: ProfileStore): ProfileStore {
+  let changed = false
+  for (const p of store.profiles) {
+    if (p.settings.reminderMinutes && !p.settings.reminderOffsets) {
+      p.settings.reminderOffsets = [p.settings.reminderMinutes]
+      delete p.settings.reminderMinutes
+      changed = true
+    }
+  }
+  if (changed) writeJSON(STORE_KEY, store)
+  return store
+}
+
 /** Load the profile store, migrating a pre-profiles (v1) setup into a single profile. */
 export function loadStore(): ProfileStore | null {
   const store = readJSON<ProfileStore>(STORE_KEY)
-  if (store && store.profiles.length > 0) return store
+  if (store && store.profiles.length > 0) return normalizeStore(store)
   const legacy = readJSON<Settings>(LEGACY_SETTINGS_KEY)
   if (!legacy) return null
   const id = newProfileId()

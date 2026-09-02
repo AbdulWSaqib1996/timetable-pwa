@@ -30,11 +30,12 @@ export function buildFeedUrl(base: string, settings: Settings): string {
 }
 
 const REMINDER_OPTIONS = [
-  { value: 0, label: 'Off' },
-  { value: 5, label: '5 min before' },
-  { value: 10, label: '10 min before' },
-  { value: 15, label: '15 min before' },
-  { value: 30, label: '30 min before' },
+  { value: 5, label: '5 min' },
+  { value: 10, label: '10 min' },
+  { value: 15, label: '15 min' },
+  { value: 30, label: '30 min' },
+  { value: 60, label: '1 hour' },
+  { value: 120, label: '2 hours' },
 ]
 
 export function SettingsSheet({
@@ -70,11 +71,26 @@ export function SettingsSheet({
     }
   }
 
-  async function setReminder(mins: number) {
-    if (mins > 0 && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+  async function toggleReminder(mins: number) {
+    const current = settings.reminderOffsets ?? []
+    const next = current.includes(mins)
+      ? current.filter((m) => m !== mins)
+      : [...current, mins].sort((a, b) => a - b)
+    if (next.length > 0 && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       await Notification.requestPermission()
     }
-    onUpdateSettings({ reminderMinutes: mins })
+    onUpdateSettings({ reminderOffsets: next })
+  }
+
+  function toggleLocation(enabled: boolean) {
+    if (enabled && 'geolocation' in navigator) {
+      // Poke once so the permission prompt appears while the user is looking at the toggle.
+      navigator.geolocation.getCurrentPosition(
+        () => {},
+        () => {}
+      )
+    }
+    onUpdateSettings({ locationEnabled: enabled })
   }
 
   const notifBlocked = typeof Notification !== 'undefined' && Notification.permission === 'denied'
@@ -160,13 +176,18 @@ export function SettingsSheet({
 
         <section className="filter-section">
           <h3>Session reminders</h3>
+          <p className="filter-hint">
+            Pick as many as you like — e.g. 1 hour and 15 min gives two notifications before each
+            session. Select none to turn reminders off.
+          </p>
           <div className="chip-grid">
             {REMINDER_OPTIONS.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
-                className={`chip${(settings.reminderMinutes ?? 0) === value ? ' chip-on' : ''}`}
-                onClick={() => void setReminder(value)}
+                className={`chip${(settings.reminderOffsets ?? []).includes(value) ? ' chip-on' : ''}`}
+                aria-pressed={(settings.reminderOffsets ?? []).includes(value)}
+                onClick={() => void toggleReminder(value)}
               >
                 {label}
               </button>
@@ -175,7 +196,25 @@ export function SettingsSheet({
           <p className="filter-hint">
             {notifBlocked
               ? 'Notifications are blocked for this site — allow them in your browser settings.'
-              : 'Fires a notification while the app is open (or installed and running). For guaranteed alerts anywhere, subscribe to the calendar feed below and use your calendar app’s own reminders.'}
+              : (settings.reminderOffsets ?? []).length === 0
+                ? 'Reminders are off.'
+                : `Notifying ${(settings.reminderOffsets ?? []).map((m) => (m >= 60 ? `${m / 60}h` : `${m}m`)).join(', ')} before each session, while the app is open (or installed and running). For guaranteed alerts anywhere, subscribe to the calendar feed below and use your calendar app’s own reminders.`}
+          </p>
+        </section>
+
+        <section className="filter-section">
+          <h3>Travel times</h3>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={settings.locationEnabled ?? false}
+              onChange={(e) => toggleLocation(e.target.checked)}
+            />
+            Use my location for walking times
+          </label>
+          <p className="filter-hint">
+            Shows an estimated walk from where you are to each session's UCL building (rooms are
+            matched against the Bloomsbury campus). Your location never leaves this device.
           </p>
         </section>
 
