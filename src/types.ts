@@ -15,6 +15,8 @@ export interface Session {
   isSpecialism: boolean
   specialismName?: string
   isSelfStudy: boolean
+  /** title contains "(optional)" */
+  isOptional: boolean
 }
 
 export type DateRange = 'today' | 'week' | 'all'
@@ -27,6 +29,8 @@ export interface Filters {
   tutors: string[]
   rooms: string[]
   showSelfStudy: boolean
+  /** show sessions marked "(optional)" (default true) */
+  showOptional: boolean
 }
 
 export interface Settings {
@@ -59,6 +63,10 @@ export interface Settings {
   travelMode?: 'walking' | 'transit' | 'driving'
   /** minutes of head start before the computed leave-by time (start − travel) to notify at */
   leaveAlertOffsets?: number[]
+  /** key-dates (submission deadlines) tab: source sheet/tab plus the pasted URL for display */
+  keyDatesUrl?: string
+  keyDatesSheetId?: string
+  keyDatesGid?: string | null
 }
 
 /** One saved timetable (sheet + all its choices). */
@@ -94,4 +102,5 @@ export interface SessionChange {
 export interface CachedData {
   fetchedAt: number
   sessions: Session[]
+  keyDates?: Session[]
 }

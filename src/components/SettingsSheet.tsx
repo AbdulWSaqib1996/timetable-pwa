@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
+import { parseSheetUrl } from '../lib/sheetUrl'
 import type { ProfileStore, Session, Settings } from '../types'
 
 interface Props {
@@ -50,7 +51,25 @@ export function SettingsSheet({
   onClose,
 }: Props) {
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? '')
+  const [keyDatesUrl, setKeyDatesUrl] = useState(settings.keyDatesUrl ?? '')
+  const [keyDatesError, setKeyDatesError] = useState(false)
   const [copied, setCopied] = useState<'feed' | 'share' | null>(null)
+
+  function saveKeyDatesUrl() {
+    const trimmed = keyDatesUrl.trim()
+    if (!trimmed) {
+      setKeyDatesError(false)
+      onUpdateSettings({ keyDatesUrl: undefined, keyDatesSheetId: undefined, keyDatesGid: undefined })
+      return
+    }
+    const parsed = parseSheetUrl(trimmed)
+    if (!parsed) {
+      setKeyDatesError(true)
+      return
+    }
+    setKeyDatesError(false)
+    onUpdateSettings({ keyDatesUrl: trimmed, keyDatesSheetId: parsed.sheetId, keyDatesGid: parsed.gid })
+  }
 
   const activeProfile = store.profiles.find((p) => p.id === store.activeId)
 
@@ -148,6 +167,29 @@ export function SettingsSheet({
             <button type="button" className="btn-secondary" onClick={() => copy(buildShareUrl(settings), 'share')}>
               {copied === 'share' ? 'Copied!' : 'Copy share link'}
             </button>
+          </section>
+        )}
+
+        {!settings.demo && (
+          <section className="filter-section">
+            <h3>Key dates</h3>
+            <p className="filter-hint">
+              Paste the link to the submissions/key-dates tab (open that tab so the URL contains its
+              gid). Upcoming deadlines get a countdown strip on the day view.
+            </p>
+            <div className="feed-row">
+              <input
+                type="url"
+                placeholder="https://docs.google.com/spreadsheets/d/…#gid=…"
+                value={keyDatesUrl}
+                onChange={(e) => setKeyDatesUrl(e.target.value)}
+                onBlur={saveKeyDatesUrl}
+              />
+            </div>
+            {keyDatesError && <p className="setup-error">That doesn’t look like a Google Sheets link.</p>}
+            {settings.keyDatesSheetId && !keyDatesError && (
+              <p className="filter-hint">Key dates connected — they refresh with the timetable.</p>
+            )}
           </section>
         )}
 

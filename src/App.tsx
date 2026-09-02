@@ -3,6 +3,7 @@ import { AgendaView } from './components/AgendaView'
 import { ChangesSheet } from './components/ChangesSheet'
 import { FilterBar } from './components/FilterBar'
 import { FilterSheet } from './components/FilterSheet'
+import { KeyDatesSheet, daysUntil } from './components/KeyDatesSheet'
 import { MonthView } from './components/MonthView'
 import { NowNextCard } from './components/NowNextCard'
 import { SessionDetail } from './components/SessionDetail'
@@ -68,7 +69,7 @@ function matchesQuery(s: Session, q: string): boolean {
   return [s.title, s.subject, s.tutor, s.room].some((f) => f && f.toLowerCase().includes(needle))
 }
 
-type SheetName = 'none' | 'filters' | 'settings' | 'changes'
+type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -100,6 +101,7 @@ export default function App() {
   const [jumpDate, setJumpDate] = useState<string | null>(null)
   const [metaMap, setMetaMap] = useState<MetaMap>({})
   const [changes, setChanges] = useState<SessionChange[]>([])
+  const [keyDates, setKeyDates] = useState<Session[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [coords, setCoords] = useState<Coords | null>(null)
@@ -134,11 +136,22 @@ export default function App() {
             setChanges(merged.slice(0, 100))
           }
         }
+        // Key dates live in a second tab; failures there never break the main timetable.
+        let kd: Session[] | undefined
+        if (s.keyDatesSheetId) {
+          try {
+            const kdTable = await fetchGvizTable(s.keyDatesSheetId, s.keyDatesGid ?? null)
+            kd = parseTimetable(kdTable).sessions
+          } catch {
+            kd = prev?.keyDates
+          }
+        }
         setSessions(parsed)
+        setKeyDates(kd ?? [])
         const now = Date.now()
         setFetchedAt(now)
         setError(null)
-        saveCache(pid, { fetchedAt: now, sessions: parsed })
+        saveCache(pid, { fetchedAt: now, sessions: parsed, keyDates: kd })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to refresh.')
       } finally {
@@ -156,12 +169,21 @@ export default function App() {
     setFetchedAt(cached && !active.settings.demo ? cached.fetchedAt : null)
     setMetaMap(loadMeta(active.id))
     setChanges(loadChanges(active.id))
+    setKeyDates(cached?.keyDates ?? [])
     setSelected(null)
     setJumpDate(null)
     setError(null)
     void refresh(active.settings, active.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
+
+  // Refetch when the key-dates tab is configured or changed in Settings.
+  useEffect(() => {
+    if (active && sessions !== null && active.settings.keyDatesSheetId) {
+      void refresh(active.settings, active.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.keyDatesSheetId, settings?.keyDatesGid])
 
   function updateSettings(patch: Partial<Settings>) {
     setStore((prev) => {
@@ -475,6 +497,25 @@ export default function App() {
         <NowNextCard sessions={exportSessions} onSelect={setSelected} />
       )}
 
+      {sessions !== null &&
+        view === 'day' &&
+        !searchResults &&
+        (() => {
+          const next = keyDates
+            .filter((k) => k.dateISO >= todayISO)
+            .sort((a, b) => a.dateISO.localeCompare(b.dateISO))[0]
+          if (!next) return null
+          const days = daysUntil(next.dateISO, todayISO)
+          return (
+            <button type="button" className="keydate-strip" onClick={() => setOpenSheet('keydates')}>
+              <span className="keydate-title">📌 {next.title}</span>
+              <span className={`kd-chip${days <= 7 ? ' urgent' : ''}`}>
+                {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `in ${days}d`}
+              </span>
+            </button>
+          )
+        })()}
+
       {sessions === null ? (
         <div className="empty-state">Loading timetable…</div>
       ) : searchResults ? (
@@ -566,6 +607,15 @@ export default function App() {
               myGroups: [],
             })
           }
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'keydates' && (
+        <KeyDatesSheet
+          keyDates={keyDates}
+          todayISO={todayISO}
+          configured={!!settings.keyDatesSheetId}
           onClose={() => setOpenSheet('none')}
         />
       )}

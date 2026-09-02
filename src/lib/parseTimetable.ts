@@ -248,6 +248,7 @@ export function parseTimetable(table: GvizTable): ParseOutcome {
       isSpecialism: !!specialismMatch,
       specialismName: specialismMatch ? specialismMatch[1].trim() : undefined,
       isSelfStudy: /^self[- ]?study$/i.test(title),
+      isOptional: /\(optional\)/i.test(title),
     })
   }
 

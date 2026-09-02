@@ -42,6 +42,7 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', onS
           <span className="badge badge-specialism">{session.specialismName}</span>
         )}
         {session.isSelfStudy && <span className="badge badge-selfstudy">Self study</span>}
+        {session.isOptional && <span className="badge badge-optional">Optional</span>}
         {meta?.attended && <span className="badge badge-attended">✓ attended</span>}
         {meta?.note && <span className="badge badge-note">📝 note</span>}
       </div>

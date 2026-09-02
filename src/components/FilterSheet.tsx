@@ -130,6 +130,14 @@ export function FilterSheet({
             />
             Show self-study blocks
           </label>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={filters.showOptional}
+              onChange={(e) => onUpdateFilters({ showOptional: e.target.checked })}
+            />
+            Show optional sessions
+          </label>
         </section>
 
         {options.subjects.length > 0 && (

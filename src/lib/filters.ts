@@ -6,6 +6,7 @@ export const DEFAULT_FILTERS: Filters = {
   tutors: [],
   rooms: [],
   showSelfStudy: true,
+  showOptional: true,
 }
 
 export function getFilters(settings: Settings): Filters {
@@ -87,6 +88,7 @@ export function applyFilters(
       if (tokens.length > 0 && !tokens.some((t) => myGroups.includes(t))) return false
     }
     if (!filters.showSelfStudy && s.isSelfStudy) return false
+    if (!filters.showOptional && s.isOptional) return false
     if (filters.subjects.length > 0 && !s.isSpecialism && !s.isSelfStudy) {
       if (!filters.subjects.includes(s.subject || s.title)) return false
     }
@@ -103,6 +105,7 @@ export function activeFilterCount(settings: Settings): number {
   const filters = getFilters(settings)
   let count = filters.subjects.length + filters.tutors.length + filters.rooms.length
   if (!filters.showSelfStudy) count++
+  if (!filters.showOptional) count++
   if ((settings.mySpecialisms ?? []).length > 0 && settings.hideOtherSpecialisms !== false) count++
   if ((settings.myGroups ?? []).length > 0) count++
   return count

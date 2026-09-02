@@ -81,6 +81,8 @@ Each phase is independently usable — after P1 the timetable is already viewabl
 
 Ideas that would meaningfully improve the product, roughly ordered by value-for-effort. Effort: S (hours), M (a day or two), L (multi-day / needs new infrastructure).
 
+**Built (2 Sep 2026, third pass):** leave alerts (notify with a chosen head start before start − live travel time), an OpenStreetMap embed in session details, **optional-session handling** (sessions titled "(optional)" get a badge and a Filters toggle to hide them), and **key dates** — Settings → Key dates takes the submissions-tab URL, upcoming deadlines show as a countdown strip on the day view (urgent styling within 7 days) and a full list with Today/Tomorrow/in-Nd chips.
+
 **Built (2 Sep 2026, second pass):** item 12 (background freshness) is implemented — a "new version available" refresh toast, a NetworkFirst service-worker cache for the sheet data (fetches work offline), and Periodic Background Sync (Chrome, installed PWAs) that re-fetches cached sheet data in the background. Reminders were upgraded to **multiple configurable offsets** (Settings → Session reminders: any combination of 5 min–2 hours, e.g. 1 hour AND 15 min before each session, with the legacy single setting migrated). New beyond the original list: **walking times & directions** — Settings → Travel times uses device location (never leaves the device) to estimate the walk to each session, with rooms cross-checked against a UCL Bloomsbury campus gazetteer (20 Bedford Way, Darwin, Cruciform, Wilkins, and ~17 more buildings) and a Google Maps walking-directions link per session (this also covers item 13).
 
 **Built (2 Sep 2026):** items 1–8 and 10 below are implemented — share links (Settings → Share this setup), change detection (bell icon + changes sheet), search (magnifier in the header), per-session Google Calendar buttons, multiple timetable profiles (Settings → Timetables, with migration from the single-profile storage), group filtering (Filters → My group), term-start week numbers (Settings), reminders (Settings → Session reminders; fires while the app is open/installed — the note in item 8 about calendar-app alerts via the ICS feed still applies for guaranteed delivery), and attendance/notes (in each session's detail sheet, with badges on cards). Items 9 and 11–13 remain open.
@@ -98,6 +100,18 @@ Ideas that would meaningfully improve the product, roughly ordered by value-for-
 11. **ICS feed hardening (S)** — once the worker is deployed: an unguessable token in the feed path (the URL currently encodes only the already-public sheet ID), custom calendar name, and per-subject colour hints where clients support them.
 12. **Background freshness (M)** — Periodic Background Sync (where supported) so the service worker refreshes sheet data before the app is opened; plus an in-app "new version available" toast when the PWA updates.
 13. **Room directions (S)** — link the location in the session detail to Google Maps (building name + "London"), handy in the first weeks on an unfamiliar campus.
+
+## Monetisation options (explored 2 Sep 2026)
+
+Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:
+
+1. **Donations — do this now.** Ko-fi / Buy Me a Coffee / PayPal.me / GitHub Sponsors. No backend, no cost, fits a student audience; add a "Support this app ☕" link in Settings and the README. GitHub Sponsors takes no fees. Expect pocket money, not income.
+2. **Template / white-label sales — the realistic revenue path.** The app is sheet-agnostic: any course whose timetable lives in a Google Sheet could use it. Sell configured deployments or a one-time template (Gumroad / Lemon Squeezy, ~£10–30) to other cohorts, course reps or programme admins; or keep it open-source and charge for setup/customisation.
+3. **Freemium** — free core, paid conveniences (hosted ICS feed, multiple profiles, priority features) via Stripe Payment Links + a small entitlement check (Cloudflare Workers KV would keep it £0). Only worth building once there's real multi-cohort traction.
+4. **Ads — not recommended.** At this scale AdSense would earn pennies per month (display RPMs of ~£1–3 need thousands of daily views), damages the UX of a glance-at-it-daily utility, and drags in GDPR consent banners. Niche networks (Carbon/EthicalAds) require developer-scale traffic.
+5. **Hosting constraint (important):** GitHub Pages and Vercel's Hobby plan are non-commercial tiers. A donation link on a personal open-source project is generally tolerated; running ads or selling access is not — that step needs Vercel Pro (~$20/mo) or a move to Cloudflare Pages (free tier permits commercial use).
+
+**Recommendation:** add a donation link now; pursue template sales if other cohorts show interest; revisit freemium at hundreds of weekly users; skip ads.
 
 ## Resolved decisions (log)
 

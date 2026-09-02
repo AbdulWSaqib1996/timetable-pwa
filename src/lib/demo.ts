@@ -29,6 +29,7 @@ const ITEMS: DemoItem[] = [
   { offset: 1, start: '14:30', end: '16:30', title: 'EYFS Pathway 1', room: 'IOE - Bedford Way (20) - 642', tutor: 'LD', link: `${MOODLE}56895` },
   { offset: 2, start: '09:00', end: '11:00', title: 'PSHE 1', room: 'IOE - Bedford Way (20) - 631', tutor: 'DO', link: `${MOODLE}56889` },
   { offset: 2, start: '11:30', end: '13:30', title: 'Science 1', room: 'IOE - Bedford Way (20) - 731', tutor: 'JH', link: `${MOODLE}57042` },
+  { offset: 2, start: '14:30', end: '16:30', title: 'Maths Subject knowledge - Number (optional)', room: 'IOE - Bedford Way (20) - 631', tutor: 'KaW', groups: '1-10', link: `${MOODLE}57040` },
   { offset: 3, start: '09:00', end: '11:00', title: 'Specialism 1 - Art & Design', room: 'IOE - Bedford Way (20) - 828', tutor: 'KM', groups: '1-10', link: `${MOODLE}56884` },
   { offset: 3, start: '09:00', end: '11:00', title: 'Specialism 1 - Music', room: 'IOE - Bedford Way (20) - 305 - Clarke Hall', tutor: 'HB', groups: '1-10', link: `${MOODLE}56884` },
   { offset: 3, start: '09:00', end: '11:00', title: 'Specialism 1 - Computing', room: 'IOE - Bedford Way (20) - 631', tutor: 'YA', groups: '1-10', link: `${MOODLE}56884` },
@@ -61,6 +62,7 @@ export function buildDemoSessions(): Session[] {
       isSpecialism: !!specialismMatch,
       specialismName: specialismMatch ? specialismMatch[1].trim() : undefined,
       isSelfStudy: /^self[- ]?study$/i.test(item.title),
+      isOptional: /\(optional\)/i.test(item.title),
     }
   }).sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
 }

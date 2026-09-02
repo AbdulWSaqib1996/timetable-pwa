@@ -72,6 +72,7 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
           <span className="badge badge-specialism">Specialism · {session.specialismName}</span>
         )}
         {session.isSelfStudy && <span className="badge badge-selfstudy">Self study</span>}
+        {session.isOptional && <span className="badge badge-optional">Optional</span>}
         <dl className="detail-list">
           {rows.map(({ label, value }) => (
             <div className="detail-row" key={label}>
