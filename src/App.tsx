@@ -30,6 +30,8 @@ import { fetchGvizTable } from './lib/gviz'
 import { parseTimetable } from './lib/parseTimetable'
 import { parseSheetUrl } from './lib/sheetUrl'
 import { parseShareHash } from './lib/share'
+import { tflDisruptions } from './lib/tfl'
+import type { TflDisruption } from './lib/tfl'
 import {
   clearProfileData,
   clearStore,
@@ -106,6 +108,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [coords, setCoords] = useState<Coords | null>(null)
+  const [tubeStatus, setTubeStatus] = useState<TflDisruption[]>([])
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
   const settings = active?.settings ?? null
@@ -377,6 +380,27 @@ export default function App() {
   const locationEnabled = settings?.locationEnabled ?? false
   const travelMode = settings?.travelMode ?? 'walking'
 
+  // Live TfL line status while public transport is the chosen mode (strikes, closures, delays).
+  useEffect(() => {
+    if (travelMode !== 'transit') {
+      setTubeStatus([])
+      return
+    }
+    let live = true
+    const load = () =>
+      void tflDisruptions().then((d) => {
+        if (live) setTubeStatus(d)
+      })
+    load()
+    const t = setInterval(load, 5 * 60_000)
+    return () => {
+      live = false
+      clearInterval(t)
+    }
+  }, [travelMode])
+  const tubeStatusRef = useRef(tubeStatus)
+  tubeStatusRef.current = tubeStatus
+
   // Session reminders + leave alerts: checked every 30s while the app is running.
   // Multiple offsets are supported (e.g. 60 and 15 → two notifications); when several
   // offsets are due at once (say the app was just opened), only one fires per session.
@@ -440,9 +464,16 @@ export default function App() {
               (m) => untilLeave <= m && !notified[`${sessionKey(s)}#leave#${m}`]
             )
             if (leaveDue.length > 0) {
+              const disruptionNote =
+                mode === 'transit' && tubeStatusRef.current.length > 0
+                  ? ` · ⚠ TfL: ${tubeStatusRef.current
+                      .slice(0, 2)
+                      .map((d) => `${d.line} ${d.status.toLowerCase()}`)
+                      .join(', ')}`
+                  : ''
               notify(
                 untilLeave <= 0 ? `Time to leave — ${s.title}` : `Leave in ${formatRemaining(untilLeave)} — ${s.title}`,
-                `≈ ${formatRemaining(est.minutes)} ${TRAVEL_MODE_PHRASE[mode]} to ${est.building ?? shortenRoom(s.room)} · starts ${s.start}`
+                `≈ ${formatRemaining(est.minutes)} ${TRAVEL_MODE_PHRASE[mode]} to ${est.building ?? shortenRoom(s.room)} · starts ${s.start}${disruptionNote}`
               )
               for (const m of leaveDue) notified[`${sessionKey(s)}#leave#${m}`] = Date.now()
               dirty = true
@@ -589,6 +620,21 @@ export default function App() {
           {error}
           {sessions && sessions.length > 0 && ' Showing your last saved timetable.'}
         </div>
+      )}
+
+      {sessions !== null && view === 'day' && !searchResults && travelMode === 'transit' && tubeStatus.length > 0 && (
+        <details className="tfl-banner">
+          <summary>
+            ⚠ TfL disruptions: {tubeStatus.slice(0, 3).map((d) => d.line).join(', ')}
+            {tubeStatus.length > 3 && ` +${tubeStatus.length - 3} more`}
+          </summary>
+          {tubeStatus.map((d) => (
+            <p key={d.line}>
+              <strong>{d.line}</strong> — {d.status}
+              {d.reason ? `: ${d.reason.length > 200 ? d.reason.slice(0, 200) + '…' : d.reason}` : ''}
+            </p>
+          ))}
+        </details>
       )}
 
       {sessions !== null && view === 'day' && !searchResults && (

@@ -514,6 +514,50 @@ body {
   color: #e64980;
 }
 
+/* ---------- TfL status ---------- */
+
+.tfl-banner {
+  margin: 10px 0 2px;
+  padding: 10px 14px;
+  border: 1px solid rgba(240, 140, 0, 0.4);
+  border-radius: 12px;
+  background: rgba(240, 140, 0, 0.1);
+  font-size: 13px;
+}
+
+.tfl-banner summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #f08c00;
+}
+
+.tfl-banner p {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.tfl-banner strong {
+  color: var(--text);
+}
+
+.route-info {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.route-warning {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(240, 140, 0, 0.12);
+  color: #f08c00;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .subheading {
   margin: 14px 0 4px;
   font-size: 13px;

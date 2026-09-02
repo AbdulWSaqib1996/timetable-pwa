@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { TRAVEL_MODE_PHRASE, estimateTravel, osmEmbedUrl } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl } from '../lib/format'
-import { tflTransitMinutes } from '../lib/tfl'
+import { tflDisruptions, tflRoute } from '../lib/tfl'
+import type { TflDisruption, TflRoute } from '../lib/tfl'
 import type { Session, SessionMeta } from '../types'
 
 interface Props {
@@ -49,14 +50,20 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
   const travel =
     session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
 
-  // Live TfL journey time for public transport (falls back to the heuristic estimate).
-  const [tflMins, setTflMins] = useState<number | null>(null)
+  // Live TfL journey (time + recommended route, which already avoids closures/strikes),
+  // plus current line disruptions filtered to the lines this route uses.
+  const [route, setRoute] = useState<TflRoute | null>(null)
+  const [disruptions, setDisruptions] = useState<TflDisruption[]>([])
   useEffect(() => {
-    setTflMins(null)
+    setRoute(null)
+    setDisruptions([])
     if (travelMode !== 'transit' || !coords || !travel?.location) return
     let cancelled = false
-    void tflTransitMinutes(coords, travel.location).then((mins) => {
-      if (!cancelled) setTflMins(mins)
+    void tflRoute(coords, travel.location).then((r) => {
+      if (!cancelled) setRoute(r)
+    })
+    void tflDisruptions().then((d) => {
+      if (!cancelled) setDisruptions(d)
     })
     return () => {
       cancelled = true
@@ -64,8 +71,11 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [travelMode, coords?.lat, coords?.lng, session.room])
 
-  const shownMinutes = travelMode === 'transit' && tflMins !== null ? tflMins : travel?.minutes ?? null
-  const liveLabel = travelMode === 'transit' && tflMins !== null ? ' (live TfL)' : ''
+  const shownMinutes = travelMode === 'transit' && route ? route.minutes : travel?.minutes ?? null
+  const liveLabel = travelMode === 'transit' && route ? ' (live TfL)' : ''
+  const routeDisruptions = route
+    ? disruptions.filter((d) => route.lines.some((l) => l.toLowerCase().includes(d.line.toLowerCase())))
+    : []
   const rows: { label: string; value: string }[] = [
     { label: 'Date', value: formatLongDate(session.dateISO) },
     {
@@ -117,6 +127,21 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
             </a>
           </div>
         )}
+        {route && route.via.length > 0 && (
+          <p className="route-info">
+            Best route now: {route.via.join(' · ')}
+            {route.via.length > 0 && ' · then walk'}
+          </p>
+        )}
+        {route && route.via.length === 0 && travelMode === 'transit' && (
+          <p className="route-info">Best option now: walk (no transit leg needed).</p>
+        )}
+        {routeDisruptions.map((d) => (
+          <p className="route-warning" key={d.line}>
+            ⚠ {d.line}: {d.status}
+            {d.reason ? ` — ${d.reason.length > 160 ? d.reason.slice(0, 160) + '…' : d.reason}` : ''}
+          </p>
+        ))}
         {travel?.location && (
           <iframe
             className="map-embed"
