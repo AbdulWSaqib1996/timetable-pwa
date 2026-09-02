@@ -152,6 +152,8 @@ Ideas building on the app after rounds 1–2 and the TfL work (which now include
 
 ## Future enhancements — round 4 (logged 2 Sep 2026)
 
+**Built (2 Sep 2026, twelfth pass): item 1 — round 4's worker trio complete.** The cron keeps a per-sheet snapshot in KV and diffs every 10-minute run: room/time/tutor changes and added/cancelled future sessions push as "📋 Timetable change — Maths 2 (17/09): room 728 → 731", filtered to each subscriber's specialisms/groups, batched (3 lines + "+N more"), with a first-run seed, a >50-removal glitch guard, and a Settings opt-out. Items 1–5 of round 4 are now all built; remaining from this round: 6–10.
+
 **Built (2 Sep 2026, eleventh pass): item 2.** The 07:00 cron run now also composes a morning briefing per subscriber on days with sessions — "Good morning — 3 sessions today · First: 09:00 PS1 · Bedford Way A5.03 · ☁️ 18° · 📌 Maths PLT 1 in 3d" — from their filtered sheet, campus Open-Meteo weather at the first session's hour, and the nearest key date within 7 days; opt-out toggle under Settings → Background push (re-syncs the stored config live). Item 1 (background change-detection push) is the last of round 4's worker trio.
 
 **Built (2 Sep 2026, tenth pass): item 3.** The push worker's 07:00 London cron run checks TfL line status; severe disruption (severity ≤ 6: Severe Delays, closures, suspensions) or strike wording in the reason pushes "🚨 Strike action on TfL today" / "⚠ TfL disruption this morning" with the affected lines — only to transit-mode subscribers, only on days they have sessions, once per day. Verified against live data (would currently flag Jubilee Suspended, Weaver Part Closure, Windrush Part Suspended and ignore minor delays).
