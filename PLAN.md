@@ -81,6 +81,10 @@ Each phase is independently usable — after P1 the timetable is already viewabl
 
 Ideas that would meaningfully improve the product, roughly ordered by value-for-effort. Effort: S (hours), M (a day or two), L (multi-day / needs new infrastructure).
 
+**Status of the original list:** 1–8, 10, 12 built; 13 covered by the travel/directions work. Still open: **9** (private-sheet OAuth — only if a sheet can't be public) and **11** (ICS feed hardening — waits on the worker being deployed to Cloudflare). A second round of ideas is logged below in **Future enhancements — round 2**.
+
+**Built (2 Sep 2026, fourth pass):** key dates render as solid highlighted blocks in the day agenda (with month-view pins, a Filters toggle, a tappable view-all list, and search inclusion); Ko-fi support link (ko-fi.com/awsaqib) in Settings and README; public Vercel hosting at pgce-timetable.vercel.app alongside GitHub Pages.
+
 **Built (2 Sep 2026, third pass):** leave alerts (notify with a chosen head start before start − live travel time), an OpenStreetMap embed in session details, **optional-session handling** (sessions titled "(optional)" get a badge and a Filters toggle to hide them), and **key dates** — Settings → Key dates takes the submissions-tab URL, upcoming deadlines show as a countdown strip on the day view (urgent styling within 7 days) and a full list with Today/Tomorrow/in-Nd chips.
 
 **Built (2 Sep 2026, second pass):** item 12 (background freshness) is implemented — a "new version available" refresh toast, a NetworkFirst service-worker cache for the sheet data (fetches work offline), and Periodic Background Sync (Chrome, installed PWAs) that re-fetches cached sheet data in the background. Reminders were upgraded to **multiple configurable offsets** (Settings → Session reminders: any combination of 5 min–2 hours, e.g. 1 hour AND 15 min before each session, with the legacy single setting migrated). New beyond the original list: **walking times & directions** — Settings → Travel times uses device location (never leaves the device) to estimate the walk to each session, with rooms cross-checked against a UCL Bloomsbury campus gazetteer (20 Bedford Way, Darwin, Cruciform, Wilkins, and ~17 more buildings) and a Google Maps walking-directions link per session (this also covers item 13).
@@ -100,6 +104,26 @@ Ideas that would meaningfully improve the product, roughly ordered by value-for-
 11. **ICS feed hardening (S)** — once the worker is deployed: an unguessable token in the feed path (the URL currently encodes only the already-public sheet ID), custom calendar name, and per-subject colour hints where clients support them.
 12. **Background freshness (M)** — Periodic Background Sync (where supported) so the service worker refreshes sheet data before the app is opened; plus an in-app "new version available" toast when the PWA updates.
 13. **Room directions (S)** — link the location in the session detail to Google Maps (building name + "London"), handy in the first weeks on an unfamiliar campus.
+
+## Future enhancements — round 2 (logged 2 Sep 2026)
+
+A fresh pass over the app as it now stands. Effort: S (hours), M (a day or two), L (multi-day / new infrastructure).
+
+1. **Key-date reminders (S)** — the deadline data and the notification plumbing both exist; add "notify me 7/3/1 days before each key date" chips next to the session reminders. Highest-value quick win.
+2. **Key dates in the calendar export/feed (S)** — include deadlines as all-day events in the .ics download and the worker feed, so submission dates land in Google/Apple Calendar alongside sessions.
+3. **Settings backup & richer share link (S/M)** — export/import everything (profiles, filters, notes, attendance) as a JSON file, and extend the share link to carry term start and filter choices. Protects against cleared browser data — currently the only copy of notes/attendance is localStorage.
+4. **Real journey times via the TfL API (M)** — TfL's Journey Planner API is free and needs no key for light use; replace the straight-line heuristics with real door-to-door public-transport times and live disruption awareness. Walking/driving could stay heuristic.
+5. **Conflict detection (S)** — warn when two visible sessions overlap (e.g. a specialism choice clashing with a group session), as a badge on the day and a note in both details.
+6. **Attendance insights (M)** — per-subject attended/total counts and a simple term overview, with CSV export; builds directly on the existing attendance data.
+7. **PWA app shortcuts & badging (S)** — manifest shortcuts (jump straight to Today / Key dates from a long-press on the home-screen icon) and the App Badging API to show unseen timetable changes on the icon where supported.
+8. **Multi-tab merge (M)** — some cohorts split content across tabs (group tab + all-groups events tab); allow a profile to combine several tabs of the same spreadsheet into one timetable, deduplicating identical rows.
+9. **Theme toggle (S)** — manual light/dark override in Settings (currently follows the system).
+10. **Privacy-friendly usage analytics (S)** — a free GoatCounter/Plausible-style counter (no cookies, no personal data) to learn whether other cohorts adopt the app; directly informs the template-sales decision in the monetisation notes.
+11. **Error monitoring (S)** — Sentry's free tier wired into the app so parsing failures against unfamiliar sheets are visible without user reports.
+12. **Print/PDF week view (S)** — a print stylesheet so the week grid prints cleanly for a pinboard.
+13. **Accessibility pass (M)** — keyboard navigation through cards and sheets, focus trapping in modals, reduced-motion support, and a screen-reader audit; worth doing before promoting the app beyond the cohort.
+
+**Suggested order:** 1 and 2 first (small and high-value, both about deadlines users already asked for), then 3 (data safety), 5 and 7 as polish, 4 when journey accuracy starts to matter, 10/11 before any push to other cohorts.
 
 ## Monetisation options (explored 2 Sep 2026)
 
