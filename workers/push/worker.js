@@ -229,6 +229,32 @@ async function fetchSessions(sheetId, gid) {
   return sessions
 }
 
+/* ---------- TfL morning status (strikes, closures, severe delays) ---------- */
+async function fetchTflSevereStatus() {
+  try {
+    const res = await fetch('https://api.tfl.gov.uk/Line/Mode/tube,elizabeth-line,overground,dlr/Status')
+    if (!res.ok) return []
+    const lines = await res.json()
+    const items = []
+    for (const line of lines) {
+      const worst = (line.lineStatuses ?? []).reduce(
+        (acc, s) => (((s && s.statusSeverity) ?? 11) < ((acc && acc.statusSeverity) ?? 11) ? s : acc),
+        null
+      )
+      if (!worst || worst.statusSeverity === undefined || !line.name) continue
+      const reason = worst.reason || ''
+      const isStrike = /strike|industrial action/i.test(reason)
+      // severity <= 6 covers Severe Delays, Part/Planned Closure, Suspended, Closed
+      if (worst.statusSeverity <= 6 || isStrike) {
+        items.push({ line: line.name, status: worst.statusSeverityDescription || 'Disrupted', isStrike })
+      }
+    }
+    return items
+  } catch {
+    return []
+  }
+}
+
 /* ---------- reminder computation (Europe/London) ---------- */
 function londonNow() {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -295,11 +321,29 @@ async function runScheduled(env) {
     if (!sheetCache.has(key)) sheetCache.set(key, await fetchSessions(id, gid))
     return sheetCache.get(key)
   }
+  const morningWindow = now.hour === 7 && now.minutes % 60 < CRON_MINUTES
+  const tflIssues = morningWindow && list.keys.length > 0 ? await fetchTflSevereStatus() : []
   for (const entry of list.keys) {
     const record = await env.PUSH.get(entry.name, 'json')
     if (!record?.subscription?.endpoint || !record?.config?.sheetId) continue
     const { subscription, config } = record
     const due = []
+
+    // Strike-day / severe-disruption alert: 07:00 London, transit users, days with sessions.
+    if (tflIssues.length > 0 && (config.travelMode === 'transit' || config.travelMode === undefined)) {
+      const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
+      if (sessions.some((s) => s.dateISO === now.dateISO && !s.isSelfStudy)) {
+        const strike = tflIssues.some((i) => i.isStrike)
+        due.push({
+          dedupe: `tfl|${now.dateISO}`,
+          title: strike ? '🚨 Strike action on TfL today' : '⚠ TfL disruption this morning',
+          body:
+            tflIssues.slice(0, 4).map((i) => `${i.line}: ${i.status}`).join(' · ') +
+            (tflIssues.length > 4 ? ` +${tflIssues.length - 4} more` : '') +
+            ' — allow extra time',
+        })
+      }
+    }
 
     if ((config.reminderOffsets ?? []).length > 0) {
       const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
@@ -321,7 +365,7 @@ async function runScheduled(env) {
       }
     }
 
-    if ((config.keyDateReminderDays ?? []).length > 0 && (config.kdGid || config.kdSheetId) && now.hour === 7 && now.minutes % 60 < CRON_MINUTES) {
+    if ((config.keyDateReminderDays ?? []).length > 0 && (config.kdGid || config.kdSheetId) && morningWindow) {
       const keyDates = await getSheet(config.kdSheetId || config.sheetId, config.kdGid)
       for (const kd of keyDates) {
         const days = daysBetween(kd.dateISO, now.dateISO)
