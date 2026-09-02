@@ -2,9 +2,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Served from https://<username>.github.io/timetable-pwa/ (GitHub Pages)
+// Served from the domain root on Vercel (VERCEL env is set there) and from
+// /timetable-pwa/ on GitHub Pages; dev uses the Pages base too.
+const base = process.env.VERCEL ? '/' : '/timetable-pwa/'
+
 export default defineConfig({
-  base: '/timetable-pwa/',
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -29,7 +32,7 @@ export default defineConfig({
         // App shell is precached; sheet data also gets a NetworkFirst cache so a fetch
         // still succeeds offline, and periodic background sync (sw-periodic.js) keeps it warm.
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
-        navigateFallback: '/timetable-pwa/index.html',
+        navigateFallback: `${base}index.html`,
         importScripts: ['sw-periodic.js'],
         runtimeCaching: [
           {
