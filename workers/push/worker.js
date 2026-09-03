@@ -53,7 +53,7 @@ async function vapidJwt(audience, vapid) {
   const key = await crypto.subtle.importKey('jwk', vapid.privateJwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
   const header = b64url(utf8(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
   const payload = b64url(
-    utf8(JSON.stringify({ aud: audience, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:push@timetable.invalid' }))
+    utf8(JSON.stringify({ aud: audience, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:abdulwsaqib@gmail.com' }))
   )
   const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, utf8(`${header}.${payload}`))
   return `${header}.${payload}.${b64url(signature)}`
@@ -83,7 +83,7 @@ async function encryptPayload(payload, p256dh, auth) {
   return concat(header, ciphertext)
 }
 
-async function sendPush(env, subscription, payload) {
+async function sendPushDetailed(env, subscription, payload) {
   try {
     const vapid = await getVapid(env)
     const audience = new URL(subscription.endpoint).origin
@@ -93,17 +93,23 @@ async function sendPush(env, subscription, payload) {
       method: 'POST',
       headers: {
         TTL: '3600',
+        Urgency: 'high',
         'Content-Encoding': 'aes128gcm',
         'Content-Type': 'application/octet-stream',
-        Authorization: `vapid t=${jwt}, k=${vapid.publicKey}`,
+        Authorization: `vapid t=${jwt},k=${vapid.publicKey}`,
       },
       body,
     })
-    if (res.status === 404 || res.status === 410) return 'gone'
-    return res.ok ? 'ok' : 'fail'
-  } catch {
-    return 'fail'
+    return { status: res.status, detail: (await res.text()).slice(0, 300) }
+  } catch (err) {
+    return { status: 0, detail: String(err).slice(0, 300) }
   }
+}
+
+async function sendPush(env, subscription, payload) {
+  const { status } = await sendPushDetailed(env, subscription, payload)
+  if (status === 404 || status === 410) return 'gone'
+  return status >= 200 && status < 300 ? 'ok' : 'fail'
 }
 
 /* ---------- sheet parsing (compact copy of the app's parser) ---------- */
@@ -613,6 +619,23 @@ export default {
         { expirationTtl: 86400 }
       )
       return json({ ok: true })
+    }
+    if (request.method === 'POST' && url.pathname === '/test') {
+      // throttled: at most one test broadcast per 10 minutes
+      if (await env.PUSH.get('testlock')) return json({ error: 'try again in a few minutes' }, 429)
+      await env.PUSH.put('testlock', '1', { expirationTtl: 600 })
+      const list = await env.PUSH.list({ prefix: 'sub:' })
+      const results = []
+      for (const entry of list.keys) {
+        const record = await env.PUSH.get(entry.name, 'json')
+        if (!record?.subscription?.endpoint) continue
+        const r = await sendPushDetailed(env, record.subscription, {
+          title: '✅ Test notification',
+          body: 'Background push is working. This came from the timetable-push worker.',
+        })
+        results.push({ endpointHost: new URL(record.subscription.endpoint).hostname, ...r })
+      }
+      return json({ results })
     }
     if (request.method === 'POST' && url.pathname === '/unsubscribe') {
       const body = await request.json().catch(() => null)
