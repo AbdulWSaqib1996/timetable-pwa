@@ -32,6 +32,7 @@ import {
 import { daysUntil, formatRemaining, isPlacementSession, placementTag, shortenRoom, toMinutes } from './lib/format'
 import { fetchGvizTable } from './lib/gviz'
 import { parseTimetable } from './lib/parseTimetable'
+import { expandPlacementSpans } from './lib/placementSpans'
 import { parseSheetUrl } from './lib/sheetUrl'
 import { parseShareHash } from './lib/share'
 import { DEFAULT_PUSH_BASE } from './lib/config'
@@ -162,12 +163,15 @@ export default function App() {
           })
           parsed.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
         }
+        parsed = expandPlacementSpans(parsed)
         const prev = loadCache(pid)
         if (prev) {
-          // Diff the user's own view of old vs new (their specialism/group filters applied).
+          // Diff the user's own view of old vs new (their specialism/group filters applied);
+          // synthetic placement days are excluded so span expansion never floods the bell.
+          const notSynthetic = (x: Session) => !x.id.startsWith('plc-')
           const newChanges = diffSessions(
-            applyFilters(prev.sessions, s, todayISO, { ignoreDateRange: true }),
-            applyFilters(parsed, s, todayISO, { ignoreDateRange: true }),
+            applyFilters(prev.sessions.filter(notSynthetic), s, todayISO, { ignoreDateRange: true }),
+            applyFilters(parsed.filter(notSynthetic), s, todayISO, { ignoreDateRange: true }),
             todayISO
           )
           if (newChanges.length > 0) {
@@ -365,7 +369,7 @@ export default function App() {
     }
     // Validate by fetching before saving anything.
     const table = await fetchGvizTable(parsed.sheetId, parsed.gid)
-    const { sessions: parsedSessions } = parseTimetable(table)
+    const parsedSessions = expandPlacementSpans(parseTimetable(table).sessions)
     const s: Settings = { sheetUrl: url, sheetId: parsed.sheetId, gid: parsed.gid }
     const name = `Timetable ${(store?.profiles.length ?? 0) + 1}`
     const id = addProfileToStore(s, name)

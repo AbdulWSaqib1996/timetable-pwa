@@ -55,7 +55,7 @@ export function googleCalendarUrl(s: Session): string | null {
 
 /** School-experience / placement rows get a calmer rendering. */
 export function isPlacementSession(session: Session): boolean {
-  return /school experience|placement|\bSE ?\d\b/i.test(session.title)
+  return /school experience|placement|\bSE ?\d[a-z]?\b/i.test(session.title)
 }
 
 /** Placement block tag ("SE1B", "SE2"…) used to key the user's placement details. */
