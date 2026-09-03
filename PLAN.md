@@ -267,6 +267,25 @@ Round 7 closed the parity and adoption gaps it aimed at; this round comes from w
 
 **Suggested order:** 2 and 5 as quick finishers of round-7 features, 1 + 3 as the substance (they complete attendance and view parity), 4 when placements begin (late Sept), 6–8 as the polish/adoption batch, 9–10 unchanged from last round.
 
+## Future enhancements — round 9: the PGCE admin file (logged 3 Sep 2026)
+
+Theme requested by the owner: **make every piece of PGCE admin loggable in the app, so the student's "file" builds itself**. The course's real paperwork burden is: weekly mentor meetings with targets, formal observation records, weekly reflections, lesson plans + post-lesson evaluations, subject-knowledge audits, evidence against the Teachers' Standards, attendance/absence/day counts, and a binder to hand in at each placement's end. The app already holds the last three (evidence journal, absences, day counter) — this round adds the rest and ties it together. Effort: S (hours), M (a day or two), L (multi-day).
+
+1. **Weekly reflection log (M)** — one guided entry per week (went well / challenges / next week's focus), taggable TS1–TS8, attached to the week (not a session). A Friday-afternoon push during placement weeks nudges it while the week is fresh. Reflections join the evidence journal and bundle. The habit every mentor asks for and every student backfills the night before a review.
+2. **Targets tracker (M)** — mentor-set targets: text, date set, linked standards, status (set → in progress → met) and week met. Open targets surface on the placement block and in the weekly nudge; met targets are evidence. This is the spine of mentor meetings and reviews — currently it lives in a paper diary.
+3. **Mentor meeting log (S/M)** — a quick per-meeting record: date, discussed, actions agreed. Actions become tickable to-dos that carry forward until done; meetings + actions export alongside the placement day log. Cheap to build (it's a structured note), high trust value at reviews.
+4. **Observation records (M)** — formal observations received: observer, lesson/subject, focus, strengths, development points — with development points optionally becoming targets (item 2). A count of observations per block joins Stats and the placement log (courses mandate a minimum per placement).
+5. **Lesson log with evaluations (M/L)** — lessons the student taught: class/subject/date, plan attached (photo or file), and a post-lesson evaluation note. "Lessons taught" per block joins Stats; evaluations are TS-taggable evidence. The biggest single chunk of placement admin.
+6. **Subject-knowledge audit tracker (S/M)** — the sheet already carries audit deadlines as key dates; add per-subject audit status (baseline → revisited → secure) with a note per pass, so the start/mid/end audit story is in one place instead of three spreadsheets.
+7. **Document wallet (M)** — the photo store grows up: attach PDFs and files (safeguarding certificate, DBS, lesson-plan template, school policies) to sessions or a general wallet, stored in IndexedDB, size-capped, included in backups. Placement schools ask for the same three documents every time; they should live in the app that's already open.
+8. **"My PGCE file" dashboard (M)** — one screen answering "am I on track?": days 34/120 with absences, evidence counts per standard **with gap warnings** ("nothing against TS6 yet"), open targets, reflection streak, observations logged, audits pending, assignments due. Aggregates items 1–6 + existing data; the natural home is a fifth view or the Stats sheet grown up.
+9. **Full binder export (M)** — one printable bundle (extends the round-7 print machinery): evidence journal + reflections + targets + meeting log + observations + lesson log + attendance and placement-day logs, grouped and dated — the end-of-placement hand-in, generated in one tap.
+10. **Friday admin digest (S)** — a weekly push listing what's outstanding: unmarked attendance days, missing reflection, open targets, unticked mentor actions, audits due. Turns the whole round from "a place to log things" into "a thing that chases you kindly". Small worker addition once items 1–3 exist.
+
+**Carried over, still open:** Sentry + analytics (r7/8-9); encrypted photo sync via R2 (r7/8-10); email briefing fallback (r5-8, user-deferred); private-sheet OAuth (r1-9); personal-calendar clash check, Play Store TWA (r3-6/11).
+
+**Suggested order:** 3 → 2 → 1 first (they feed each other: meetings set targets, reflections review them, and all three are needed weekly from placement day one — before SE1a on 28 Sept 2026 ideally), then 4 + 5 as the observation/lesson pair, 8 once three data sources exist, 6 and 7 as fill-ins, 9 + 10 last since they aggregate everything.
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:
