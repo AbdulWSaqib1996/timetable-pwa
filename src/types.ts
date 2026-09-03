@@ -85,6 +85,8 @@ export interface Settings {
   morningBriefing?: boolean
   /** push timetable changes (rooms/times/added/cancelled) in the background (default true) */
   changeAlerts?: boolean
+  /** background leave alerts: cache the last app-open location to the push worker (default off) */
+  bgLeaveAlerts?: boolean
 }
 
 /** One saved timetable (sheet + all its choices). */

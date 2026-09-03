@@ -467,7 +467,8 @@ export function SettingsSheet({
             Shows an estimated journey from where you are to each session's UCL building, on the
             timetable cards and in session details (rooms are matched against the Bloomsbury
             campus). Estimates are approximate — the Directions link gives the exact route. Your
-            location never leaves this device.
+            location stays on this device unless you turn on background leave alerts below, which
+            store your last app-open location in your own push worker.
           </p>
         </section>
 
@@ -573,6 +574,32 @@ export function SettingsSheet({
               />
               Push timetable changes (rooms, times, added/cancelled sessions)
             </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={settings.bgLeaveAlerts === true}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  onUpdateSettings({ bgLeaveAlerts: next })
+                  if (settings.pushEnabled) {
+                    void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
+                      ...settings,
+                      bgLeaveAlerts: next,
+                    }).catch(() => {})
+                  }
+                }}
+              />
+              Background leave alerts (uses your last app-open location)
+            </label>
+            {settings.bgLeaveAlerts && (
+              <p className="filter-hint">
+                {!settings.locationEnabled
+                  ? 'Enable travel times above so the app can capture your location while open.'
+                  : (settings.leaveAlertOffsets ?? []).length === 0
+                    ? 'Pick head starts under Leave alerts above — they set when these fire.'
+                    : 'The location captured while the app is open is stored in your own push worker and used to compute “time to leave” pushes with the app closed. Alerts say how old the location is when it isn’t fresh.'}
+              </p>
+            )}
             {pushMessage && <p className="filter-hint">{pushMessage}</p>}
           </section>
         )}

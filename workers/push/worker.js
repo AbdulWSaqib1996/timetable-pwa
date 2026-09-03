@@ -237,6 +237,68 @@ async function fetchSessions(sheetId, gid) {
   return sessions
 }
 
+/* ---------- travel estimation for background leave alerts ---------- */
+const BUILDINGS = [
+  { name: 'IOE — 20 Bedford Way', keywords: ['bedford way'], lat: 51.5227, lng: -0.1276 },
+  { name: 'Darwin Building', keywords: ['darwin'], lat: 51.5238, lng: -0.1319 },
+  { name: 'Cruciform Building', keywords: ['cruciform'], lat: 51.5246, lng: -0.1339 },
+  { name: 'Wilkins Building', keywords: ['wilkins', 'main quad', 'octagon', 'gustave tuck'], lat: 51.5248, lng: -0.1336 },
+  { name: 'Senate House', keywords: ['senate house'], lat: 51.5213, lng: -0.1287 },
+  { name: 'Institute of Archaeology', keywords: ['archaeology'], lat: 51.5249, lng: -0.131 },
+  { name: 'Chandler House', keywords: ['chandler'], lat: 51.5253, lng: -0.1228 },
+  { name: 'Roberts Building', keywords: ['roberts'], lat: 51.523, lng: -0.1322 },
+  { name: 'Christopher Ingold Building', keywords: ['ingold'], lat: 51.5253, lng: -0.1325 },
+  { name: 'Medical Sciences / Anatomy', keywords: ['anatomy', 'medical sciences'], lat: 51.5237, lng: -0.1334 },
+  { name: 'Bentham House', keywords: ['bentham'], lat: 51.5257, lng: -0.1307 },
+  { name: 'Foster Court', keywords: ['foster court'], lat: 51.5243, lng: -0.1329 },
+  { name: '25 Gordon Street', keywords: ['gordon street', 'gordon house'], lat: 51.5245, lng: -0.1317 },
+  { name: 'Medawar Building', keywords: ['medawar'], lat: 51.5238, lng: -0.1326 },
+  { name: '1–19 Torrington Place', keywords: ['torrington'], lat: 51.5218, lng: -0.1343 },
+  { name: 'Tavistock Square area', keywords: ['tavistock'], lat: 51.5253, lng: -0.1289 },
+  { name: 'Birkbeck / Malet Street', keywords: ['birkbeck', 'malet street'], lat: 51.5217, lng: -0.1303 },
+  { name: 'Student Centre', keywords: ['student centre'], lat: 51.5246, lng: -0.1325 },
+  { name: 'Drayton House', keywords: ['drayton'], lat: 51.525, lng: -0.132 },
+  { name: 'Gordon Square', keywords: ['gordon square'], lat: 51.5244, lng: -0.13 },
+  { name: 'UCL (IOE)', keywords: ['ioe'], lat: 51.5227, lng: -0.1276 },
+]
+const matchBuilding = (room) => {
+  const key = (room || '').toLowerCase()
+  return BUILDINGS.find((b) => b.keywords.some((k) => key.includes(k))) ?? null
+}
+const haversineM = (a, b) => {
+  const toRad = (d) => (d * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * 6371000 * Math.asin(Math.sqrt(h))
+}
+const MODE_PARAMS = {
+  walking: { rf: 1.25, mpm: 83.3, over: 0, phrase: 'walk' },
+  transit: { rf: 1.3, mpm: 250, over: 8, phrase: 'by public transport' },
+  driving: { rf: 1.4, mpm: 333, over: 5, phrase: 'drive' },
+}
+function heuristicMinutes(from, to, mode) {
+  const p = MODE_PARAMS[mode] ?? MODE_PARAMS.walking
+  return Math.max(1, Math.ceil((haversineM(from, to) * p.rf) / p.mpm + p.over))
+}
+async function tflJourneyMinutes(from, to, cache) {
+  const key = `${from.lat.toFixed(3)},${from.lng.toFixed(3)}|${to.lat},${to.lng}`
+  if (cache.has(key)) return cache.get(key)
+  let mins = null
+  try {
+    const res = await fetch(`https://api.tfl.gov.uk/Journey/JourneyResults/${from.lat},${from.lng}/to/${to.lat},${to.lng}`)
+    if (res.ok) {
+      const json = await res.json()
+      const d = json.journeys?.[0]?.duration
+      if (typeof d === 'number' && d > 0) mins = d
+    }
+  } catch {
+    /* fall back to heuristic */
+  }
+  cache.set(key, mins)
+  return mins
+}
+
 /* ---------- TfL morning status (strikes, closures, severe delays) ---------- */
 async function fetchTflSevereStatus() {
   try {
@@ -417,6 +479,7 @@ async function runScheduled(env) {
   const tflIssues = morningWindow && list.keys.length > 0 ? await fetchTflSevereStatus() : []
   let morningWeather = null
   let morningWeatherFetched = false
+  const journeyCache = new Map()
   for (const entry of list.keys) {
     const record = await env.PUSH.get(entry.name, 'json')
     if (!record?.subscription?.endpoint || !record?.config?.sheetId) continue
@@ -501,6 +564,46 @@ async function runScheduled(env) {
             (tflIssues.length > 4 ? ` +${tflIssues.length - 4} more` : '') +
             ' — allow extra time',
         })
+      }
+    }
+
+    // Background leave alerts: session start − travel from the cached last-app-open
+    // location (live TfL journey when the mode is transit), with the chosen head start.
+    const loc = record.loc
+    const locFresh = loc && Date.now() - loc.at < 18 * 3600 * 1000
+    if (config.bgLeave === true && (config.leaveAlertOffsets ?? []).length > 0 && locFresh) {
+      const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
+      for (const s of sessions) {
+        if (s.dateISO !== now.dateISO || s.isSelfStudy) continue
+        const start = toMinutes(s.start)
+        if (start === null || start <= now.minutes) continue
+        const building = matchBuilding(s.room)
+        if (!building) continue
+        const mode = config.travelMode ?? 'walking'
+        let travelMins = heuristicMinutes(loc, building, mode)
+        let liveLabel = ''
+        if (mode === 'transit') {
+          const live = await tflJourneyMinutes(loc, building, journeyCache)
+          if (live !== null) {
+            travelMins = live
+            liveLabel = ' (live TfL)'
+          }
+        }
+        const untilLeave = start - now.minutes - travelMins
+        for (const offset of config.leaveAlertOffsets) {
+          if (untilLeave > offset - CRON_MINUTES && untilLeave <= offset) {
+            const ageH = Math.round((Date.now() - loc.at) / 3600000)
+            due.push({
+              dedupe: `leave|${s.dateISO}|${s.start}|${s.title}|${offset}`,
+              key: `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`,
+              title:
+                untilLeave <= 2 ? `Time to leave — ${s.title}` : `Leave in ~${untilLeave}m — ${s.title}`,
+              body:
+                `≈ ${travelMins}m ${MODE_PARAMS[mode]?.phrase ?? 'journey'}${liveLabel} to ${building.name} · starts ${s.start}` +
+                (ageH >= 2 ? ` · location from ${ageH}h ago` : ''),
+            })
+          }
+        }
       }
     }
 
@@ -593,9 +696,11 @@ export default {
       if (!body?.subscription?.endpoint || !body?.subscription?.keys?.p256dh || !body?.config?.sheetId) {
         return json({ error: 'invalid subscription' }, 400)
       }
+      const subKey = await endpointKey(body.subscription.endpoint)
+      const existing = await env.PUSH.get(subKey, 'json')
       await env.PUSH.put(
-        await endpointKey(body.subscription.endpoint),
-        JSON.stringify({ subscription: body.subscription, config: body.config, base: url.origin })
+        subKey,
+        JSON.stringify({ subscription: body.subscription, config: body.config, base: url.origin, loc: existing?.loc })
       )
       return json({ ok: true })
     }
@@ -636,6 +741,20 @@ export default {
         results.push({ endpointHost: new URL(record.subscription.endpoint).hostname, ...r })
       }
       return json({ results })
+    }
+    if (request.method === 'POST' && url.pathname === '/location') {
+      const body = await request.json().catch(() => null)
+      const lat = Number(body?.lat)
+      const lng = Number(body?.lng)
+      if (!body?.endpoint || !isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+        return json({ error: 'invalid location' }, 400)
+      }
+      const subKey = await endpointKey(body.endpoint)
+      const record = await env.PUSH.get(subKey, 'json')
+      if (!record) return json({ error: 'unknown subscription' }, 404)
+      record.loc = { lat, lng, at: Date.now() }
+      await env.PUSH.put(subKey, JSON.stringify(record))
+      return json({ ok: true })
     }
     if (request.method === 'POST' && url.pathname === '/unsubscribe') {
       const body = await request.json().catch(() => null)

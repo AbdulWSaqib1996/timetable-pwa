@@ -33,6 +33,7 @@ import { parseSheetUrl } from './lib/sheetUrl'
 import { parseShareHash } from './lib/share'
 import { DEFAULT_PUSH_BASE } from './lib/config'
 import { showReminder } from './lib/notify'
+import { reportLocation } from './lib/push'
 import { drainPendingActions } from './lib/pendingActions'
 import { cachedRouteMinutes, tflDisruptions, tflRoute } from './lib/tfl'
 import type { TflDisruption } from './lib/tfl'
@@ -272,6 +273,34 @@ export default function App() {
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
   }, [])
+
+  // Background leave alerts: cache the latest app-open location to the push worker,
+  // throttled to every 15 minutes or a ~300 m move.
+  const bgLeaveOn = settings?.bgLeaveAlerts === true && settings?.pushEnabled === true
+  useEffect(() => {
+    if (!bgLeaveOn || !coords) return
+    try {
+      const last = JSON.parse(localStorage.getItem('timetable.locreport.v1') ?? 'null') as {
+        lat: number
+        lng: number
+        at: number
+      } | null
+      const moved =
+        !last ||
+        Math.abs(last.lat - coords.lat) > 0.003 ||
+        Math.abs(last.lng - coords.lng) > 0.005 ||
+        Date.now() - last.at > 15 * 60_000
+      if (!moved) return
+      localStorage.setItem(
+        'timetable.locreport.v1',
+        JSON.stringify({ lat: coords.lat, lng: coords.lng, at: Date.now() })
+      )
+      void reportLocation(settings?.pushServerBase ?? DEFAULT_PUSH_BASE, coords.lat, coords.lng).catch(() => {})
+    } catch {
+      /* storage unavailable */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bgLeaveOn, coords?.lat, coords?.lng])
 
   // PWA shortcut deep-link (?view=keydates) — consume it once.
   useEffect(() => {

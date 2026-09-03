@@ -41,6 +41,8 @@ export async function subscribePush(base: string, settings: Settings): Promise<v
     travelMode: settings.travelMode ?? 'walking',
     briefing: settings.morningBriefing !== false,
     changeAlerts: settings.changeAlerts !== false,
+    bgLeave: settings.bgLeaveAlerts === true,
+    leaveAlertOffsets: settings.leaveAlertOffsets ?? [],
     base: trim(base),
   }
   const save = await fetch(`${trim(base)}/subscribe`, {
@@ -49,6 +51,22 @@ export async function subscribePush(base: string, settings: Settings): Promise<v
     body: JSON.stringify({ subscription: subscription.toJSON(), config }),
   })
   if (!save.ok) throw new Error('The push server rejected the subscription.')
+}
+
+/**
+ * Report the device's current location to the push worker (opt-in, for background
+ * leave alerts). Throttled by the caller; stored against this device's subscription.
+ */
+export async function reportLocation(base: string, lat: number, lng: number): Promise<void> {
+  if (!('serviceWorker' in navigator)) return
+  const reg = await navigator.serviceWorker.ready
+  const subscription = await reg.pushManager.getSubscription()
+  if (!subscription) return
+  await fetch(`${trim(base)}/location`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ endpoint: subscription.endpoint, lat, lng }),
+  })
 }
 
 export async function unsubscribePush(base: string): Promise<void> {
