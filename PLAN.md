@@ -246,6 +246,25 @@ Round 6 finished the placement story in the app and push worker — and exposed 
 
 **Suggested order:** 1 and 4 first (small worker wins that finish parity), 2 next (completes the attendance loop the day counter depends on), 6 before telling anyone with an iPhone about the app, 3 before the first evidence submission deadline, 5 once sync sees real two-device use, then 7–9 as the adoption push, 10 only on demand.
 
+## Future enhancements — round 8 (logged 3 Sep 2026)
+
+Round 7 closed the parity and adoption gaps it aimed at; this round comes from what's now visibly uneven. Verified before logging: the week and month views have **zero** placement/break awareness (all of rounds 6–7's placement work lives in the day view), the app ships as a single 299KB chunk, and there's no share-target or install-prompt handling. Themes: finish attendance honestly (absence is data too), push the notices channel, bring the other views up to par, and the capture/adoption polish. Effort: S (hours), M (a day or two), L (multi-day).
+
+1. **Absence tracking (M)** — attendance is currently binary (ticked or silent). Add "✗ Absent" alongside ✓ on the end-of-session prompt and in the detail sheet, with an optional reason (sick / travel / other); Stats and the attendance CSV show absences, and the placement day log gains an Absent column — PGCE attendance requirements care about recorded absence, not just presence.
+2. **Notices push (S)** — notices only appear when the app opens; the push worker already diffs sheets on a cron, so diff the notices tab too and push new rows ("📣 Room change: PS1 moves to 731") to subscribers. Makes the broadcast channel actually reach people.
+3. **Week & month view parity (S/M)** — placement days green and break stretches labelled in the month grid; the week view gets the placement tint and school name. The day view learned all this in rounds 6–7; the other two views still pretend placements don't exist.
+4. **Share-target photo capture (M)** — register the PWA as a share target so a whiteboard photo can be shared from the camera roll straight into today's session as evidence (picks the current/most recent session, tags it for the journal). Removes the clunkiest step in evidence capture, and works offline in schools with bad signal.
+5. **Feed-URL staleness nudge (S)** — placement details and filters are baked into the copied feed URL; when they change after the URL was last copied, show "your calendar feed URL is out of date — re-copy it" in Settings. Fixes the silent drift noted when round 7 shipped.
+6. **Android install button (S)** — capture `beforeinstallprompt` and offer an "Install app" button in Settings and the setup checklist. Pairs with round 7's iOS guide so both platforms get walked to the Home Screen.
+7. **Notification preferences panel (S/M)** — push types are now scattered across four Settings sections (reminders, leave alerts, briefing/changes/leave toggles, attendance prompts, key dates). One "Notifications" section listing every type with its toggle, plus optional quiet hours. Consolidation, not new capability.
+8. **Code splitting & bundle audit (S/M)** — 299KB in one chunk; React.lazy the sheets (Settings, Journal, Stats, Study group are all rarely-first-paint) and audit for dead weight, targeting a materially smaller initial load on school Wi-Fi.
+9. **Sentry + privacy-friendly analytics (S/M)** — carried from round 7 item 9, unchanged: operational visibility before wider adoption.
+10. **Encrypted photo sync via R2 (L)** — carried from round 7 item 10, unchanged: only with real two-device demand.
+
+**Carried over, still open:** round-5 8 (email briefing fallback — user-deferred); private-sheet OAuth (r1-9); personal-calendar clash check, Play Store TWA (r3-6/11).
+
+**Suggested order:** 2 and 5 as quick finishers of round-7 features, 1 + 3 as the substance (they complete attendance and view parity), 4 when placements begin (late Sept), 6–8 as the polish/adoption batch, 9–10 unchanged from last round.
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:
