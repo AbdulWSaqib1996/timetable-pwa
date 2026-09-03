@@ -2150,3 +2150,123 @@ body {
   border-radius: 8px;
   padding: 8px 10px;
 }
+
+/* ---------- Round 9: My PGCE file ---------- */
+
+.admin-tabs {
+  margin-bottom: 10px;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  margin-bottom: 12px;
+}
+
+.admin-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-item {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.admin-item p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+
+.admin-item.done {
+  opacity: 0.65;
+}
+
+.admin-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.admin-dates {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.admin-action {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.action-done {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.status-cycle {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 3px 10px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.admin-overview .notif-state.warn {
+  color: #e8590c;
+}
+
+.admin-gaps {
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.btn-file {
+  display: inline-block;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.wallet-open {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.journal-static {
+  cursor: default;
+}
+
+.pb-ts {
+  font-size: 12pt;
+  margin: 10pt 0 4pt;
+}

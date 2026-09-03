@@ -84,6 +84,7 @@ export function clearProfileData(pid: string): void {
   removeKey(cacheKey(pid))
   removeKey(metaKey(pid))
   removeKey(changesKey(pid))
+  removeKey(`timetable.admin.v1.${pid}`)
 }
 
 export function loadCache(pid: string): CachedData | null {
@@ -110,15 +111,26 @@ export function saveChanges(pid: string, changes: SessionChange[]): void {
   writeJSON(changesKey(pid), changes.slice(0, 100))
 }
 
-/** Everything worth keeping (profiles, notes, attendance, photos) as a JSON backup. */
+/** Everything worth keeping (profiles, notes, attendance, photos, PGCE admin file, wallet). */
 export async function exportBackup(): Promise<string> {
   const store = readJSON<ProfileStore>(STORE_KEY)
   const meta: Record<string, MetaMap> = {}
-  for (const p of store?.profiles ?? []) meta[p.id] = loadMeta(p.id)
+  const admin: Record<string, unknown> = {}
+  for (const p of store?.profiles ?? []) {
+    meta[p.id] = loadMeta(p.id)
+    const rawAdmin = readJSON<unknown>(`timetable.admin.v1.${p.id}`)
+    if (rawAdmin) admin[p.id] = rawAdmin
+  }
   const { exportPhotos } = await import('./photos')
   const photos = await exportPhotos()
+  const { exportWallet } = await import('./wallet')
+  const wallet = await exportWallet()
   markBackedUp()
-  return JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), store, meta, photos }, null, 2)
+  return JSON.stringify(
+    { version: 3, exportedAt: new Date().toISOString(), store, meta, admin, photos, wallet },
+    null,
+    2
+  )
 }
 
 /** Restore a backup produced by exportBackup. Returns false if the file isn't one. */
@@ -127,14 +139,21 @@ export async function importBackup(text: string): Promise<boolean> {
     const data = JSON.parse(text) as {
       store?: ProfileStore
       meta?: Record<string, MetaMap>
+      admin?: Record<string, unknown>
       photos?: { owner: string; at: number; data: string }[]
+      wallet?: { owner: string; name: string; type: string; at: number; data: string }[]
     }
     if (!data.store || !Array.isArray(data.store.profiles) || data.store.profiles.length === 0) return false
     writeJSON(STORE_KEY, data.store)
     for (const [pid, m] of Object.entries(data.meta ?? {})) writeJSON(metaKey(pid), m)
+    for (const [pid, a] of Object.entries(data.admin ?? {})) writeJSON(`timetable.admin.v1.${pid}`, a)
     if (Array.isArray(data.photos) && data.photos.length > 0) {
       const { importPhotos } = await import('./photos')
       await importPhotos(data.photos)
+    }
+    if (Array.isArray(data.wallet) && data.wallet.length > 0) {
+      const { importWallet } = await import('./wallet')
+      await importWallet(data.wallet)
     }
     return true
   } catch {

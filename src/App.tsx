@@ -9,6 +9,7 @@ import { SpecialismPicker } from './components/SpecialismPicker'
 
 // The bottom sheets are modal and rarely part of first paint — split them out
 // of the initial bundle (they load on first open).
+const AdminSheet = lazy(() => import('./components/AdminSheet').then((m) => ({ default: m.AdminSheet })))
 const AddDeadlineSheet = lazy(() => import('./components/AddDeadlineSheet').then((m) => ({ default: m.AddDeadlineSheet })))
 const ChangesSheet = lazy(() => import('./components/ChangesSheet').then((m) => ({ default: m.ChangesSheet })))
 const FilterSheet = lazy(() => import('./components/FilterSheet').then((m) => ({ default: m.FilterSheet })))
@@ -38,6 +39,8 @@ import { parseSheetUrl } from './lib/sheetUrl'
 import { parseShareHash } from './lib/share'
 import { DEFAULT_PUSH_BASE } from './lib/config'
 import { subscribePush } from './lib/push'
+import { EMPTY_ADMIN, loadAdminFile, saveAdminFile } from './lib/admin'
+import type { AdminFile } from './lib/admin'
 import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
 import type { Notice } from './lib/notices'
 import { loadSyncState, pushSync, saveSyncState, syncPullApply } from './lib/sync'
@@ -81,7 +84,7 @@ function matchesQuery(s: Session, q: string): boolean {
   return [s.title, s.subject, s.tutor, s.room].some((f) => f && f.toLowerCase().includes(needle))
 }
 
-type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats' | 'group' | 'adddl' | 'journal'
+type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats' | 'group' | 'adddl' | 'journal' | 'admin'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -113,6 +116,7 @@ export default function App() {
   const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowWhatsNew())
   const [notices, setNotices] = useState<Notice[]>([])
   const [dismissedNotices, setDismissedNotices] = useState<Set<string>>(() => loadDismissedNotices())
+  const [adminFile, setAdminFile] = useState<AdminFile>(EMPTY_ADMIN)
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
   const settings = active?.settings ?? null
@@ -137,7 +141,18 @@ export default function App() {
   useEffect(() => {
     setSelected(null)
     setJumpDate(null)
+    setAdminFile(active ? loadAdminFile(active.id) : EMPTY_ADMIN)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
+
+  function updateAdmin(updater: (prev: AdminFile) => AdminFile) {
+    if (!active) return
+    setAdminFile((prev) => {
+      const next = updater(prev)
+      saveAdminFile(active.id, next)
+      return next
+    })
+  }
 
   // Manual theme override (default: follow the system).
   useEffect(() => {
@@ -231,9 +246,15 @@ export default function App() {
     return () => clearTimeout(t)
   }, [store, metaMap])
 
-  // Keep the push worker's copy of placement details fresh (school names and
-  // coords feed background briefings/reminders/leave alerts).
+  // Keep the push worker's copy of placement details and admin-summary counts
+  // fresh (they feed background briefings/leave alerts and the Friday digest).
   const placementsConfigKey = JSON.stringify(settings?.placements ?? {})
+  const adminSummaryKey = JSON.stringify({
+    t: adminFile.targets.filter((t) => t.status !== 'met').length,
+    a: adminFile.meetings.reduce((n, m) => n + m.actions.filter((a) => !a.done).length, 0),
+    r: [...adminFile.reflections.map((r) => r.weekISO)].sort().pop() ?? '',
+  })
+  const activeIdForSync = active?.id
   const placementsSyncedOnce = useRef(false)
   useEffect(() => {
     if (!settings?.pushEnabled) return
@@ -244,12 +265,12 @@ export default function App() {
     const t = setTimeout(() => {
       const s = settingsRef.current
       if (s?.pushEnabled) {
-        void subscribePush(s.pushServerBase ?? DEFAULT_PUSH_BASE, s).catch(() => {})
+        void subscribePush(s.pushServerBase ?? DEFAULT_PUSH_BASE, s, activeIdForSync).catch(() => {})
       }
     }, 5000)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placementsConfigKey])
+  }, [placementsConfigKey, adminSummaryKey])
 
   function updateSettings(patch: Partial<Settings>) {
     setStore((prev) => {
@@ -601,6 +622,15 @@ export default function App() {
             <button
               type="button"
               className="btn-icon"
+              onClick={() => setOpenSheet('admin')}
+              aria-label="My PGCE file"
+              title="My PGCE file"
+            >
+              🎓
+            </button>
+            <button
+              type="button"
+              className="btn-icon"
               onClick={() => {
                 setSearchOpen((v) => !v)
                 setQuery('')
@@ -872,7 +902,11 @@ export default function App() {
           placements={settings.placements}
           placementProgress={
             placementStats.totalDays > 0
-              ? { attended: placementStats.attended, target: settings.placementTargetDays }
+              ? {
+                  attended: placementStats.attended,
+                  target: settings.placementTargetDays,
+                  openTargets: adminFile.targets.filter((t) => t.status !== 'met').length,
+                }
               : undefined
           }
           windowed
@@ -955,6 +989,22 @@ export default function App() {
           todayISO={todayISO}
           keyDates={allKeyDates}
           placementTargetDays={settings.placementTargetDays}
+          adminCounts={{ observations: adminFile.observations.length, lessons: adminFile.lessons.length }}
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'admin' && (
+        <AdminSheet
+          profileId={active.id}
+          profileName={active.name}
+          admin={adminFile}
+          onUpdateAdmin={updateAdmin}
+          sessions={exportSessions}
+          metaMap={metaMap}
+          keyDates={allKeyDates}
+          placementTargetDays={settings.placementTargetDays}
+          todayISO={todayISO}
           onClose={() => setOpenSheet('none')}
         />
       )}
@@ -964,6 +1014,7 @@ export default function App() {
           sessions={[...exportSessions, ...allKeyDates]}
           metaMap={metaMap}
           profileId={active.id}
+          admin={adminFile}
           onSelect={setSelected}
           onClose={() => setOpenSheet('none')}
         />

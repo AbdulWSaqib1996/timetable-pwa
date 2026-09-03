@@ -21,7 +21,7 @@ interface Props {
   /** user-entered placement details, keyed by placement tag */
   placements?: Record<string, { school?: string }>
   /** overall school-days progress shown on placement-day blocks */
-  placementProgress?: { attended: number; target?: number }
+  placementProgress?: { attended: number; target?: number; openTargets?: number }
 }
 
 function diffDaysISO(fromISO: string, toISO: string): number {
@@ -213,6 +213,8 @@ export function AgendaView({
                           ` · ${placementProgress.attended}${placementProgress.target ? `/${placementProgress.target}` : ''} school day${
                             placementProgress.attended === 1 && !placementProgress.target ? '' : 's'
                           } logged`}
+                        {(placementProgress?.openTargets ?? 0) > 0 &&
+                          ` · 🎯 ${placementProgress!.openTargets} open target${placementProgress!.openTargets === 1 ? '' : 's'}`}
                       </span>
                     </button>
                   </div>

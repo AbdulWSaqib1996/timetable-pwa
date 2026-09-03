@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
+import type { AdminFile } from '../lib/admin'
 import { sessionKey } from '../lib/diff'
 import { downloadFile } from '../lib/files'
 import { printEvidenceBundle } from '../lib/printBundle'
@@ -12,12 +13,22 @@ interface Props {
   metaMap: MetaMap
   /** active profile id, for reading photos into the print bundle */
   profileId: string
+  /** PGCE admin file — reflections and lesson evaluations join the journal */
+  admin?: AdminFile
   onSelect: (session: Session) => void
   onClose: () => void
 }
 
 interface Entry {
-  session: Session
+  id: string
+  key: string
+  dateISO: string
+  title: string
+  room?: string
+  /** present for session entries (tap-through); admin entries have none */
+  session?: Session
+  /** 📔 reflection / 🍎 lesson marker for admin entries */
+  marker?: string
   note?: string
   photos: number
   standards: string[]
@@ -41,10 +52,7 @@ function buildMarkdown(entries: Entry[]): string {
     if (mine.length === 0) continue
     lines.push('', `## ${ts.id === 'Untagged' ? ts.label : `${ts.id} — ${ts.label}`}`, '')
     for (const e of mine) {
-      const bits = [
-        `**${formatShortDate(e.session.dateISO)} · ${e.session.title}**`,
-        e.session.room ? `(${e.session.room})` : '',
-      ]
+      const bits = [`**${formatShortDate(e.dateISO)} · ${e.title}**`, e.room ? `(${e.room})` : '']
         .filter(Boolean)
         .join(' ')
       lines.push(`- ${bits}`)
@@ -55,7 +63,7 @@ function buildMarkdown(entries: Entry[]): string {
   return lines.join('\n') + '\n'
 }
 
-export function JournalSheet({ sessions, metaMap, profileId, onSelect, onClose }: Props) {
+export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, onClose }: Props) {
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const [filter, setFilter] = useState<string | null>(null)
 
@@ -68,10 +76,47 @@ export function JournalSheet({ sessions, metaMap, profileId, onSelect, onClose }
       const m = metaMap[key]
       if (!m || (!m.note && !(m.photos ?? 0) && !(m.standards ?? []).length)) continue
       seen.add(key)
-      out.push({ session: s, note: m.note, photos: m.photos ?? 0, standards: m.standards ?? [] })
+      out.push({
+        id: key,
+        key,
+        dateISO: s.dateISO,
+        title: s.title,
+        room: s.room,
+        session: s,
+        note: m.note,
+        photos: m.photos ?? 0,
+        standards: m.standards ?? [],
+      })
     }
-    return out.sort((a, b) => b.session.dateISO.localeCompare(a.session.dateISO))
-  }, [sessions, metaMap])
+    for (const r of admin?.reflections ?? []) {
+      out.push({
+        id: `refl-${r.id}`,
+        key: `refl-${r.id}`,
+        dateISO: r.weekISO,
+        title: `Weekly reflection (w/c ${formatShortDate(r.weekISO)})`,
+        marker: '📔',
+        note: [r.wentWell && `Went well: ${r.wentWell}`, r.challenges && `Challenges: ${r.challenges}`, r.focus && `Next focus: ${r.focus}`]
+          .filter(Boolean)
+          .join(' · '),
+        photos: 0,
+        standards: r.standards,
+      })
+    }
+    for (const l of admin?.lessons ?? []) {
+      if (!l.evaluation && l.standards.length === 0) continue
+      out.push({
+        id: `les-${l.id}`,
+        key: `les-${l.id}`,
+        dateISO: l.dateISO,
+        title: `Lesson taught: ${l.subject}${l.classGroup ? ` (${l.classGroup})` : ''}`,
+        marker: '🍎',
+        note: l.evaluation,
+        photos: 0,
+        standards: l.standards,
+      })
+    }
+    return out.sort((a, b) => b.dateISO.localeCompare(a.dateISO))
+  }, [sessions, metaMap, admin])
 
   const counts = useMemo(() => {
     const map = new Map<string, number>()
@@ -132,12 +177,15 @@ export function JournalSheet({ sessions, metaMap, profileId, onSelect, onClose }
           </div>
         ) : (
           <ul className="journal-list">
-            {shown.map((e) => (
-              <li key={e.session.id}>
-                <button type="button" className="journal-entry" onClick={() => onSelect(e.session)}>
+            {shown.map((e) => {
+              const body = (
+                <>
                   <span className="journal-head">
-                    <span className="journal-date">{formatShortDate(e.session.dateISO)}</span>
-                    <span className="journal-title">{e.session.title}</span>
+                    <span className="journal-date">{formatShortDate(e.dateISO)}</span>
+                    <span className="journal-title">
+                      {e.marker ? `${e.marker} ` : ''}
+                      {e.title}
+                    </span>
                   </span>
                   {e.note && <span className="journal-note">{e.note}</span>}
                   <span className="journal-tags">
@@ -148,9 +196,20 @@ export function JournalSheet({ sessions, metaMap, profileId, onSelect, onClose }
                     ))}
                     {e.photos > 0 && <span className="badge badge-note">📷 {e.photos}</span>}
                   </span>
-                </button>
-              </li>
-            ))}
+                </>
+              )
+              return (
+                <li key={e.id}>
+                  {e.session ? (
+                    <button type="button" className="journal-entry" onClick={() => onSelect(e.session!)}>
+                      {body}
+                    </button>
+                  ) : (
+                    <div className="journal-entry journal-static">{body}</div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
         <div className="modal-actions">
@@ -162,10 +221,10 @@ export function JournalSheet({ sessions, metaMap, profileId, onSelect, onClose }
               void printEvidenceBundle(
                 profileId,
                 entries.map((e) => ({
-                  key: sessionKey(e.session),
-                  dateISO: e.session.dateISO,
-                  title: e.session.title,
-                  room: e.session.room,
+                  key: e.key,
+                  dateISO: e.dateISO,
+                  title: e.title,
+                  room: e.room,
                   note: e.note,
                   photos: e.photos,
                   standards: e.standards,

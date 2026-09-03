@@ -12,6 +12,8 @@ interface Props {
   keyDates?: Session[]
   /** course requirement for assessed school days, from Settings */
   placementTargetDays?: number
+  /** counts from the PGCE admin file */
+  adminCounts?: { observations: number; lessons: number }
   onClose: () => void
 }
 
@@ -174,10 +176,12 @@ async function shareStatsImage(tiles: { big: string; small: string }[]): Promise
   URL.revokeObjectURL(url)
 }
 
-export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placementTargetDays, onClose }: Props) {
+export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placementTargetDays, adminCounts, onClose }: Props) {
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const stats = computeStats(sessions, metaMap, todayISO, keyDates, placementTargetDays)
   const tiles = buildTiles(stats)
+  if (adminCounts?.lessons) tiles.push({ big: `${adminCounts.lessons}`, small: 'lessons taught (logged)' })
+  if (adminCounts?.observations) tiles.push({ big: `${adminCounts.observations}`, small: 'observations received' })
 
   return (
     <div className="modal-overlay" onClick={onClose}>

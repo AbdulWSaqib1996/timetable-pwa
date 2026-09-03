@@ -213,7 +213,7 @@ export function SettingsSheet({
     setPushMessage(null)
     try {
       if (enable) {
-        await subscribePush(base, settings)
+        await subscribePush(base, settings, store.activeId)
         onUpdateSettings({ pushServerBase: base, pushEnabled: true })
         setPushMessage('Background push enabled on this device. ✓')
       } else {
@@ -674,7 +674,7 @@ export function SettingsSheet({
                         ...settings,
                         quietFrom: from,
                         quietTo: to,
-                      }).catch(() => {})
+                      }, store.activeId).catch(() => {})
                     }
                   }}
                 >
@@ -725,7 +725,7 @@ export function SettingsSheet({
                   void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
                     ...settings,
                     attendancePrompts: next,
-                  }).catch(() => {})
+                  }, store.activeId).catch(() => {})
                 }
               }}
             />
@@ -873,7 +873,7 @@ export function SettingsSheet({
                     void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
                       ...settings,
                       morningBriefing: next,
-                    }).catch(() => {})
+                    }, store.activeId).catch(() => {})
                   }
                 }}
               />
@@ -890,11 +890,25 @@ export function SettingsSheet({
                     void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
                       ...settings,
                       changeAlerts: next,
-                    }).catch(() => {})
+                    }, store.activeId).catch(() => {})
                   }
                 }}
               />
               Push timetable changes (rooms, times, added/cancelled sessions)
+            </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={settings.fridayDigest !== false}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  onUpdateSettings({ fridayDigest: next })
+                  if (settings.pushEnabled) {
+                    void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, { ...settings, fridayDigest: next }, store.activeId).catch(() => {})
+                  }
+                }}
+              />
+              Friday admin digest (open targets, mentor actions, missing reflection)
             </label>
             <label className="toggle-row">
               <input
@@ -907,7 +921,7 @@ export function SettingsSheet({
                     void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
                       ...settings,
                       bgLeaveAlerts: next,
-                    }).catch(() => {})
+                    }, store.activeId).catch(() => {})
                   }
                 }}
               />

@@ -1,14 +1,14 @@
 /** Bump the version whenever WHATSNEW changes; the app shows the list once per version. */
-export const WHATSNEW_VERSION = 4
+export const WHATSNEW_VERSION = 5
 
 export const WHATSNEW: string[] = [
-  '✗ Absence tracking — record absences (with a reason) alongside attendance',
-  '📣 New cohort notices now arrive as push notifications too',
-  '🏫 Week and month views now show placements (green) and term breaks',
-  '📷 Share a photo straight into today’s session from your camera roll',
-  '🌙 Quiet hours — silence all notifications overnight (Settings → Notifications)',
-  '📲 Android/desktop get an Install button in Settings',
-  '⚠ Settings warns when your calendar-feed URL needs re-copying',
+  '🎓 My PGCE file — tap the cap in the top bar: your whole admin file in one place',
+  '✍️ Weekly reflections, 🎯 mentor targets and ☐ meeting actions, all logged in seconds',
+  '👀 Observation records (development points become targets) and 🍎 a lessons-taught log',
+  '📚 Subject-knowledge audit tracker and 📎 a document wallet (DBS, certificates, templates)',
+  '📊 Overview dashboard with evidence-gap warnings per Teachers’ Standard',
+  '🖨 One-tap full binder export — the end-of-placement hand-in as a PDF',
+  '📋 Friday admin digest push: what’s still outstanding before the weekend',
 ]
 
 const KEY = 'timetable.whatsnew.v1'

@@ -1,4 +1,6 @@
 import type { MetaMap, ProfileStore } from '../types'
+import { loadAdminFile, mergeAdminFiles, saveAdminFile } from './admin'
+import type { AdminFile } from './admin'
 import { loadMeta, loadStore } from './storage'
 
 /**
@@ -20,6 +22,8 @@ export interface SyncState {
 export interface SyncPayload {
   store: ProfileStore
   meta: Record<string, MetaMap>
+  /** PGCE admin file per profile (absent in pre-round-9 blobs) */
+  admin?: Record<string, AdminFile>
 }
 
 export function loadSyncState(): SyncState | null {
@@ -123,13 +127,17 @@ async function decrypt(code: string, blob: string): Promise<SyncPayload | null> 
   }
 }
 
-/** Everything synced: the profile store plus notes/attendance for each profile. */
+/** Everything synced: profile store, notes/attendance and PGCE admin file per profile. */
 export function collectSyncPayload(): SyncPayload | null {
   const store = loadStore()
   if (!store) return null
   const meta: Record<string, MetaMap> = {}
-  for (const p of store.profiles) meta[p.id] = loadMeta(p.id)
-  return { store, meta }
+  const admin: Record<string, AdminFile> = {}
+  for (const p of store.profiles) {
+    meta[p.id] = loadMeta(p.id)
+    admin[p.id] = loadAdminFile(p.id)
+  }
+  return { store, meta, admin }
 }
 
 const trim = (base: string) => base.replace(/\/+$/, '')
@@ -178,6 +186,9 @@ export function applySyncPayload(payload: SyncPayload): void {
     localStorage.setItem('timetable.store.v2', JSON.stringify(payload.store))
     for (const [pid, m] of Object.entries(payload.meta)) {
       localStorage.setItem(`timetable.meta.v2.${pid}`, JSON.stringify(mergeMeta(loadMeta(pid), m)))
+    }
+    for (const [pid, a] of Object.entries(payload.admin ?? {})) {
+      saveAdminFile(pid, mergeAdminFiles(loadAdminFile(pid), a))
     }
   } catch {
     /* storage unavailable */

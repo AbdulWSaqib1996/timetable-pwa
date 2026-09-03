@@ -618,6 +618,7 @@ async function runScheduled(env) {
   const getSheet = async (id, gid) => (await getSheetInfo(id, gid)).expanded
   const morningWindow = now.hour === 7 && now.minutes % 60 < CRON_MINUTES
   const eveningWindow = now.weekday === 'Sun' && now.hour === 18 && now.minutes % 60 < CRON_MINUTES
+  const fridayWindow = now.weekday === 'Fri' && now.hour === 16 && now.minutes % 60 < CRON_MINUTES
 
   // Notices tabs: fetched once per run; new rows vs the KV seen-set push to subscribers.
   // A tab seen for the first time seeds silently (no backlog flood).
@@ -862,6 +863,34 @@ async function runScheduled(env) {
             body: 'Tap ✓ Attended to log it — it counts toward attendance and placement days.',
           })
         }
+      }
+    }
+
+    // Friday 16:00 admin digest: outstanding PGCE admin, from counts the app syncs
+    // on use (so "as of your last app open"). Only sent when something's outstanding.
+    if (fridayWindow && config.fridayDigest !== false && config.adminSummary) {
+      const a = config.adminSummary
+      const parts = []
+      if (a.openTargets > 0) parts.push(`🎯 ${a.openTargets} open target${a.openTargets === 1 ? '' : 's'}`)
+      if (a.openActions > 0) parts.push(`☐ ${a.openActions} mentor action${a.openActions === 1 ? '' : 's'} to tick off`)
+      // Reflection missing this week — only nag if the week actually had sessions.
+      const weekMonday = (() => {
+        const d = new Date(`${now.dateISO}T12:00:00Z`)
+        d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
+        return d.toISOString().slice(0, 10)
+      })()
+      if ((a.lastReflectionWeek || '') < weekMonday) {
+        const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
+        if (sessions.some((s) => s.dateISO >= weekMonday && s.dateISO <= now.dateISO && !s.isSelfStudy)) {
+          parts.push('✍️ no reflection logged this week')
+        }
+      }
+      if (parts.length > 0) {
+        due.push({
+          dedupe: `fri|${now.dateISO}`,
+          title: '📋 Friday admin check',
+          body: (parts.join(' · ') + ' — five minutes now saves the Sunday scramble.').slice(0, 290),
+        })
       }
     }
 

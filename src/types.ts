@@ -96,6 +96,8 @@ export interface Settings {
   morningBriefing?: boolean
   /** push timetable changes (rooms/times/added/cancelled) in the background (default true) */
   changeAlerts?: boolean
+  /** Friday-afternoon outstanding-admin digest push (default true when push is on) */
+  fridayDigest?: boolean
   /** background leave alerts: cache the last app-open location to the push worker (default off) */
   bgLeaveAlerts?: boolean
   /** user-added personal deadlines, merged into the key-dates views */

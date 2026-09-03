@@ -1,3 +1,4 @@
+import { adminSummary } from './admin'
 import type { Settings } from '../types'
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
@@ -14,7 +15,7 @@ const trim = (base: string) => base.replace(/\/+$/, '')
  * (workers/push). The worker stores the subscription plus enough config to
  * compute reminders server-side.
  */
-export async function subscribePush(base: string, settings: Settings): Promise<void> {
+export async function subscribePush(base: string, settings: Settings, profileId?: string): Promise<void> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     throw new Error('Background push isn’t supported in this browser.')
   }
@@ -46,6 +47,9 @@ export async function subscribePush(base: string, settings: Settings): Promise<v
     travelMode: settings.travelMode ?? 'walking',
     briefing: settings.morningBriefing !== false,
     changeAlerts: settings.changeAlerts !== false,
+    fridayDigest: settings.fridayDigest !== false,
+    // Outstanding-admin counts for the Friday digest (as of the last app open).
+    adminSummary: profileId ? adminSummary(profileId) : undefined,
     bgLeave: settings.bgLeaveAlerts === true,
     leaveAlertOffsets: settings.leaveAlertOffsets ?? [],
     // Placement details (school + geocoded coords) so the worker can name the
