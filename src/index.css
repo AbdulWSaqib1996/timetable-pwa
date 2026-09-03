@@ -2056,3 +2056,97 @@ body {
     object-fit: contain;
   }
 }
+
+/* ---------- Round 8: absence, view parity, notifications overview ---------- */
+
+.chip-absent {
+  background: #b02a37 !important;
+  border-color: #b02a37 !important;
+  color: #fff !important;
+}
+
+.absent-reason {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.badge-absent {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+.week-event.placement {
+  background: rgba(12, 166, 120, 0.12);
+}
+
+.week-event-school {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.month-cell.placement {
+  background: rgba(12, 166, 120, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .month-cell.placement,
+  :root:not([data-theme='light']) .week-event.placement {
+    background: rgba(18, 184, 134, 0.16);
+  }
+}
+
+:root[data-theme='dark'] .month-cell.placement,
+:root[data-theme='dark'] .week-event.placement {
+  background: rgba(18, 184, 134, 0.16);
+}
+
+.month-break {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.notif-overview {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.notif-overview li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notif-overview li > span:first-child {
+  color: var(--text);
+}
+
+.notif-state {
+  color: var(--accent);
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.notif-state.off {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.feed-stale {
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+}

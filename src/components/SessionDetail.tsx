@@ -388,14 +388,50 @@ export function SessionDetail({
           </section>
         )}
         <section className="detail-notes">
-          <label className="toggle-row">
-            <input
-              type="checkbox"
-              checked={meta?.attended ?? false}
-              onChange={(e) => onMeta({ attended: e.target.checked })}
-            />
-            Attended
-          </label>
+          <div className="chip-grid attendance-chips">
+            <button
+              type="button"
+              className={`chip${meta?.attended ? ' chip-on' : ''}`}
+              aria-pressed={meta?.attended === true}
+              onClick={() =>
+                onMeta(
+                  meta?.attended
+                    ? { attended: false }
+                    : { attended: true, absent: false, absentReason: undefined }
+                )
+              }
+            >
+              ✓ Attended
+            </button>
+            <button
+              type="button"
+              className={`chip${meta?.absent ? ' chip-on chip-absent' : ''}`}
+              aria-pressed={meta?.absent === true}
+              onClick={() =>
+                onMeta(
+                  meta?.absent
+                    ? { absent: false, absentReason: undefined }
+                    : { absent: true, attended: false }
+                )
+              }
+            >
+              ✗ Absent
+            </button>
+            {meta?.absent && (
+              <select
+                className="absent-reason"
+                aria-label="Absence reason"
+                value={meta?.absentReason ?? ''}
+                onChange={(e) => onMeta({ absentReason: e.target.value || undefined })}
+              >
+                <option value="">Reason…</option>
+                <option value="Sick">Sick</option>
+                <option value="Travel">Travel</option>
+                <option value="Personal">Personal</option>
+                <option value="Other">Other</option>
+              </select>
+            )}
+          </div>
           <textarea
             className="note-input"
             placeholder="Notes for this session (saved on this device)…"

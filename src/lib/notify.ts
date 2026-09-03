@@ -19,10 +19,15 @@ export function showReminder(title: string, body: string, key?: string, snoozeUr
           data: { url: './', key, snoozeUrl: key ? snoozeUrl : undefined },
         }
         if (key) {
-          options.actions = [
-            { action: 'attended', title: '✓ Attended' },
-            { action: 'snooze', title: '⏰ Snooze 10m' },
-          ]
+          options.actions = tag?.startsWith('att-')
+            ? [
+                { action: 'attended', title: '✓ Attended' },
+                { action: 'absent', title: '✗ Absent' },
+              ]
+            : [
+                { action: 'attended', title: '✓ Attended' },
+                { action: 'snooze', title: '⏰ Snooze 10m' },
+              ]
         }
         await reg.showNotification(title, options)
         return

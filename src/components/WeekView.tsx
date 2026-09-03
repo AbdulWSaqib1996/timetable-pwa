@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
-import { subjectColor, toMinutes as toMins, weekNumber } from '../lib/format'
+import { isPlacementSession, placementTag, subjectColor, toMinutes as toMins, weekNumber } from '../lib/format'
 import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import { shareWeekImage } from '../lib/weekImage'
 import type { Session } from '../types'
@@ -13,6 +13,8 @@ interface Props {
   termStartISO?: string
   coords?: Coords | null
   travelMode?: TravelMode
+  /** user-entered placement details, for the school name on placement events */
+  placements?: Record<string, { school?: string }>
 }
 
 function iso(d: Date): string {
@@ -75,7 +77,7 @@ function useIsNarrow(): boolean {
 
 const HOUR_PX = 56
 
-export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, travelMode }: Props) {
+export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, travelMode, placements }: Props) {
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayISO))
   const isNarrow = useIsNarrow()
   const wkNum = termStartISO ? weekNumber(weekStart, termStartISO) : null
@@ -227,12 +229,14 @@ export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, t
               const end = toMinutes(session.end) ?? start + 60
               const top = ((start - minHour * 60) / 60) * HOUR_PX
               const height = Math.max(24, ((end - start) / 60) * HOUR_PX - 2)
-              const color = subjectColor(session)
+              const placement = !session.isKeyDate && isPlacementSession(session)
+              const color = placement ? '#0ca678' : subjectColor(session)
+              const school = placement ? placements?.[placementTag(session.title)]?.school : undefined
               return (
                 <button
                   key={session.id}
                   type="button"
-                  className={`week-event${session.isSelfStudy ? ' self-study' : ''}`}
+                  className={`week-event${session.isSelfStudy ? ' self-study' : ''}${placement ? ' placement' : ''}`}
                   style={{
                     top,
                     height,
@@ -241,10 +245,14 @@ export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, t
                     ...(color ? { borderLeftColor: color } : {}),
                   }}
                   onClick={() => onSelect(session)}
-                  title={session.title}
+                  title={school ? `${session.title} · ${school}` : session.title}
                 >
                   <span className="week-event-time">{session.start}</span>
-                  <span className="week-event-title">{session.title}</span>
+                  <span className="week-event-title">
+                    {placement ? '🏫 ' : ''}
+                    {session.title}
+                  </span>
+                  {school && height > 56 && <span className="week-event-school">{school}</span>}
                 </button>
               )
             })}

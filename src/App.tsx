@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AddDeadlineSheet } from './components/AddDeadlineSheet'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AgendaView } from './components/AgendaView'
-import { ChangesSheet } from './components/ChangesSheet'
 import { FilterBar } from './components/FilterBar'
-import { FilterSheet } from './components/FilterSheet'
-import { JournalSheet } from './components/JournalSheet'
-import { KeyDatesSheet } from './components/KeyDatesSheet'
 import { MonthView } from './components/MonthView'
 import { NowNextCard } from './components/NowNextCard'
 import { SessionDetail } from './components/SessionDetail'
-import { SettingsSheet } from './components/SettingsSheet'
 import { SetupScreen } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
-import { StatsSheet } from './components/StatsSheet'
-import { StudyGroupSheet } from './components/StudyGroupSheet'
+
+// The bottom sheets are modal and rarely part of first paint — split them out
+// of the initial bundle (they load on first open).
+const AddDeadlineSheet = lazy(() => import('./components/AddDeadlineSheet').then((m) => ({ default: m.AddDeadlineSheet })))
+const ChangesSheet = lazy(() => import('./components/ChangesSheet').then((m) => ({ default: m.ChangesSheet })))
+const FilterSheet = lazy(() => import('./components/FilterSheet').then((m) => ({ default: m.FilterSheet })))
+const JournalSheet = lazy(() => import('./components/JournalSheet').then((m) => ({ default: m.JournalSheet })))
+const KeyDatesSheet = lazy(() => import('./components/KeyDatesSheet').then((m) => ({ default: m.KeyDatesSheet })))
+const SettingsSheet = lazy(() => import('./components/SettingsSheet').then((m) => ({ default: m.SettingsSheet })))
+const StatsSheet = lazy(() => import('./components/StatsSheet').then((m) => ({ default: m.StatsSheet })))
+const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((m) => ({ default: m.StudyGroupSheet })))
 import { WHATSNEW, dismissWhatsNew, shouldShowWhatsNew } from './lib/changelog'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
@@ -336,6 +339,7 @@ export default function App() {
       const next = { ...prev, [key]: entry }
       if (
         !entry.attended &&
+        !entry.absent &&
         !entry.note &&
         !entry.photos &&
         (!entry.status || entry.status === 'todo') &&
@@ -436,6 +440,102 @@ export default function App() {
     }
   }, [exportSessions, metaMap])
 
+  // Month-grid extras: fully-placement days (tinted) and the first day of each break (🏖).
+  const monthExtras = useMemo(() => {
+    const byDate = new Map<string, { placement: number; real: number }>()
+    for (const s of filteredSessions) {
+      if (s.isKeyDate) continue
+      const e = byDate.get(s.dateISO) ?? { placement: 0, real: 0 }
+      e.real++
+      if (isPlacementSession(s)) e.placement++
+      byDate.set(s.dateISO, e)
+    }
+    const placementDays = new Set(
+      [...byDate.entries()].filter(([, e]) => e.real > 0 && e.placement === e.real).map(([d]) => d)
+    )
+    const sorted = [...byDate.keys()].sort()
+    const breakStarts = new Map<string, number>()
+    for (let i = 1; i < sorted.length; i++) {
+      const gap = daysUntil(sorted[i], sorted[i - 1]) - 1
+      if (gap >= 7) {
+        const [y, m, d] = sorted[i - 1].split('-').map(Number)
+        const first = new Date(y, m - 1, d + 1)
+        breakStarts.set(
+          `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-${String(first.getDate()).padStart(2, '0')}`,
+          gap
+        )
+      }
+    }
+    return { placementDays, breakStarts }
+  }, [filteredSessions])
+
+  // Android/desktop install prompt: captured so Settings can offer an Install button.
+  const installEvtRef = useRef<{ prompt: () => Promise<void> } | null>(null)
+  const [canInstall, setCanInstall] = useState(false)
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault()
+      installEvtRef.current = e as unknown as { prompt: () => Promise<void> }
+      setCanInstall(true)
+    }
+    const onInstalled = () => {
+      installEvtRef.current = null
+      setCanInstall(false)
+    }
+    window.addEventListener('beforeinstallprompt', onPrompt)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onPrompt)
+      window.removeEventListener('appinstalled', onInstalled)
+    }
+  }, [])
+  const handleInstall = () => {
+    void installEvtRef.current?.prompt().then(() => {
+      installEvtRef.current = null
+      setCanInstall(false)
+    })
+  }
+
+  // Share-target intake: photos shared into the PWA land in IndexedDB (sw-push.js);
+  // attach them to today's current/most recent session once sessions have loaded.
+  const [pendingShare, setPendingShare] = useState(false)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('share') === 'photo') {
+      setPendingShare(true)
+      history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
+  useEffect(() => {
+    if (!pendingShare || !active || exportSessions.length === 0) return
+    setPendingShare(false)
+    void (async () => {
+      const { getAndClearSharedPhotos } = await import('./lib/shareTarget')
+      const blobs = await getAndClearSharedPhotos()
+      if (blobs.length === 0) return
+      const now = new Date()
+      const nowMins = now.getHours() * 60 + now.getMinutes()
+      // Today's latest already-started session; else the most recent past session.
+      const started = exportSessions.filter((s) => {
+        if (s.isKeyDate || s.isSelfStudy) return false
+        if (s.dateISO < todayISO) return true
+        if (s.dateISO !== todayISO || !s.start) return false
+        const m = s.start.match(/^(\d{1,2}):(\d{2})$/)
+        return m !== null && Number(m[1]) * 60 + Number(m[2]) <= nowMins
+      })
+      const target = started[started.length - 1]
+      if (!target) return
+      const { addPhoto, compressImage } = await import('./lib/photos')
+      const key = sessionKey(target)
+      for (const blob of blobs) {
+        await addPhoto(active.id, key, await compressImage(new File([blob], 'shared.jpg', { type: blob.type || 'image/jpeg' })))
+      }
+      handleMeta(target, { photos: (metaMap[key]?.photos ?? 0) + blobs.length })
+      setSelected(target)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingShare, active?.id, exportSessions.length])
+
   const { coords, tubeStatus, locationEnabled, travelMode } = useTravel(settings, exportSessions, todayISO)
 
   useNotifications({
@@ -447,11 +547,14 @@ export default function App() {
     travelMode,
     locationEnabled,
     tubeStatus,
-    onAttended: (key) => {
+    onMark: (key, kind) => {
       const pid = active?.id
       if (!pid) return
       setMetaMap((prev) => {
-        const next = { ...prev, [key]: { ...prev[key], attended: true } }
+        const next = {
+          ...prev,
+          [key]: { ...prev[key], attended: kind === 'attended', absent: kind === 'absent', at: Date.now() },
+        }
         saveMeta(pid, next)
         return next
       })
@@ -622,17 +725,19 @@ export default function App() {
       {!settings.checklistDismissed &&
         sessions !== null &&
         (() => {
-          const items = [
+          const all = [
+            ...(canInstall ? [{ done: false, label: 'Install the app on this device', act: handleInstall }] : []),
             { done: !!settings.specialismsChosen || options.specialisms.length === 0, label: 'Pick your specialism', act: () => setRechoosing(true) },
             { done: !!settings.keyDatesSheetId, label: 'Connect key dates (Settings → Key dates)', act: () => setOpenSheet('settings') },
             { done: !!settings.pushEnabled, label: 'Enable background push (Settings)', act: () => setOpenSheet('settings') },
             { done: !!settings.locationEnabled, label: 'Turn on travel times (Settings)', act: () => setOpenSheet('settings') },
-          ].filter((i) => !i.done)
+          ]
+          const items = all.filter((i) => !i.done)
           if (items.length === 0) return null
           return (
             <div className="backup-banner checklist">
               <div>
-                <strong>Finish setting up ({4 - items.length}/4 done)</strong>
+                <strong>Finish setting up ({all.length - items.length}/{all.length} done)</strong>
                 <ul className="whatsnew-list">
                   {items.map((i) => (
                     <li key={i.label}>
@@ -741,12 +846,15 @@ export default function App() {
           termStartISO={settings.termStartISO}
           coords={coords}
           travelMode={travelMode}
+          placements={settings.placements}
         />
       ) : view === 'month' ? (
         <MonthView
           sessions={filteredSessions}
           todayISO={todayISO}
           keyDateDays={getFilters(settings).showKeyDates ? keyDateDays : undefined}
+          placementDays={monthExtras.placementDays}
+          breakStarts={monthExtras.breakStarts}
           onPickDay={(dateISO) => {
             setJumpDate(dateISO)
             updateSettings({ activeView: 'day' })
@@ -818,6 +926,7 @@ export default function App() {
         />
       )}
 
+      <Suspense fallback={null}>
       {openSheet === 'filters' && (
         <FilterSheet
           settings={settings}
@@ -922,6 +1031,7 @@ export default function App() {
           metaMap={metaMap}
           todayISO={todayISO}
           placementBlocks={placementStats.blocks}
+          onInstall={canInstall ? handleInstall : undefined}
           onUpdateSettings={updateSettings}
           onOpenStats={() => setOpenSheet('stats')}
           onOpenJournal={() => setOpenSheet('journal')}
@@ -941,6 +1051,7 @@ export default function App() {
           onClose={() => setOpenSheet('none')}
         />
       )}
+      </Suspense>
 
       {view === 'day' && !searchResults && (
         <button

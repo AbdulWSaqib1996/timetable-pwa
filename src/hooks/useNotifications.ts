@@ -35,8 +35,8 @@ interface Options {
   travelMode: TravelMode
   locationEnabled: boolean
   tubeStatus: TflDisruption[]
-  /** apply a "✓ Attended" tap that arrived via a notification action */
-  onAttended: (key: string) => void
+  /** apply a "✓ Attended"/"✗ Absent" tap that arrived via a notification action */
+  onMark: (key: string, kind: 'attended' | 'absent') => void
 }
 
 /**
@@ -53,7 +53,7 @@ export function useNotifications({
   travelMode,
   locationEnabled,
   tubeStatus,
-  onAttended,
+  onMark,
 }: Options) {
   const exportRef = useRef(exportSessions)
   exportRef.current = exportSessions
@@ -67,8 +67,8 @@ export function useNotifications({
   tubeStatusRef.current = tubeStatus
   const placementsRef = useRef(settings?.placements)
   placementsRef.current = settings?.placements
-  const onAttendedRef = useRef(onAttended)
-  onAttendedRef.current = onAttended
+  const onMarkRef = useRef(onMark)
+  onMarkRef.current = onMark
   const snoozeUrlRef = useRef<string | undefined>(undefined)
   snoozeUrlRef.current = settings?.pushEnabled ? settings.pushServerBase ?? DEFAULT_PUSH_BASE : undefined
 
@@ -79,8 +79,8 @@ export function useNotifications({
     const onMessage = (event: MessageEvent) => {
       const msg = event.data as { type?: string; action?: string; key?: string; title?: string; body?: string }
       if (msg?.type !== 'timetable-action' || !msg.key) return
-      if (msg.action === 'attended') {
-        onAttendedRef.current(msg.key)
+      if (msg.action === 'attended' || msg.action === 'absent') {
+        onMarkRef.current(msg.key, msg.action)
       } else if (msg.action === 'snooze' && msg.title) {
         setTimeout(() => showReminder(msg.title!, msg.body ?? '', msg.key, snoozeUrlRef.current), 10 * 60_000)
       }
@@ -124,6 +124,8 @@ export function useNotifications({
   const leaveKey = JSON.stringify(settings?.leaveAlertOffsets ?? [])
   const kdDaysKey = JSON.stringify(settings?.keyDateReminderDays ?? [])
   const attendancePrompts = settings?.attendancePrompts === true
+  const quietRef = useRef({ from: settings?.quietFrom, to: settings?.quietTo })
+  quietRef.current = { from: settings?.quietFrom, to: settings?.quietTo }
   useEffect(() => {
     const offsets = (JSON.parse(offsetsKey) as number[]).sort((a, b) => a - b)
     const leaveOffsets = (JSON.parse(leaveKey) as number[]).sort((a, b) => a - b)
@@ -138,6 +140,13 @@ export function useNotifications({
     const check = () => {
       if (Notification.permission !== 'granted') return
       const now = new Date()
+      // Quiet hours: skip without marking anything notified, so alerts still
+      // relevant afterwards fire on the first check outside the window.
+      const { from: qFrom, to: qTo } = quietRef.current
+      if (typeof qFrom === 'number' && typeof qTo === 'number' && qFrom !== qTo) {
+        const h = now.getHours()
+        if (qFrom < qTo ? h >= qFrom && h < qTo : h >= qFrom || h < qTo) return
+      }
       const today = localTodayISO()
       const nowMins = now.getHours() * 60 + now.getMinutes()
       const notified = loadNotified()
@@ -226,7 +235,8 @@ export function useNotifications({
           if (end === null) continue
           const since = nowMins - end
           const key = sessionKey(s)
-          if (since < 0 || since > 30 || notified[`${key}#att`] || metaRef.current[key]?.attended) continue
+          const marked = metaRef.current[key]?.attended || metaRef.current[key]?.absent
+          if (since < 0 || since > 30 || notified[`${key}#att`] || marked) continue
           showReminder(`Did you attend ${s.title}?`, 'Tap ✓ Attended to log it.', key, snoozeUrlRef.current, `att-${key}`)
           notified[`${key}#att`] = Date.now()
           dirty = true

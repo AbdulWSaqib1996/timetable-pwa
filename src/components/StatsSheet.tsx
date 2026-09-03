@@ -40,6 +40,7 @@ function computeStats(
   const totalHours = taught.reduce((n, s) => n + hours(s), 0)
   const past = taught.filter((s) => s.dateISO <= todayISO)
   const attended = past.filter((s) => metaMap[sessionKey(s)]?.attended).length
+  const absent = past.filter((s) => metaMap[sessionKey(s)]?.absent).length
 
   const byWeek = new Map<string, number>()
   for (const s of taught) byWeek.set(mondayOf(s.dateISO), (byWeek.get(mondayOf(s.dateISO)) ?? 0) + hours(s))
@@ -82,6 +83,7 @@ function computeStats(
     pastCount: past.length,
     attended,
     attendancePct: past.length > 0 ? Math.round((attended / past.length) * 100) : null,
+    absent,
     busiestWeek: busiest
       ? {
           label: new Date(busiest[0]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
@@ -106,6 +108,7 @@ function buildTiles(stats: ReturnType<typeof computeStats>): { big: string; smal
   ]
   if (stats.attendancePct !== null)
     tiles.push({ big: `${stats.attendancePct}%`, small: `attendance (${stats.attended}/${stats.pastCount} marked)` })
+  if (stats.absent > 0) tiles.push({ big: `${stats.absent}`, small: 'absences recorded' })
   if (stats.placementBlocks.length > 0)
     tiles.push({
       big: `${stats.placementAttended}${stats.placementTarget ? `/${stats.placementTarget}` : ''}`,

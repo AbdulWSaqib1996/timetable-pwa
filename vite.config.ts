@@ -39,6 +39,16 @@ export default defineConfig({
             icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }],
           },
         ],
+        // Photos shared to the app attach to the current session as journal evidence
+        // (sw-push.js handles the POST and parks the files in IndexedDB).
+        share_target: {
+          action: './share-photo',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            files: [{ name: 'photos', accept: ['image/*'] }],
+          },
+        },
       },
       workbox: {
         // App shell is precached; sheet data also gets a NetworkFirst cache so a fetch

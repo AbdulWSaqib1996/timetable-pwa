@@ -6,6 +6,10 @@ interface Props {
   todayISO: string
   /** days (yyyy-mm-dd) that carry a key date, marked distinctly */
   keyDateDays?: Set<string>
+  /** days that are entirely school-experience (tinted green) */
+  placementDays?: Set<string>
+  /** first day of each ≥7-day session gap → total gap days (marked 🏖) */
+  breakStarts?: Map<string, number>
   onPickDay: (dateISO: string) => void
 }
 
@@ -13,7 +17,7 @@ function iso(y: number, monthIndex: number, d: number): string {
   return `${y}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
 
-export function MonthView({ sessions, todayISO, keyDateDays, onPickDay }: Props) {
+export function MonthView({ sessions, todayISO, keyDateDays, placementDays, breakStarts, onPickDay }: Props) {
   const [ty, tm] = todayISO.split('-').map(Number)
   const [year, setYear] = useState(ty)
   const [month, setMonth] = useState(tm - 1) // 0-based
@@ -75,13 +79,18 @@ export function MonthView({ sessions, todayISO, keyDateDays, onPickDay }: Props)
             <button
               key={dateISO}
               type="button"
-              className={`month-cell${dateISO === todayISO ? ' today' : ''}${(counts.get(dateISO) ?? 0) > 0 ? ' has-sessions' : ''}`}
+              className={`month-cell${dateISO === todayISO ? ' today' : ''}${(counts.get(dateISO) ?? 0) > 0 ? ' has-sessions' : ''}${placementDays?.has(dateISO) ? ' placement' : ''}`}
               onClick={() => onPickDay(dateISO)}
             >
               <span className="month-daynum">{Number(dateISO.slice(-2))}</span>
               {keyDateDays?.has(dateISO) && (
                 <span className="month-keydate" aria-label="Key date">
                   📌
+                </span>
+              )}
+              {breakStarts?.has(dateISO) && (
+                <span className="month-break" aria-label={`${breakStarts.get(dateISO)}-day break starts`} title={`${breakStarts.get(dateISO)}-day break`}>
+                  🏖
                 </span>
               )}
               {(counts.get(dateISO) ?? 0) > 0 && (

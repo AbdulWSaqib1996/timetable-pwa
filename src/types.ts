@@ -65,6 +65,9 @@ export interface Settings {
   reminderOffsets?: number[]
   /** "did you attend?" notification at each session's end time (default off) */
   attendancePrompts?: boolean
+  /** quiet hours: no notifications between these hours (24h, wraps midnight); both unset = off */
+  quietFrom?: number
+  quietTo?: number
   /** use device location to estimate travel time to session locations */
   locationEnabled?: boolean
   /** how travel-time estimates are calculated (default walking) */
@@ -126,6 +129,9 @@ export interface ProfileStore {
 /** Per-session attendance/note, keyed by sessionKey(). */
 export interface SessionMeta {
   attended?: boolean
+  /** recorded absence (mutually exclusive with attended) */
+  absent?: boolean
+  absentReason?: string
   note?: string
   /** number of photos attached (blobs live in IndexedDB) */
   photos?: number

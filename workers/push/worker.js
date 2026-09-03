@@ -313,6 +313,57 @@ function placementSchool(session, config) {
   return p?.school || null
 }
 
+/* ---------- cohort notices (Date/Message/Link tab) ---------- */
+function noticeHash(dateText, message) {
+  let hash = 5381
+  for (const ch of `${dateText}|${message}`) hash = ((hash * 33) ^ ch.charCodeAt(0)) >>> 0
+  return 'n' + hash.toString(36)
+}
+/** Fetch a notices tab's rows; matches the app's parser (header row with a Message column). */
+async function fetchNoticeRows(sheetId, gid) {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0${gid ? `&gid=${encodeURIComponent(gid)}` : ''}`
+  const res = await fetch(url)
+  if (!res.ok) return null
+  const text = await res.text()
+  let table
+  try {
+    table = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)).table
+  } catch {
+    return null
+  }
+  if (!table) return null
+  let headerIndex = -1
+  let msgCol = -1
+  let dateCol = -1
+  for (let r = 0; r < Math.min(table.rows.length, 10); r++) {
+    const cells = table.rows[r].c
+    for (let i = 0; i < cells.length; i++) {
+      const t = cellText(cells[i]).toLowerCase()
+      if (t === 'message' || t === 'notice' || t === 'announcement') {
+        headerIndex = r
+        msgCol = i
+      } else if (t === 'date') dateCol = i
+    }
+    if (headerIndex !== -1) break
+  }
+  if (headerIndex === -1) return null
+  const rows = []
+  for (let r = headerIndex + 1; r < table.rows.length; r++) {
+    const cells = table.rows[r].c
+    const message = cellText(cells[msgCol]).slice(0, 500)
+    if (!message) continue
+    const dateText = dateCol >= 0 ? cellText(cells[dateCol]) : ''
+    rows.push({ id: noticeHash(dateText, message), message })
+  }
+  return rows
+}
+
+/* ---------- quiet hours ---------- */
+function inQuietHours(hour, from, to) {
+  if (typeof from !== 'number' || typeof to !== 'number' || from === to) return false
+  return from < to ? hour >= from && hour < to : hour >= from || hour < to
+}
+
 /* ---------- travel estimation for background leave alerts ---------- */
 const BUILDINGS = [
   { name: 'IOE — 20 Bedford Way', keywords: ['bedford way'], lat: 51.5227, lng: -0.1276 },
@@ -567,6 +618,32 @@ async function runScheduled(env) {
   const getSheet = async (id, gid) => (await getSheetInfo(id, gid)).expanded
   const morningWindow = now.hour === 7 && now.minutes % 60 < CRON_MINUTES
   const eveningWindow = now.weekday === 'Sun' && now.hour === 18 && now.minutes % 60 < CRON_MINUTES
+
+  // Notices tabs: fetched once per run; new rows vs the KV seen-set push to subscribers.
+  // A tab seen for the first time seeds silently (no backlog flood).
+  const noticesCache = new Map()
+  const noticesDirty = new Map()
+  const getNewNotices = async (id, gid) => {
+    const key = `${id}|${gid ?? ''}`
+    if (!noticesCache.has(key)) {
+      let fresh = []
+      const rows = await fetchNoticeRows(id, gid)
+      if (rows) {
+        const seenKey = `ntcseen:${key}`
+        const seen = (await env.PUSH.get(seenKey, 'json')) ?? null
+        if (seen === null) {
+          noticesDirty.set(seenKey, rows.map((r) => r.id))
+        } else {
+          fresh = rows.filter((r) => !seen.includes(r.id))
+          if (fresh.length > 0) {
+            noticesDirty.set(seenKey, [...new Set([...seen, ...rows.map((r) => r.id)])].slice(-200))
+          }
+        }
+      }
+      noticesCache.set(key, fresh)
+    }
+    return noticesCache.get(key)
+  }
   const tflIssues = morningWindow && list.keys.length > 0 ? await fetchTflSevereStatus() : []
   let morningWeather = null
   let morningWeatherFetched = false
@@ -575,7 +652,23 @@ async function runScheduled(env) {
     const record = await env.PUSH.get(entry.name, 'json')
     if (!record?.subscription?.endpoint || !record?.config?.sheetId) continue
     const { subscription, config } = record
+    // Quiet hours: nothing is sent (or marked sent) inside the window; anything
+    // still relevant when it ends fires on a later run.
+    if (inQuietHours(now.hour, config.quietFrom, config.quietTo)) continue
     const due = []
+
+    // New cohort notices (gated with change alerts — both are "the sheet changed" pushes).
+    if (config.noticesSheetId && config.changeAlerts !== false) {
+      const fresh = await getNewNotices(config.noticesSheetId, config.noticesGid)
+      if (fresh.length > 0) {
+        const lines = fresh.slice(0, 2).map((n) => n.message)
+        due.push({
+          dedupe: `ntc|${fresh.map((n) => n.id).join(',')}`,
+          title: fresh.length === 1 ? '📣 Cohort notice' : `📣 ${fresh.length} cohort notices`,
+          body: (lines.join(' · ') + (fresh.length > 2 ? ` +${fresh.length - 2} more` : '')).slice(0, 290),
+        })
+      }
+    }
 
     // Sheet health: after ~1 hour of consecutive failures, tell its subscribers once.
     {
@@ -887,6 +980,9 @@ async function runScheduled(env) {
     if (info.sessions.length > 0 && (!info.hadSnapshot || info.changes.length > 0)) {
       await env.PUSH.put(snapKey(info.id, info.gid), JSON.stringify(info.sessions))
     }
+  }
+  for (const [seenKey, ids] of noticesDirty) {
+    await env.PUSH.put(seenKey, JSON.stringify(ids))
   }
 }
 

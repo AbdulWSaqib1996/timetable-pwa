@@ -67,6 +67,7 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
         {session.isSelfStudy && <span className="badge badge-selfstudy">Self study</span>}
         {session.isOptional && <span className="badge badge-optional">Optional</span>}
         {meta?.attended && <span className="badge badge-attended">✓ attended</span>}
+        {meta?.absent && <span className="badge badge-absent">✗ absent</span>}
         {meta?.note && <span className="badge badge-note">📝 note</span>}
         {(meta?.photos ?? 0) > 0 && <span className="badge badge-note">📷 {meta!.photos}</span>}
       </div>

@@ -115,14 +115,16 @@ export function useTimetableData(active: ProfileEntry | null) {
     setMetaMap(loadMeta(active.id))
     setChanges(loadChanges(active.id))
     setKeyDates((cached?.keyDates ?? []).map((k) => ({ ...k, isKeyDate: true })))
-    // Apply "✓ Attended" taps made on notifications while the app was closed.
+    // Apply "✓ Attended"/"✗ Absent" taps made on notifications while the app was closed.
     const pid = active.id
     void drainPendingActions().then((actions) => {
-      const attendedKeys = actions.filter((a) => a.action === 'attended' && a.key).map((a) => a.key)
-      if (attendedKeys.length === 0) return
+      const marks = actions.filter((a) => (a.action === 'attended' || a.action === 'absent') && a.key)
+      if (marks.length === 0) return
       setMetaMap((prev) => {
         const next = { ...prev }
-        for (const key of attendedKeys) next[key] = { ...next[key], attended: true }
+        for (const { action, key } of marks) {
+          next[key] = { ...next[key], attended: action === 'attended', absent: action === 'absent', at: Date.now() }
+        }
         saveMeta(pid, next)
         return next
       })

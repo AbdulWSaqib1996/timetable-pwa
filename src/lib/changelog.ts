@@ -1,14 +1,14 @@
 /** Bump the version whenever WHATSNEW changes; the app shows the list once per version. */
-export const WHATSNEW_VERSION = 3
+export const WHATSNEW_VERSION = 4
 
 export const WHATSNEW: string[] = [
-  '📆 Calendar feed now includes placement days, located at your school',
-  '✓ “Did you attend?” prompt at each session’s end (turn on under Session reminders)',
-  '🖨 Evidence journal prints to PDF with your photos included',
-  '📅 Sunday-evening week-ahead push — with a warning when a placement starts',
-  '🔄 Sync now merges notes from both devices and pulls when you return to the app',
-  '📱 iPhone? Settings now walks you through installing before enabling push',
-  '📣 Cohort notices — reps can broadcast from a tab in the same sheet',
+  '✗ Absence tracking — record absences (with a reason) alongside attendance',
+  '📣 New cohort notices now arrive as push notifications too',
+  '🏫 Week and month views now show placements (green) and term breaks',
+  '📷 Share a photo straight into today’s session from your camera roll',
+  '🌙 Quiet hours — silence all notifications overnight (Settings → Notifications)',
+  '📲 Android/desktop get an Install button in Settings',
+  '⚠ Settings warns when your calendar-feed URL needs re-copying',
 ]
 
 const KEY = 'timetable.whatsnew.v1'

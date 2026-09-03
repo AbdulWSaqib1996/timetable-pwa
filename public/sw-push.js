@@ -11,6 +11,66 @@ const ACTIONS = [
   { action: 'snooze', title: '⏰ Snooze 10m' },
 ]
 
+// End-of-session attendance prompts (tag "att-…") ask attended-or-absent instead.
+const ACTIONS_ATTENDANCE = [
+  { action: 'attended', title: '✓ Attended' },
+  { action: 'absent', title: '✗ Absent' },
+]
+
+// Web Share Target: photos shared into the app POST here; park them in IndexedDB
+// and bounce to the app, which attaches them to the current session.
+function storeSharedPhotos(files) {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('timetable-share', 1)
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains('photos')) {
+          req.result.createObjectStore('photos', { autoIncrement: true })
+        }
+      }
+      req.onsuccess = () => {
+        const db = req.result
+        try {
+          const tx = db.transaction('photos', 'readwrite')
+          for (const file of files) tx.objectStore('photos').add({ blob: file, at: Date.now() })
+          tx.oncomplete = () => {
+            db.close()
+            resolve()
+          }
+          tx.onerror = () => {
+            db.close()
+            resolve()
+          }
+        } catch {
+          db.close()
+          resolve()
+        }
+      }
+      req.onerror = () => resolve()
+    } catch {
+      resolve()
+    }
+  })
+}
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'POST') return
+  const url = new URL(event.request.url)
+  if (!url.pathname.endsWith('/share-photo')) return
+  event.respondWith(
+    (async () => {
+      try {
+        const form = await event.request.formData()
+        const files = form.getAll('photos').filter((f) => f && f.size > 0)
+        await storeSharedPhotos(files)
+      } catch {
+        /* fall through to the app either way */
+      }
+      return Response.redirect('./?share=photo', 303)
+    })()
+  )
+})
+
 // Record when a push last arrived, so the Settings self-check can show it.
 function recordPushReceived() {
   return new Promise((resolve) => {
@@ -60,7 +120,7 @@ self.addEventListener('push', (event) => {
         badge: 'icon-192.png',
         tag: data.tag || undefined,
         data: { url: data.url || './', key: data.key, snoozeUrl: data.snoozeUrl },
-        actions: data.key ? ACTIONS : [],
+        actions: data.key ? (String(data.tag || '').startsWith('att-') ? ACTIONS_ATTENDANCE : ACTIONS) : [],
       }),
       recordPushReceived(),
     ])
@@ -100,14 +160,15 @@ self.addEventListener('notificationclick', (event) => {
   const data = event.notification.data || {}
   event.notification.close()
 
-  if (event.action === 'attended' && data.key) {
+  if ((event.action === 'attended' || event.action === 'absent') && data.key) {
+    const action = event.action
     event.waitUntil(
       (async () => {
         const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true })
         if (windows.length > 0) {
-          windows[0].postMessage({ type: 'timetable-action', action: 'attended', key: data.key })
+          windows[0].postMessage({ type: 'timetable-action', action, key: data.key })
         } else {
-          await queuePendingAction('attended', data.key)
+          await queuePendingAction(action, data.key)
         }
       })()
     )

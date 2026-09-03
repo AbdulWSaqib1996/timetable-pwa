@@ -33,6 +33,8 @@ interface Props {
   todayISO: string
   /** per-block placement day counts (tag, attended, total) */
   placementBlocks: { tag: string; attended: number; total: number }[]
+  /** present when the browser offered an install prompt (Android/desktop Chrome) */
+  onInstall?: () => void
   onUpdateSettings: (patch: Partial<Settings>) => void
   onOpenStats: () => void
   onOpenGroup: () => void
@@ -89,6 +91,7 @@ export function SettingsSheet({
   metaMap,
   todayISO,
   placementBlocks,
+  onInstall,
   onUpdateSettings,
   onOpenStats,
   onOpenGroup,
@@ -226,6 +229,14 @@ export function SettingsSheet({
   }
   const [copied, setCopied] = useState<'feed' | 'share' | null>(null)
   const importInput = useRef<HTMLInputElement | null>(null)
+  const feedCopiedKey = `timetable.feedcopied.${store.activeId}`
+  const [feedCopiedUrl, setFeedCopiedUrl] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(feedCopiedKey)
+    } catch {
+      return null
+    }
+  })
 
   function addMergeTab() {
     const trimmed = mergeUrl.trim()
@@ -255,6 +266,7 @@ export function SettingsSheet({
   // Attendance insights over past sessions (self-study excluded).
   const pastSessions = exportSessions.filter((s) => s.dateISO <= todayISO && !s.isSelfStudy)
   const attendedCount = pastSessions.filter((s) => metaMap[sessionKey(s)]?.attended).length
+  const absentCount = pastSessions.filter((s) => metaMap[sessionKey(s)]?.absent).length
   const bySubject = new Map<string, { attended: number; total: number }>()
   for (const s of pastSessions) {
     const key = s.subject || s.title
@@ -267,11 +279,21 @@ export function SettingsSheet({
 
   function downloadAttendanceCSV() {
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
-    const rows = ['Date,Start,Title,Subject,Room,Attended,Note']
+    const rows = ['Date,Start,Title,Subject,Room,Attended,Absent,Reason,Note']
     for (const s of pastSessions) {
       const m = metaMap[sessionKey(s)]
       rows.push(
-        [s.dateISO, s.start, esc(s.title), esc(s.subject || s.title), esc(s.room), m?.attended ? 'yes' : 'no', esc(m?.note ?? '')].join(',')
+        [
+          s.dateISO,
+          s.start,
+          esc(s.title),
+          esc(s.subject || s.title),
+          esc(s.room),
+          m?.attended ? 'yes' : 'no',
+          m?.absent ? 'yes' : 'no',
+          esc(m?.absentReason ?? ''),
+          esc(m?.note ?? ''),
+        ].join(',')
       )
     }
     downloadFile('attendance.csv', rows.join('\r\n'), 'text/csv;charset=utf-8')
@@ -280,7 +302,7 @@ export function SettingsSheet({
   // Placement day log: one row per school day per block, for mentor/tutor sign-off.
   function downloadPlacementLog() {
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
-    const rows = ['Date,Block,School,Attended,Note']
+    const rows = ['Date,Block,School,Attended,Absent,Reason,Note']
     const seen = new Set<string>()
     for (const s of exportSessions) {
       if (s.isKeyDate || !isPlacementSession(s)) continue
@@ -290,7 +312,17 @@ export function SettingsSheet({
       seen.add(dayKey)
       const m = metaMap[sessionKey(s)]
       const school = (settings.placements ?? {})[tag]?.school ?? ''
-      rows.push([s.dateISO, tag, esc(school), m?.attended ? 'yes' : 'no', esc(m?.note ?? '')].join(','))
+      rows.push(
+        [
+          s.dateISO,
+          tag,
+          esc(school),
+          m?.attended ? 'yes' : 'no',
+          m?.absent ? 'yes' : 'no',
+          esc(m?.absentReason ?? ''),
+          esc(m?.note ?? ''),
+        ].join(',')
+      )
     }
     downloadFile('placement-day-log.csv', rows.join('\r\n'), 'text/csv;charset=utf-8')
   }
@@ -330,12 +362,25 @@ export function SettingsSheet({
   const activeProfile = store.profiles.find((p) => p.id === store.activeId)
 
   async function copy(text: string, which: 'feed' | 'share') {
+    if (which === 'feed') {
+      // Remember what was copied so we can flag when filters/placements change the URL.
+      try {
+        localStorage.setItem(feedCopiedKey, text)
+      } catch {
+        /* ignore */
+      }
+      setFeedCopiedUrl(text)
+    }
     try {
       await navigator.clipboard.writeText(text)
       setCopied(which)
       setTimeout(() => setCopied(null), 2000)
     } catch {
-      window.prompt('Copy this link:', text)
+      try {
+        window.prompt('Copy this link:', text)
+      } catch {
+        /* dialogs unavailable — the URL is shown above the button anyway */
+      }
     }
   }
 
@@ -583,6 +628,61 @@ export function SettingsSheet({
             value={settings.termStartISO ?? ''}
             onChange={(e) => onUpdateSettings({ termStartISO: e.target.value || undefined })}
           />
+        </section>
+
+        <section className="filter-section">
+          <h3>Notifications at a glance</h3>
+          <ul className="notif-overview">
+            {(
+              [
+                ['Session reminders', (settings.reminderOffsets ?? []).length > 0 ? (settings.reminderOffsets ?? []).map((m) => (m >= 60 ? `${m / 60}h` : `${m}m`)).join(', ') + ' before' : 'off'],
+                ['“Did you attend?” prompts', settings.attendancePrompts ? 'at each session’s end' : 'off'],
+                ['Leave alerts', (settings.leaveAlertOffsets ?? []).length > 0 && settings.locationEnabled ? 'on' : 'off'],
+                ['Key-date reminders', (settings.keyDateReminderDays ?? []).length > 0 ? (settings.keyDateReminderDays ?? []).join('/') + ' days before' : 'off'],
+                ['Morning briefing (07:00) & week ahead (Sun)', settings.pushEnabled ? (settings.morningBriefing !== false ? 'on' : 'off') : 'needs background push'],
+                ['Timetable changes & cohort notices', settings.pushEnabled ? (settings.changeAlerts !== false ? 'on' : 'off') : 'needs background push'],
+              ] as const
+            ).map(([label, state]) => (
+              <li key={label}>
+                <span>{label}</span>
+                <span className={`notif-state${state === 'off' ? ' off' : ''}`}>{state}</span>
+              </li>
+            ))}
+          </ul>
+          <h3 className="subheading">Quiet hours</h3>
+          <p className="filter-hint">No notifications during these hours (in-app and push).</p>
+          <div className="chip-grid">
+            {(
+              [
+                { label: 'Off', from: undefined, to: undefined },
+                { label: '21:00–07:00', from: 21, to: 7 },
+                { label: '22:00–07:00', from: 22, to: 7 },
+                { label: '23:00–08:00', from: 23, to: 8 },
+              ] as const
+            ).map(({ label, from, to }) => {
+              const on = settings.quietFrom === from && settings.quietTo === to
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  className={`chip${on ? ' chip-on' : ''}`}
+                  aria-pressed={on}
+                  onClick={() => {
+                    onUpdateSettings({ quietFrom: from, quietTo: to })
+                    if (settings.pushEnabled) {
+                      void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
+                        ...settings,
+                        quietFrom: from,
+                        quietTo: to,
+                      }).catch(() => {})
+                    }
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         </section>
 
         <section className="filter-section">
@@ -915,7 +1015,8 @@ export function SettingsSheet({
             <h3>Attendance</h3>
             <p className="filter-hint">
               {attendedCount} of {pastSessions.length} past sessions marked attended (
-              {Math.round((attendedCount / pastSessions.length) * 100)}%).
+              {Math.round((attendedCount / pastSessions.length) * 100)}%)
+              {absentCount > 0 ? `, ${absentCount} absent` : ''}.
             </p>
             {subjectRows.length > 0 && (
               <ul className="attendance-list">
@@ -1083,6 +1184,12 @@ export function SettingsSheet({
               {feedUrl && (
                 <>
                   <p className="settings-url">{feedUrl}</p>
+                  {feedCopiedUrl && feedCopiedUrl !== feedUrl && (
+                    <p className="filter-hint feed-stale">
+                      ⚠ Your feed URL has changed since you last copied it (filters or placement
+                      details changed) — re-copy it and update the subscription in your calendar app.
+                    </p>
+                  )}
                   <button type="button" className="btn-secondary" onClick={() => copy(feedUrl, 'feed')}>
                     {copied === 'feed' ? 'Copied!' : 'Copy feed URL'}
                   </button>
@@ -1103,6 +1210,19 @@ export function SettingsSheet({
             👥 {settings.groupCode ? 'Open study group' : 'Set up a study group'}
           </button>
         </section>
+
+        {onInstall && (
+          <section className="filter-section">
+            <h3>Install the app</h3>
+            <p className="filter-hint">
+              Put My Timetable on your Home Screen / desktop — it opens full-screen, works offline
+              and can receive background push.
+            </p>
+            <button type="button" className="btn-secondary" onClick={onInstall}>
+              📲 Install
+            </button>
+          </section>
+        )}
 
         <section className="filter-section">
           <h3>Support this app</h3>
