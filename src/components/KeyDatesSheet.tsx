@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { sessionKey } from '../lib/diff'
 import { daysUntil } from '../lib/format'
 import type { MetaMap, Session, SessionMeta } from '../types'
@@ -10,7 +9,6 @@ interface Props {
   metaMap?: MetaMap
   onSelect: (session: Session) => void
   onSetStatus: (kd: Session, status: SessionMeta['status']) => void
-  onAddCustom: (title: string, dateISO: string, start?: string) => void
   onDeleteCustom: (id: string) => void
   onClose: () => void
 }
@@ -35,14 +33,9 @@ export function KeyDatesSheet({
   metaMap,
   onSelect,
   onSetStatus,
-  onAddCustom,
   onDeleteCustom,
   onClose,
 }: Props) {
-  const [adding, setAdding] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newDate, setNewDate] = useState('')
-  const [newTime, setNewTime] = useState('')
 
   const statusOf = (k: Session): SessionMeta['status'] => metaMap?.[sessionKey(k)]?.status ?? 'todo'
   const upcoming = keyDates
@@ -50,15 +43,6 @@ export function KeyDatesSheet({
     .sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
   const pastCount = keyDates.length - upcoming.length
   const nextFortnight = upcoming.filter((k) => daysUntil(k.dateISO, todayISO) <= 14 && statusOf(k) !== 'done').length
-
-  function submitCustom() {
-    if (!newTitle.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return
-    onAddCustom(newTitle.trim(), newDate, newTime || undefined)
-    setNewTitle('')
-    setNewDate('')
-    setNewTime('')
-    setAdding(false)
-  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -135,48 +119,12 @@ export function KeyDatesSheet({
             )
           })}
         </ul>
-        {adding && (
-          <div className="custom-kd-form filter-section">
-            <h3>New personal deadline</h3>
-            <input
-              type="text"
-              placeholder="e.g. Dissertation draft to supervisor"
-              autoFocus
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-            />
-            <div className="btn-row">
-              <input type="date" className="date-input" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
-              <input type="time" className="date-input" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={!newTitle.trim() || !newDate}
-                onClick={submitCustom}
-              >
-                Add
-              </button>
-            </div>
-            <p className="filter-hint">
-              Personal deadlines join the countdown strip, reminders and calendar export, and stay on
-              this device (and in backups).
-            </p>
-          </div>
-        )}
+        <p className="filter-hint">Add personal deadlines with the ＋ button on the main screen.</p>
         <div className="modal-actions">
           <button type="button" className="btn-primary" onClick={onClose}>
             Done
           </button>
         </div>
-        <button
-          type="button"
-          className="kd-fab"
-          aria-label={adding ? 'Close the add-deadline form' : 'Add your own deadline'}
-          title="Add your own deadline"
-          onClick={() => setAdding((v) => !v)}
-        >
-          {adding ? '✕' : '＋'}
-        </button>
       </div>
     </div>
   )

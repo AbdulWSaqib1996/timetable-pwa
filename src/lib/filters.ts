@@ -1,4 +1,5 @@
 import type { Filters, Session, Settings } from '../types'
+import { isPlacementSession } from './format'
 
 export const DEFAULT_FILTERS: Filters = {
   dateRange: 'all',
@@ -8,6 +9,7 @@ export const DEFAULT_FILTERS: Filters = {
   showSelfStudy: true,
   showOptional: true,
   showKeyDates: true,
+  placementsOnly: false,
 }
 
 export function getFilters(settings: Settings): Filters {
@@ -81,6 +83,7 @@ export function applyFilters(
 
   const myGroups = settings.myGroups ?? []
   return sessions.filter((s) => {
+    if (filters.placementsOnly && !isPlacementSession(s)) return false
     if (hideOthers && s.isSpecialism && s.specialismName && !mySpecialisms.includes(s.specialismName)) {
       return false
     }
@@ -108,6 +111,7 @@ export function activeFilterCount(settings: Settings): number {
   if (!filters.showSelfStudy) count++
   if (!filters.showOptional) count++
   if (!filters.showKeyDates) count++
+  if (filters.placementsOnly) count++
   if ((settings.mySpecialisms ?? []).length > 0 && settings.hideOtherSpecialisms !== false) count++
   if ((settings.myGroups ?? []).length > 0) count++
   return count

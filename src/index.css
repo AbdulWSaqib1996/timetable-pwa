@@ -637,10 +637,11 @@ body {
   margin: 4px 0 8px;
 }
 
-.kd-fab {
-  position: sticky;
-  bottom: 4px;
-  margin-left: auto;
+.fab-add {
+  position: fixed;
+  right: 16px;
+  bottom: calc(70px + env(safe-area-inset-bottom));
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -648,11 +649,21 @@ body {
   height: 46px;
   border-radius: 50%;
   border: none;
-  background: var(--accent);
-  color: #fff;
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--border);
   font-size: 22px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.3);
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.25);
+}
+
+.btn-placements {
+  padding: 8px 10px;
+}
+
+.btn-placements.on {
+  background: rgba(12, 166, 120, 0.15);
+  border-color: #0ca678;
 }
 
 .placement-sub {

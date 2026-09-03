@@ -35,6 +35,8 @@ export interface Filters {
   showOptional: boolean
   /** show key dates as highlighted blocks in the timetable (default true) */
   showKeyDates: boolean
+  /** quick filter: show only placement (school experience) sessions */
+  placementsOnly?: boolean
 }
 
 export interface Settings {

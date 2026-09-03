@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AddDeadlineSheet } from './components/AddDeadlineSheet'
 import { AgendaView } from './components/AgendaView'
 import { ChangesSheet } from './components/ChangesSheet'
 import { FilterBar } from './components/FilterBar'
@@ -84,7 +85,7 @@ function matchesQuery(s: Session, q: string): boolean {
   return [s.title, s.subject, s.tutor, s.room].some((f) => f && f.toLowerCase().includes(needle))
 }
 
-type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats' | 'group'
+type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats' | 'group' | 'adddl'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -760,10 +761,12 @@ export default function App() {
         <FilterBar
           view={view}
           activeCount={activeFilterCount(settings)}
+          placementsOnly={filters.placementsOnly === true}
           onView={(v) => {
             setJumpDate(null)
             updateSettings({ activeView: v })
           }}
+          onTogglePlacements={() => updateFilters({ placementsOnly: !filters.placementsOnly })}
           onOpenFilters={() => setOpenSheet('filters')}
         />
       </header>
@@ -1025,17 +1028,23 @@ export default function App() {
           metaMap={metaMap}
           onSelect={setSelected}
           onSetStatus={(kd, status) => handleMeta(kd, { status })}
-          onAddCustom={(title, dateISO, start) =>
+          onDeleteCustom={(id) =>
+            updateSettings({
+              customKeyDates: (settings.customKeyDates ?? []).filter((c) => `custom-${c.id}` !== id),
+            })
+          }
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'adddl' && (
+        <AddDeadlineSheet
+          onAdd={(title, dateISO, start) =>
             updateSettings({
               customKeyDates: [
                 ...(settings.customKeyDates ?? []),
                 { id: Date.now().toString(36), title, dateISO, start },
               ],
-            })
-          }
-          onDeleteCustom={(id) =>
-            updateSettings({
-              customKeyDates: (settings.customKeyDates ?? []).filter((c) => `custom-${c.id}` !== id),
             })
           }
           onClose={() => setOpenSheet('none')}
@@ -1089,6 +1098,18 @@ export default function App() {
           onDeleteProfile={handleDeleteProfile}
           onClose={() => setOpenSheet('none')}
         />
+      )}
+
+      {view === 'day' && !searchResults && (
+        <button
+          type="button"
+          className="fab-add"
+          aria-label="Add a personal deadline"
+          title="Add a personal deadline"
+          onClick={() => setOpenSheet('adddl')}
+        >
+          ＋
+        </button>
       )}
 
       <UpdateToast />
