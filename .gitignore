@@ -4,3 +4,7 @@ dist
 *.local
 .vercel
 .env*
+
+# Playwright
+test-results/
+playwright-report/
