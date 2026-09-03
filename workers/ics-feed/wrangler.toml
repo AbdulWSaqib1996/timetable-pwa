@@ -1,3 +1,8 @@
 name = "timetable-ics"
 main = "worker.js"
 compatibility_date = "2026-09-01"
+
+# shared with timetable-push; used only for per-IP rate limiting
+[[kv_namespaces]]
+binding = "RATE"
+id = "f4bb2f63ca3a4a76975036c421791731"

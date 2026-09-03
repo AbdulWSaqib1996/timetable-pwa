@@ -110,25 +110,60 @@ export function saveChanges(pid: string, changes: SessionChange[]): void {
   writeJSON(changesKey(pid), changes.slice(0, 100))
 }
 
-/** Everything worth keeping, as a downloadable JSON backup. */
-export function exportBackup(): string {
+/** Everything worth keeping (profiles, notes, attendance, photos) as a JSON backup. */
+export async function exportBackup(): Promise<string> {
   const store = readJSON<ProfileStore>(STORE_KEY)
   const meta: Record<string, MetaMap> = {}
   for (const p of store?.profiles ?? []) meta[p.id] = loadMeta(p.id)
-  return JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), store, meta }, null, 2)
+  const { exportPhotos } = await import('./photos')
+  const photos = await exportPhotos()
+  markBackedUp()
+  return JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), store, meta, photos }, null, 2)
 }
 
 /** Restore a backup produced by exportBackup. Returns false if the file isn't one. */
-export function importBackup(text: string): boolean {
+export async function importBackup(text: string): Promise<boolean> {
   try {
-    const data = JSON.parse(text) as { store?: ProfileStore; meta?: Record<string, MetaMap> }
+    const data = JSON.parse(text) as {
+      store?: ProfileStore
+      meta?: Record<string, MetaMap>
+      photos?: { owner: string; at: number; data: string }[]
+    }
     if (!data.store || !Array.isArray(data.store.profiles) || data.store.profiles.length === 0) return false
     writeJSON(STORE_KEY, data.store)
     for (const [pid, m] of Object.entries(data.meta ?? {})) writeJSON(metaKey(pid), m)
+    if (Array.isArray(data.photos) && data.photos.length > 0) {
+      const { importPhotos } = await import('./photos')
+      await importPhotos(data.photos)
+    }
     return true
   } catch {
     return false
   }
+}
+
+/* ---------- backup nudge bookkeeping ---------- */
+const BACKUP_KEY = 'timetable.backup.v1'
+
+export function markBackedUp(): void {
+  const state = readJSON<{ lastBackupAt?: number; lastNudgeAt?: number }>(BACKUP_KEY) ?? {}
+  writeJSON(BACKUP_KEY, { ...state, lastBackupAt: Date.now() })
+}
+
+export function snoozeBackupNudge(): void {
+  const state = readJSON<{ lastBackupAt?: number; lastNudgeAt?: number }>(BACKUP_KEY) ?? {}
+  writeJSON(BACKUP_KEY, { ...state, lastNudgeAt: Date.now() })
+}
+
+/** Show the nudge when there's meaningful local data and no backup for 30 days. */
+export function shouldNudgeBackup(hasData: boolean): boolean {
+  if (!hasData) return false
+  const state = readJSON<{ lastBackupAt?: number; lastNudgeAt?: number }>(BACKUP_KEY) ?? {}
+  const month = 30 * 24 * 3600 * 1000
+  const week = 7 * 24 * 3600 * 1000
+  if (state.lastBackupAt && Date.now() - state.lastBackupAt < month) return false
+  if (state.lastNudgeAt && Date.now() - state.lastNudgeAt < week) return false
+  return true
 }
 
 /** Reminder bookkeeping: sessionKey → timestamp notified. */

@@ -125,15 +125,22 @@ export function AgendaView({
     return future ? future[0] : null
   }, [days, scrollTo, todayISO])
 
+  // Scroll so the day's header lands just below the sticky header stack
+  // (plain scrollIntoView hides the top of the section behind it).
+  function scrollToAnchor(behavior: ScrollBehavior) {
+    const el = anchorRef.current
+    if (!el) return
+    const headerH = document.querySelector('.header-stack')?.getBoundingClientRect().height ?? 0
+    const top = el.getBoundingClientRect().top + window.scrollY - headerH - 6
+    window.scrollTo({ top: Math.max(0, top), behavior })
+  }
+
   useEffect(() => {
-    if (anchorRef.current) {
-      anchorRef.current.scrollIntoView({ block: 'start' })
-    }
+    scrollToAnchor('auto')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anchorISO])
 
-  function scrollToToday() {
-    anchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  const scrollToToday = () => scrollToAnchor('smooth')
 
   if (days.length === 0) {
     return <div className="empty-state">{emptyMessage ?? 'No sessions found in this sheet.'}</div>

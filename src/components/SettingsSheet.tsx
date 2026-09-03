@@ -25,23 +25,13 @@ interface Props {
 }
 
 import { DEFAULT_ICS_FEED_BASE, DEFAULT_PUSH_BASE } from '../lib/config'
-
-function downloadFile(name: string, content: string, type: string) {
-  const blob = new Blob([content], { type })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
-}
+import { downloadFile } from '../lib/files'
 
 /** Build the subscribable feed URL for a deployed ics-feed worker. */
-export function buildFeedUrl(base: string, settings: Settings): string {
+export function buildFeedUrl(base: string, settings: Settings, calendarName?: string): string {
   const url = new URL(base)
   url.searchParams.set('id', settings.sheetId)
+  if (calendarName) url.searchParams.set('name', calendarName)
   if (settings.gid) url.searchParams.set('gid', settings.gid)
   const specialisms = settings.mySpecialisms ?? []
   if (specialisms.length > 0 && settings.hideOtherSpecialisms !== false) {
@@ -128,8 +118,8 @@ export function SettingsSheet({
   }
 
   function handleImportFile(file: File) {
-    void file.text().then((text) => {
-      if (importBackup(text)) {
+    void file.text().then(async (text) => {
+      if (await importBackup(text)) {
         window.location.reload()
       } else {
         window.alert('That file doesn’t look like a My Timetable backup.')
@@ -221,7 +211,7 @@ export function SettingsSheet({
 
   const notifBlocked = typeof Notification !== 'undefined' && Notification.permission === 'denied'
   const feedUrl = !settings.demo
-    ? buildFeedUrl(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE, settings)
+    ? buildFeedUrl(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE, settings, activeProfile?.name)
     : null
 
   return (
@@ -661,7 +651,9 @@ export function SettingsSheet({
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => downloadFile('my-timetable-backup.json', exportBackup(), 'application/json')}
+              onClick={() =>
+                void exportBackup().then((json) => downloadFile('my-timetable-backup.json', json, 'application/json'))
+              }
             >
               Export backup
             </button>

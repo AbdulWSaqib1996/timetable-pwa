@@ -38,9 +38,11 @@ import { drainPendingActions } from './lib/pendingActions'
 import { cachedRouteMinutes, tflDisruptions, tflRoute } from './lib/tfl'
 import type { TflDisruption } from './lib/tfl'
 import { cachedWeatherForHour, weatherForHour } from './lib/weather'
+import { downloadFile } from './lib/files'
 import {
   clearProfileData,
   clearStore,
+  exportBackup,
   loadCache,
   loadChanges,
   loadMeta,
@@ -52,6 +54,8 @@ import {
   saveMeta,
   saveNotified,
   saveStore,
+  shouldNudgeBackup,
+  snoozeBackupNudge,
 } from './lib/storage'
 import type {
   Filters,
@@ -114,6 +118,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [coords, setCoords] = useState<Coords | null>(null)
+  const [showBackupNudge, setShowBackupNudge] = useState(false)
   const [tubeStatus, setTubeStatus] = useState<TflDisruption[]>([])
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
@@ -310,6 +315,12 @@ export default function App() {
       history.replaceState(null, '', window.location.pathname)
     }
   }, [])
+
+  // Monthly backup nudge: notes/attendance/photos exist only on this device.
+  useEffect(() => {
+    setShowBackupNudge(shouldNudgeBackup(Object.keys(metaMap).length > 0))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id, Object.keys(metaMap).length > 0])
 
   function updateSettings(patch: Partial<Settings>) {
     setStore((prev) => {
@@ -709,6 +720,34 @@ export default function App() {
         </div>
       )}
 
+      {showBackupNudge && (
+        <div className="backup-banner">
+          <span>💾 Your notes, attendance and photos live only on this device.</span>
+          <span className="backup-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                void exportBackup().then((json) => downloadFile('my-timetable-backup.json', json, 'application/json'))
+                setShowBackupNudge(false)
+              }}
+            >
+              Back up now
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                snoozeBackupNudge()
+                setShowBackupNudge(false)
+              }}
+            >
+              Later
+            </button>
+          </span>
+        </div>
+      )}
+
       {sessions !== null && view === 'day' && !searchResults && travelMode === 'transit' && tubeStatus.length > 0 && (
         <details className="tfl-banner">
           <summary>
@@ -805,6 +844,7 @@ export default function App() {
           coords={coords}
           locationEnabled={locationEnabled}
           travelMode={travelMode}
+          profileId={active.id}
           onMeta={(patch) => handleMeta(selected, patch)}
           onClose={() => setSelected(null)}
         />

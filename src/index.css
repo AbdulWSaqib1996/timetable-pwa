@@ -514,6 +514,84 @@ body {
   color: #e64980;
 }
 
+/* ---------- Photos & backup nudge ---------- */
+
+.photo-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+.photo-thumb {
+  position: relative;
+  display: inline-block;
+}
+
+.photo-thumb img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.photo-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: #e64980;
+  color: #fff;
+  font-size: 11px;
+  line-height: 20px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.photo-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.backup-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0 2px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.backup-actions .btn-ghost {
+  width: auto;
+  margin: 0;
+  padding: 6px 10px;
+}
+
 /* ---------- Round-3 bits ---------- */
 
 .stats-grid {

@@ -105,6 +105,8 @@ export interface ProfileStore {
 export interface SessionMeta {
   attended?: boolean
   note?: string
+  /** number of photos attached (blobs live in IndexedDB) */
+  photos?: number
 }
 
 export type MetaMap = Record<string, SessionMeta>

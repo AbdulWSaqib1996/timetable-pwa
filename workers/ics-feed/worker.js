@@ -155,11 +155,11 @@ function fold(line) {
   return parts.join('\r\n')
 }
 
-function buildICS(sessions) {
+function buildICS(sessions, calName = 'My Timetable') {
   const now = new Date()
   const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`
   const dt = (dateISO, time) => `${dateISO.replace(/-/g, '')}T${time.replace(':', '')}00`
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//timetable-pwa ics-feed//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:My Timetable']
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//timetable-pwa ics-feed//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', fold(`X-WR-CALNAME:${esc(calName)}`)]
   for (const s of sessions) {
     lines.push('BEGIN:VEVENT', fold(`UID:${s.id}@timetable-pwa`), `DTSTAMP:${stamp}`)
     if (s.isKeyDate || !s.start) {
@@ -184,12 +184,28 @@ function buildICS(sessions) {
 }
 
 export default {
-  async fetch(request) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url)
     const id = url.searchParams.get('id')
     if (!id || !/^[a-zA-Z0-9_-]{20,}$/.test(id)) {
       return new Response('Missing or invalid ?id=<sheetId>', { status: 400 })
     }
+
+    // Edge cache: calendar apps poll aggressively; serve a 5-minute cached copy.
+    const cache = caches.default
+    const cachedResponse = await cache.match(request)
+    if (cachedResponse) return cachedResponse
+
+    // Per-IP rate limit: 60 fresh builds per hour is plenty for any calendar client.
+    if (env?.RATE) {
+      const ip = request.headers.get('cf-connecting-ip') ?? 'unknown'
+      const bucket = `rl:${ip}:${Math.floor(Date.now() / 3600000)}`
+      const count = parseInt((await env.RATE.get(bucket)) ?? '0', 10)
+      if (count >= 60) return new Response('Rate limit exceeded — try again later.', { status: 429 })
+      ctx.waitUntil(env.RATE.put(bucket, String(count + 1), { expirationTtl: 3600 }))
+    }
+
+    const calName = (url.searchParams.get('name') || 'My Timetable').slice(0, 60)
     const gid = url.searchParams.get('gid')
     const spec = (url.searchParams.get('spec') || '').split(',').map((s) => s.trim()).filter(Boolean)
     const dropSelfStudy = url.searchParams.get('selfstudy') === '0'
@@ -237,12 +253,14 @@ export default {
       }
     }
 
-    return new Response(buildICS(sessions), {
+    const response = new Response(buildICS(sessions, calName), {
       headers: {
         'content-type': 'text/calendar; charset=utf-8',
-        'cache-control': 'public, max-age=900',
+        'cache-control': 'public, max-age=300',
         'access-control-allow-origin': '*',
       },
     })
+    ctx.waitUntil(cache.put(request, response.clone()))
+    return response
   },
 }

@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { TRAVEL_MODE_PHRASE, estimateTravel } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl } from '../lib/format'
+import { sessionKey } from '../lib/diff'
+import { addPhoto, compressImage, deletePhoto, getPhotos } from '../lib/photos'
+import type { StoredPhoto } from '../lib/photos'
 import { tflDeparturesNear, tflDisruptions, tflLineColor, tflModeIcon, tflRoute } from '../lib/tfl'
 import type { TflDepartures, TflDisruption, TflRoute } from '../lib/tfl'
 import { weatherEmoji, weatherForHour } from '../lib/weather'
@@ -16,6 +19,8 @@ interface Props {
   coords: Coords | null
   locationEnabled: boolean
   travelMode: TravelMode
+  /** active profile id, for the photo store */
+  profileId: string
   onMeta: (patch: Partial<SessionMeta>) => void
   onClose: () => void
 }
@@ -47,11 +52,42 @@ function formatDuration(start: string, end: string): string | null {
   return rest > 0 ? `${hourPart} ${rest} minutes` : hourPart
 }
 
-export function SessionDetail({ session, meta, coords, locationEnabled, travelMode, onMeta, onClose }: Props) {
+export function SessionDetail({ session, meta, coords, locationEnabled, travelMode, profileId, onMeta, onClose }: Props) {
   const duration = formatDuration(session.start, session.end)
   const gcalUrl = googleCalendarUrl(session)
   const travel =
     session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
+
+  // Photo notes (stored locally in IndexedDB, downscaled on save).
+  const [photos, setPhotos] = useState<StoredPhoto[]>([])
+  const photoUrls = useRef<string[]>([])
+  const reloadPhotos = () =>
+    void getPhotos(profileId, sessionKey(session)).then((list) => {
+      photoUrls.current.forEach((u) => URL.revokeObjectURL(u))
+      photoUrls.current = list.map((p) => URL.createObjectURL(p.blob))
+      setPhotos(list)
+    })
+  useEffect(() => {
+    reloadPhotos()
+    return () => {
+      photoUrls.current.forEach((u) => URL.revokeObjectURL(u))
+      photoUrls.current = []
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id, profileId])
+
+  async function handleAddPhoto(file: File) {
+    const blob = await compressImage(file)
+    await addPhoto(profileId, sessionKey(session), blob)
+    onMeta({ photos: photos.length + 1 })
+    reloadPhotos()
+  }
+
+  async function handleDeletePhoto(id: number) {
+    await deletePhoto(id)
+    onMeta({ photos: Math.max(0, photos.length - 1) || undefined })
+    reloadPhotos()
+  }
 
   // Live TfL journey (time + recommended route, which already avoids closures/strikes),
   // plus current line disruptions filtered to the lines this route uses.
@@ -247,6 +283,36 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
             value={meta?.note ?? ''}
             onChange={(e) => onMeta({ note: e.target.value })}
           />
+          <div className="photo-grid">
+            {photos.map((p, i) => (
+              <span className="photo-thumb" key={p.id}>
+                <a href={photoUrls.current[i]} target="_blank" rel="noopener noreferrer">
+                  <img src={photoUrls.current[i]} alt="Session photo" loading="lazy" />
+                </a>
+                <button
+                  type="button"
+                  className="photo-delete"
+                  aria-label="Delete photo"
+                  onClick={() => void handleDeletePhoto(p.id)}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            <label className="photo-add">
+              📷 Add photo
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void handleAddPhoto(file)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+          </div>
         </section>
         <div className="modal-actions">
           <button type="button" className="btn-ghost" onClick={onClose}>

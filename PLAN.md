@@ -152,6 +152,8 @@ Ideas building on the app after rounds 1–2 and the TfL work (which now include
 
 ## Future enhancements — round 4 (logged 2 Sep 2026)
 
+**Built (3 Sep 2026, thirteenth pass): items 7, 9 and 10 — plus background leave alerts.** Background leave alerts (opt-in) cache the last app-open location to the push worker (throttled reports; live TfL journey in transit mode; staleness noted, >18h skipped). Feed hardening: 5-min edge cache, 60/hr per-IP rate limit (KV), and a `name=` parameter for custom calendar names (feed URLs now carry the profile name). Photo notes: attach downscaled photos to any session (camera/file picker), thumbnails + delete in the detail sheet, 📷 badge on cards, stored in IndexedDB and included in the v2 JSON backup. Backup nudges: a dismissible monthly banner ("your notes live only on this device") with one-tap export; exports record lastBackupAt, "Later" snoozes a week. Also fixed this session: Apple push delivery (VAPID sub claim used the reserved .invalid TLD → 403 BadJwtToken on every send; confirmed by A/B probe and repaired). Round 4 is now complete except item 6 (departures auto-refresh) and item 8 (notices tab).
+
 **Built (2 Sep 2026, twelfth pass): item 1 — round 4's worker trio complete.** The cron keeps a per-sheet snapshot in KV and diffs every 10-minute run: room/time/tutor changes and added/cancelled future sessions push as "📋 Timetable change — Maths 2 (17/09): room 728 → 731", filtered to each subscriber's specialisms/groups, batched (3 lines + "+N more"), with a first-run seed, a >50-removal glitch guard, and a Settings opt-out. Items 1–5 of round 4 are now all built; remaining from this round: 6–10.
 
 **Built (2 Sep 2026, eleventh pass): item 2.** The 07:00 cron run now also composes a morning briefing per subscriber on days with sessions — "Good morning — 3 sessions today · First: 09:00 PS1 · Bedford Way A5.03 · ☁️ 18° · 📌 Maths PLT 1 in 3d" — from their filtered sheet, campus Open-Meteo weather at the first session's hour, and the nearest key date within 7 days; opt-out toggle under Settings → Background push (re-syncs the stored config live). Item 1 (background change-detection push) is the last of round 4's worker trio.
@@ -176,6 +178,25 @@ The app now has live worker infrastructure (background push with a 10-min cron +
 **Carried over, still open:** private-sheet OAuth (r1-9); analytics, Sentry, print stylesheet, accessibility pass (r2-10..13); personal-calendar clash check, Playwright E2E in CI, Play Store TWA (r3-6/10/11).
 
 **Suggested order:** 1 → 3 → 2 (each a small addition to the deployed worker, together turning it into a genuine assistant), then 4 and 6 as quick wins, 8 when another cohort member wants to broadcast, 7 before sharing feed URLs widely.
+
+## Future enhancements — round 5 (logged 3 Sep 2026)
+
+Rounds 1–4 are essentially built: the app is now a full assistant (live TfL routing/departures/disruptions, weather, key dates, background push with briefings/strike/change/leave alerts, photos, backups, stats, profiles, share links, two workers deployed). Round 5 shifts from adding capabilities to **discoverability, personal workflow, and resilience** — the things that decide whether other cohorts adopt it. Effort: S (hours), M (a day or two), L (multi-day).
+
+1. **First-run tour & feature discovery (S/M)** — the app has ~30 features and a new user sees a URL box. A three-step guided setup (specialism → key dates → enable push) plus a "set-up checklist" card in Settings showing what's not yet switched on. The highest-leverage item for adoption beyond your cohort.
+2. **"What's new" toast (S)** — a one-time note after each update listing what changed (static changelog shipped with the build). At this pace of change, features are landing that users never discover.
+3. **Personal deadlines (S/M)** — user-added key dates ("dissertation draft to supervisor") stored locally, merged into the key-dates list, countdown strip, reminders and ICS export alongside the sheet's official ones.
+4. **Assignment status on key dates (M)** — a status per deadline (not started / in progress / submitted) on top of the existing notes; submitted ones grey out everywhere, and the workload line counts only what's still live. Turns the key-dates list into a real assignment tracker.
+5. **Notification digest batching (S)** — when one cron run owes several pushes (briefing + strike + change alert on a bad morning), send one combined notification instead of three. Small worker change, big politeness win.
+6. **Placement mode (M)** — school-experience blocks (SE rows) dominate whole weeks; detect them and give placement days a calmer rendering (banner + key dates + placement span) instead of empty-looking agenda days.
+7. **Sheet health alerts (S/M)** — if the worker's fetches for a sheet fail for several consecutive runs (permissions changed, tab deleted), push "your timetable source is broken" to its subscribers instead of failing silently forever.
+8. **Email fallback for the briefing (M)** — browsers without web push (older iOS, some desktop setups) could get the 07:00 briefing by email via MailChannels (free from Cloudflare Workers); an email field in Settings as an alternative to Enable.
+9. **Offline journey resilience (S)** — cache the last TfL journey/disruption and weather responses in the service worker so the detail sheet shows last-known values (age-labelled) with no signal, e.g. on the tube.
+10. **Study-group availability codes (L)** — share a short code with coursemates; the push worker's KV intersects free slots across the group ("all four of you are free Thu 13:30–14:30"). The only round-5 item needing new shared state; only worth it with real multi-user demand.
+
+**Carried over, still open:** round-4 6 (departures auto-refresh) and 8 (notices tab); private-sheet OAuth (r1-9); analytics, Sentry, print stylesheet, accessibility pass (r2-10..13); personal-calendar clash check, Playwright E2E in CI, Play Store TWA (r3-6/10/11).
+
+**Suggested order:** 2 and 5 as immediate small wins, 1 before promoting to other cohorts, 3 + 4 as the next feature pair (they complete the deadline story), 7 for operational peace of mind.
 
 ## Monetisation options (explored 2 Sep 2026)
 
