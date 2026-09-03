@@ -66,6 +66,16 @@ export default defineConfig({
             },
           },
           {
+            // last-known journey/status/arrivals when offline (e.g. on the tube)
+            urlPattern: /^https:\/\/api\.tfl\.gov\.uk\//,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'tfl',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 40, maxAgeSeconds: 1800 },
+            },
+          },
+          {
             urlPattern: /^https:\/\/api\.open-meteo\.com\//,
             handler: 'NetworkFirst',
             options: {

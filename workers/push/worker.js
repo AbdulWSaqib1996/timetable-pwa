@@ -463,14 +463,20 @@ async function runScheduled(env) {
       const sessions = await fetchSessions(id, gid)
       let changes = []
       let hadSnapshot = false
+      let failCount = 0
       if (sessions.length > 0) {
+        await env.PUSH.delete(`fail:${key}`)
         const old = await env.PUSH.get(snapKey(id, gid), 'json')
         if (old) {
           hadSnapshot = true
           changes = diffSheets(old, sessions, now.dateISO)
         }
+      } else {
+        // Sheet health: count consecutive failing runs so subscribers can be told.
+        failCount = parseInt((await env.PUSH.get(`fail:${key}`)) ?? '0', 10) + 1
+        await env.PUSH.put(`fail:${key}`, String(failCount), { expirationTtl: 86400 })
       }
-      sheetCache.set(key, { id, gid, sessions, changes, hadSnapshot })
+      sheetCache.set(key, { id, gid, sessions, changes, hadSnapshot, failCount })
     }
     return sheetCache.get(key)
   }
@@ -485,6 +491,18 @@ async function runScheduled(env) {
     if (!record?.subscription?.endpoint || !record?.config?.sheetId) continue
     const { subscription, config } = record
     const due = []
+
+    // Sheet health: after ~1 hour of consecutive failures, tell its subscribers once.
+    {
+      const info = await getSheetInfo(config.sheetId, config.gid)
+      if (info.failCount === 6) {
+        due.push({
+          dedupe: `srcfail|${now.dateISO}`,
+          title: '⚠ Timetable source problem',
+          body: 'Your timetable sheet hasn’t loaded for the last hour — check it’s still shared as “anyone with the link can view”.',
+        })
+      }
+    }
 
     // Timetable-change push: diff of this run vs the stored snapshot, filtered to
     // this subscriber's specialisms/groups, batched into one notification.
@@ -644,20 +662,31 @@ async function runScheduled(env) {
       }
     }
 
+    // Digest batching: several due items in one run arrive as a single notification.
+    const unsent = []
     for (const item of due) {
       const sentKey = `sent:${entry.name.slice(4)}:${item.dedupe}`
       if (await env.PUSH.get(sentKey)) continue
-      const result = await sendPush(env, subscription, {
-        title: item.title,
-        body: item.body,
-        key: item.key,
-        snoozeUrl: record.base,
-      })
-      if (result === 'gone') {
-        await env.PUSH.delete(entry.name)
-        break
-      }
-      if (result === 'ok') await env.PUSH.put(sentKey, '1', { expirationTtl: 172800 })
+      unsent.push({ ...item, sentKey })
+    }
+    if (unsent.length === 0) continue
+    const payload =
+      unsent.length === 1
+        ? { title: unsent[0].title, body: unsent[0].body, key: unsent[0].key, snoozeUrl: record.base }
+        : {
+            title: `${unsent.length} timetable updates`,
+            body: unsent
+              .map((i) => i.title)
+              .join(' · ')
+              .slice(0, 290),
+          }
+    const result = await sendPush(env, subscription, payload)
+    if (result === 'gone') {
+      await env.PUSH.delete(entry.name)
+      continue
+    }
+    if (result === 'ok') {
+      for (const item of unsent) await env.PUSH.put(item.sentKey, '1', { expirationTtl: 172800 })
     }
   }
 
@@ -741,6 +770,70 @@ export default {
         results.push({ endpointHost: new URL(record.subscription.endpoint).hostname, ...r })
       }
       return json({ results })
+    }
+    /* ---------- study groups: shared free-slot codes (times only, no session details) ---------- */
+    const cleanSlots = (slots) =>
+      Array.isArray(slots)
+        ? slots
+            .filter(
+              (s) =>
+                s &&
+                /^\d{4}-\d{2}-\d{2}$/.test(s.d) &&
+                Number.isInteger(s.from) &&
+                Number.isInteger(s.to) &&
+                s.from >= 0 &&
+                s.to > s.from &&
+                s.to <= 1440
+            )
+            .slice(0, 120)
+        : []
+    const cleanName = (n) => String(n ?? '').trim().slice(0, 24)
+    if (request.method === 'POST' && url.pathname === '/group') {
+      const body = await request.json().catch(() => null)
+      const name = cleanName(body?.name)
+      if (!name) return json({ error: 'missing name' }, 400)
+      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+      let code = ''
+      for (const b of crypto.getRandomValues(new Uint8Array(6))) code += chars[b % chars.length]
+      await env.PUSH.put(
+        `grp:${code}`,
+        JSON.stringify({ createdAt: Date.now(), members: { [name]: { slots: cleanSlots(body?.slots), at: Date.now() } } }),
+        { expirationTtl: 21 * 86400 }
+      )
+      return json({ code })
+    }
+    if (request.method === 'POST' && url.pathname === '/group/join') {
+      const body = await request.json().catch(() => null)
+      const name = cleanName(body?.name)
+      const code = String(body?.code ?? '').toUpperCase().trim()
+      if (!name || !/^[A-Z2-9]{4,8}$/.test(code)) return json({ error: 'invalid request' }, 400)
+      const group = await env.PUSH.get(`grp:${code}`, 'json')
+      if (!group) return json({ error: 'unknown group' }, 404)
+      if (!group.members[name] && Object.keys(group.members).length >= 12) {
+        return json({ error: 'group is full' }, 403)
+      }
+      group.members[name] = { slots: cleanSlots(body?.slots), at: Date.now() }
+      await env.PUSH.put(`grp:${code}`, JSON.stringify(group), { expirationTtl: 21 * 86400 })
+      return json({ ok: true })
+    }
+    if (request.method === 'GET' && url.pathname === '/group') {
+      const code = String(url.searchParams.get('code') ?? '').toUpperCase().trim()
+      const group = code ? await env.PUSH.get(`grp:${code}`, 'json') : null
+      if (!group) return json({ error: 'unknown group' }, 404)
+      const members = Object.entries(group.members).map(([name, m]) => ({ name, at: m.at, slots: m.slots }))
+      return json({ members })
+    }
+    if (request.method === 'POST' && url.pathname === '/group/leave') {
+      const body = await request.json().catch(() => null)
+      const code = String(body?.code ?? '').toUpperCase().trim()
+      const name = cleanName(body?.name)
+      const group = code ? await env.PUSH.get(`grp:${code}`, 'json') : null
+      if (group && name && group.members[name]) {
+        delete group.members[name]
+        if (Object.keys(group.members).length === 0) await env.PUSH.delete(`grp:${code}`)
+        else await env.PUSH.put(`grp:${code}`, JSON.stringify(group), { expirationTtl: 21 * 86400 })
+      }
+      return json({ ok: true })
     }
     if (request.method === 'POST' && url.pathname === '/location') {
       const body = await request.json().catch(() => null)

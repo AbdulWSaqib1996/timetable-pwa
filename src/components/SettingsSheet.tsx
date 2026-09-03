@@ -17,6 +17,7 @@ interface Props {
   todayISO: string
   onUpdateSettings: (patch: Partial<Settings>) => void
   onOpenStats: () => void
+  onOpenGroup: () => void
   onRechooseSpecialisms: () => void
   onSwitchProfile: (id: string) => void
   onAddProfile: () => void
@@ -63,6 +64,7 @@ export function SettingsSheet({
   todayISO,
   onUpdateSettings,
   onOpenStats,
+  onOpenGroup,
   onRechooseSpecialisms,
   onSwitchProfile,
   onAddProfile,
@@ -704,6 +706,18 @@ export function SettingsSheet({
               )}
             </>
           )}
+        </section>
+
+        <section className="filter-section">
+          <h3>Study group</h3>
+          <p className="filter-hint">
+            {settings.groupCode
+              ? `In group ${settings.groupCode} as ${settings.groupName}.`
+              : 'Find common free slots with coursemates by sharing a code.'}
+          </p>
+          <button type="button" className="btn-secondary" onClick={onOpenGroup}>
+            👥 {settings.groupCode ? 'Open study group' : 'Set up a study group'}
+          </button>
         </section>
 
         <section className="filter-section">

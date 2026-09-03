@@ -514,6 +514,113 @@ body {
   color: #e64980;
 }
 
+/* ---------- Round-5 bits ---------- */
+
+.whatsnew-list {
+  margin: 6px 0 0;
+  padding-left: 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.checklist-link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.keydate-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.keydate-line .keydate-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.kd-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.kd-status {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kd-status-doing {
+  color: #f08c00;
+  border-color: rgba(240, 140, 0, 0.5);
+}
+
+.kd-status-done {
+  color: #37b24d;
+  border-color: rgba(55, 178, 77, 0.5);
+}
+
+.kd-done {
+  opacity: 0.45;
+}
+
+.custom-kd-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.custom-kd-form input[type='text'] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.placement-day {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  padding: 14px;
+  cursor: pointer;
+}
+
+.placement-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 /* ---------- Photos & backup nudge ---------- */
 
 .photo-grid {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
-import { toMinutes, weekNumber } from '../lib/format'
+import { isPlacementSession, toMinutes, weekNumber } from '../lib/format'
 import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import type { MetaMap, Session } from '../types'
 import { SessionCard } from './SessionCard'
@@ -170,6 +170,25 @@ export function AgendaView({
               )}
               {isToday && <span className="badge badge-today">Today</span>}
             </h2>
+            {(() => {
+              // Placement mode: an all-placement day collapses into one calm block.
+              const real = daySessions.filter((s) => !s.isKeyDate)
+              if (real.length > 0 && real.every(isPlacementSession)) {
+                return (
+                  <div className="day-sessions">
+                    {daySessions.filter((s) => s.isKeyDate).map((s) => (
+                      <SessionCard key={s.id} session={s} onSelect={onSelect} />
+                    ))}
+                    <button type="button" className="placement-day" onClick={() => onSelect(real[0])}>
+                      🏫 {real[0].title}
+                      {real.length > 1 ? ` (+${real.length - 1} more)` : ''}
+                      <span className="placement-sub">School experience day</span>
+                    </button>
+                  </div>
+                )
+              }
+              return null
+            })() ?? (
             <div className="day-sessions">
               {daySessions.map((s, i) => {
                 // Free-slot finder: surface usable gaps between real sessions.
@@ -205,6 +224,7 @@ export function AgendaView({
                 )
               })}
             </div>
+            )}
           </section>
         )
       })}

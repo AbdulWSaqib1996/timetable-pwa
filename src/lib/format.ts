@@ -53,6 +53,11 @@ export function googleCalendarUrl(s: Session): string | null {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
+/** School-experience / placement rows get a calmer rendering. */
+export function isPlacementSession(session: Session): boolean {
+  return /school experience|placement|\bSE ?\d\b/i.test(session.title)
+}
+
 /** Whole days from todayISO to dateISO (0 = today, negative = past). */
 export function daysUntil(dateISO: string, todayISO: string): number {
   const toTime = (iso: string) => {

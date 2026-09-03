@@ -11,6 +11,8 @@ import { SettingsSheet } from './components/SettingsSheet'
 import { SetupScreen } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
 import { StatsSheet } from './components/StatsSheet'
+import { StudyGroupSheet } from './components/StudyGroupSheet'
+import { WHATSNEW, dismissWhatsNew, shouldShowWhatsNew } from './lib/changelog'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
 import type { Coords } from './lib/campus'
@@ -82,7 +84,7 @@ function matchesQuery(s: Session, q: string): boolean {
   return [s.title, s.subject, s.tutor, s.room].some((f) => f && f.toLowerCase().includes(needle))
 }
 
-type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats'
+type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats' | 'group'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -119,6 +121,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [coords, setCoords] = useState<Coords | null>(null)
   const [showBackupNudge, setShowBackupNudge] = useState(false)
+  const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowWhatsNew())
   const [tubeStatus, setTubeStatus] = useState<TflDisruption[]>([])
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
@@ -408,7 +411,9 @@ export default function App() {
       const key = sessionKey(session)
       const entry = { ...prev[key], ...patch }
       const next: MetaMap = { ...prev, [key]: entry }
-      if (!entry.attended && !entry.note) delete next[key]
+      if (!entry.attended && !entry.note && !entry.photos && (!entry.status || entry.status === 'todo')) {
+        delete next[key]
+      }
       saveMeta(active.id, next)
       return next
     })
@@ -433,19 +438,42 @@ export default function App() {
     [sessions, settings, todayISO]
   )
 
+  // Sheet key dates + the user's personal deadlines, merged.
+  const allKeyDates = useMemo(() => {
+    const custom = (settings?.customKeyDates ?? []).map(
+      (c): Session => ({
+        id: `custom-${c.id}`,
+        title: c.title,
+        day: '',
+        dateISO: c.dateISO,
+        start: c.start ?? '',
+        end: '',
+        room: '',
+        groups: '',
+        tutor: '',
+        subject: c.title,
+        isSpecialism: false,
+        isSelfStudy: false,
+        isOptional: false,
+        isKeyDate: true,
+      })
+    )
+    return [...keyDates, ...custom].sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
+  }, [keyDates, settings?.customKeyDates])
+
   const searchResults = useMemo(() => {
     const q = query.trim()
-    return q ? [...exportSessions, ...keyDates].filter((s) => matchesQuery(s, q)) : null
-  }, [exportSessions, keyDates, query])
+    return q ? [...exportSessions, ...allKeyDates].filter((s) => matchesQuery(s, q)) : null
+  }, [exportSessions, allKeyDates, query])
 
   // Day view weaves key dates in as highlighted blocks (toggle in Filters); they follow
   // the same date-range choice as the rest of the day view.
   const dayViewSessions = useMemo(() => {
     if (!settings) return filteredSessions
     const f = getFilters(settings)
-    if (view !== 'day' || !f.showKeyDates || keyDates.length === 0) return filteredSessions
+    if (view !== 'day' || !f.showKeyDates || allKeyDates.length === 0) return filteredSessions
     const week = f.dateRange === 'week' ? weekBounds(todayISO) : null
-    const inRange = keyDates.filter((k) => {
+    const inRange = allKeyDates.filter((k) => {
       if (f.dateRange === 'today') return k.dateISO === todayISO
       if (week) return k.dateISO >= week.from && k.dateISO <= week.to
       return true
@@ -454,9 +482,9 @@ export default function App() {
       (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99'))
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredSessions, keyDates, settings, view, todayISO])
+  }, [filteredSessions, allKeyDates, settings, view, todayISO])
 
-  const keyDateDays = useMemo(() => new Set(keyDates.map((k) => k.dateISO)), [keyDates])
+  const keyDateDays = useMemo(() => new Set(allKeyDates.map((k) => k.dateISO)), [allKeyDates])
 
   // Device location for travel-time estimates (only while enabled in Settings).
   const locationEnabled = settings?.locationEnabled ?? false
@@ -488,8 +516,8 @@ export default function App() {
   // offsets are due at once (say the app was just opened), only one fires per session.
   const exportRef = useRef(exportSessions)
   exportRef.current = exportSessions
-  const keyDatesRef = useRef(keyDates)
-  keyDatesRef.current = keyDates
+  const keyDatesRef = useRef(allKeyDates)
+  keyDatesRef.current = allKeyDates
   const travelRef = useRef({ coords, travelMode, locationEnabled })
   travelRef.current = { coords, travelMode, locationEnabled }
   const snoozeUrlRef = useRef<string | undefined>(undefined)
@@ -720,6 +748,64 @@ export default function App() {
         </div>
       )}
 
+      {showWhatsNew && (
+        <div className="backup-banner whatsnew">
+          <div>
+            <strong>What's new</strong>
+            <ul className="whatsnew-list">
+              {WHATSNEW.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              dismissWhatsNew()
+              setShowWhatsNew(false)
+            }}
+          >
+            Got it
+          </button>
+        </div>
+      )}
+
+      {!settings.checklistDismissed &&
+        sessions !== null &&
+        (() => {
+          const items = [
+            { done: !!settings.specialismsChosen || options.specialisms.length === 0, label: 'Pick your specialism', act: () => setRechoosing(true) },
+            { done: !!settings.keyDatesSheetId, label: 'Connect key dates (Settings → Key dates)', act: () => setOpenSheet('settings') },
+            { done: !!settings.pushEnabled, label: 'Enable background push (Settings)', act: () => setOpenSheet('settings') },
+            { done: !!settings.locationEnabled, label: 'Turn on travel times (Settings)', act: () => setOpenSheet('settings') },
+          ].filter((i) => !i.done)
+          if (items.length === 0) return null
+          return (
+            <div className="backup-banner checklist">
+              <div>
+                <strong>Finish setting up ({4 - items.length}/4 done)</strong>
+                <ul className="whatsnew-list">
+                  {items.map((i) => (
+                    <li key={i.label}>
+                      <button type="button" className="checklist-link" onClick={i.act}>
+                        ☐ {i.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => updateSettings({ checklistDismissed: true })}
+              >
+                Hide
+              </button>
+            </div>
+          )
+        })()}
+
       {showBackupNudge && (
         <div className="backup-banner">
           <span>💾 Your notes, attendance and photos live only on this device.</span>
@@ -771,8 +857,8 @@ export default function App() {
         view === 'day' &&
         !searchResults &&
         (() => {
-          const next = keyDates
-            .filter((k) => k.dateISO >= todayISO)
+          const next = allKeyDates
+            .filter((k) => k.dateISO >= todayISO && metaMap[sessionKey(k)]?.status !== 'done')
             .sort((a, b) => a.dateISO.localeCompare(b.dateISO))[0]
           if (!next) return null
           const days = daysUntil(next.dateISO, todayISO)
@@ -892,11 +978,35 @@ export default function App() {
 
       {openSheet === 'keydates' && (
         <KeyDatesSheet
-          keyDates={keyDates}
+          keyDates={allKeyDates}
           todayISO={todayISO}
           configured={!!settings.keyDatesSheetId}
           metaMap={metaMap}
           onSelect={setSelected}
+          onSetStatus={(kd, status) => handleMeta(kd, { status })}
+          onAddCustom={(title, dateISO, start) =>
+            updateSettings({
+              customKeyDates: [
+                ...(settings.customKeyDates ?? []),
+                { id: Date.now().toString(36), title, dateISO, start },
+              ],
+            })
+          }
+          onDeleteCustom={(id) =>
+            updateSettings({
+              customKeyDates: (settings.customKeyDates ?? []).filter((c) => `custom-${c.id}` !== id),
+            })
+          }
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'group' && (
+        <StudyGroupSheet
+          settings={settings}
+          sessions={exportSessions}
+          todayISO={todayISO}
+          onUpdateSettings={updateSettings}
           onClose={() => setOpenSheet('none')}
         />
       )}
@@ -917,7 +1027,8 @@ export default function App() {
           settings={settings}
           store={store}
           exportSessions={exportSessions}
-          keyDates={keyDates}
+          keyDates={allKeyDates}
+          onOpenGroup={() => setOpenSheet('group')}
           metaMap={metaMap}
           todayISO={todayISO}
           onUpdateSettings={updateSettings}

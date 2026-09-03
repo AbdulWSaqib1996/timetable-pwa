@@ -87,6 +87,13 @@ export interface Settings {
   changeAlerts?: boolean
   /** background leave alerts: cache the last app-open location to the push worker (default off) */
   bgLeaveAlerts?: boolean
+  /** user-added personal deadlines, merged into the key-dates views */
+  customKeyDates?: { id: string; title: string; dateISO: string; start?: string }[]
+  /** study group membership */
+  groupCode?: string
+  groupName?: string
+  /** setup checklist card permanently dismissed */
+  checklistDismissed?: boolean
 }
 
 /** One saved timetable (sheet + all its choices). */
@@ -107,6 +114,8 @@ export interface SessionMeta {
   note?: string
   /** number of photos attached (blobs live in IndexedDB) */
   photos?: number
+  /** assignment status for key dates */
+  status?: 'todo' | 'doing' | 'done'
 }
 
 export type MetaMap = Record<string, SessionMeta>
