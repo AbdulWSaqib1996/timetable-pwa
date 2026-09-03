@@ -11,6 +11,39 @@ const ACTIONS = [
   { action: 'snooze', title: '⏰ Snooze 10m' },
 ]
 
+// Record when a push last arrived, so the Settings self-check can show it.
+function recordPushReceived() {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('timetable-push', 1)
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains('meta')) req.result.createObjectStore('meta')
+      }
+      req.onsuccess = () => {
+        const db = req.result
+        try {
+          const tx = db.transaction('meta', 'readwrite')
+          tx.objectStore('meta').put(Date.now(), 'lastPushAt')
+          tx.oncomplete = () => {
+            db.close()
+            resolve()
+          }
+          tx.onerror = () => {
+            db.close()
+            resolve()
+          }
+        } catch {
+          db.close()
+          resolve()
+        }
+      }
+      req.onerror = () => resolve()
+    } catch {
+      resolve()
+    }
+  })
+}
+
 self.addEventListener('push', (event) => {
   let data = {}
   try {
@@ -20,13 +53,16 @@ self.addEventListener('push', (event) => {
   }
   const title = data.title || 'My Timetable'
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body: data.body || 'You have a timetable update.',
-      icon: 'icon-192.png',
-      badge: 'icon-192.png',
-      data: { url: data.url || './', key: data.key, snoozeUrl: data.snoozeUrl },
-      actions: data.key ? ACTIONS : [],
-    })
+    Promise.all([
+      self.registration.showNotification(title, {
+        body: data.body || 'You have a timetable update.',
+        icon: 'icon-192.png',
+        badge: 'icon-192.png',
+        data: { url: data.url || './', key: data.key, snoozeUrl: data.snoozeUrl },
+        actions: data.key ? ACTIONS : [],
+      }),
+      recordPushReceived(),
+    ])
   )
 })
 

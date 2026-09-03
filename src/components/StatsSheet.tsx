@@ -1,12 +1,17 @@
+import { useModalA11y } from '../lib/a11y'
 import { matchBuilding } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
-import { shortenRoom, toMinutes } from '../lib/format'
+import { isPlacementSession, placementTag, shortenRoom, toMinutes } from '../lib/format'
 import type { MetaMap, Session } from '../types'
 
 interface Props {
   sessions: Session[]
   metaMap: MetaMap
   todayISO: string
+  /** merged key dates (sheet + personal), for the deadlines tile */
+  keyDates?: Session[]
+  /** course requirement for assessed school days, from Settings */
+  placementTargetDays?: number
   onClose: () => void
 }
 
@@ -17,8 +22,16 @@ function mondayOf(dateISO: string): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-function computeStats(sessions: Session[], metaMap: MetaMap, todayISO: string) {
-  const taught = sessions.filter((s) => !s.isSelfStudy && !s.isKeyDate)
+function computeStats(
+  sessions: Session[],
+  metaMap: MetaMap,
+  todayISO: string,
+  keyDates: Session[],
+  placementTargetDays?: number
+) {
+  // Placement (school-experience) days count separately from taught hours.
+  const placementSessions = sessions.filter((s) => !s.isKeyDate && isPlacementSession(s))
+  const taught = sessions.filter((s) => !s.isSelfStudy && !s.isKeyDate && !isPlacementSession(s))
   const hours = (s: Session) => {
     const start = toMinutes(s.start)
     const end = toMinutes(s.end)
@@ -47,6 +60,22 @@ function computeStats(sessions: Session[], metaMap: MetaMap, todayISO: string) {
   const starts = taught.map((s) => toMinutes(s.start)).filter((n): n is number => n !== null && n > 0)
   const earliest = starts.length > 0 ? Math.min(...starts) : null
 
+  // Placement days: unique dates per block; attended via the ✓ tick on any of the day's entries.
+  const placementByTag = new Map<string, { total: Set<string>; attended: Set<string> }>()
+  for (const s of placementSessions) {
+    const tag = placementTag(s.title)
+    const e = placementByTag.get(tag) ?? { total: new Set<string>(), attended: new Set<string>() }
+    e.total.add(s.dateISO)
+    if (metaMap[sessionKey(s)]?.attended) e.attended.add(s.dateISO)
+    placementByTag.set(tag, e)
+  }
+  const placementBlocks = [...placementByTag.entries()]
+    .map(([tag, e]) => ({ tag, attended: e.attended.size, total: e.total.size }))
+    .sort((a, b) => a.tag.localeCompare(b.tag))
+  const placementAttended = placementBlocks.reduce((n, b) => n + b.attended, 0)
+
+  const deadlinesDone = keyDates.filter((k) => metaMap[sessionKey(k)]?.status === 'done').length
+
   return {
     totalSessions: taught.length,
     totalHours: Math.round(totalHours),
@@ -62,12 +91,38 @@ function computeStats(sessions: Session[], metaMap: MetaMap, todayISO: string) {
     topBuilding: topBuilding ? { name: topBuilding[0], count: topBuilding[1] } : null,
     topSubject: topSubject ? { name: topSubject[0], count: topSubject[1] } : null,
     earliestStart: earliest !== null ? `${String(Math.floor(earliest / 60)).padStart(2, '0')}:${String(earliest % 60).padStart(2, '0')}` : null,
+    placementAttended,
+    placementTarget: placementTargetDays,
+    placementBlocks,
+    deadlinesDone,
+    deadlinesTotal: keyDates.length,
   }
 }
 
-async function shareStatsImage(stats: ReturnType<typeof computeStats>): Promise<void> {
+function buildTiles(stats: ReturnType<typeof computeStats>): { big: string; small: string }[] {
+  const tiles: { big: string; small: string }[] = [
+    { big: `${stats.totalSessions}`, small: 'sessions on the timetable' },
+    { big: `${stats.totalHours}h`, small: 'of taught time' },
+  ]
+  if (stats.attendancePct !== null)
+    tiles.push({ big: `${stats.attendancePct}%`, small: `attendance (${stats.attended}/${stats.pastCount} marked)` })
+  if (stats.placementBlocks.length > 0)
+    tiles.push({
+      big: `${stats.placementAttended}${stats.placementTarget ? `/${stats.placementTarget}` : ''}`,
+      small: 'school days at placement',
+    })
+  if (stats.deadlinesTotal > 0)
+    tiles.push({ big: `${stats.deadlinesDone}/${stats.deadlinesTotal}`, small: 'deadlines submitted' })
+  if (stats.busiestWeek) tiles.push({ big: `${stats.busiestWeek.hours}h`, small: `busiest week (w/c ${stats.busiestWeek.label})` })
+  if (stats.topBuilding) tiles.push({ big: `${stats.topBuilding.count}×`, small: `most-visited: ${stats.topBuilding.name}` })
+  if (stats.topSubject) tiles.push({ big: `${stats.topSubject.count}×`, small: `top subject: ${stats.topSubject.name}` })
+  if (stats.earliestStart) tiles.push({ big: stats.earliestStart, small: 'earliest start' })
+  return tiles
+}
+
+async function shareStatsImage(tiles: { big: string; small: string }[]): Promise<void> {
   const width = 620
-  const height = 560
+  const height = 120 + tiles.length * 72 + 48
   const canvas = document.createElement('canvas')
   canvas.width = width * 2
   canvas.height = height * 2
@@ -82,21 +137,14 @@ async function shareStatsImage(stats: ReturnType<typeof computeStats>): Promise<
   ctx.fillStyle = '#8da2f0'
   ctx.font = '700 15px -apple-system, "Segoe UI", Roboto, sans-serif'
   ctx.fillText('MY TIMETABLE · TERM SO FAR', 36, 52)
-  const rows: [string, string][] = []
-  rows.push([`${stats.totalSessions}`, 'sessions on the timetable'])
-  rows.push([`${stats.totalHours}h`, 'of taught time'])
-  if (stats.attendancePct !== null) rows.push([`${stats.attendancePct}%`, `attendance (${stats.attended}/${stats.pastCount} marked)`])
-  if (stats.busiestWeek) rows.push([`${stats.busiestWeek.hours}h`, `busiest week (w/c ${stats.busiestWeek.label})`])
-  if (stats.topBuilding) rows.push([`${stats.topBuilding.count}×`, `most-visited: ${stats.topBuilding.name}`])
-  if (stats.earliestStart) rows.push([stats.earliestStart, 'earliest start'])
-  rows.forEach(([big, small], i) => {
+  tiles.forEach(({ big, small }, i) => {
     const y = 120 + i * 72
     ctx.fillStyle = '#ffffff'
     ctx.font = '800 34px -apple-system, "Segoe UI", Roboto, sans-serif'
     ctx.fillText(big, 36, y)
     ctx.fillStyle = '#9aa1b5'
     ctx.font = '500 15px -apple-system, "Segoe UI", Roboto, sans-serif'
-    ctx.fillText(small, 170, y - 6)
+    ctx.fillText(small, 200, y - 6)
   })
   ctx.fillStyle = '#5b6178'
   ctx.font = '400 12px -apple-system, "Segoe UI", Roboto, sans-serif'
@@ -123,22 +171,21 @@ async function shareStatsImage(stats: ReturnType<typeof computeStats>): Promise<
   URL.revokeObjectURL(url)
 }
 
-export function StatsSheet({ sessions, metaMap, todayISO, onClose }: Props) {
-  const stats = computeStats(sessions, metaMap, todayISO)
-  const tiles: { big: string; small: string }[] = [
-    { big: `${stats.totalSessions}`, small: 'sessions on the timetable' },
-    { big: `${stats.totalHours}h`, small: 'of taught time' },
-  ]
-  if (stats.attendancePct !== null)
-    tiles.push({ big: `${stats.attendancePct}%`, small: `attendance (${stats.attended}/${stats.pastCount} marked)` })
-  if (stats.busiestWeek) tiles.push({ big: `${stats.busiestWeek.hours}h`, small: `busiest week (w/c ${stats.busiestWeek.label})` })
-  if (stats.topBuilding) tiles.push({ big: `${stats.topBuilding.count}×`, small: `most-visited: ${stats.topBuilding.name}` })
-  if (stats.topSubject) tiles.push({ big: `${stats.topSubject.count}×`, small: `top subject: ${stats.topSubject.name}` })
-  if (stats.earliestStart) tiles.push({ big: stats.earliestStart, small: 'earliest start' })
+export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placementTargetDays, onClose }: Props) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
+  const stats = computeStats(sessions, metaMap, todayISO, keyDates, placementTargetDays)
+  const tiles = buildTiles(stats)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card sheet" role="dialog" aria-label="Term stats" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        className="modal-card sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Term stats"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="sheet-header">
           <h2>Term so far</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
@@ -153,8 +200,15 @@ export function StatsSheet({ sessions, metaMap, todayISO, onClose }: Props) {
             </div>
           ))}
         </div>
+        {stats.placementBlocks.length > 0 && (
+          <p className="filter-hint">
+            Placement blocks:{' '}
+            {stats.placementBlocks.map((b) => `${b.tag} ${b.attended}/${b.total}`).join(' · ')} — tick
+            “Attended” on a placement day to log it.
+          </p>
+        )}
         <div className="modal-actions">
-          <button type="button" className="btn-primary" onClick={() => void shareStatsImage(stats)}>
+          <button type="button" className="btn-primary" onClick={() => void shareStatsImage(tiles)}>
             📸 Share as image
           </button>
           <button type="button" className="btn-ghost" onClick={onClose}>

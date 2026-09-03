@@ -43,6 +43,13 @@ export async function subscribePush(base: string, settings: Settings): Promise<v
     changeAlerts: settings.changeAlerts !== false,
     bgLeave: settings.bgLeaveAlerts === true,
     leaveAlertOffsets: settings.leaveAlertOffsets ?? [],
+    // Placement details (school + geocoded coords) so the worker can name the
+    // school in briefings/reminders and route background leave alerts to it.
+    placements: Object.fromEntries(
+      Object.entries(settings.placements ?? {})
+        .filter(([, p]) => p.school || (p.lat != null && p.lng != null))
+        .map(([tag, p]) => [tag, { school: p.school, lat: p.lat, lng: p.lng }])
+    ),
     base: trim(base),
   }
   const save = await fetch(`${trim(base)}/subscribe`, {

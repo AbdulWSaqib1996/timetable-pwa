@@ -237,6 +237,82 @@ async function fetchSessions(sheetId, gid) {
   return sessions
 }
 
+/* ---------- placement (school experience) parity with the app ---------- */
+const isPlacementTitle = (t) => /school experience|placement|\bSE ?\d[a-z]?\b/i.test(t || '')
+const placementTagOf = (t) => {
+  const m = (t || '').match(/SE ?\d[a-z]?/i)
+  return m ? m[0].replace(/\s/g, '').toUpperCase() : 'PLACEMENT'
+}
+const PLACEMENT_MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
+function parsePlacementRange(title) {
+  const m = (title || '').match(
+    /\((\d{1,2})(?:st|nd|rd|th)?(?:\s+([A-Za-z]+))?\s*[-–—]\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})\)/
+  )
+  if (!m) return null
+  const [, d1, m1name, d2, m2name, year] = m
+  const mo2 = PLACEMENT_MONTHS[m2name.slice(0, 3).toLowerCase()]
+  if (mo2 === undefined) return null
+  const mo1 = m1name !== undefined ? PLACEMENT_MONTHS[m1name.slice(0, 3).toLowerCase()] : mo2
+  if (mo1 === undefined) return null
+  const iso = (y, mo, d) => `${y}-${pad(mo + 1)}-${pad(d)}`
+  const from = iso(+year, mo1, +d1)
+  const to = iso(+year, mo2, +d2)
+  return from <= to ? { from, to } : null
+}
+/**
+ * Same expansion the app does: marker rows like "SE1a begins (28th Sept - 2nd Oct 2026)"
+ * become one placement day per weekday in the span, so background reminders/briefings/
+ * leave alerts cover placement mornings. Synthesized entries never enter the change diff.
+ */
+function expandPlacements(sessions) {
+  const out = sessions.slice()
+  const seenSpans = new Set()
+  for (const s of sessions) {
+    if (!isPlacementTitle(s.title)) continue
+    const range = parsePlacementRange(s.title)
+    if (!range) continue
+    const tag = placementTagOf(s.title)
+    const spanKey = `${tag}|${range.from}|${range.to}`
+    if (seenSpans.has(spanKey)) continue
+    seenSpans.add(spanKey)
+    const validTime = (t) => t && t !== '00:00'
+    const start = validTime(s.start) && s.start !== s.end ? s.start : '08:30'
+    const end = validTime(s.end) && s.end !== s.start ? s.end : '15:45'
+    const [y, m, d] = range.from.split('-').map(Number)
+    const cursor = new Date(Date.UTC(y, m - 1, d))
+    for (;;) {
+      const dateISO = `${cursor.getUTCFullYear()}-${pad(cursor.getUTCMonth() + 1)}-${pad(cursor.getUTCDate())}`
+      if (dateISO > range.to) break
+      const dow = cursor.getUTCDay()
+      const alreadyMarked = sessions.some(
+        (x) => x.dateISO === dateISO && isPlacementTitle(x.title) && placementTagOf(x.title) === tag
+      )
+      if (dow !== 0 && dow !== 6 && !alreadyMarked) {
+        out.push({
+          title: `${tag} placement day`,
+          dateISO,
+          start,
+          end,
+          room: '',
+          tutor: '',
+          groups: '',
+          isSelfStudy: false,
+          placementTag: tag,
+        })
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1)
+    }
+  }
+  return out.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
+}
+
+/** School name for a placement session, when the subscriber has entered one. */
+function placementSchool(session, config) {
+  if (!isPlacementTitle(session.title)) return null
+  const p = config.placements?.[session.placementTag ?? placementTagOf(session.title)]
+  return p?.school || null
+}
+
 /* ---------- travel estimation for background leave alerts ---------- */
 const BUILDINGS = [
   { name: 'IOE — 20 Bedford Way', keywords: ['bedford way'], lat: 51.5227, lng: -0.1276 },
@@ -476,11 +552,13 @@ async function runScheduled(env) {
         failCount = parseInt((await env.PUSH.get(`fail:${key}`)) ?? '0', 10) + 1
         await env.PUSH.put(`fail:${key}`, String(failCount), { expirationTtl: 86400 })
       }
-      sheetCache.set(key, { id, gid, sessions, changes, hadSnapshot, failCount })
+      // Snapshots/diffs use the raw sheet; everything user-facing (briefing,
+      // reminders, leave alerts) uses the placement-expanded view.
+      sheetCache.set(key, { id, gid, sessions, expanded: expandPlacements(sessions), changes, hadSnapshot, failCount })
     }
     return sheetCache.get(key)
   }
-  const getSheet = async (id, gid) => (await getSheetInfo(id, gid)).sessions
+  const getSheet = async (id, gid) => (await getSheetInfo(id, gid)).expanded
   const morningWindow = now.hour === 7 && now.minutes % 60 < CRON_MINUTES
   const tflIssues = morningWindow && list.keys.length > 0 ? await fetchTflSevereStatus() : []
   let morningWeather = null
@@ -539,10 +617,43 @@ async function runScheduled(env) {
       const todays = sessions
         .filter((s) => s.dateISO === now.dateISO && !s.isSelfStudy && toMinutes(s.start) !== null)
         .sort((a, b) => a.start.localeCompare(b.start))
+      if (todays.length === 0) {
+        // First weekday of a week-plus gap: one "enjoy the break" note, so a silent
+        // morning is distinguishable from a broken sheet.
+        const dow = new Date(`${now.dateISO}T12:00:00Z`).getUTCDay()
+        if (dow >= 1 && dow <= 5) {
+          const nextDay = sessions
+            .filter((s) => s.dateISO > now.dateISO && !s.isSelfStudy)
+            .map((s) => s.dateISO)
+            .sort()[0]
+          const prevWeekdayISO = (() => {
+            const d = new Date(`${now.dateISO}T12:00:00Z`)
+            d.setUTCDate(d.getUTCDate() - (dow === 1 ? 3 : 1))
+            return d.toISOString().slice(0, 10)
+          })()
+          const hadPrev = sessions.some((s) => s.dateISO === prevWeekdayISO && !s.isSelfStudy)
+          if (nextDay && hadPrev && daysBetween(nextDay, now.dateISO) >= 7) {
+            const [ny, nm, nd] = nextDay.split('-').map(Number)
+            const nextLabel = new Date(Date.UTC(ny, nm - 1, nd)).toLocaleDateString('en-GB', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+              timeZone: 'UTC',
+            })
+            due.push({
+              dedupe: `break|${nextDay}`,
+              title: '🏖 Term break',
+              body: `No sessions until ${nextLabel} — enjoy the break! The morning briefing pauses until then.`,
+            })
+          }
+        }
+      }
       if (todays.length > 0) {
         const first = todays[0]
         let body = `First: ${first.start} ${first.title}`
-        if (first.room) body += ` · ${shortRoom(first.room)}`
+        const school = placementSchool(first, config)
+        if (school) body += ` · ${school}`
+        else if (first.room) body += ` · ${shortRoom(first.room)}`
         if (!morningWeatherFetched) {
           morningWeatherFetched = true
           morningWeather = await fetchMorningWeather()
@@ -595,7 +706,14 @@ async function runScheduled(env) {
         if (s.dateISO !== now.dateISO || s.isSelfStudy) continue
         const start = toMinutes(s.start)
         if (start === null || start <= now.minutes) continue
-        const building = matchBuilding(s.room)
+        let building = matchBuilding(s.room)
+        // Placement days have no campus room — route to the geocoded school instead.
+        if (!building && isPlacementTitle(s.title)) {
+          const p = config.placements?.[s.placementTag ?? placementTagOf(s.title)]
+          if (p && typeof p.lat === 'number' && typeof p.lng === 'number') {
+            building = { name: p.school || 'placement school', lat: p.lat, lng: p.lng }
+          }
+        }
         if (!building) continue
         const mode = config.travelMode ?? 'walking'
         let travelMins = heuristicMinutes(loc, building, mode)
@@ -634,11 +752,12 @@ async function runScheduled(env) {
         const delta = start - now.minutes
         for (const offset of config.reminderOffsets) {
           if (delta > offset - CRON_MINUTES && delta <= offset) {
+            const school = placementSchool(s, config)
             due.push({
               dedupe: `${s.dateISO}|${s.start}|${s.title}|${offset}`,
               key: `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`,
               title: s.title,
-              body: `Starts ${s.start}${s.room ? ` · ${s.room}` : ''}`,
+              body: `Starts ${s.start}${school ? ` · ${school}` : s.room ? ` · ${s.room}` : ''}`,
             })
           }
         }
@@ -834,6 +953,29 @@ export default {
         else await env.PUSH.put(`grp:${code}`, JSON.stringify(group), { expirationTtl: 21 * 86400 })
       }
       return json({ ok: true })
+    }
+    /* ---------- cross-device sync: opaque encrypted blobs keyed by a hash of the code ---------- */
+    if (request.method === 'POST' && url.pathname === '/sync') {
+      const body = await request.json().catch(() => null)
+      const id = String(body?.id ?? '')
+      if (
+        !/^[0-9a-f]{64}$/.test(id) ||
+        typeof body?.blob !== 'string' ||
+        body.blob.length > 400000 ||
+        typeof body?.at !== 'number'
+      ) {
+        return json({ error: 'invalid sync payload' }, 400)
+      }
+      await env.PUSH.put(`sync:${id}`, JSON.stringify({ blob: body.blob, at: body.at }), {
+        expirationTtl: 90 * 86400,
+      })
+      return json({ ok: true })
+    }
+    if (request.method === 'GET' && url.pathname === '/sync') {
+      const id = String(url.searchParams.get('id') ?? '')
+      const rec = /^[0-9a-f]{64}$/.test(id) ? await env.PUSH.get(`sync:${id}`, 'json') : null
+      if (!rec) return json({ error: 'not found' }, 404)
+      return json(rec)
     }
     if (request.method === 'POST' && url.pathname === '/location') {
       const body = await request.json().catch(() => null)

@@ -1,3 +1,4 @@
+import { useModalA11y } from '../lib/a11y'
 import { useState } from 'react'
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export function AddDeadlineSheet({ onAdd, onClose }: Props) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -18,7 +20,7 @@ export function AddDeadlineSheet({ onAdd, onClose }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" role="dialog" aria-label="Add deadline" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-label="Add deadline" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">
           <h2>Add a deadline</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">

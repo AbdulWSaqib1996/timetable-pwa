@@ -1,3 +1,4 @@
+import { useModalA11y } from '../lib/a11y'
 import type { SessionChange } from '../types'
 
 interface Props {
@@ -18,9 +19,10 @@ const LABEL: Record<SessionChange['type'], string> = {
 }
 
 export function ChangesSheet({ changes, onClear, onClose }: Props) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card sheet" role="dialog" aria-label="Timetable changes" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="modal-card sheet" role="dialog" aria-modal="true" aria-label="Timetable changes" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">
           <h2>Timetable changes</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">

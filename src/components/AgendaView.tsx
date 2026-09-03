@@ -20,6 +20,16 @@ interface Props {
   windowed?: boolean
   /** user-entered placement details, keyed by placement tag */
   placements?: Record<string, { school?: string }>
+  /** overall school-days progress shown on placement-day blocks */
+  placementProgress?: { attended: number; target?: number }
+}
+
+function diffDaysISO(fromISO: string, toISO: string): number {
+  const toTime = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number)
+    return new Date(y, m - 1, d).getTime()
+  }
+  return Math.round((toTime(toISO) - toTime(fromISO)) / 86_400_000)
 }
 
 function addDaysISO(dateISO: string, days: number): string {
@@ -54,6 +64,7 @@ export function AgendaView({
   travelMode,
   windowed,
   placements,
+  placementProgress,
 }: Props) {
   const todayISO = localTodayISO()
   const anchorRef = useRef<HTMLElement | null>(null)
@@ -156,16 +167,23 @@ export function AgendaView({
           ↑ Show earlier ({hiddenEarlier} more days)
         </button>
       )}
-      {days.map(([dateISO, daySessions]) => {
+      {days.map(([dateISO, daySessions], dayIdx) => {
         const isToday = dateISO === todayISO
         const isPast = dateISO < todayISO
         const isAnchor = dateISO === anchorISO
+        // A week-plus with no sessions renders as a labelled break, not silent blank days.
+        const gapDays = dayIdx > 0 ? diffDaysISO(days[dayIdx - 1][0], dateISO) - 1 : 0
         return (
           <section
             key={dateISO}
             className={`agenda-day${isPast ? ' past' : ''}`}
             ref={isAnchor ? anchorRef : undefined}
           >
+            {gapDays >= 7 && (
+              <div className="break-band" role="note">
+                🏖 {gapDays}-day break — no sessions until {formatDayHeader(dateISO)}
+              </div>
+            )}
             <h2 className="day-header">
               <span>{formatDayHeader(dateISO)}</span>
               {termStartISO && weekNumber(dateISO, termStartISO) !== null && (
@@ -190,6 +208,11 @@ export function AgendaView({
                         {placements?.[placementTag(real[0].title)]?.school
                           ? ` · ${placements[placementTag(real[0].title)].school}`
                           : ' · tap to add school details'}
+                        {placementProgress &&
+                          (placementProgress.attended > 0 || placementProgress.target) &&
+                          ` · ${placementProgress.attended}${placementProgress.target ? `/${placementProgress.target}` : ''} school day${
+                            placementProgress.attended === 1 && !placementProgress.target ? '' : 's'
+                          } logged`}
                       </span>
                     </button>
                   </div>

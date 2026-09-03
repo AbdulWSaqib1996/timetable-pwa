@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AddDeadlineSheet } from './components/AddDeadlineSheet'
 import { AgendaView } from './components/AgendaView'
 import { ChangesSheet } from './components/ChangesSheet'
 import { FilterBar } from './components/FilterBar'
 import { FilterSheet } from './components/FilterSheet'
+import { JournalSheet } from './components/JournalSheet'
 import { KeyDatesSheet } from './components/KeyDatesSheet'
 import { MonthView } from './components/MonthView'
 import { NowNextCard } from './components/NowNextCard'
@@ -16,10 +17,7 @@ import { StudyGroupSheet } from './components/StudyGroupSheet'
 import { WHATSNEW, dismissWhatsNew, shouldShowWhatsNew } from './lib/changelog'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
-import type { Coords } from './lib/campus'
-import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords, matchBuilding } from './lib/campus'
-import { buildDemoSessions } from './lib/demo'
-import { diffSessions, sessionKey } from './lib/diff'
+import { sessionKey } from './lib/diff'
 import {
   DEFAULT_FILTERS,
   activeFilterCount,
@@ -29,44 +27,36 @@ import {
   localTodayISO,
   weekBounds,
 } from './lib/filters'
-import { daysUntil, formatRemaining, isPlacementSession, placementTag, shortenRoom, toMinutes } from './lib/format'
+import { daysUntil, isPlacementSession, placementTag } from './lib/format'
 import { fetchGvizTable } from './lib/gviz'
 import { parseTimetable } from './lib/parseTimetable'
 import { expandPlacementSpans } from './lib/placementSpans'
 import { parseSheetUrl } from './lib/sheetUrl'
 import { parseShareHash } from './lib/share'
 import { DEFAULT_PUSH_BASE } from './lib/config'
-import { showReminder } from './lib/notify'
-import { reportLocation } from './lib/push'
-import { drainPendingActions } from './lib/pendingActions'
-import { cachedRouteMinutes, tflDisruptions, tflRoute } from './lib/tfl'
-import type { TflDisruption } from './lib/tfl'
-import { cachedWeatherForHour, weatherForHour } from './lib/weather'
+import { subscribePush } from './lib/push'
+import { loadSyncState, pullSync, pushSync, applySyncPayload, saveSyncState } from './lib/sync'
 import { downloadFile } from './lib/files'
+import { useNotifications } from './hooks/useNotifications'
+import { useTimetableData } from './hooks/useTimetableData'
+import { useTravel } from './hooks/useTravel'
 import {
   clearProfileData,
   clearStore,
   exportBackup,
-  loadCache,
-  loadChanges,
-  loadMeta,
-  loadNotified,
   loadStore,
   newProfileId,
   saveCache,
   saveChanges,
   saveMeta,
-  saveNotified,
   saveStore,
   shouldNudgeBackup,
   snoozeBackupNudge,
 } from './lib/storage'
 import type {
   Filters,
-  MetaMap,
   ProfileStore,
   Session,
-  SessionChange,
   SessionMeta,
   Settings,
   ViewMode,
@@ -86,7 +76,7 @@ function matchesQuery(s: Session, q: string): boolean {
   return [s.title, s.subject, s.tutor, s.room].some((f) => f && f.toLowerCase().includes(needle))
 }
 
-type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats' | 'group' | 'adddl'
+type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats' | 'group' | 'adddl' | 'journal'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -108,139 +98,39 @@ function initStore(): ProfileStore | null {
 export default function App() {
   const [store, setStore] = useState<ProfileStore | null>(initStore)
   const [addingProfile, setAddingProfile] = useState(false)
-  const [sessions, setSessions] = useState<Session[] | null>(null)
-  const [fetchedAt, setFetchedAt] = useState<number | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [openSheet, setOpenSheet] = useState<SheetName>('none')
   const [rechoosing, setRechoosing] = useState(false)
   const [selected, setSelected] = useState<Session | null>(null)
   const [jumpDate, setJumpDate] = useState<string | null>(null)
-  const [metaMap, setMetaMap] = useState<MetaMap>({})
-  const [changes, setChanges] = useState<SessionChange[]>([])
-  const [keyDates, setKeyDates] = useState<Session[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [coords, setCoords] = useState<Coords | null>(null)
   const [showBackupNudge, setShowBackupNudge] = useState(false)
   const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowWhatsNew())
-  const [tubeStatus, setTubeStatus] = useState<TflDisruption[]>([])
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
   const settings = active?.settings ?? null
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
   const todayISO = localTodayISO()
 
-  const refresh = useCallback(
-    async (s: Settings, pid: string) => {
-      if (s.demo) {
-        setSessions(buildDemoSessions())
-        setFetchedAt(Date.now())
-        setError(null)
-        return
-      }
-      setRefreshing(true)
-      try {
-        const table = await fetchGvizTable(s.sheetId, s.gid)
-        let parsed = parseTimetable(table).sessions
-        // Merge any extra tabs into the same timetable, deduplicating identical rows.
-        for (const [i, tab] of (s.extraTabs ?? []).entries()) {
-          try {
-            const extra = await fetchGvizTable(tab.sheetId, tab.gid)
-            parsed = parsed.concat(
-              parseTimetable(extra).sessions.map((x) => ({ ...x, id: `t${i}-${x.id}` }))
-            )
-          } catch {
-            /* a broken extra tab shouldn't take down the main timetable */
-          }
-        }
-        if ((s.extraTabs ?? []).length > 0) {
-          const seen = new Set<string>()
-          parsed = parsed.filter((x) => {
-            const k = `${x.dateISO}|${x.start}|${x.title.toLowerCase()}|${x.room}`
-            if (seen.has(k)) return false
-            seen.add(k)
-            return true
-          })
-          parsed.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
-        }
-        parsed = expandPlacementSpans(parsed)
-        const prev = loadCache(pid)
-        if (prev) {
-          // Diff the user's own view of old vs new (their specialism/group filters applied);
-          // synthetic placement days are excluded so span expansion never floods the bell.
-          const notSynthetic = (x: Session) => !x.id.startsWith('plc-')
-          const newChanges = diffSessions(
-            applyFilters(prev.sessions.filter(notSynthetic), s, todayISO, { ignoreDateRange: true }),
-            applyFilters(parsed.filter(notSynthetic), s, todayISO, { ignoreDateRange: true }),
-            todayISO
-          )
-          if (newChanges.length > 0) {
-            const merged = [...newChanges, ...loadChanges(pid)]
-            saveChanges(pid, merged)
-            setChanges(merged.slice(0, 100))
-          }
-        }
-        // Key dates live in a second tab; failures there never break the main timetable.
-        let kd: Session[] | undefined
-        if (s.keyDatesSheetId) {
-          try {
-            const kdTable = await fetchGvizTable(s.keyDatesSheetId, s.keyDatesGid ?? null)
-            kd = parseTimetable(kdTable).sessions.map((k) => ({ ...k, id: `kd-${k.id}`, isKeyDate: true }))
-          } catch {
-            kd = prev?.keyDates
-          }
-        }
-        setSessions(parsed)
-        setKeyDates(kd ?? [])
-        const now = Date.now()
-        setFetchedAt(now)
-        setError(null)
-        saveCache(pid, { fetchedAt: now, sessions: parsed, keyDates: kd })
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to refresh.')
-      } finally {
-        setRefreshing(false)
-      }
-    },
-    [todayISO]
-  )
+  const {
+    sessions,
+    keyDates,
+    fetchedAt,
+    refreshing,
+    error,
+    metaMap,
+    setMetaMap,
+    changes,
+    setChanges,
+    refresh,
+  } = useTimetableData(active)
 
-  // When the active profile changes (startup or switch): load its cache/meta/changes, then refresh.
+  // Close any open detail/jump target when the active profile switches.
   useEffect(() => {
-    if (!active) return
-    const cached = loadCache(active.id)
-    setSessions(cached && !active.settings.demo ? cached.sessions : null)
-    setFetchedAt(cached && !active.settings.demo ? cached.fetchedAt : null)
-    setMetaMap(loadMeta(active.id))
-    setChanges(loadChanges(active.id))
-    setKeyDates((cached?.keyDates ?? []).map((k) => ({ ...k, isKeyDate: true })))
-    // Apply "✓ Attended" taps made on notifications while the app was closed.
-    const pid = active.id
-    void drainPendingActions().then((actions) => {
-      const attendedKeys = actions.filter((a) => a.action === 'attended' && a.key).map((a) => a.key)
-      if (attendedKeys.length === 0) return
-      setMetaMap((prev) => {
-        const next = { ...prev }
-        for (const key of attendedKeys) next[key] = { ...next[key], attended: true }
-        saveMeta(pid, next)
-        return next
-      })
-    })
     setSelected(null)
     setJumpDate(null)
-    setError(null)
-    void refresh(active.settings, active.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
-
-  // Refetch when the key-dates tab or merged tabs change in Settings.
-  const extraTabsKey = JSON.stringify(settings?.extraTabs ?? [])
-  useEffect(() => {
-    if (active && sessions !== null && (active.settings.keyDatesSheetId || (active.settings.extraTabs ?? []).length > 0)) {
-      void refresh(active.settings, active.id)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.keyDatesSheetId, settings?.keyDatesGid, extraTabsKey])
 
   // Manual theme override (default: follow the system).
   useEffect(() => {
@@ -262,59 +152,6 @@ export default function App() {
     }
   }, [changes])
 
-  // Notification action buttons: the service worker relays "attended"/"snooze"
-  // taps to an open window via postMessage.
-  const activeIdRef = useRef<string | null>(null)
-  activeIdRef.current = active?.id ?? null
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return
-    const onMessage = (event: MessageEvent) => {
-      const msg = event.data as { type?: string; action?: string; key?: string; title?: string; body?: string }
-      if (msg?.type !== 'timetable-action' || !msg.key) return
-      if (msg.action === 'attended') {
-        const pid = activeIdRef.current
-        if (!pid) return
-        setMetaMap((prev) => {
-          const next = { ...prev, [msg.key!]: { ...prev[msg.key!], attended: true } }
-          saveMeta(pid, next)
-          return next
-        })
-      } else if (msg.action === 'snooze' && msg.title) {
-        setTimeout(() => showReminder(msg.title!, msg.body ?? '', msg.key, snoozeUrlRef.current), 10 * 60_000)
-      }
-    }
-    navigator.serviceWorker.addEventListener('message', onMessage)
-    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
-  }, [])
-
-  // Background leave alerts: cache the latest app-open location to the push worker,
-  // throttled to every 15 minutes or a ~300 m move.
-  const bgLeaveOn = settings?.bgLeaveAlerts === true && settings?.pushEnabled === true
-  useEffect(() => {
-    if (!bgLeaveOn || !coords) return
-    try {
-      const last = JSON.parse(localStorage.getItem('timetable.locreport.v1') ?? 'null') as {
-        lat: number
-        lng: number
-        at: number
-      } | null
-      const moved =
-        !last ||
-        Math.abs(last.lat - coords.lat) > 0.003 ||
-        Math.abs(last.lng - coords.lng) > 0.005 ||
-        Date.now() - last.at > 15 * 60_000
-      if (!moved) return
-      localStorage.setItem(
-        'timetable.locreport.v1',
-        JSON.stringify({ lat: coords.lat, lng: coords.lng, at: Date.now() })
-      )
-      void reportLocation(settings?.pushServerBase ?? DEFAULT_PUSH_BASE, coords.lat, coords.lng).catch(() => {})
-    } catch {
-      /* storage unavailable */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bgLeaveOn, coords?.lat, coords?.lng])
-
   // PWA shortcut deep-link (?view=keydates) — consume it once.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -329,6 +166,62 @@ export default function App() {
     setShowBackupNudge(shouldNudgeBackup(Object.keys(metaMap).length > 0))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, Object.keys(metaMap).length > 0])
+
+  // Cross-device sync (opt-in): on start, apply a newer state parked by another
+  // device; after local edits, park this device's state (debounced, encrypted).
+  useEffect(() => {
+    const state = loadSyncState()
+    if (!state) return
+    const base = settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE
+    void pullSync(base, state.code)
+      .then((remote) => {
+        if (remote && remote.at > state.lastAt) {
+          applySyncPayload(remote.payload)
+          saveSyncState({ ...state, lastAt: remote.at })
+          window.location.reload()
+        }
+      })
+      .catch(() => {})
+  }, [])
+  const syncSkippedFirst = useRef(false)
+  useEffect(() => {
+    if (!store) return
+    if (!syncSkippedFirst.current) {
+      syncSkippedFirst.current = true
+      return
+    }
+    const t = setTimeout(() => {
+      const state = loadSyncState()
+      if (!state) return
+      const base = settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE
+      void pushSync(base, state.code)
+        .then((at) => {
+          if (at) saveSyncState({ ...state, lastAt: at })
+        })
+        .catch(() => {})
+    }, 8000)
+    return () => clearTimeout(t)
+  }, [store, metaMap])
+
+  // Keep the push worker's copy of placement details fresh (school names and
+  // coords feed background briefings/reminders/leave alerts).
+  const placementsConfigKey = JSON.stringify(settings?.placements ?? {})
+  const placementsSyncedOnce = useRef(false)
+  useEffect(() => {
+    if (!settings?.pushEnabled) return
+    if (!placementsSyncedOnce.current) {
+      placementsSyncedOnce.current = true
+      return
+    }
+    const t = setTimeout(() => {
+      const s = settingsRef.current
+      if (s?.pushEnabled) {
+        void subscribePush(s.pushServerBase ?? DEFAULT_PUSH_BASE, s).catch(() => {})
+      }
+    }, 5000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placementsConfigKey])
 
   function updateSettings(patch: Partial<Settings>) {
     setStore((prev) => {
@@ -415,8 +308,14 @@ export default function App() {
     setMetaMap((prev) => {
       const key = sessionKey(session)
       const entry = { ...prev[key], ...patch }
-      const next: MetaMap = { ...prev, [key]: entry }
-      if (!entry.attended && !entry.note && !entry.photos && (!entry.status || entry.status === 'todo')) {
+      const next = { ...prev, [key]: entry }
+      if (
+        !entry.attended &&
+        !entry.note &&
+        !entry.photos &&
+        (!entry.status || entry.status === 'todo') &&
+        (entry.standards ?? []).length === 0
+      ) {
         delete next[key]
       }
       saveMeta(active.id, next)
@@ -491,203 +390,47 @@ export default function App() {
 
   const keyDateDays = useMemo(() => new Set(allKeyDates.map((k) => k.dateISO)), [allKeyDates])
 
-  // Device location for travel-time estimates (only while enabled in Settings).
-  const locationEnabled = settings?.locationEnabled ?? false
-  const travelMode = settings?.travelMode ?? 'walking'
-
-  // Live TfL line status while public transport is the chosen mode (strikes, closures, delays).
-  useEffect(() => {
-    if (travelMode !== 'transit') {
-      setTubeStatus([])
-      return
+  // Placement progress: unique school days per block, attended via the ✓ tick.
+  const placementStats = useMemo(() => {
+    const byTag = new Map<string, { total: Set<string>; attended: Set<string> }>()
+    for (const s of exportSessions) {
+      if (s.isKeyDate || !isPlacementSession(s)) continue
+      const tag = placementTag(s.title)
+      const e = byTag.get(tag) ?? { total: new Set<string>(), attended: new Set<string>() }
+      e.total.add(s.dateISO)
+      if (metaMap[sessionKey(s)]?.attended) e.attended.add(s.dateISO)
+      byTag.set(tag, e)
     }
-    let live = true
-    const load = () =>
-      void tflDisruptions().then((d) => {
-        if (live) setTubeStatus(d)
+    const blocks = [...byTag.entries()]
+      .map(([tag, e]) => ({ tag, attended: e.attended.size, total: e.total.size }))
+      .sort((a, b) => a.tag.localeCompare(b.tag))
+    return {
+      blocks,
+      attended: blocks.reduce((n, b) => n + b.attended, 0),
+      totalDays: blocks.reduce((n, b) => n + b.total, 0),
+    }
+  }, [exportSessions, metaMap])
+
+  const { coords, tubeStatus, locationEnabled, travelMode } = useTravel(settings, exportSessions, todayISO)
+
+  useNotifications({
+    settings,
+    exportSessions,
+    allKeyDates,
+    coords,
+    travelMode,
+    locationEnabled,
+    tubeStatus,
+    onAttended: (key) => {
+      const pid = active?.id
+      if (!pid) return
+      setMetaMap((prev) => {
+        const next = { ...prev, [key]: { ...prev[key], attended: true } }
+        saveMeta(pid, next)
+        return next
       })
-    load()
-    const t = setInterval(load, 5 * 60_000)
-    return () => {
-      live = false
-      clearInterval(t)
-    }
-  }, [travelMode])
-  const tubeStatusRef = useRef(tubeStatus)
-  tubeStatusRef.current = tubeStatus
-
-  // Warm live TfL journey times for upcoming buildings so list cards show the same
-  // live value as the detail sheet (cards read the cache synchronously).
-  const [, setLiveTick] = useState(0)
-  useEffect(() => {
-    if (travelMode !== 'transit' || !coords) return
-    let live = true
-    const warm = async () => {
-      const seen = new Set<string>()
-      for (const s of exportRef.current) {
-        if (s.dateISO < todayISO || s.isSelfStudy || !s.room) continue
-        const building = matchBuilding(s.room)
-        if (!building || seen.has(building.name)) continue
-        seen.add(building.name)
-        if (seen.size > 8) break
-        await tflRoute(coords, { lat: building.lat, lng: building.lng })
-      }
-      if (live) setLiveTick((t) => t + 1)
-    }
-    void warm()
-    const t = setInterval(() => void warm(), 5 * 60_000)
-    return () => {
-      live = false
-      clearInterval(t)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [travelMode, coords?.lat, coords?.lng])
-
-  // Session reminders + leave alerts: checked every 30s while the app is running.
-  // Multiple offsets are supported (e.g. 60 and 15 → two notifications); when several
-  // offsets are due at once (say the app was just opened), only one fires per session.
-  const exportRef = useRef(exportSessions)
-  exportRef.current = exportSessions
-  const keyDatesRef = useRef(allKeyDates)
-  keyDatesRef.current = allKeyDates
-  const travelRef = useRef({ coords, travelMode, locationEnabled })
-  travelRef.current = { coords, travelMode, locationEnabled }
-  const placementsRef = useRef(settings?.placements)
-  placementsRef.current = settings?.placements
-  const snoozeUrlRef = useRef<string | undefined>(undefined)
-  snoozeUrlRef.current = settings?.pushEnabled ? settings.pushServerBase ?? DEFAULT_PUSH_BASE : undefined
-  const offsetsKey = JSON.stringify(settings?.reminderOffsets ?? [])
-  const leaveKey = JSON.stringify(settings?.leaveAlertOffsets ?? [])
-  const kdDaysKey = JSON.stringify(settings?.keyDateReminderDays ?? [])
-  useEffect(() => {
-    const offsets = (JSON.parse(offsetsKey) as number[]).sort((a, b) => a - b)
-    const leaveOffsets = (JSON.parse(leaveKey) as number[]).sort((a, b) => a - b)
-    const kdDays = (JSON.parse(kdDaysKey) as number[]).sort((a, b) => a - b)
-    if (
-      (offsets.length === 0 && leaveOffsets.length === 0 && kdDays.length === 0) ||
-      typeof Notification === 'undefined'
-    )
-      return
-    const notify = (title: string, body: string, key?: string) =>
-      showReminder(title, body, key, snoozeUrlRef.current)
-    const check = () => {
-      if (Notification.permission !== 'granted') return
-      const now = new Date()
-      const today = localTodayISO()
-      const nowMins = now.getHours() * 60 + now.getMinutes()
-      const notified = loadNotified()
-      let dirty = false
-      const { coords: here, travelMode: mode, locationEnabled: locEnabled } = travelRef.current
-      for (const s of exportRef.current) {
-        if (s.dateISO !== today || !s.start) continue
-        const start = toMinutes(s.start)
-        if (start === null) continue
-        const delta = start - nowMins
-        if (delta <= 0) continue
-
-        // Fixed "before the session" reminders.
-        const due = offsets.filter((m) => delta <= m && !notified[`${sessionKey(s)}#${m}`])
-        if (due.length > 0) {
-          notify(
-            s.title,
-            `Starts ${s.start} (in ${formatRemaining(delta)})${s.room && !s.isSelfStudy ? ` · ${shortenRoom(s.room)}` : ''}`,
-            sessionKey(s)
-          )
-          for (const m of due) notified[`${sessionKey(s)}#${m}`] = Date.now()
-          dirty = true
-        }
-
-        // "Time to leave" alerts: leave-by = start − live travel estimate; alert with head start.
-        if (leaveOffsets.length > 0 && locEnabled && here && (s.room || isPlacementSession(s)) && !s.isSelfStudy) {
-          void weatherForHour(today, Math.floor(start / 60)) // warm the forecast cache
-          let est = estimateTravel(s.room, here, mode)
-          if (est.minutes === null && isPlacementSession(s)) {
-            const placement = placementsRef.current?.[placementTag(s.title)]
-            if (placement?.lat != null && placement?.lng != null) {
-              est = estimateTravelToCoords(
-                { lat: placement.lat, lng: placement.lng },
-                here,
-                mode,
-                placement.school || 'placement school'
-              )
-            }
-          }
-          if (est.minutes !== null) {
-            // In transit mode, prefer the live TfL journey time (cache warmed here, used
-            // next tick) so disruptions automatically make the alert fire earlier.
-            let travelMins = est.minutes
-            let liveLabel = ''
-            if (mode === 'transit' && est.location) {
-              void tflRoute(here, est.location)
-              const live = cachedRouteMinutes(here, est.location)
-              if (live !== null) {
-                travelMins = live
-                liveLabel = ' (live TfL)'
-              }
-            }
-            const untilLeave = delta - travelMins
-            const leaveDue = leaveOffsets.filter(
-              (m) => untilLeave <= m && !notified[`${sessionKey(s)}#leave#${m}`]
-            )
-            if (leaveDue.length > 0) {
-              const disruptionNote =
-                mode === 'transit' && tubeStatusRef.current.length > 0
-                  ? ` · ⚠ TfL: ${tubeStatusRef.current
-                      .slice(0, 2)
-                      .map((d) => `${d.line} ${d.status.toLowerCase()}`)
-                      .join(', ')}`
-                  : ''
-              const forecast = cachedWeatherForHour(today, Math.floor(start / 60))
-              const weatherNote =
-                forecast && forecast.rainProb >= 50 ? ` · 🌧 ${forecast.rainProb}% rain — allow extra time` : ''
-              notify(
-                untilLeave <= 0 ? `Time to leave — ${s.title}` : `Leave in ${formatRemaining(untilLeave)} — ${s.title}`,
-                `≈ ${formatRemaining(travelMins)} ${TRAVEL_MODE_PHRASE[mode]}${liveLabel} to ${est.building ?? shortenRoom(s.room)} · starts ${s.start}${disruptionNote}${weatherNote}`,
-                sessionKey(s)
-              )
-              for (const m of leaveDue) notified[`${sessionKey(s)}#leave#${m}`] = Date.now()
-              dirty = true
-            }
-          }
-        }
-      }
-      // Key-date reminders: N days before each deadline (one notification per offset).
-      if (kdDays.length > 0) {
-        const today = localTodayISO()
-        for (const kd of keyDatesRef.current) {
-          if (kd.dateISO < today) continue
-          const days = daysUntil(kd.dateISO, today)
-          const due = kdDays.filter((d) => days <= d && !notified[`${sessionKey(kd)}#kd#${d}`])
-          if (due.length === 0) continue
-          notify(
-            `📌 ${kd.title}`,
-            days === 0
-              ? `Due today${kd.start ? ` at ${kd.start}` : ''}`
-              : `Due in ${days} day${days === 1 ? '' : 's'} (${kd.dateISO.split('-').reverse().join('/')})`,
-            sessionKey(kd)
-          )
-          for (const d of due) notified[`${sessionKey(kd)}#kd#${d}`] = Date.now()
-          dirty = true
-        }
-      }
-      if (dirty) saveNotified(notified)
-    }
-    check()
-    const t = setInterval(check, 30_000)
-    return () => clearInterval(t)
-  }, [offsetsKey, leaveKey, kdDaysKey])
-  useEffect(() => {
-    if (!locationEnabled || !('geolocation' in navigator)) {
-      setCoords(null)
-      return
-    }
-    const id = navigator.geolocation.watchPosition(
-      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setCoords(null),
-      { enableHighAccuracy: false, maximumAge: 120_000 }
-    )
-    return () => navigator.geolocation.clearWatch(id)
-  }, [locationEnabled])
+    },
+  })
 
   if (!active || !settings || addingProfile) {
     return (
@@ -768,6 +511,7 @@ export default function App() {
             <input
               type="search"
               placeholder="Search title, tutor or room…"
+              aria-label="Search sessions"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
@@ -961,6 +705,11 @@ export default function App() {
           coords={coords}
           travelMode={travelMode}
           placements={settings.placements}
+          placementProgress={
+            placementStats.totalDays > 0
+              ? { attended: placementStats.attended, target: settings.placementTargetDays }
+              : undefined
+          }
           windowed
           emptyMessage={
             sessions.length === 0
@@ -1034,7 +783,23 @@ export default function App() {
       )}
 
       {openSheet === 'stats' && (
-        <StatsSheet sessions={exportSessions} metaMap={metaMap} todayISO={todayISO} onClose={() => setOpenSheet('none')} />
+        <StatsSheet
+          sessions={exportSessions}
+          metaMap={metaMap}
+          todayISO={todayISO}
+          keyDates={allKeyDates}
+          placementTargetDays={settings.placementTargetDays}
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'journal' && (
+        <JournalSheet
+          sessions={[...exportSessions, ...allKeyDates]}
+          metaMap={metaMap}
+          onSelect={setSelected}
+          onClose={() => setOpenSheet('none')}
+        />
       )}
 
       {openSheet === 'keydates' && (
@@ -1098,8 +863,10 @@ export default function App() {
           onOpenGroup={() => setOpenSheet('group')}
           metaMap={metaMap}
           todayISO={todayISO}
+          placementBlocks={placementStats.blocks}
           onUpdateSettings={updateSettings}
           onOpenStats={() => setOpenSheet('stats')}
+          onOpenJournal={() => setOpenSheet('journal')}
           onRechooseSpecialisms={() => {
             setOpenSheet('none')
             setRechoosing(true)

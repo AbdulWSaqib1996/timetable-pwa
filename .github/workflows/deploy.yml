@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
       - uses: actions/configure-pages@v5
         with:
           enablement: true

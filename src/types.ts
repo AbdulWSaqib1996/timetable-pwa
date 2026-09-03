@@ -101,6 +101,8 @@ export interface Settings {
     string,
     { school?: string; address?: string; mentor?: string; notes?: string; lat?: number; lng?: number }
   >
+  /** required assessed school days for the course (drives the placement progress line) */
+  placementTargetDays?: number
 }
 
 /** One saved timetable (sheet + all its choices). */
@@ -123,6 +125,8 @@ export interface SessionMeta {
   photos?: number
   /** assignment status for key dates */
   status?: 'todo' | 'doing' | 'done'
+  /** Teachers' Standards this note/photo evidences (e.g. ["TS1","TS4"]) */
+  standards?: string[]
 }
 
 export type MetaMap = Record<string, SessionMeta>

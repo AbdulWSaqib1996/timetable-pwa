@@ -1,9 +1,23 @@
 import { useRef, useState } from 'react'
+import { useModalA11y } from '../lib/a11y'
 import { sessionKey } from '../lib/diff'
+import { isPlacementSession, placementTag } from '../lib/format'
 import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
 import { parseSheetUrl } from '../lib/sheetUrl'
 import { subscribePush, unsubscribePush } from '../lib/push'
+import { runPushSelfCheck, sendTestPush } from '../lib/pushCheck'
+import type { CheckRow } from '../lib/pushCheck'
+import {
+  applySyncPayload,
+  clearSyncState,
+  loadSyncState,
+  newSyncCode,
+  pullSync,
+  pushSync,
+  saveSyncState,
+} from '../lib/sync'
+import type { SyncState } from '../lib/sync'
 import { exportBackup, importBackup } from '../lib/storage'
 import type { MetaMap, ProfileStore, Session, Settings } from '../types'
 
@@ -15,9 +29,12 @@ interface Props {
   keyDates: Session[]
   metaMap: MetaMap
   todayISO: string
+  /** per-block placement day counts (tag, attended, total) */
+  placementBlocks: { tag: string; attended: number; total: number }[]
   onUpdateSettings: (patch: Partial<Settings>) => void
   onOpenStats: () => void
   onOpenGroup: () => void
+  onOpenJournal: () => void
   onRechooseSpecialisms: () => void
   onSwitchProfile: (id: string) => void
   onAddProfile: () => void
@@ -62,15 +79,18 @@ export function SettingsSheet({
   keyDates,
   metaMap,
   todayISO,
+  placementBlocks,
   onUpdateSettings,
   onOpenStats,
   onOpenGroup,
+  onOpenJournal,
   onRechooseSpecialisms,
   onSwitchProfile,
   onAddProfile,
   onDeleteProfile,
   onClose,
 }: Props) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE)
   const [keyDatesUrl, setKeyDatesUrl] = useState(settings.keyDatesUrl ?? '')
   const [keyDatesError, setKeyDatesError] = useState(false)
@@ -79,6 +99,76 @@ export function SettingsSheet({
   const [pushBase, setPushBase] = useState(settings.pushServerBase ?? DEFAULT_PUSH_BASE)
   const [pushBusy, setPushBusy] = useState(false)
   const [pushMessage, setPushMessage] = useState<string | null>(null)
+  const [checkRows, setCheckRows] = useState<CheckRow[] | null>(null)
+  const [checkBusy, setCheckBusy] = useState(false)
+  const [syncState, setSyncState] = useState<SyncState | null>(loadSyncState)
+  const [syncInput, setSyncInput] = useState('')
+  const [syncBusy, setSyncBusy] = useState(false)
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  const syncBase = settings.pushServerBase ?? DEFAULT_PUSH_BASE
+
+  async function enableSync() {
+    setSyncBusy(true)
+    setSyncMsg(null)
+    try {
+      const code = newSyncCode()
+      const at = await pushSync(syncBase, code)
+      const state: SyncState = { code, lastAt: at ?? Date.now() }
+      saveSyncState(state)
+      setSyncState(state)
+      setSyncMsg('Sync is on — enter this code on your other device to connect it.')
+    } catch (err) {
+      setSyncMsg(err instanceof Error ? err.message : 'Could not reach the sync server.')
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  async function connectSync() {
+    const code = syncInput.trim().toUpperCase()
+    if (!code) return
+    setSyncBusy(true)
+    setSyncMsg(null)
+    try {
+      const remote = await pullSync(syncBase, code)
+      if (!remote) {
+        setSyncMsg('No synced data found for that code — check it and try again.')
+        return
+      }
+      applySyncPayload(remote.payload)
+      saveSyncState({ code, lastAt: remote.at })
+      window.location.reload()
+    } catch {
+      setSyncMsg('Could not reach the sync server.')
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  async function syncNow() {
+    if (!syncState) return
+    setSyncBusy(true)
+    setSyncMsg(null)
+    try {
+      const at = await pushSync(syncBase, syncState.code)
+      if (at) {
+        const next = { ...syncState, lastAt: at }
+        saveSyncState(next)
+        setSyncState(next)
+      }
+      setSyncMsg('Synced. ✓')
+    } catch {
+      setSyncMsg('Could not reach the sync server.')
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  function disableSync() {
+    clearSyncState()
+    setSyncState(null)
+    setSyncMsg('Sync is off on this device. The parked copy expires by itself after 90 days.')
+  }
 
   async function handlePush(enable: boolean) {
     const base = pushBase.trim()
@@ -154,6 +244,24 @@ export function SettingsSheet({
     downloadFile('attendance.csv', rows.join('\r\n'), 'text/csv;charset=utf-8')
   }
 
+  // Placement day log: one row per school day per block, for mentor/tutor sign-off.
+  function downloadPlacementLog() {
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const rows = ['Date,Block,School,Attended,Note']
+    const seen = new Set<string>()
+    for (const s of exportSessions) {
+      if (s.isKeyDate || !isPlacementSession(s)) continue
+      const tag = placementTag(s.title)
+      const dayKey = `${tag}|${s.dateISO}`
+      if (seen.has(dayKey)) continue
+      seen.add(dayKey)
+      const m = metaMap[sessionKey(s)]
+      const school = (settings.placements ?? {})[tag]?.school ?? ''
+      rows.push([s.dateISO, tag, esc(school), m?.attended ? 'yes' : 'no', esc(m?.note ?? '')].join(','))
+    }
+    downloadFile('placement-day-log.csv', rows.join('\r\n'), 'text/csv;charset=utf-8')
+  }
+
   function saveKeyDatesUrl() {
     const trimmed = keyDatesUrl.trim()
     if (!trimmed) {
@@ -218,7 +326,14 @@ export function SettingsSheet({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card sheet" role="dialog" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        className="modal-card sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="sheet-header">
           <h2>Settings</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
@@ -592,9 +707,93 @@ export function SettingsSheet({
                     : 'The location captured while the app is open is stored in your own push worker and used to compute “time to leave” pushes with the app closed. Alerts say how old the location is when it isn’t fresh.'}
               </p>
             )}
+            <div className="btn-row">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={checkBusy}
+                onClick={() => {
+                  setCheckBusy(true)
+                  void runPushSelfCheck(pushBase.trim() || DEFAULT_PUSH_BASE).then((rows) => {
+                    setCheckRows(rows)
+                    setCheckBusy(false)
+                  })
+                }}
+              >
+                {checkBusy ? 'Checking…' : '🩺 Run self-check'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  void sendTestPush(pushBase.trim() || DEFAULT_PUSH_BASE).then(setPushMessage)
+                }}
+              >
+                Send test push
+              </button>
+            </div>
+            {checkRows && (
+              <ul className="check-list">
+                {checkRows.map((r) => (
+                  <li key={r.label} className={r.ok ? 'check-ok' : 'check-bad'}>
+                    {r.ok ? '✓' : '✗'} {r.label}
+                    {r.detail ? ` — ${r.detail}` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
             {pushMessage && <p className="filter-hint">{pushMessage}</p>}
           </section>
         )}
+
+        {(placementBlocks.length > 0 || Object.keys(settings.placements ?? {}).length > 0) && (
+          <section className="filter-section">
+            <h3>Placements</h3>
+            <p className="filter-hint">
+              {placementBlocks.length > 0
+                ? `${placementBlocks.reduce((n, b) => n + b.attended, 0)} school day${
+                    placementBlocks.reduce((n, b) => n + b.attended, 0) === 1 ? '' : 's'
+                  } logged${settings.placementTargetDays ? ` of ${settings.placementTargetDays} required` : ''} (${placementBlocks
+                    .map((b) => `${b.tag} ${b.attended}/${b.total}`)
+                    .join(' · ')}). Tick “Attended” on a placement day to log it.`
+                : 'No placement blocks detected in this timetable yet.'}
+            </p>
+            <label className="toggle-row placement-target-row">
+              Required school days for the course
+              <input
+                type="number"
+                className="date-input placement-target"
+                min={0}
+                max={999}
+                placeholder="e.g. 120"
+                value={settings.placementTargetDays ?? ''}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10)
+                  onUpdateSettings({ placementTargetDays: Number.isFinite(n) && n > 0 ? n : undefined })
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={placementBlocks.length === 0}
+              onClick={downloadPlacementLog}
+            >
+              Export placement day log (CSV)
+            </button>
+          </section>
+        )}
+
+        <section className="filter-section">
+          <h3>Evidence journal</h3>
+          <p className="filter-hint">
+            Session notes and photos, tagged against the Teachers' Standards (TS1–TS8) in each
+            session's details — exportable when you compile your evidence bundle.
+          </p>
+          <button type="button" className="btn-secondary" onClick={onOpenJournal}>
+            📔 Open evidence journal
+          </button>
+        </section>
 
         {pastSessions.length > 0 && (
           <section className="filter-section">
@@ -674,6 +873,71 @@ export function SettingsSheet({
               }}
             />
           </div>
+        </section>
+
+        <section className="filter-section">
+          <h3>Sync between devices</h3>
+          <p className="filter-hint">
+            Keeps your timetables, filters, notes and attendance the same on your phone and laptop
+            via a shared code. Everything is encrypted on this device before it leaves — the server
+            only ever sees scrambled data. Photos stay on each device (use Backup to move them).
+          </p>
+          {syncState ? (
+            <>
+              <p className="settings-url sync-code">
+                Code: <strong>{syncState.code}</strong>
+              </p>
+              <div className="btn-row">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(syncState.code).catch(() => {})
+                    setSyncMsg('Code copied — enter it on your other device under “Sync between devices”.')
+                  }}
+                >
+                  Copy code
+                </button>
+                <button type="button" className="btn-secondary" disabled={syncBusy} onClick={() => void syncNow()}>
+                  {syncBusy ? 'Working…' : 'Sync now'}
+                </button>
+                <button type="button" className="btn-ghost" onClick={disableSync}>
+                  Turn off
+                </button>
+              </div>
+              <p className="filter-hint">
+                Changes sync automatically a few seconds after you make them; the newest version wins
+                when both devices edit.
+              </p>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn-secondary" disabled={syncBusy} onClick={() => void enableSync()}>
+                {syncBusy ? 'Working…' : 'Turn on sync (creates a code)'}
+              </button>
+              <div className="feed-row">
+                <input
+                  type="text"
+                  placeholder="Or enter a code from another device"
+                  aria-label="Sync code from another device"
+                  value={syncInput}
+                  onChange={(e) => setSyncInput(e.target.value.toUpperCase())}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={syncBusy || syncInput.trim().length < 4}
+                onClick={() => void connectSync()}
+              >
+                Connect to that device
+              </button>
+              <p className="filter-hint">
+                Connecting replaces this device's timetables and notes with the synced copy.
+              </p>
+            </>
+          )}
+          {syncMsg && <p className="filter-hint">{syncMsg}</p>}
         </section>
 
         <section className="filter-section">

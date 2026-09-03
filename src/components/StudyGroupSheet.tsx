@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useModalA11y } from '../lib/a11y'
 import { DEFAULT_PUSH_BASE } from '../lib/config'
 import {
   computeFreeSlots,
@@ -27,6 +28,7 @@ function formatSlotDay(dateISO: string): string {
 }
 
 export function StudyGroupSheet({ settings, sessions, todayISO, onUpdateSettings, onClose }: Props) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const base = settings.pushServerBase ?? DEFAULT_PUSH_BASE
   const [name, setName] = useState(settings.groupName ?? '')
   const [codeInput, setCodeInput] = useState('')
@@ -90,7 +92,7 @@ export function StudyGroupSheet({ settings, sessions, todayISO, onUpdateSettings
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card sheet" role="dialog" aria-label="Study group" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="modal-card sheet" role="dialog" aria-modal="true" aria-label="Study group" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">
           <h2>Study group</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">

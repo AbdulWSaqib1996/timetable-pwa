@@ -1,14 +1,14 @@
 /** Bump the version whenever WHATSNEW changes; the app shows the list once per version. */
-export const WHATSNEW_VERSION = 1
+export const WHATSNEW_VERSION = 2
 
 export const WHATSNEW: string[] = [
-  '📌 Personal deadlines — add your own key dates alongside the official ones',
-  '✓ Assignment status — mark deadlines in progress or submitted',
-  '👥 Study groups — share a code with coursemates to find common free slots',
-  '🏫 Placement days now render as one calm block',
-  '🔔 Multiple alerts due at once arrive as a single notification',
-  '⚠ You’ll be told if your timetable sheet stops loading',
-  '📶 Journey info falls back to last-known data when offline',
+  '🏫 Placement day counter — tick “Attended” on school days to log them (set your required days in Settings)',
+  '📔 Evidence journal — tag notes/photos TS1–TS8 and export the bundle',
+  '🔄 Sync between devices — share a code to keep phone + laptop identical',
+  '🩺 Push self-check — Settings answers “why didn’t I get a notification?”',
+  '🏖 Term breaks now show as a labelled band instead of blank days',
+  '🚌 Departure boards refresh live every 30 seconds',
+  '🔔 Background alerts now cover placement days and route to your school',
 ]
 
 const KEY = 'timetable.whatsnew.v1'

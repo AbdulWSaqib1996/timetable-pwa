@@ -1,3 +1,4 @@
+import { useModalA11y } from '../lib/a11y'
 import { sessionKey } from '../lib/diff'
 import { daysUntil } from '../lib/format'
 import type { MetaMap, Session, SessionMeta } from '../types'
@@ -36,7 +37,7 @@ export function KeyDatesSheet({
   onDeleteCustom,
   onClose,
 }: Props) {
-
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const statusOf = (k: Session): SessionMeta['status'] => metaMap?.[sessionKey(k)]?.status ?? 'todo'
   const upcoming = keyDates
     .filter((k) => k.dateISO >= todayISO)
@@ -46,7 +47,7 @@ export function KeyDatesSheet({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card sheet" role="dialog" aria-label="Key dates" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="modal-card sheet" role="dialog" aria-modal="true" aria-label="Key dates" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">
           <h2>Key dates</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">

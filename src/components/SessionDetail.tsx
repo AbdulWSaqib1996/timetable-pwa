@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { useModalA11y } from '../lib/a11y'
 import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords } from '../lib/campus'
 import { geocodeAddress } from '../lib/geocode'
+import { TEACHERS_STANDARDS } from '../lib/standards'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl, isPlacementSession } from '../lib/format'
 import { sessionKey } from '../lib/diff'
@@ -75,6 +77,7 @@ export function SessionDetail({
   onMeta,
   onClose,
 }: Props) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const duration = formatDuration(session.start, session.end)
   const gcalUrl = googleCalendarUrl(session)
   // Placement sessions with a geocoded school address target the school; everything
@@ -134,25 +137,34 @@ export function SessionDetail({
     setLegDeps({})
     if (travelMode !== 'transit' || !coords || !travel?.location) return
     let cancelled = false
-    void tflRoute(coords, travel.location).then((r) => {
-      if (cancelled) return
-      setRoute(r)
-      // Live departures for every transit leg (bus, tube, Overground, Elizabeth line, DLR —
-      // National Rail boards aren't in TfL's arrivals feed and simply won't show).
+    let depsTimer: ReturnType<typeof setInterval> | undefined
+    // Live departures for every transit leg (bus, tube, Overground, Elizabeth line, DLR —
+    // National Rail boards aren't in TfL's arrivals feed and simply won't show).
+    const loadDepartures = (r: TflRoute) => {
       let fetched = 0
-      r?.legs.forEach((leg, i) => {
+      r.legs.forEach((leg, i) => {
         if (leg.mode === 'walking' || !leg.line || leg.fromLat == null || leg.fromLng == null) return
         if (fetched++ >= 3) return
         void tflDeparturesNear(leg.fromLat, leg.fromLng, leg.line).then((dep) => {
           if (!cancelled && dep) setLegDeps((prev) => ({ ...prev, [i]: dep }))
         })
       })
+    }
+    void tflRoute(coords, travel.location).then((r) => {
+      if (cancelled) return
+      setRoute(r)
+      if (r) {
+        loadDepartures(r)
+        // Departure boards stay live while the sheet is open.
+        depsTimer = setInterval(() => loadDepartures(r), 30_000)
+      }
     })
     void tflDisruptions().then((d) => {
       if (!cancelled) setDisruptions(d)
     })
     return () => {
       cancelled = true
+      if (depsTimer) clearInterval(depsTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [travelMode, coords?.lat, coords?.lng, session.room, schoolCoords?.lat, schoolCoords?.lng])
@@ -200,7 +212,14 @@ export function SessionDetail({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card sheet" role="dialog" aria-label={session.title} onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        className="modal-card sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={session.title}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="sheet-header">
           <h2 className="detail-title">{session.title}</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
@@ -263,6 +282,7 @@ export function SessionDetail({
                     {legDeps[i] && (
                       <span className="route-step-deps">
                         🕐 {legDeps[i].mins.map((m) => (m === 0 ? 'due' : `${m}m`)).join(', ')} · {legDeps[i].stop}
+                        <span className="route-live"> · live</span>
                       </span>
                     )}
                   </span>
@@ -383,6 +403,30 @@ export function SessionDetail({
             value={meta?.note ?? ''}
             onChange={(e) => onMeta({ note: e.target.value })}
           />
+          <div className="chip-grid ts-chips">
+            {TEACHERS_STANDARDS.map((ts) => {
+              const on = (meta?.standards ?? []).includes(ts.id)
+              return (
+                <button
+                  key={ts.id}
+                  type="button"
+                  className={`chip chip-small${on ? ' chip-on' : ''}`}
+                  aria-pressed={on}
+                  title={ts.label}
+                  onClick={() => {
+                    const cur = meta?.standards ?? []
+                    onMeta({ standards: on ? cur.filter((x) => x !== ts.id) : [...cur, ts.id].sort() })
+                  }}
+                >
+                  {ts.id}
+                </button>
+              )
+            })}
+          </div>
+          <p className="filter-hint">
+            Tag notes/photos against the Teachers' Standards — they build your evidence journal
+            (Settings → Evidence journal).
+          </p>
           <div className="photo-grid">
             {photos.map((p, i) => (
               <span className="photo-thumb" key={p.id}>

@@ -1,3 +1,4 @@
+import { useModalA11y } from '../lib/a11y'
 import type { FilterOptions } from '../lib/filters'
 import type { DateRange, Filters, Settings } from '../types'
 
@@ -60,11 +61,12 @@ export function FilterSheet({
   onClear,
   onClose,
 }: Props) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const mySpecialisms = settings.mySpecialisms ?? []
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card sheet" role="dialog" aria-label="Filters" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="modal-card sheet" role="dialog" aria-modal="true" aria-label="Filters" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">
           <h2>Filters</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
