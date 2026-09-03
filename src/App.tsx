@@ -16,7 +16,7 @@ import { WHATSNEW, dismissWhatsNew, shouldShowWhatsNew } from './lib/changelog'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
 import type { Coords } from './lib/campus'
-import { TRAVEL_MODE_PHRASE, estimateTravel } from './lib/campus'
+import { TRAVEL_MODE_PHRASE, estimateTravel, matchBuilding } from './lib/campus'
 import { buildDemoSessions } from './lib/demo'
 import { diffSessions, sessionKey } from './lib/diff'
 import {
@@ -28,7 +28,7 @@ import {
   localTodayISO,
   weekBounds,
 } from './lib/filters'
-import { daysUntil, formatRemaining, shortenRoom, toMinutes } from './lib/format'
+import { daysUntil, formatRemaining, isPlacementSession, placementTag, shortenRoom, toMinutes } from './lib/format'
 import { fetchGvizTable } from './lib/gviz'
 import { parseTimetable } from './lib/parseTimetable'
 import { parseSheetUrl } from './lib/sheetUrl'
@@ -511,6 +511,33 @@ export default function App() {
   const tubeStatusRef = useRef(tubeStatus)
   tubeStatusRef.current = tubeStatus
 
+  // Warm live TfL journey times for upcoming buildings so list cards show the same
+  // live value as the detail sheet (cards read the cache synchronously).
+  const [, setLiveTick] = useState(0)
+  useEffect(() => {
+    if (travelMode !== 'transit' || !coords) return
+    let live = true
+    const warm = async () => {
+      const seen = new Set<string>()
+      for (const s of exportRef.current) {
+        if (s.dateISO < todayISO || s.isSelfStudy || !s.room) continue
+        const building = matchBuilding(s.room)
+        if (!building || seen.has(building.name)) continue
+        seen.add(building.name)
+        if (seen.size > 8) break
+        await tflRoute(coords, { lat: building.lat, lng: building.lng })
+      }
+      if (live) setLiveTick((t) => t + 1)
+    }
+    void warm()
+    const t = setInterval(() => void warm(), 5 * 60_000)
+    return () => {
+      live = false
+      clearInterval(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [travelMode, coords?.lat, coords?.lng])
+
   // Session reminders + leave alerts: checked every 30s while the app is running.
   // Multiple offsets are supported (e.g. 60 and 15 → two notifications); when several
   // offsets are due at once (say the app was just opened), only one fires per session.
@@ -882,6 +909,7 @@ export default function App() {
           termStartISO={settings.termStartISO}
           coords={coords}
           travelMode={travelMode}
+          placements={settings.placements}
           emptyMessage={`No sessions match “${query.trim()}”.`}
         />
       ) : view === 'week' ? (
@@ -912,6 +940,7 @@ export default function App() {
           termStartISO={settings.termStartISO}
           coords={coords}
           travelMode={travelMode}
+          placements={settings.placements}
           windowed
           emptyMessage={
             sessions.length === 0
@@ -931,6 +960,18 @@ export default function App() {
           locationEnabled={locationEnabled}
           travelMode={travelMode}
           profileId={active.id}
+          placementInfo={
+            isPlacementSession(selected) ? (settings.placements ?? {})[placementTag(selected.title)] : undefined
+          }
+          onPlacementInfo={(patch) => {
+            const tag = placementTag(selected.title)
+            updateSettings({
+              placements: {
+                ...(settings.placements ?? {}),
+                [tag]: { ...(settings.placements ?? {})[tag], ...patch },
+              },
+            })
+          }}
           onMeta={(patch) => handleMeta(selected, patch)}
           onClose={() => setSelected(null)}
         />

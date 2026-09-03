@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
-import { isPlacementSession, toMinutes, weekNumber } from '../lib/format'
+import { isPlacementSession, placementTag, toMinutes, weekNumber } from '../lib/format'
 import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import type { MetaMap, Session } from '../types'
 import { SessionCard } from './SessionCard'
@@ -18,6 +18,8 @@ interface Props {
   travelMode?: TravelMode
   /** limit rendering to a window around today, with show-earlier/show-later controls */
   windowed?: boolean
+  /** user-entered placement details, keyed by placement tag */
+  placements?: Record<string, { school?: string }>
 }
 
 function addDaysISO(dateISO: string, days: number): string {
@@ -51,6 +53,7 @@ export function AgendaView({
   coords,
   travelMode,
   windowed,
+  placements,
 }: Props) {
   const todayISO = localTodayISO()
   const anchorRef = useRef<HTMLElement | null>(null)
@@ -182,7 +185,12 @@ export function AgendaView({
                     <button type="button" className="placement-day" onClick={() => onSelect(real[0])}>
                       🏫 {real[0].title}
                       {real.length > 1 ? ` (+${real.length - 1} more)` : ''}
-                      <span className="placement-sub">School experience day</span>
+                      <span className="placement-sub">
+                        School experience day
+                        {placements?.[placementTag(real[0].title)]?.school
+                          ? ` · ${placements[placementTag(real[0].title)].school}`
+                          : ' · tap to add school details'}
+                      </span>
                     </button>
                   </div>
                 )

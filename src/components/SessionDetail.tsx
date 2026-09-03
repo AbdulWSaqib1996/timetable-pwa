@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { TRAVEL_MODE_PHRASE, estimateTravel } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
-import { formatRemaining, googleCalendarUrl } from '../lib/format'
+import { formatRemaining, googleCalendarUrl, isPlacementSession } from '../lib/format'
 import { sessionKey } from '../lib/diff'
 import { addPhoto, compressImage, deletePhoto, getPhotos } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
@@ -21,6 +21,9 @@ interface Props {
   travelMode: TravelMode
   /** active profile id, for the photo store */
   profileId: string
+  /** placement details for this session's SE block (placement sessions only) */
+  placementInfo?: { school?: string; address?: string; mentor?: string; notes?: string }
+  onPlacementInfo?: (patch: { school?: string; address?: string; mentor?: string; notes?: string }) => void
   onMeta: (patch: Partial<SessionMeta>) => void
   onClose: () => void
 }
@@ -52,7 +55,18 @@ function formatDuration(start: string, end: string): string | null {
   return rest > 0 ? `${hourPart} ${rest} minutes` : hourPart
 }
 
-export function SessionDetail({ session, meta, coords, locationEnabled, travelMode, profileId, onMeta, onClose }: Props) {
+export function SessionDetail({
+  session,
+  meta,
+  coords,
+  locationEnabled,
+  travelMode,
+  profileId,
+  placementInfo,
+  onPlacementInfo,
+  onMeta,
+  onClose,
+}: Props) {
   const duration = formatDuration(session.start, session.end)
   const gcalUrl = googleCalendarUrl(session)
   const travel =
@@ -266,6 +280,50 @@ export function SessionDetail({ session, meta, coords, locationEnabled, travelMo
           <a className="btn-secondary btn-link" href={gcalUrl} target="_blank" rel="noopener noreferrer">
             Add to Google Calendar
           </a>
+        )}
+        {isPlacementSession(session) && onPlacementInfo && (
+          <section className="detail-notes placement-details">
+            <h3 className="subheading">🏫 Placement details</h3>
+            <input
+              type="text"
+              className="placement-input"
+              placeholder="School name"
+              value={placementInfo?.school ?? ''}
+              onChange={(e) => onPlacementInfo({ school: e.target.value })}
+            />
+            <input
+              type="text"
+              className="placement-input"
+              placeholder="Address / postcode"
+              value={placementInfo?.address ?? ''}
+              onChange={(e) => onPlacementInfo({ address: e.target.value })}
+            />
+            <input
+              type="text"
+              className="placement-input"
+              placeholder="Mentor / contact"
+              value={placementInfo?.mentor ?? ''}
+              onChange={(e) => onPlacementInfo({ mentor: e.target.value })}
+            />
+            <textarea
+              className="note-input"
+              rows={2}
+              placeholder="Placement notes (times, entry instructions, what to bring…)"
+              value={placementInfo?.notes ?? ''}
+              onChange={(e) => onPlacementInfo({ notes: e.target.value })}
+            />
+            {placementInfo?.address && (
+              <a
+                className="travel-link"
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placementInfo.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Directions to the school ↗
+              </a>
+            )}
+            <p className="filter-hint">Shared across all sessions of this placement block; saved on this device.</p>
+          </section>
         )}
         <section className="detail-notes">
           <label className="toggle-row">

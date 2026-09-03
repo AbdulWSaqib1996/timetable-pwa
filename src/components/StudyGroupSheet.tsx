@@ -100,8 +100,8 @@ export function StudyGroupSheet({ settings, sessions, todayISO, onUpdateSettings
         {!settings.groupCode ? (
           <>
             <p className="filter-hint">
-              Share a code with coursemates to find when you're all free (only your free times are
-              shared — never session details).
+              Find when you and your coursemates are all free. Only your free times are shared —
+              never session details. Start with your display name:
             </p>
             <div className="feed-row">
               <input
@@ -112,32 +112,42 @@ export function StudyGroupSheet({ settings, sessions, todayISO, onUpdateSettings
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <div className="btn-row">
+            <section className="filter-section">
+              <h3>Join an existing group</h3>
+              <p className="filter-hint">
+                Got a code from a coursemate? Enter it here. (They'll find it at the top of their
+                Study group screen.)
+              </p>
+              <div className="feed-row">
+                <input
+                  type="text"
+                  placeholder="Group code, e.g. K7M2PQ"
+                  value={codeInput}
+                  onChange={(e) => setCodeInput(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={busy || !name.trim() || codeInput.trim().length < 4}
+                onClick={handleJoin}
+              >
+                {busy ? 'Working…' : 'Join group'}
+              </button>
+            </section>
+            <section className="filter-section">
+              <h3>…or create a new group</h3>
+              <p className="filter-hint">You'll get a code to share with your coursemates.</p>
               <button type="button" className="btn-secondary" disabled={busy || !name.trim()} onClick={handleCreate}>
                 Create a group
               </button>
-            </div>
-            <div className="feed-row">
-              <input
-                type="text"
-                placeholder="Or enter a code, e.g. K7M2PQ"
-                value={codeInput}
-                onChange={(e) => setCodeInput(e.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={busy || !name.trim() || codeInput.trim().length < 4}
-              onClick={handleJoin}
-            >
-              Join with code
-            </button>
+            </section>
           </>
         ) : (
           <>
             <p className="workload-line">
-              Group code: <strong>{settings.groupCode}</strong> — share it with coursemates.
+              Group code: <strong>{settings.groupCode}</strong> — coursemates join by opening
+              Settings → Study group in their own app and entering this code.
             </p>
             {members && (
               <p className="filter-hint">

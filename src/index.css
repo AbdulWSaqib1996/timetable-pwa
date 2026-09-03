@@ -603,9 +603,10 @@ body {
   flex-direction: column;
   gap: 3px;
   width: 100%;
-  border: 1px dashed var(--border);
+  border: 1px solid rgba(12, 166, 120, 0.45);
+  border-left: 4px solid #0ca678;
   border-radius: 12px;
-  background: var(--bg);
+  background: rgba(12, 166, 120, 0.1);
   color: var(--text);
   font: inherit;
   font-size: 14px;
@@ -613,6 +614,45 @@ body {
   text-align: left;
   padding: 14px;
   cursor: pointer;
+}
+
+.session-card.placement-session {
+  background: rgba(12, 166, 120, 0.08);
+  border-color: rgba(12, 166, 120, 0.35);
+}
+
+.placement-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.placement-details .travel-link {
+  display: inline-block;
+  margin: 4px 0 8px;
+}
+
+.kd-fab {
+  position: sticky;
+  bottom: 4px;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.3);
 }
 
 .placement-sub {

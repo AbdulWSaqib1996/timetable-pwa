@@ -1,6 +1,7 @@
 import { TRAVEL_MODE_ICON, estimateTravel } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
-import { formatRemaining, shortenRoom, subjectColor } from '../lib/format'
+import { formatRemaining, isPlacementSession, shortenRoom, subjectColor } from '../lib/format'
+import { cachedRouteMinutes } from '../lib/tfl'
 import { weatherEmoji } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
@@ -19,13 +20,21 @@ interface Props {
 }
 
 export function SessionCard({ session, meta, coords, travelMode = 'walking', conflict, weather, onSelect }: Props) {
-  const color = session.isKeyDate ? null : subjectColor(session)
+  const placement = !session.isKeyDate && isPlacementSession(session)
+  const color = session.isKeyDate ? null : placement ? '#0ca678' : subjectColor(session)
   const travel =
     coords && session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
+  // Keep card and detail-sheet times consistent: in transit mode, use the same
+  // cached live TfL journey the detail sheet shows (warmed by the app).
+  let travelMins = travel?.minutes ?? null
+  if (travelMins !== null && travelMode === 'transit' && travel?.location && coords) {
+    const live = cachedRouteMinutes(coords, travel.location)
+    if (live !== null) travelMins = live
+  }
   return (
     <button
       type="button"
-      className={`session-card${session.isSelfStudy ? ' self-study' : ''}${session.isKeyDate ? ' key-date' : ''}`}
+      className={`session-card${session.isSelfStudy ? ' self-study' : ''}${session.isKeyDate ? ' key-date' : ''}${placement ? ' placement-session' : ''}`}
       style={color ? { borderLeft: `4px solid ${color}` } : undefined}
       onClick={() => onSelect(session)}
     >
@@ -38,9 +47,9 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
         <div className="session-meta">
           {!session.isSelfStudy && session.room && <span>{shortenRoom(session.room)}</span>}
           {session.tutor && session.tutor !== 'Self Study' && <span>{session.tutor}</span>}
-          {travel?.minutes != null && (
-            <span className="travel-chip" title={travel.building ?? undefined}>
-              {TRAVEL_MODE_ICON[travelMode]} {formatRemaining(travel.minutes)}
+          {travelMins != null && (
+            <span className="travel-chip" title={travel?.building ?? undefined}>
+              {TRAVEL_MODE_ICON[travelMode]} {formatRemaining(travelMins)}
             </span>
           )}
           {weather && !session.isKeyDate && (

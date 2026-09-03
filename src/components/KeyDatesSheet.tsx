@@ -39,6 +39,7 @@ export function KeyDatesSheet({
   onDeleteCustom,
   onClose,
 }: Props) {
+  const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState('')
   const [newTime, setNewTime] = useState('')
@@ -56,6 +57,7 @@ export function KeyDatesSheet({
     setNewTitle('')
     setNewDate('')
     setNewTime('')
+    setAdding(false)
   }
 
   return (
@@ -133,12 +135,13 @@ export function KeyDatesSheet({
             )
           })}
         </ul>
-        <details className="filter-section">
-          <summary>➕ Add your own deadline</summary>
-          <div className="custom-kd-form">
+        {adding && (
+          <div className="custom-kd-form filter-section">
+            <h3>New personal deadline</h3>
             <input
               type="text"
               placeholder="e.g. Dissertation draft to supervisor"
+              autoFocus
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
             />
@@ -159,12 +162,21 @@ export function KeyDatesSheet({
               this device (and in backups).
             </p>
           </div>
-        </details>
+        )}
         <div className="modal-actions">
           <button type="button" className="btn-primary" onClick={onClose}>
             Done
           </button>
         </div>
+        <button
+          type="button"
+          className="kd-fab"
+          aria-label={adding ? 'Close the add-deadline form' : 'Add your own deadline'}
+          title="Add your own deadline"
+          onClick={() => setAdding((v) => !v)}
+        >
+          {adding ? '✕' : '＋'}
+        </button>
       </div>
     </div>
   )

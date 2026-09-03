@@ -58,6 +58,12 @@ export function isPlacementSession(session: Session): boolean {
   return /school experience|placement|\bSE ?\d\b/i.test(session.title)
 }
 
+/** Placement block tag ("SE1B", "SE2"…) used to key the user's placement details. */
+export function placementTag(title: string): string {
+  const m = title.match(/SE ?\d[a-z]?/i)
+  return m ? m[0].replace(/\s/g, '').toUpperCase() : 'PLACEMENT'
+}
+
 /** Whole days from todayISO to dateISO (0 = today, negative = past). */
 export function daysUntil(dateISO: string, todayISO: string): number {
   const toTime = (iso: string) => {
