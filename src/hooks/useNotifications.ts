@@ -22,13 +22,15 @@ import { loadNotified, saveNotified } from '../lib/storage'
 import { cachedRouteMinutes, tflRoute } from '../lib/tfl'
 import type { TflDisruption } from '../lib/tfl'
 import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
-import type { Session, Settings } from '../types'
+import type { MetaMap, Session, Settings } from '../types'
 
 interface Options {
   settings: Settings | null
   /** sessions with the user's filters applied, all dates */
   exportSessions: Session[]
   allKeyDates: Session[]
+  /** per-session meta, to skip attendance prompts for already-ticked sessions */
+  metaMap: MetaMap
   coords: Coords | null
   travelMode: TravelMode
   locationEnabled: boolean
@@ -46,6 +48,7 @@ export function useNotifications({
   settings,
   exportSessions,
   allKeyDates,
+  metaMap,
   coords,
   travelMode,
   locationEnabled,
@@ -54,6 +57,8 @@ export function useNotifications({
 }: Options) {
   const exportRef = useRef(exportSessions)
   exportRef.current = exportSessions
+  const metaRef = useRef(metaMap)
+  metaRef.current = metaMap
   const keyDatesRef = useRef(allKeyDates)
   keyDatesRef.current = allKeyDates
   const travelRef = useRef({ coords, travelMode, locationEnabled })
@@ -118,12 +123,13 @@ export function useNotifications({
   const offsetsKey = JSON.stringify(settings?.reminderOffsets ?? [])
   const leaveKey = JSON.stringify(settings?.leaveAlertOffsets ?? [])
   const kdDaysKey = JSON.stringify(settings?.keyDateReminderDays ?? [])
+  const attendancePrompts = settings?.attendancePrompts === true
   useEffect(() => {
     const offsets = (JSON.parse(offsetsKey) as number[]).sort((a, b) => a - b)
     const leaveOffsets = (JSON.parse(leaveKey) as number[]).sort((a, b) => a - b)
     const kdDays = (JSON.parse(kdDaysKey) as number[]).sort((a, b) => a - b)
     if (
-      (offsets.length === 0 && leaveOffsets.length === 0 && kdDays.length === 0) ||
+      (offsets.length === 0 && leaveOffsets.length === 0 && kdDays.length === 0 && !attendancePrompts) ||
       typeof Notification === 'undefined'
     )
       return
@@ -210,6 +216,22 @@ export function useNotifications({
           }
         }
       }
+      // End-of-session attendance prompts: fire once within 30 min of each end time,
+      // skipping sessions already ticked. A push-worker copy may also arrive; the
+      // shared notification tag makes it replace this one instead of doubling up.
+      if (attendancePrompts) {
+        for (const s of exportRef.current) {
+          if (s.dateISO !== today || s.isSelfStudy || s.isKeyDate || !s.end) continue
+          const end = toMinutes(s.end)
+          if (end === null) continue
+          const since = nowMins - end
+          const key = sessionKey(s)
+          if (since < 0 || since > 30 || notified[`${key}#att`] || metaRef.current[key]?.attended) continue
+          showReminder(`Did you attend ${s.title}?`, 'Tap ✓ Attended to log it.', key, snoozeUrlRef.current, `att-${key}`)
+          notified[`${key}#att`] = Date.now()
+          dirty = true
+        }
+      }
       // Key-date reminders: N days before each deadline (one notification per offset).
       if (kdDays.length > 0) {
         const today = localTodayISO()
@@ -234,5 +256,5 @@ export function useNotifications({
     check()
     const t = setInterval(check, 30_000)
     return () => clearInterval(t)
-  }, [offsetsKey, leaveKey, kdDaysKey])
+  }, [offsetsKey, leaveKey, kdDaysKey, attendancePrompts])
 }

@@ -7,10 +7,20 @@ interface Props {
   onCancel?: () => void
 }
 
+const FEATURES: { icon: string; title: string; text: string }[] = [
+  { icon: '🔄', title: 'Always up to date', text: 'Reads the sheet directly — edits appear on the next refresh, no re-import.' },
+  { icon: '📅', title: 'Day, week & month views', text: 'A clean agenda with your filters, clash warnings and free-slot finder.' },
+  { icon: '🔔', title: 'Smart reminders', text: 'Session, deadline and “time to leave” alerts — even with the app closed.' },
+  { icon: '🚇', title: 'Live travel times', text: 'TfL routes, departures and disruption warnings to every session.' },
+  { icon: '🏫', title: 'Placement-aware', text: 'School-experience blocks, day counting and directions to your school.' },
+  { icon: '📲', title: 'Installs like an app', text: 'Free, no account, works offline; your data stays on your device.' },
+]
+
 export function SetupScreen({ onSubmit, onDemo, onCancel }: Props) {
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const firstRun = !onCancel
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -29,6 +39,12 @@ export function SetupScreen({ onSubmit, onDemo, onCancel }: Props) {
     <div className="setup">
       <div className="setup-card">
         <h1>My Timetable</h1>
+        {firstRun && (
+          <p className="setup-tagline">
+            Turn any Google Sheet timetable into a fast, installable app — reminders, travel times
+            and calendar sync included. Built for course cohorts; free forever.
+          </p>
+        )}
         <p className="setup-lead">
           Paste the link to your timetable Google Sheet. Open the sheet on the tab you want (e.g.{' '}
           <em>Group 2 Timetable</em>) and copy the URL from the address bar — it remembers which tab
@@ -60,6 +76,31 @@ export function SetupScreen({ onSubmit, onDemo, onCancel }: Props) {
           <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
+        )}
+        {firstRun && (
+          <>
+            <div className="setup-features">
+              {FEATURES.map((f) => (
+                <div className="setup-feature" key={f.title}>
+                  <span className="setup-feature-icon" aria-hidden="true">
+                    {f.icon}
+                  </span>
+                  <span>
+                    <strong>{f.title}</strong>
+                    <br />
+                    {f.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="setup-footer">
+              Got a share link from a coursemate instead? Just open it — everything configures
+              itself. ·{' '}
+              <a href="https://ko-fi.com/awsaqib" target="_blank" rel="noopener noreferrer">
+                Support the app ☕
+              </a>
+            </p>
+          </>
         )}
       </div>
     </div>

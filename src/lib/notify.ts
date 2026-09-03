@@ -4,7 +4,7 @@
  * the page Notification constructor doesn't support actions); falls back
  * to a plain Notification (dev mode, or no SW).
  */
-export function showReminder(title: string, body: string, key?: string, snoozeUrl?: string): void {
+export function showReminder(title: string, body: string, key?: string, snoozeUrl?: string, tag?: string): void {
   void (async () => {
     try {
       const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : undefined
@@ -13,6 +13,9 @@ export function showReminder(title: string, body: string, key?: string, snoozeUr
           body,
           icon: 'icon-192.png',
           badge: 'icon-192.png',
+          // A tag makes a same-tag notification replace this one (used so the
+          // in-app and push-worker copies of an attendance prompt can't double up).
+          tag,
           data: { url: './', key, snoozeUrl: key ? snoozeUrl : undefined },
         }
         if (key) {

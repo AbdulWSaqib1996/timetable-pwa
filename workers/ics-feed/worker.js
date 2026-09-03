@@ -1,12 +1,14 @@
 /**
  * ics-feed worker — serves a subscribable ICS calendar feed for a public Google Sheet timetable.
  *
- * GET /?id=<sheetId>&gid=<tabGid>&spec=Music,PE&selfstudy=0&kdid=<sheetId>&kdgid=<tabGid>
+ * GET /?id=<sheetId>&gid=<tabGid>&spec=Music,PE&selfstudy=0&kdid=<sheetId>&kdgid=<tabGid>&plc=<json>
  *   id        (required) Google Sheet ID — the sheet must be "anyone with the link can view"
  *   gid       (optional) tab gid
  *   spec      (optional) comma-separated specialism names to keep; other specialisms are dropped
  *   selfstudy (optional) "0" to drop Self Study rows
  *   kdid/kdgid (optional) key-dates tab — its rows are added as 📌 all-day events
+ *   plc       (optional) placement details JSON {"SE1A":{"s":"School name","a":"Address"}} —
+ *             placement marker rows expand into one event per school day, located at the school
  *
  * Deploy (free Cloudflare account):  npx wrangler deploy
  */
@@ -144,6 +146,82 @@ function parseSessions(table) {
   return sessions
 }
 
+/* ---------- placement (school experience) expansion, matching the app ---------- */
+const isPlacementTitle = (t) => /school experience|placement|\bSE ?\d[a-z]?\b/i.test(t || '')
+const placementTagOf = (t) => {
+  const m = (t || '').match(/SE ?\d[a-z]?/i)
+  return m ? m[0].replace(/\s/g, '').toUpperCase() : 'PLACEMENT'
+}
+function parsePlacementRange(title) {
+  const m = (title || '').match(
+    /\((\d{1,2})(?:st|nd|rd|th)?(?:\s+([A-Za-z]+))?\s*[-\u2013\u2014]\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})\)/
+  )
+  if (!m) return null
+  const [, d1, m1name, d2, m2name, year] = m
+  const mo2 = MONTHS[m2name.slice(0, 3).toLowerCase()]
+  if (mo2 === undefined) return null
+  const mo1 = m1name !== undefined ? MONTHS[m1name.slice(0, 3).toLowerCase()] : mo2
+  if (mo1 === undefined) return null
+  const iso = (y, mo, d) => `${y}-${pad(mo + 1)}-${pad(d)}`
+  const from = iso(+year, mo1, +d1)
+  const to = iso(+year, mo2, +d2)
+  return from <= to ? { from, to } : null
+}
+/**
+ * Marker rows like "SE1a begins (28th Sept - 2nd Oct 2026)" become one event per
+ * weekday in the span, so subscribed calendars show school days too. When the app
+ * passed placement details (?plc=), the school becomes each event's location.
+ */
+function expandPlacements(sessions, plcMap) {
+  const out = sessions.slice()
+  const seenSpans = new Set()
+  const schoolLocation = (tag) => {
+    const p = plcMap[tag]
+    if (!p || (!p.s && !p.a)) return ''
+    return [p.s, p.a].filter(Boolean).join(', ')
+  }
+  for (const s of sessions) {
+    if (!isPlacementTitle(s.title)) continue
+    const tag = placementTagOf(s.title)
+    // Marker rows themselves get the school as their location when the room is empty.
+    if (!s.room) s.room = schoolLocation(tag)
+    const range = parsePlacementRange(s.title)
+    if (!range) continue
+    const spanKey = `${tag}|${range.from}|${range.to}`
+    if (seenSpans.has(spanKey)) continue
+    seenSpans.add(spanKey)
+    const validTime = (t) => t && t !== '00:00'
+    const start = validTime(s.start) && s.start !== s.end ? s.start : '08:30'
+    const end = validTime(s.end) && s.end !== s.start ? s.end : '15:45'
+    const [y, m, d] = range.from.split('-').map(Number)
+    const cursor = new Date(Date.UTC(y, m - 1, d))
+    for (;;) {
+      const dateISO = `${cursor.getUTCFullYear()}-${pad(cursor.getUTCMonth() + 1)}-${pad(cursor.getUTCDate())}`
+      if (dateISO > range.to) break
+      const dow = cursor.getUTCDay()
+      const alreadyMarked = sessions.some(
+        (x) => x.dateISO === dateISO && isPlacementTitle(x.title) && placementTagOf(x.title) === tag
+      )
+      if (dow !== 0 && dow !== 6 && !alreadyMarked) {
+        out.push({
+          id: `plc-${tag}-${dateISO}`,
+          title: `${tag} placement day`,
+          dateISO,
+          start,
+          end,
+          room: schoolLocation(tag),
+          groups: '',
+          tutor: '',
+          subject: 'School experience',
+          isSelfStudy: false,
+        })
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1)
+    }
+  }
+  return out.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
+}
+
 const esc = (v) => v.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
 
 function fold(line) {
@@ -229,6 +307,25 @@ export default {
       sessions = sessions.filter((s) => !s.specialismName || spec.includes(s.specialismName))
     }
     if (dropSelfStudy) sessions = sessions.filter((s) => !s.isSelfStudy)
+
+    // Placement spans expand into per-day events (school as location when provided).
+    let plcMap = {}
+    try {
+      const raw = url.searchParams.get('plc')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          for (const [tag, p] of Object.entries(parsed).slice(0, 20)) {
+            if (/^[A-Z0-9]{1,12}$/.test(tag) && p && typeof p === 'object') {
+              plcMap[tag] = { s: String(p.s ?? '').slice(0, 80), a: String(p.a ?? '').slice(0, 120) }
+            }
+          }
+        }
+      }
+    } catch {
+      plcMap = {}
+    }
+    sessions = expandPlacements(sessions, plcMap)
 
     // Optional key-dates tab appended as all-day events; failures there don't break the feed.
     const kdid = url.searchParams.get('kdid') || (url.searchParams.get('kdgid') ? id : null)

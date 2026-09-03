@@ -5,12 +5,14 @@ import { isPlacementSession, placementTag } from '../lib/format'
 import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
 import { parseSheetUrl } from '../lib/sheetUrl'
+import { needsIosInstall } from '../lib/platform'
 import { subscribePush, unsubscribePush } from '../lib/push'
 import { runPushSelfCheck, sendTestPush } from '../lib/pushCheck'
 import type { CheckRow } from '../lib/pushCheck'
 import {
   applySyncPayload,
   clearSyncState,
+  deleteSync,
   loadSyncState,
   newSyncCode,
   pullSync,
@@ -60,6 +62,13 @@ export function buildFeedUrl(base: string, settings: Settings, calendarName?: st
     if (settings.keyDatesSheetId !== settings.sheetId) url.searchParams.set('kdid', settings.keyDatesSheetId)
     if (settings.keyDatesGid) url.searchParams.set('kdgid', settings.keyDatesGid)
   }
+  // Placement details so the feed can put the school on each expanded school day.
+  const plc = Object.fromEntries(
+    Object.entries(settings.placements ?? {})
+      .filter(([, p]) => p.school || p.address)
+      .map(([tag, p]) => [tag, { s: p.school ?? '', a: p.address ?? '' }])
+  )
+  if (Object.keys(plc).length > 0) url.searchParams.set('plc', JSON.stringify(plc))
   return url.toString()
 }
 
@@ -94,6 +103,8 @@ export function SettingsSheet({
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE)
   const [keyDatesUrl, setKeyDatesUrl] = useState(settings.keyDatesUrl ?? '')
   const [keyDatesError, setKeyDatesError] = useState(false)
+  const [noticesUrl, setNoticesUrl] = useState(settings.noticesUrl ?? '')
+  const [noticesError, setNoticesError] = useState(false)
   const [mergeUrl, setMergeUrl] = useState('')
   const [mergeError, setMergeError] = useState(false)
   const [pushBase, setPushBase] = useState(settings.pushServerBase ?? DEFAULT_PUSH_BASE)
@@ -136,7 +147,9 @@ export function SettingsSheet({
         return
       }
       applySyncPayload(remote.payload)
-      saveSyncState({ code, lastAt: remote.at })
+      // Park the merged result so the other device gets this one's notes too.
+      const at = await pushSync(syncBase, code).catch(() => null)
+      saveSyncState({ code, lastAt: at ?? remote.at })
       window.location.reload()
     } catch {
       setSyncMsg('Could not reach the sync server.')
@@ -157,6 +170,26 @@ export function SettingsSheet({
         setSyncState(next)
       }
       setSyncMsg('Synced. ✓')
+    } catch {
+      setSyncMsg('Could not reach the sync server.')
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  // Rotate: new code, park under it, delete the old blob — the old code stops working.
+  async function rotateSyncCode() {
+    if (!syncState) return
+    setSyncBusy(true)
+    setSyncMsg(null)
+    try {
+      const code = newSyncCode()
+      const at = await pushSync(syncBase, code)
+      await deleteSync(syncBase, syncState.code)
+      const next = { code, lastAt: at ?? Date.now() }
+      saveSyncState(next)
+      setSyncState(next)
+      setSyncMsg('Code rotated — the old code no longer works. Enter the new one on your other devices.')
     } catch {
       setSyncMsg('Could not reach the sync server.')
     } finally {
@@ -276,6 +309,22 @@ export function SettingsSheet({
     }
     setKeyDatesError(false)
     onUpdateSettings({ keyDatesUrl: trimmed, keyDatesSheetId: parsed.sheetId, keyDatesGid: parsed.gid })
+  }
+
+  function saveNoticesUrl() {
+    const trimmed = noticesUrl.trim()
+    if (!trimmed) {
+      setNoticesError(false)
+      onUpdateSettings({ noticesUrl: undefined, noticesSheetId: undefined, noticesGid: undefined })
+      return
+    }
+    const parsed = parseSheetUrl(trimmed)
+    if (!parsed) {
+      setNoticesError(true)
+      return
+    }
+    setNoticesError(false)
+    onUpdateSettings({ noticesUrl: trimmed, noticesSheetId: parsed.sheetId, noticesGid: parsed.gid })
   }
 
   const activeProfile = store.profiles.find((p) => p.id === store.activeId)
@@ -467,6 +516,29 @@ export function SettingsSheet({
           </section>
         )}
 
+        {!settings.demo && (
+          <section className="filter-section">
+            <h3>Notices (cohort broadcasts)</h3>
+            <p className="filter-hint">
+              A tab with Date / Message / Link columns becomes dismissible announcement banners for
+              everyone using that sheet — a broadcast channel for cohort reps, no backend needed.
+            </p>
+            <div className="feed-row">
+              <input
+                type="url"
+                placeholder="https://docs.google.com/spreadsheets/d/…#gid=…"
+                value={noticesUrl}
+                onChange={(e) => setNoticesUrl(e.target.value)}
+                onBlur={saveNoticesUrl}
+              />
+            </div>
+            {noticesError && <p className="setup-error">That doesn’t look like a Google Sheets link.</p>}
+            {settings.noticesSheetId && !noticesError && (
+              <p className="filter-hint">Notices connected — new rows appear as banners on the day view.</p>
+            )}
+          </section>
+        )}
+
         <section className="filter-section">
           <h3>Specialisms</h3>
           <p className="filter-hint">
@@ -538,6 +610,30 @@ export function SettingsSheet({
               : (settings.reminderOffsets ?? []).length === 0
                 ? 'Reminders are off.'
                 : `Notifying ${(settings.reminderOffsets ?? []).map((m) => (m >= 60 ? `${m / 60}h` : `${m}m`)).join(', ')} before each session, while the app is open (or installed and running). For guaranteed alerts anywhere, subscribe to the calendar feed below and use your calendar app’s own reminders.`}
+          </p>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={settings.attendancePrompts === true}
+              onChange={(e) => {
+                const next = e.target.checked
+                if (next && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+                  void Notification.requestPermission()
+                }
+                onUpdateSettings({ attendancePrompts: next })
+                if (settings.pushEnabled) {
+                  void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
+                    ...settings,
+                    attendancePrompts: next,
+                  }).catch(() => {})
+                }
+              }}
+            />
+            Ask “did you attend?” when each session ends
+          </label>
+          <p className="filter-hint">
+            The prompt's ✓ Attended button logs the session — attendance and the placement day
+            counter then build themselves. Works in the background too when push is enabled.
           </p>
         </section>
 
@@ -623,29 +719,48 @@ export function SettingsSheet({
               already deployed — just tap Enable (the URL below only needs changing for a different
               deployment).
             </p>
-            <div className="feed-row">
-              <input
-                type="url"
-                placeholder="https://timetable-push.<you>.workers.dev"
-                value={pushBase}
-                onChange={(e) => setPushBase(e.target.value)}
-              />
-            </div>
-            <div className="btn-row">
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={pushBusy || !pushBase.trim() || settings.pushEnabled}
-                onClick={() => void handlePush(true)}
-              >
-                {pushBusy ? 'Working…' : settings.pushEnabled ? 'Enabled ✓' : 'Enable on this device'}
-              </button>
-              {settings.pushEnabled && (
-                <button type="button" className="btn-secondary" disabled={pushBusy} onClick={() => void handlePush(false)}>
-                  Disable
-                </button>
-              )}
-            </div>
+            {needsIosInstall() && !settings.pushEnabled ? (
+              <div className="ios-install-guide">
+                <p className="filter-hint">
+                  <strong>On iPhone/iPad, notifications need the app on your Home Screen first:</strong>
+                </p>
+                <ol className="ios-install-steps">
+                  <li>
+                    Tap the <strong>Share</strong> button in Safari's toolbar
+                  </li>
+                  <li>
+                    Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>
+                  </li>
+                  <li>Open My Timetable from your Home Screen and tap Enable here</li>
+                </ol>
+              </div>
+            ) : (
+              <>
+                <div className="feed-row">
+                  <input
+                    type="url"
+                    placeholder="https://timetable-push.<you>.workers.dev"
+                    value={pushBase}
+                    onChange={(e) => setPushBase(e.target.value)}
+                  />
+                </div>
+                <div className="btn-row">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={pushBusy || !pushBase.trim() || settings.pushEnabled}
+                    onClick={() => void handlePush(true)}
+                  >
+                    {pushBusy ? 'Working…' : settings.pushEnabled ? 'Enabled ✓' : 'Enable on this device'}
+                  </button>
+                  {settings.pushEnabled && (
+                    <button type="button" className="btn-secondary" disabled={pushBusy} onClick={() => void handlePush(false)}>
+                      Disable
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
             <label className="toggle-row">
               <input
                 type="checkbox"
@@ -901,13 +1016,17 @@ export function SettingsSheet({
                 <button type="button" className="btn-secondary" disabled={syncBusy} onClick={() => void syncNow()}>
                   {syncBusy ? 'Working…' : 'Sync now'}
                 </button>
+                <button type="button" className="btn-secondary" disabled={syncBusy} onClick={() => void rotateSyncCode()}>
+                  Rotate code
+                </button>
                 <button type="button" className="btn-ghost" onClick={disableSync}>
                   Turn off
                 </button>
               </div>
               <p className="filter-hint">
-                Changes sync automatically a few seconds after you make them; the newest version wins
-                when both devices edit.
+                Changes sync automatically a few seconds after you make them, and again when you
+                return to the app. Notes and attendance merge per session (newest edit wins), so both
+                devices' entries survive. Rotate the code if it leaks.
               </p>
             </>
           ) : (
@@ -933,7 +1052,8 @@ export function SettingsSheet({
                 Connect to that device
               </button>
               <p className="filter-hint">
-                Connecting replaces this device's timetables and notes with the synced copy.
+                Connecting brings in the synced timetables and merges notes/attendance with this
+                device's own.
               </p>
             </>
           )}

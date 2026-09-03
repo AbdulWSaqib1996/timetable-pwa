@@ -63,6 +63,8 @@ export interface Settings {
   reminderMinutes?: number
   /** minutes-before offsets to fire notifications at (e.g. [60, 15]); empty/unset = off */
   reminderOffsets?: number[]
+  /** "did you attend?" notification at each session's end time (default off) */
+  attendancePrompts?: boolean
   /** use device location to estimate travel time to session locations */
   locationEnabled?: boolean
   /** how travel-time estimates are calculated (default walking) */
@@ -75,6 +77,10 @@ export interface Settings {
   keyDatesGid?: string | null
   /** days-before offsets for key-date reminder notifications (e.g. [7, 3, 1]) */
   keyDateReminderDays?: number[]
+  /** cohort-notices tab (Date/Message/Link) rendered as dismissible banners */
+  noticesUrl?: string
+  noticesSheetId?: string
+  noticesGid?: string | null
   /** additional timetable tabs merged into this profile's sessions */
   extraTabs?: { sheetId: string; gid: string | null; url: string }[]
   /** colour theme override (default follows the system) */
@@ -127,6 +133,8 @@ export interface SessionMeta {
   status?: 'todo' | 'doing' | 'done'
   /** Teachers' Standards this note/photo evidences (e.g. ["TS1","TS4"]) */
   standards?: string[]
+  /** last local edit time, used by cross-device sync to merge (newest wins per session) */
+  at?: number
 }
 
 export type MetaMap = Record<string, SessionMeta>

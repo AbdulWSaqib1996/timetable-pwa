@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
 import { sessionKey } from '../lib/diff'
 import { downloadFile } from '../lib/files'
+import { printEvidenceBundle } from '../lib/printBundle'
 import { TEACHERS_STANDARDS, standardLabel } from '../lib/standards'
 import type { MetaMap, Session } from '../types'
 
@@ -9,6 +10,8 @@ interface Props {
   /** sessions with the user's filters applied, all dates (key dates included) */
   sessions: Session[]
   metaMap: MetaMap
+  /** active profile id, for reading photos into the print bundle */
+  profileId: string
   onSelect: (session: Session) => void
   onClose: () => void
 }
@@ -52,7 +55,7 @@ function buildMarkdown(entries: Entry[]): string {
   return lines.join('\n') + '\n'
 }
 
-export function JournalSheet({ sessions, metaMap, onSelect, onClose }: Props) {
+export function JournalSheet({ sessions, metaMap, profileId, onSelect, onClose }: Props) {
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const [filter, setFilter] = useState<string | null>(null)
 
@@ -155,9 +158,30 @@ export function JournalSheet({ sessions, metaMap, onSelect, onClose }: Props) {
             type="button"
             className="btn-primary"
             disabled={entries.length === 0}
+            onClick={() =>
+              void printEvidenceBundle(
+                profileId,
+                entries.map((e) => ({
+                  key: sessionKey(e.session),
+                  dateISO: e.session.dateISO,
+                  title: e.session.title,
+                  room: e.session.room,
+                  note: e.note,
+                  photos: e.photos,
+                  standards: e.standards,
+                }))
+              )
+            }
+          >
+            🖨 Print / PDF (with photos)
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={entries.length === 0}
             onClick={() => downloadFile('evidence-journal.md', buildMarkdown(entries), 'text/markdown;charset=utf-8')}
           >
-            Export journal (.md)
+            Export .md
           </button>
           <button type="button" className="btn-ghost" onClick={onClose}>
             Close

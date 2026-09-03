@@ -37,6 +37,7 @@ export async function subscribePush(base: string, settings: Settings): Promise<v
     spec: settings.hideOtherSpecialisms !== false ? settings.mySpecialisms ?? [] : [],
     groups: settings.myGroups ?? [],
     reminderOffsets: settings.reminderOffsets ?? [],
+    attendancePrompts: settings.attendancePrompts === true,
     keyDateReminderDays: settings.keyDateReminderDays ?? [],
     travelMode: settings.travelMode ?? 'walking',
     briefing: settings.morningBriefing !== false,

@@ -35,7 +35,9 @@ import { parseSheetUrl } from './lib/sheetUrl'
 import { parseShareHash } from './lib/share'
 import { DEFAULT_PUSH_BASE } from './lib/config'
 import { subscribePush } from './lib/push'
-import { loadSyncState, pullSync, pushSync, applySyncPayload, saveSyncState } from './lib/sync'
+import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
+import type { Notice } from './lib/notices'
+import { loadSyncState, pushSync, saveSyncState, syncPullApply } from './lib/sync'
 import { downloadFile } from './lib/files'
 import { useNotifications } from './hooks/useNotifications'
 import { useTimetableData } from './hooks/useTimetableData'
@@ -106,6 +108,8 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [showBackupNudge, setShowBackupNudge] = useState(false)
   const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowWhatsNew())
+  const [notices, setNotices] = useState<Notice[]>([])
+  const [dismissedNotices, setDismissedNotices] = useState<Set<string>>(() => loadDismissedNotices())
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
   const settings = active?.settings ?? null
@@ -167,21 +171,42 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, Object.keys(metaMap).length > 0])
 
-  // Cross-device sync (opt-in): on start, apply a newer state parked by another
-  // device; after local edits, park this device's state (debounced, encrypted).
+  // Cohort notices: a Date/Message/Link tab rendered as dismissible banners.
   useEffect(() => {
-    const state = loadSyncState()
-    if (!state) return
-    const base = settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE
-    void pullSync(base, state.code)
-      .then((remote) => {
-        if (remote && remote.at > state.lastAt) {
-          applySyncPayload(remote.payload)
-          saveSyncState({ ...state, lastAt: remote.at })
-          window.location.reload()
-        }
+    setNotices([])
+    if (!settings?.noticesSheetId) return
+    let live = true
+    void fetchNotices(settings.noticesSheetId, settings.noticesGid ?? null)
+      .then((list) => {
+        if (live) setNotices(list)
       })
       .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [settings?.noticesSheetId, settings?.noticesGid, fetchedAt])
+
+  // Cross-device sync (opt-in): on start — and again when the tab comes back into
+  // view — merge in a newer state parked by another device; after local edits,
+  // park this device's state (debounced, encrypted).
+  useEffect(() => {
+    const pull = () => {
+      const base = settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE
+      void syncPullApply(base)
+        .then((applied) => {
+          if (applied) window.location.reload()
+        })
+        .catch(() => {})
+    }
+    pull()
+    let lastPull = Date.now()
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - lastPull < 60_000) return
+      lastPull = Date.now()
+      pull()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
   const syncSkippedFirst = useRef(false)
   useEffect(() => {
@@ -307,7 +332,7 @@ export default function App() {
     if (!active) return
     setMetaMap((prev) => {
       const key = sessionKey(session)
-      const entry = { ...prev[key], ...patch }
+      const entry = { ...prev[key], ...patch, at: Date.now() }
       const next = { ...prev, [key]: entry }
       if (
         !entry.attended &&
@@ -417,6 +442,7 @@ export default function App() {
     settings,
     exportSessions,
     allKeyDates,
+    metaMap,
     coords,
     travelMode,
     locationEnabled,
@@ -538,6 +564,37 @@ export default function App() {
           {sessions && sessions.length > 0 && ' Showing your last saved timetable.'}
         </div>
       )}
+
+      {notices
+        .filter((n) => !dismissedNotices.has(n.id))
+        .slice(0, 3)
+        .map((n) => (
+          <div className="backup-banner notice-banner" key={n.id}>
+            <span>
+              📣 {n.dateISO ? `${n.dateISO.split('-').reverse().slice(0, 2).join('/')} — ` : ''}
+              {n.message}
+              {n.link && (
+                <>
+                  {' '}
+                  <a href={n.link} target="_blank" rel="noopener noreferrer">
+                    More ↗
+                  </a>
+                </>
+              )}
+            </span>
+            <button
+              type="button"
+              className="btn-icon"
+              aria-label="Dismiss notice"
+              onClick={() => {
+                dismissNotice(n.id)
+                setDismissedNotices((prev) => new Set([...prev, n.id]))
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
 
       {showWhatsNew && (
         <div className="backup-banner whatsnew">
@@ -797,6 +854,7 @@ export default function App() {
         <JournalSheet
           sessions={[...exportSessions, ...allKeyDates]}
           metaMap={metaMap}
+          profileId={active.id}
           onSelect={setSelected}
           onClose={() => setOpenSheet('none')}
         />

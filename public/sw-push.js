@@ -58,6 +58,7 @@ self.addEventListener('push', (event) => {
         body: data.body || 'You have a timetable update.',
         icon: 'icon-192.png',
         badge: 'icon-192.png',
+        tag: data.tag || undefined,
         data: { url: data.url || './', key: data.key, snoozeUrl: data.snoozeUrl },
         actions: data.key ? ACTIONS : [],
       }),

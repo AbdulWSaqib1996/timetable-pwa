@@ -1,14 +1,14 @@
 /** Bump the version whenever WHATSNEW changes; the app shows the list once per version. */
-export const WHATSNEW_VERSION = 2
+export const WHATSNEW_VERSION = 3
 
 export const WHATSNEW: string[] = [
-  '🏫 Placement day counter — tick “Attended” on school days to log them (set your required days in Settings)',
-  '📔 Evidence journal — tag notes/photos TS1–TS8 and export the bundle',
-  '🔄 Sync between devices — share a code to keep phone + laptop identical',
-  '🩺 Push self-check — Settings answers “why didn’t I get a notification?”',
-  '🏖 Term breaks now show as a labelled band instead of blank days',
-  '🚌 Departure boards refresh live every 30 seconds',
-  '🔔 Background alerts now cover placement days and route to your school',
+  '📆 Calendar feed now includes placement days, located at your school',
+  '✓ “Did you attend?” prompt at each session’s end (turn on under Session reminders)',
+  '🖨 Evidence journal prints to PDF with your photos included',
+  '📅 Sunday-evening week-ahead push — with a warning when a placement starts',
+  '🔄 Sync now merges notes from both devices and pulls when you return to the app',
+  '📱 iPhone? Settings now walks you through installing before enabling push',
+  '📣 Cohort notices — reps can broadcast from a tab in the same sheet',
 ]
 
 const KEY = 'timetable.whatsnew.v1'

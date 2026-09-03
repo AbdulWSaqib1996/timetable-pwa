@@ -447,14 +447,20 @@ function shortRoom(room) {
 function londonNow() {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
+    hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
   }).formatToParts(new Date())
   const get = (type) => parts.find((p) => p.type === type)?.value ?? '0'
   return {
     dateISO: `${get('year')}-${get('month')}-${get('day')}`,
     minutes: parseInt(get('hour'), 10) * 60 + parseInt(get('minute'), 10),
     hour: parseInt(get('hour'), 10),
+    weekday: get('weekday'),
   }
+}
+const addDaysISO = (iso, days) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d + days))
+  return date.toISOString().slice(0, 10)
 }
 const toMinutes = (t) => {
   const m = t.match(/^(\d{1,2}):(\d{2})$/)
@@ -560,6 +566,7 @@ async function runScheduled(env) {
   }
   const getSheet = async (id, gid) => (await getSheetInfo(id, gid)).expanded
   const morningWindow = now.hour === 7 && now.minutes % 60 < CRON_MINUTES
+  const eveningWindow = now.weekday === 'Sun' && now.hour === 18 && now.minutes % 60 < CRON_MINUTES
   const tflIssues = morningWindow && list.keys.length > 0 ? await fetchTflSevereStatus() : []
   let morningWeather = null
   let morningWeatherFetched = false
@@ -743,6 +750,71 @@ async function runScheduled(env) {
       }
     }
 
+    // End-of-session attendance prompts: a "did you attend?" push carrying the session
+    // key, so the notification's ✓ Attended action logs it without opening the app.
+    if (config.attendancePrompts === true) {
+      const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
+      for (const s of sessions) {
+        if (s.dateISO !== now.dateISO || s.isSelfStudy) continue
+        const end = toMinutes(s.end)
+        if (end === null) continue
+        const since = now.minutes - end
+        if (since >= 0 && since < CRON_MINUTES) {
+          const sKey = `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`
+          due.push({
+            dedupe: `att|${s.dateISO}|${s.end}|${s.title}`,
+            key: sKey,
+            tag: `att-${sKey}`,
+            title: `Did you attend ${s.title}?`,
+            body: 'Tap ✓ Attended to log it — it counts toward attendance and placement days.',
+          })
+        }
+      }
+    }
+
+    // Sunday 18:00 week-ahead briefing: the week's shape, plus a warning when a
+    // placement block starts (the morning people most want a day's notice for).
+    if (eveningWindow && config.briefing !== false) {
+      const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
+      const weekFrom = addDaysISO(now.dateISO, 1)
+      const weekTo = addDaysISO(now.dateISO, 7)
+      const week = sessions.filter((s) => s.dateISO >= weekFrom && s.dateISO <= weekTo && !s.isSelfStudy)
+      if (week.length > 0) {
+        const days = new Set(week.map((s) => s.dateISO)).size
+        let body = `${week.length} session${week.length === 1 ? '' : 's'} over ${days} day${days === 1 ? '' : 's'}`
+        if (config.kdGid || config.kdSheetId) {
+          const keyDates = await getSheet(config.kdSheetId || config.sheetId, config.kdGid)
+          const dueCount = keyDates.filter((kd) => kd.dateISO >= weekFrom && kd.dateISO <= weekTo).length
+          if (dueCount > 0) body += ` · 📌 ${dueCount} deadline${dueCount === 1 ? '' : 's'}`
+        }
+        const placementStart = week
+          .filter((s) => isPlacementTitle(s.title))
+          .sort((a, b) => a.dateISO.localeCompare(b.dateISO))
+          .find((s) => {
+            const tag = s.placementTag ?? placementTagOf(s.title)
+            return !sessions.some(
+              (x) =>
+                x.dateISO < s.dateISO &&
+                x.dateISO >= addDaysISO(s.dateISO, -3) &&
+                isPlacementTitle(x.title) &&
+                (x.placementTag ?? placementTagOf(x.title)) === tag
+            )
+          })
+        if (placementStart) {
+          const [py, pm, pd] = placementStart.dateISO.split('-').map(Number)
+          const dayName = new Date(Date.UTC(py, pm - 1, pd)).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
+          const tag = placementStart.placementTag ?? placementTagOf(placementStart.title)
+          const school = config.placements?.[tag]?.school
+          body += ` · 🏫 ${tag} starts ${dayName}${school ? ` — ${school}` : ''}`
+        }
+        due.push({
+          dedupe: `week|${now.dateISO}`,
+          title: '📅 Your week ahead',
+          body: body.slice(0, 290),
+        })
+      }
+    }
+
     if ((config.reminderOffsets ?? []).length > 0) {
       const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
       for (const s of sessions) {
@@ -791,7 +863,7 @@ async function runScheduled(env) {
     if (unsent.length === 0) continue
     const payload =
       unsent.length === 1
-        ? { title: unsent[0].title, body: unsent[0].body, key: unsent[0].key, snoozeUrl: record.base }
+        ? { title: unsent[0].title, body: unsent[0].body, key: unsent[0].key, tag: unsent[0].tag, snoozeUrl: record.base }
         : {
             title: `${unsent.length} timetable updates`,
             body: unsent
@@ -976,6 +1048,13 @@ export default {
       const rec = /^[0-9a-f]{64}$/.test(id) ? await env.PUSH.get(`sync:${id}`, 'json') : null
       if (!rec) return json({ error: 'not found' }, 404)
       return json(rec)
+    }
+    if (request.method === 'POST' && url.pathname === '/sync/delete') {
+      const body = await request.json().catch(() => null)
+      const id = String(body?.id ?? '')
+      if (!/^[0-9a-f]{64}$/.test(id)) return json({ error: 'invalid id' }, 400)
+      await env.PUSH.delete(`sync:${id}`)
+      return json({ ok: true })
     }
     if (request.method === 'POST' && url.pathname === '/location') {
       const body = await request.json().catch(() => null)

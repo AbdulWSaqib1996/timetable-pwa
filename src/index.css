@@ -1919,3 +1919,140 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- Round 7: notices, iOS guide, landing, print bundle ---------- */
+
+.notice-banner {
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+}
+
+.notice-banner a {
+  color: var(--accent);
+}
+
+.ios-install-steps {
+  margin: 4px 0 8px;
+  padding-left: 22px;
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setup-tagline {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 4px 0 14px;
+}
+
+.setup-features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+
+@media (max-width: 480px) {
+  .setup-features {
+    grid-template-columns: 1fr;
+  }
+}
+
+.setup-feature {
+  display: flex;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.setup-feature strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.setup-feature-icon {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.setup-footer {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.setup-footer a {
+  color: var(--accent);
+}
+
+/* Evidence bundle print view: hidden on screen, the only thing on paper. */
+#print-bundle {
+  display: none;
+}
+
+@media print {
+  body.printing-bundle .app,
+  body.printing-bundle .setup,
+  body.printing-bundle .modal-overlay {
+    display: none !important;
+  }
+
+  body.printing-bundle #print-bundle {
+    display: block;
+    color: #000;
+    background: #fff;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  #print-bundle h1 {
+    font-size: 20pt;
+    margin: 0 0 2pt;
+  }
+
+  #print-bundle .pb-sub {
+    color: #555;
+    font-size: 10pt;
+    margin: 0 0 14pt;
+  }
+
+  #print-bundle h2 {
+    font-size: 14pt;
+    margin: 16pt 0 6pt;
+    border-bottom: 1pt solid #999;
+    padding-bottom: 2pt;
+    break-after: avoid;
+  }
+
+  #print-bundle .pb-entry {
+    break-inside: avoid;
+    margin-bottom: 10pt;
+  }
+
+  #print-bundle .pb-entry h3 {
+    font-size: 11pt;
+    margin: 0 0 3pt;
+  }
+
+  #print-bundle .pb-entry p {
+    margin: 0 0 4pt;
+  }
+
+  #print-bundle .pb-photos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6pt;
+  }
+
+  #print-bundle .pb-photos img {
+    max-width: 45%;
+    max-height: 220pt;
+    object-fit: contain;
+  }
+}
