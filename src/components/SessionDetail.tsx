@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { TRAVEL_MODE_PHRASE, estimateTravel } from '../lib/campus'
+import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords } from '../lib/campus'
+import { geocodeAddress } from '../lib/geocode'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl, isPlacementSession } from '../lib/format'
 import { sessionKey } from '../lib/diff'
@@ -22,8 +23,15 @@ interface Props {
   /** active profile id, for the photo store */
   profileId: string
   /** placement details for this session's SE block (placement sessions only) */
-  placementInfo?: { school?: string; address?: string; mentor?: string; notes?: string }
-  onPlacementInfo?: (patch: { school?: string; address?: string; mentor?: string; notes?: string }) => void
+  placementInfo?: { school?: string; address?: string; mentor?: string; notes?: string; lat?: number; lng?: number }
+  onPlacementInfo?: (patch: {
+    school?: string
+    address?: string
+    mentor?: string
+    notes?: string
+    lat?: number
+    lng?: number
+  }) => void
   onMeta: (patch: Partial<SessionMeta>) => void
   onClose: () => void
 }
@@ -69,8 +77,20 @@ export function SessionDetail({
 }: Props) {
   const duration = formatDuration(session.start, session.end)
   const gcalUrl = googleCalendarUrl(session)
-  const travel =
-    session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
+  // Placement sessions with a geocoded school address target the school; everything
+  // else targets the matched campus building. All travel machinery (map, live route,
+  // departures, leave-time weather) follows this target.
+  const schoolCoords =
+    isPlacementSession(session) && placementInfo?.lat != null && placementInfo?.lng != null
+      ? { lat: placementInfo.lat, lng: placementInfo.lng }
+      : null
+  const travel = schoolCoords
+    ? estimateTravelToCoords(schoolCoords, coords, travelMode, placementInfo?.school || 'Placement school')
+    : session.room && !session.isSelfStudy
+      ? estimateTravel(session.room, coords, travelMode)
+      : null
+
+  const [geoStatus, setGeoStatus] = useState<'working' | 'ok' | 'fail' | null>(null)
 
   // Photo notes (stored locally in IndexedDB, downscaled on save).
   const [photos, setPhotos] = useState<StoredPhoto[]>([])
@@ -135,7 +155,7 @@ export function SessionDetail({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [travelMode, coords?.lat, coords?.lng, session.room])
+  }, [travelMode, coords?.lat, coords?.lng, session.room, schoolCoords?.lat, schoolCoords?.lng])
 
   // Weather for the journey: forecast at the computed leave time (start − travel).
   const [journeyWeather, setJourneyWeather] = useState<{ at: string; w: HourWeather } | null>(null)
@@ -297,7 +317,29 @@ export function SessionDetail({
               placeholder="Address / postcode"
               value={placementInfo?.address ?? ''}
               onChange={(e) => onPlacementInfo({ address: e.target.value })}
+              onBlur={(e) => {
+                const address = e.target.value.trim()
+                if (!address) return
+                setGeoStatus('working')
+                void geocodeAddress(address).then((located) => {
+                  if (located) {
+                    onPlacementInfo({ lat: located.lat, lng: located.lng })
+                    setGeoStatus('ok')
+                  } else {
+                    setGeoStatus('fail')
+                  }
+                })
+              }}
             />
+            {geoStatus === 'working' && <p className="filter-hint">📍 Locating the school…</p>}
+            {geoStatus === 'fail' && (
+              <p className="filter-hint">Couldn't locate that address — try adding the postcode.</p>
+            )}
+            {(geoStatus === 'ok' || (geoStatus === null && schoolCoords)) && (
+              <p className="filter-hint">
+                📍 Located — the map and travel details below now point at the school.
+              </p>
+            )}
             <input
               type="text"
               className="placement-input"

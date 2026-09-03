@@ -97,7 +97,10 @@ export interface Settings {
   /** setup checklist card permanently dismissed */
   checklistDismissed?: boolean
   /** user-entered placement details, keyed by placement tag (SE1B, SE2…) */
-  placements?: Record<string, { school?: string; address?: string; mentor?: string; notes?: string }>
+  placements?: Record<
+    string,
+    { school?: string; address?: string; mentor?: string; notes?: string; lat?: number; lng?: number }
+  >
 }
 
 /** One saved timetable (sheet + all its choices). */

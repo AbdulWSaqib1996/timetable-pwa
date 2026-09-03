@@ -17,7 +17,7 @@ import { WHATSNEW, dismissWhatsNew, shouldShowWhatsNew } from './lib/changelog'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
 import type { Coords } from './lib/campus'
-import { TRAVEL_MODE_PHRASE, estimateTravel, matchBuilding } from './lib/campus'
+import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords, matchBuilding } from './lib/campus'
 import { buildDemoSessions } from './lib/demo'
 import { diffSessions, sessionKey } from './lib/diff'
 import {
@@ -552,6 +552,8 @@ export default function App() {
   keyDatesRef.current = allKeyDates
   const travelRef = useRef({ coords, travelMode, locationEnabled })
   travelRef.current = { coords, travelMode, locationEnabled }
+  const placementsRef = useRef(settings?.placements)
+  placementsRef.current = settings?.placements
   const snoozeUrlRef = useRef<string | undefined>(undefined)
   snoozeUrlRef.current = settings?.pushEnabled ? settings.pushServerBase ?? DEFAULT_PUSH_BASE : undefined
   const offsetsKey = JSON.stringify(settings?.reminderOffsets ?? [])
@@ -596,9 +598,20 @@ export default function App() {
         }
 
         // "Time to leave" alerts: leave-by = start − live travel estimate; alert with head start.
-        if (leaveOffsets.length > 0 && locEnabled && here && s.room && !s.isSelfStudy) {
+        if (leaveOffsets.length > 0 && locEnabled && here && (s.room || isPlacementSession(s)) && !s.isSelfStudy) {
           void weatherForHour(today, Math.floor(start / 60)) // warm the forecast cache
-          const est = estimateTravel(s.room, here, mode)
+          let est = estimateTravel(s.room, here, mode)
+          if (est.minutes === null && isPlacementSession(s)) {
+            const placement = placementsRef.current?.[placementTag(s.title)]
+            if (placement?.lat != null && placement?.lng != null) {
+              est = estimateTravelToCoords(
+                { lat: placement.lat, lng: placement.lng },
+                here,
+                mode,
+                placement.school || 'placement school'
+              )
+            }
+          }
           if (est.minutes !== null) {
             // In transit mode, prefer the live TfL journey time (cache warmed here, used
             // next tick) so disruptions automatically make the alert fire earlier.

@@ -97,6 +97,21 @@ function travelMinutes(from: Coords, to: Coords, mode: TravelMode): number {
   return Math.max(1, Math.ceil((haversineMeters(from, to) * p.routeFactor) / p.metersPerMin + p.overheadMin))
 }
 
+/** Travel estimate to arbitrary coordinates (e.g. a geocoded placement school). */
+export function estimateTravelToCoords(
+  dest: Coords,
+  from: Coords | null,
+  mode: TravelMode = 'walking',
+  label = 'Destination'
+): TravelEstimate {
+  return {
+    building: label,
+    minutes: from ? travelMinutes(from, dest, mode) : null,
+    location: dest,
+    mapsUrl: `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}&travelmode=${MODE_PARAMS[mode].mapsMode}`,
+  }
+}
+
 export function estimateTravel(room: string, from: Coords | null, mode: TravelMode = 'walking'): TravelEstimate {
   const building = matchBuilding(room)
   if (!building) {
