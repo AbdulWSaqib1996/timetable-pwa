@@ -225,6 +225,25 @@ Rounds 1–5 built the whole assistant. Round 6 is shaped by what the last passe
 
 **Suggested order:** 1 first (it completes work just shipped), 5 + 7 as small trust-builders, 2 when placements start (late Sept 2026 — before SE1a on the 28th would be ideal), 10 before the next feature round, 6 at the end of term, 3 and 4 only with sustained daily use to justify the size.
 
+## Future enhancements — round 7 (logged 3 Sep 2026)
+
+Round 6 finished the placement story in the app and push worker — and exposed the last parity hole: the **calendar feed** knows nothing about placements (verified: the ics-feed worker has no span expansion, so subscribed calendars miss every school day). Round 7 closes the remaining loops (attendance capture, evidence output, sync robustness) and turns toward adoption beyond this cohort. Effort: S (hours), M (a day or two), L (multi-day).
+
+1. **Calendar-feed placement parity (S/M)** — port the placement-span expansion into the ics-feed worker so subscribed calendars show school days too, with the school name/address as the event LOCATION (passed as a query param the app adds to the feed URL when placement details exist). The one place placement days still don't appear.
+2. **End-of-session attendance prompt (S/M)** — at a session's end time, a "Did you attend?" push with the existing ✓ action (worker cron + in-app timer). Attendance and the placement day counter then build themselves without opening the app — today the tick still depends on remembering to.
+3. **Evidence bundle with photos (M)** — the journal's markdown export references photos but can't include them; add a print view of the journal that embeds the photos (browser print → PDF), grouped by standard with dates and notes. Makes the bundle actually submittable, and absorbs the long-carried print stylesheet (r2-12).
+4. **Sunday week-ahead briefing (S)** — one push on Sunday evening: session count, deadlines due, and "SE1B starts Monday · Winton Primary — check the entry notes". The worker already knows all of it; placement first-mornings are exactly when people want a day's warning.
+5. **Sync hardening (M)** — sync is whole-blob last-write-wins and pulls only on app start: merge notes/attendance per key (newest field wins) instead of dropping one device's edits, pull again on tab-visibility, gzip the blob (CompressionStream) against the 400KB cap, and a "rotate code" button.
+6. **iOS install guide (S)** — on iOS Safari outside standalone mode, enabling push can't work until the app is on the Home Screen; detect it and show a guided add-to-Home-Screen sheet instead of a failing Enable button. Removes the likeliest new-user dead end.
+7. **Notices tab / cohort broadcasts (S/M)** — carried from round 4 item 8: a "Notices" tab in the same spreadsheet (date, message, link) rendered as dismissible banners — a broadcast channel for cohort reps with no backend at all.
+8. **Landing page for new cohorts (S/M)** — the app's root currently assumes you were sent a share link; a short public "what is this / works with any Google Sheet timetable" page with screenshots and a paste-your-sheet start. The distribution half of the monetisation plan's template-sales route.
+9. **Sentry + privacy-friendly analytics (S/M)** — promote the long-carried operational pair before promoting the app: error reporting (free tier) and a counter-only analytics ping (no cookies), so breakage in other cohorts' sheets is visible without them reporting it.
+10. **Encrypted photo sync via R2 (L)** — the one thing sync can't carry; Cloudflare R2's free tier (10GB) could hold client-side-encrypted photo blobs keyed like the sync store. New (still-£0) resource — only with real two-device demand.
+
+**Carried over, still open:** round-5 8 (email briefing fallback — user-deferred); private-sheet OAuth (r1-9); personal-calendar clash check, Play Store TWA (r3-6/11). (r2-12 print stylesheet folds into item 3; r4-8 notices is item 7; analytics/Sentry are item 9.)
+
+**Suggested order:** 1 and 4 first (small worker wins that finish parity), 2 next (completes the attendance loop the day counter depends on), 6 before telling anyone with an iPhone about the app, 3 before the first evidence submission deadline, 5 once sync sees real two-device use, then 7–9 as the adoption push, 10 only on demand.
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:
