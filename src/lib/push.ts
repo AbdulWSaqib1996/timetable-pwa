@@ -15,7 +15,14 @@ const trim = (base: string) => base.replace(/\/+$/, '')
  * (workers/push). The worker stores the subscription plus enough config to
  * compute reminders server-side.
  */
-export async function subscribePush(base: string, settings: Settings, profileId?: string): Promise<void> {
+const CONFIG_SENT_KEY = 'timetable.pushcfg.v1'
+
+export async function subscribePush(
+  base: string,
+  settings: Settings,
+  profileId?: string,
+  opts?: { force?: boolean }
+): Promise<void> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     throw new Error('Background push isn’t supported in this browser.')
   }
@@ -61,12 +68,28 @@ export async function subscribePush(base: string, settings: Settings, profileId?
     ),
     base: trim(base),
   }
+  // Config re-syncs fire from several places (toggles, placement edits, admin
+  // changes); skip the request entirely when nothing actually changed, so
+  // Cloudflare only sees real updates. The explicit Enable button forces.
+  const configHash = JSON.stringify(config)
+  if (!opts?.force) {
+    try {
+      if (localStorage.getItem(CONFIG_SENT_KEY) === configHash) return
+    } catch {
+      /* storage unavailable — just send */
+    }
+  }
   const save = await fetch(`${trim(base)}/subscribe`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ subscription: subscription.toJSON(), config }),
   })
   if (!save.ok) throw new Error('The push server rejected the subscription.')
+  try {
+    localStorage.setItem(CONFIG_SENT_KEY, configHash)
+  } catch {
+    /* ignore */
+  }
 }
 
 /**

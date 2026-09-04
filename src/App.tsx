@@ -286,12 +286,13 @@ export default function App() {
       const state = loadSyncState()
       if (!state) return
       const base = settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE
+      // pushSync skips the request when nothing actually changed.
       void pushSync(base, state.code)
         .then((at) => {
           if (at) saveSyncState({ ...state, lastAt: at })
         })
         .catch(() => {})
-    }, 8000)
+    }, 20_000)
     return () => clearTimeout(t)
   }, [store, metaMap])
 

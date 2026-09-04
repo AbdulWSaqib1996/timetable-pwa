@@ -142,10 +142,29 @@ export function collectSyncPayload(): SyncPayload | null {
 
 const trim = (base: string) => base.replace(/\/+$/, '')
 
-/** Encrypt the current local state and park it on the worker. Returns the write timestamp. */
-export async function pushSync(base: string, code: string): Promise<number | null> {
+const SYNC_SENT_HASH_KEY = 'timetable.synchash.v1'
+
+function payloadHash(payload: SyncPayload): string {
+  const s = JSON.stringify(payload)
+  let hash = 5381
+  for (let i = 0; i < s.length; i++) hash = ((hash * 33) ^ s.charCodeAt(i)) >>> 0
+  return `${s.length}:${hash.toString(36)}`
+}
+
+/** Encrypt the current local state and park it on the worker. Returns the write
+ *  timestamp, or null when nothing changed since the last successful push
+ *  (skipped entirely — no request). `force` bypasses the skip. */
+export async function pushSync(base: string, code: string, opts?: { force?: boolean }): Promise<number | null> {
   const payload = collectSyncPayload()
   if (!payload) return null
+  const hash = `${code}|${payloadHash(payload)}`
+  if (!opts?.force) {
+    try {
+      if (localStorage.getItem(SYNC_SENT_HASH_KEY) === hash) return null
+    } catch {
+      /* storage unavailable — just send */
+    }
+  }
   const at = Date.now()
   const res = await fetch(`${trim(base)}/sync`, {
     method: 'POST',
@@ -153,6 +172,11 @@ export async function pushSync(base: string, code: string): Promise<number | nul
     body: JSON.stringify({ id: await syncId(code), blob: await encrypt(code, payload), at }),
   })
   if (!res.ok) throw new Error('The sync server rejected the update.')
+  try {
+    localStorage.setItem(SYNC_SENT_HASH_KEY, hash)
+  } catch {
+    /* ignore */
+  }
   return at
 }
 
@@ -206,7 +230,7 @@ export async function syncPullApply(base: string): Promise<boolean> {
   const remote = await pullSync(base, state.code)
   if (!remote || remote.at <= state.lastAt) return false
   applySyncPayload(remote.payload)
-  const at = await pushSync(base, state.code).catch(() => null)
+  const at = await pushSync(base, state.code, { force: true }).catch(() => null)
   saveSyncState({ ...state, lastAt: at ?? remote.at })
   return true
 }

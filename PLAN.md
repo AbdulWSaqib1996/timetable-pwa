@@ -331,6 +331,16 @@ The head-home dropdown only summarised the journey; sessions got the full treatm
 
 **Home pill "disappeared" (owner report):** the pill was verified fine on the current build — the two ways it hides are (a) being within ~400m of home, by design, and (b) location silently dropping (iOS can lose the geolocation watch on resume), which previously looked identical. Now (b) shows a visible "🏠 …" waiting pill whose dropdown explains and suggests re-toggling Travel times, so the states are distinguishable.
 
+## Cloudflare free-tier budget (4 Sep 2026, twenty-ninth pass — owner request)
+
+Audited both workers against the free-tier caps. Requests (100k/day) were never at risk at cohort scale; the tight cap is **KV: 1,000 writes/day account-wide**, and the biggest spender was the ICS feed's per-IP rate counter (one KV write per uncached calendar poll). Changes, cheapest savings first:
+1. **ICS feed:** the KV rate counter became an in-memory per-isolate counter (zero KV writes) and the edge cache went 5 → 15 minutes (~3× fewer origin hits; a timetable doesn't need 5-minute calendar freshness).
+2. **Client dedupe:** `/subscribe` config re-syncs now hash the config and skip the request entirely when nothing changed (the Enable button forces); sync pushes hash the payload the same way (explicit Sync-now/connect/rotate force), and the auto-push debounce went 8s → 20s.
+3. **Worker write-skips:** `/location` skips its KV write when the stored fix is <5 min old and <100 m moved.
+4. **Per-user rate caps:** every endpoint now has a per-IP requests-per-minute cap (subscribe/sync/group 10, ping 6, stats 20…) via an in-memory map — an abuse guard that itself costs nothing. Honest caveat: it's per-isolate/per-colo, so bursts spread across isolates can slip through (verified: 8 rapid curls all passed); it bounds sustained single-source abuse, not determined attackers — acceptable since it protects a free-tier budget, not security, and KV-based counters would spend the very writes being protected.
+5. **Dashboard:** caches `/stats` (the KV-list-heavy call) for 10 minutes client-side; the refresh link forces.
+Post-change worst-case budget at ~30 active users: a few hundred KV writes/day (pings ≤2/device, real config/sync changes only, movement-gated locations, ~1 hist write/sheet) against the 1,000 cap, with cron overhead constant. Also noted: the "3 devices" briefly visible on the dashboard were this session's test devices, purged after verification — real counts start from zero.
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:

@@ -222,6 +222,9 @@ function expandPlacements(sessions, plcMap) {
   return out.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
 }
 
+// in-memory per-IP request counter (per isolate; abuse guard, not billing)
+const RL = new Map()
+
 const esc = (v) => v.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
 
 function fold(line) {
@@ -269,18 +272,25 @@ export default {
       return new Response('Missing or invalid ?id=<sheetId>', { status: 400 })
     }
 
-    // Edge cache: calendar apps poll aggressively; serve a 5-minute cached copy.
+    // Edge cache: calendar apps poll aggressively; a 15-minute cached copy is
+    // plenty fresh for a timetable and cuts origin hits (and KV traffic) ~3×.
     const cache = caches.default
     const cachedResponse = await cache.match(request)
     if (cachedResponse) return cachedResponse
 
-    // Per-IP rate limit: 60 fresh builds per hour is plenty for any calendar client.
-    if (env?.RATE) {
+    // Per-IP rate limit, in memory (per isolate): abuse guard that costs no KV
+    // writes — the old KV counter spent one write per uncached poll, which was
+    // the single biggest drain on the account's 1,000 writes/day budget.
+    {
       const ip = request.headers.get('cf-connecting-ip') ?? 'unknown'
-      const bucket = `rl:${ip}:${Math.floor(Date.now() / 3600000)}`
-      const count = parseInt((await env.RATE.get(bucket)) ?? '0', 10)
-      if (count >= 60) return new Response('Rate limit exceeded — try again later.', { status: 429 })
-      ctx.waitUntil(env.RATE.put(bucket, String(count + 1), { expirationTtl: 3600 }))
+      const now = Date.now()
+      const entry = RL.get(ip)
+      if (!entry || now - entry.start > 3600_000) {
+        if (RL.size > 5000) RL.clear()
+        RL.set(ip, { start: now, n: 1 })
+      } else if (++entry.n > 60) {
+        return new Response('Rate limit exceeded — try again later.', { status: 429 })
+      }
     }
 
     const calName = (url.searchParams.get('name') || 'My Timetable').slice(0, 60)
@@ -381,7 +391,7 @@ export default {
     const response = new Response(buildICS(sessions, calName), {
       headers: {
         'content-type': 'text/calendar; charset=utf-8',
-        'cache-control': 'public, max-age=300',
+        'cache-control': 'public, max-age=900',
         'access-control-allow-origin': '*',
       },
     })

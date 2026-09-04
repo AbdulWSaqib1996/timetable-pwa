@@ -61,8 +61,16 @@ const $ = (id) => document.getElementById(id);
 
 function esc(s){ const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
 
-async function load() {
+async function load(force) {
   const key = localStorage.getItem(KEY_STORE) ?? '';
+  // Cache the (expensive, KV-list-heavy) stats response for 10 minutes so
+  // reopening the dashboard doesn't re-hit Cloudflare every time.
+  if (!force) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('tt.statscache') ?? 'null');
+      if (cached && Date.now() - cached.at < 10 * 60000) { render(cached.data); return; }
+    } catch {}
+  }
   $('content').innerHTML = '<p class="muted">Loading…</p>';
   let data;
   try {
@@ -79,6 +87,7 @@ async function load() {
     return;
   }
   $('keyrow').hidden = true;
+  try { localStorage.setItem('tt.statscache', JSON.stringify({ at: Date.now(), data })); } catch {}
   render(data);
 }
 
@@ -130,7 +139,7 @@ function render(d) {
     + '<div class="tiles">' + tile(plat(today.platforms), 'platforms') + tile(versions, 'app versions seen') + '</div>'
     + '<h2>Last 14 days</h2>'
     + '<table><tr><th>Date</th><th>Active</th><th>New</th><th>Installed</th><th>Platforms</th></tr>' + rows + '</table>'
-    + '<p class="sub" style="margin-top:14px">Generated ' + esc(new Date(d.generatedAt).toLocaleString('en-GB')) + ' · pings expire after 90 days · <a style="color:var(--accent)" href="javascript:location.reload()">refresh</a></p>';
+    + '<p class="sub" style="margin-top:14px">Generated ' + esc(new Date(d.generatedAt).toLocaleString('en-GB')) + ' · pings expire after 90 days · <a style="color:var(--accent)" href="javascript:void 0" onclick="load(true)">refresh</a></p>';
 }
 
 function tile(big, small) {

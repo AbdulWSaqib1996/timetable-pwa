@@ -150,7 +150,7 @@ export function SettingsSheet({
     setSyncMsg(null)
     try {
       const code = newSyncCode()
-      const at = await pushSync(syncBase, code)
+      const at = await pushSync(syncBase, code, { force: true })
       const state: SyncState = { code, lastAt: at ?? Date.now() }
       saveSyncState(state)
       setSyncState(state)
@@ -175,7 +175,7 @@ export function SettingsSheet({
       }
       applySyncPayload(remote.payload)
       // Park the merged result so the other device gets this one's notes too.
-      const at = await pushSync(syncBase, code).catch(() => null)
+      const at = await pushSync(syncBase, code, { force: true }).catch(() => null)
       saveSyncState({ code, lastAt: at ?? remote.at })
       window.location.reload()
     } catch {
@@ -190,7 +190,7 @@ export function SettingsSheet({
     setSyncBusy(true)
     setSyncMsg(null)
     try {
-      const at = await pushSync(syncBase, syncState.code)
+      const at = await pushSync(syncBase, syncState.code, { force: true })
       if (at) {
         const next = { ...syncState, lastAt: at }
         saveSyncState(next)
@@ -211,7 +211,7 @@ export function SettingsSheet({
     setSyncMsg(null)
     try {
       const code = newSyncCode()
-      const at = await pushSync(syncBase, code)
+      const at = await pushSync(syncBase, code, { force: true })
       await deleteSync(syncBase, syncState.code)
       const next = { code, lastAt: at ?? Date.now() }
       saveSyncState(next)
@@ -237,7 +237,7 @@ export function SettingsSheet({
     setPushMessage(null)
     try {
       if (enable) {
-        await subscribePush(base, settings, store.activeId)
+        await subscribePush(base, settings, store.activeId, { force: true })
         onUpdateSettings({ pushServerBase: base, pushEnabled: true })
         setPushMessage('Background push enabled on this device. ✓')
       } else {

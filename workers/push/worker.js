@@ -1021,6 +1021,40 @@ async function runScheduled(env) {
   }
 }
 
+/* ---------- per-user rate limiting (in-memory, per isolate) ----------
+ * Protects the free tier without spending KV writes on counters. Best-effort
+ * (resets when the isolate recycles, per-colo) — fine as an abuse guard, since
+ * legitimate app traffic sits far below these caps. */
+const RL = new Map()
+function rateLimited(request, name, max, windowMs = 60_000) {
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown'
+  const key = `${name}:${ip}`
+  const now = Date.now()
+  const entry = RL.get(key)
+  if (!entry || now - entry.start > windowMs) {
+    if (RL.size > 5000) RL.clear()
+    RL.set(key, { start: now, n: 1 })
+    return false
+  }
+  entry.n++
+  return entry.n > max
+}
+// requests per minute per IP, by endpoint
+const RATE_CAPS = {
+  '/subscribe': 10,
+  '/unsubscribe': 10,
+  '/snooze': 10,
+  '/location': 10,
+  '/ping': 6,
+  '/sync': 10,
+  '/sync/delete': 6,
+  '/group': 10,
+  '/group/join': 10,
+  '/group/leave': 10,
+  '/stats': 20,
+  '/history': 10,
+}
+
 /* ---------- HTTP ---------- */
 const CORS = {
   'access-control-allow-origin': '*',
@@ -1038,6 +1072,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url)
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS })
+    const cap = RATE_CAPS[url.pathname]
+    if (cap && rateLimited(request, url.pathname, cap)) {
+      return json({ error: 'rate limited — try again in a minute' }, 429)
+    }
     if (request.method === 'GET' && url.pathname === '/vapid') {
       const vapid = await getVapid(env)
       return json({ publicKey: vapid.publicKey })
@@ -1325,6 +1363,11 @@ export default {
       const subKey = await endpointKey(body.endpoint)
       const record = await env.PUSH.get(subKey, 'json')
       if (!record) return json({ error: 'unknown subscription' }, 404)
+      // Skip the KV write when the stored location is fresh and barely moved —
+      // saves the daily write budget without hurting leave-alert accuracy.
+      if (record.loc && Date.now() - record.loc.at < 5 * 60_000 && haversineM(record.loc, { lat, lng }) < 100) {
+        return json({ ok: true, skipped: true })
+      }
       record.loc = { lat, lng, at: Date.now() }
       await env.PUSH.put(subKey, JSON.stringify(record))
       return json({ ok: true })
