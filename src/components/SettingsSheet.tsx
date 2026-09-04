@@ -812,12 +812,12 @@ export function SettingsSheet({
             <p className="filter-hint">Couldn't locate that address — try adding the postcode.</p>
           )}
           {(homeGeoStatus === 'ok' || (homeGeoStatus === null && settings.homeLat != null)) && (
-            <p className="filter-hint">📍 Home set — a "🏠 Head home" card appears as your last session of the day ends.</p>
+            <p className="filter-hint">📍 Home set — a "🏠 Head home" card shows whenever you're away from home.</p>
           )}
           <p className="filter-hint">
-            The card shows the live journey home — time, TfL route and arrival estimate. Your home
-            address stays on this device (and in encrypted sync/backups); it is never sent to the
-            push worker.
+            The card shows the live journey home — time, TfL route and arrival estimate — any time
+            you're out (it hides itself when you're home). Your home address stays on this device
+            (and in encrypted sync/backups); it is never sent to the push worker.
           </p>
         </section>
 

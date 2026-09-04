@@ -1183,29 +1183,58 @@ export default {
       return json({ ok: true })
     }
     if (request.method === 'GET' && url.pathname === '/stats') {
-      const days = Math.min(31, Math.max(1, parseInt(url.searchParams.get('days') ?? '14', 10) || 14))
+      // Owner-only: when a 'statskey' exists in KV, ?key= must match it.
+      const requiredKey = await env.PUSH.get('statskey')
+      if (requiredKey && url.searchParams.get('key') !== requiredKey) {
+        return json({ error: 'unauthorized' }, 401)
+      }
+      const days = Math.min(62, Math.max(1, parseInt(url.searchParams.get('days') ?? '31', 10) || 31))
+      // First-seen dates per device → new-device counts and retention.
+      const firstSeen = new Map()
+      const devList = await env.PUSH.list({ prefix: 'adev:' })
+      for (const k of devList.keys) {
+        firstSeen.set(k.name.slice(5), await env.PUSH.get(k.name))
+      }
       const daily = []
       const activeWeek = new Set()
+      const activeMonth = new Set()
+      const deviceDays = new Map()
+      const versions = {}
       for (let i = 0; i < days; i++) {
         const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10)
         const list = await env.PUSH.list({ prefix: `aping:${date}:` })
         let installed = 0
+        let newDevices = 0
         const platforms = {}
-        let latestVersion = 0
         for (const k of list.keys) {
           const rec = await env.PUSH.get(k.name, 'json')
+          const dev = k.name.split(':')[2]
           if (rec?.i) installed++
           const p = rec?.p ?? 'other'
           platforms[p] = (platforms[p] ?? 0) + 1
-          if ((rec?.v ?? 0) > latestVersion) latestVersion = rec.v
-          if (i < 7) activeWeek.add(k.name.split(':')[2])
+          if (firstSeen.get(dev) === date) newDevices++
+          if (i < 7) activeWeek.add(dev)
+          if (i < 30) activeMonth.add(dev)
+          deviceDays.set(dev, (deviceDays.get(dev) ?? 0) + 1)
+          if (i === 0 && rec?.v) versions[rec.v] = (versions[rec.v] ?? 0) + 1
         }
-        daily.push({ date, active: list.keys.length, installed, platforms, latestVersion })
+        daily.push({ date, active: list.keys.length, installed, newDevices, platforms })
       }
-      const devices = await env.PUSH.list({ prefix: 'adev:' })
+      // Stickiness: how many distinct days each device appeared in the window.
+      let d1 = 0, d2to4 = 0, d5plus = 0
+      for (const n of deviceDays.values()) {
+        if (n >= 5) d5plus++
+        else if (n >= 2) d2to4++
+        else d1++
+      }
       return json({
-        totalDevicesEver: devices.keys.length,
+        generatedAt: new Date().toISOString(),
+        windowDays: days,
+        totalDevicesEver: devList.keys.length,
         activeLast7Days: activeWeek.size,
+        activeLast30Days: activeMonth.size,
+        todayVersions: versions,
+        retention: { oneDay: d1, twoToFourDays: d2to4, fivePlusDays: d5plus },
         daily,
       })
     }

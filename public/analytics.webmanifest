@@ -1,0 +1,14 @@
+{
+  "name": "Timetable Analytics",
+  "short_name": "TT Stats",
+  "description": "Owner dashboard: installs, daily use and retention for My Timetable.",
+  "start_url": "./analytics.html",
+  "scope": "./analytics.html",
+  "display": "standalone",
+  "theme_color": "#101322",
+  "background_color": "#101322",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

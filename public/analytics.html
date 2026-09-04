@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#101322" />
+<link rel="manifest" href="analytics.webmanifest" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="icon" type="image/png" href="icon-192.png" />
+<title>Timetable Analytics</title>
+<style>
+  :root { --bg:#101322; --surface:#1a1f36; --text:#eef0f7; --muted:#9aa1b5; --accent:#8da2f0; --border:#2b3252; --green:#4ad3a5; --warn:#f0a58d; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif; padding:16px calc(12px + env(safe-area-inset-right)) 40px calc(12px + env(safe-area-inset-left)); }
+  h1 { font-size:18px; margin:4px 0 2px; }
+  .sub { color:var(--muted); font-size:12px; margin:0 0 16px; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-bottom:18px; }
+  .tile { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px; }
+  .big { font-size:26px; font-weight:800; }
+  .small { color:var(--muted); font-size:12px; }
+  h2 { font-size:14px; margin:20px 0 8px; color:var(--accent); }
+  .chart { display:flex; align-items:flex-end; gap:2px; height:120px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px; overflow-x:auto; }
+  .bar { flex:1 0 10px; min-width:10px; display:flex; flex-direction:column; justify-content:flex-end; align-items:stretch; gap:1px; position:relative; }
+  .bar .seg-ret { background:var(--accent); border-radius:2px 2px 0 0; }
+  .bar .seg-new { background:var(--green); border-radius:2px; }
+  .bar:hover::after { content:attr(data-tip); position:absolute; bottom:100%; left:50%; transform:translateX(-50%); background:#000; color:#fff; font-size:11px; padding:3px 7px; border-radius:6px; white-space:nowrap; z-index:2; }
+  .legend { color:var(--muted); font-size:12px; margin:6px 2px 0; }
+  .legend b { color:var(--text); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:2px; margin:0 4px 0 10px; vertical-align:baseline; }
+  table { width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; font-size:13px; }
+  th, td { text-align:left; padding:7px 12px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  tr:last-child td { border-bottom:none; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button, input { background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font:inherit; }
+  button { cursor:pointer; }
+  .err { color:var(--warn); }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<h1>📈 Timetable Analytics</h1>
+<p class="sub" id="sub">Installs, daily use and retention — data from your own push worker, no third parties.</p>
+<div id="keyrow" class="row" hidden>
+  <input id="key" type="password" placeholder="Stats key" autocomplete="off" />
+  <button id="save">Unlock</button>
+  <span class="muted">The key stays in this browser only.</span>
+</div>
+<div id="content"></div>
+<script>
+const BASE = 'https://timetable-push.ics-feed.workers.dev';
+const KEY_STORE = 'tt.statskey';
+const $ = (id) => document.getElementById(id);
+
+function esc(s){ const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
+async function load() {
+  const key = localStorage.getItem(KEY_STORE) ?? '';
+  $('content').innerHTML = '<p class="muted">Loading…</p>';
+  let data;
+  try {
+    const res = await fetch(BASE + '/stats?days=31&key=' + encodeURIComponent(key));
+    if (res.status === 401) {
+      $('keyrow').hidden = false;
+      $('content').innerHTML = '<p class="err">Locked — enter the stats key.</p>';
+      return;
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch (e) {
+    $('content').innerHTML = '<p class="err">Could not reach the stats server (' + esc(e.message) + '). Pull to refresh or try again.</p>';
+    return;
+  }
+  $('keyrow').hidden = true;
+  render(data);
+}
+
+function render(d) {
+  const daily = [...d.daily].reverse(); // oldest → newest
+  const today = d.daily[0] ?? { active: 0, installed: 0, platforms: {}, newDevices: 0 };
+  const plat = (p) => Object.entries(p).map(([k, v]) => k + ' ' + v).join(' · ') || '—';
+  const versions = Object.entries(d.todayVersions ?? {}).sort((a, b) => b[0] - a[0]).map(([v, n]) => 'v' + v + ' ×' + n).join(' · ') || '—';
+  const max = Math.max(1, ...daily.map((x) => x.active));
+  const sumNew = daily.reduce((n, x) => n + (x.newDevices ?? 0), 0);
+  const ret = d.retention ?? { oneDay: 0, twoToFourDays: 0, fivePlusDays: 0 };
+  const retTotal = Math.max(1, ret.oneDay + ret.twoToFourDays + ret.fivePlusDays);
+
+  const bars = daily.map((x) => {
+    const nh = Math.round(((x.newDevices ?? 0) / max) * 100);
+    const rh = Math.round(((x.active - (x.newDevices ?? 0)) / max) * 100);
+    const dt = x.date.slice(5).split('-').reverse().join('/');
+    return '<div class="bar" data-tip="' + dt + ': ' + x.active + ' active (' + (x.newDevices ?? 0) + ' new, ' + x.installed + ' installed)">'
+      + '<div class="seg-ret" style="height:' + rh + '%"></div>'
+      + '<div class="seg-new" style="height:' + nh + '%"></div></div>';
+  }).join('');
+
+  const rows = d.daily.slice(0, 14).map((x) =>
+    '<tr><td>' + esc(x.date) + '</td><td>' + x.active + '</td><td>' + (x.newDevices ?? 0) + '</td><td>' + x.installed + '</td><td>' + esc(plat(x.platforms)) + '</td></tr>'
+  ).join('');
+
+  $('content').innerHTML =
+    '<div class="tiles">'
+    + tile(today.active, 'active today')
+    + tile(d.activeLast7Days, 'active last 7 days')
+    + tile(d.activeLast30Days ?? '—', 'active last 30 days')
+    + tile(d.totalDevicesEver, 'devices ever seen')
+    + tile(today.installed, 'installed (home screen) today')
+    + tile(sumNew, 'new devices in window')
+    + '</div>'
+    + '<h2>Daily active devices (' + d.windowDays + ' days)</h2>'
+    + '<div class="chart">' + bars + '</div>'
+    + '<p class="legend"><span class="dot" style="background:var(--green)"></span>new devices <span class="dot" style="background:var(--accent)"></span>returning · hover/tap a bar for detail</p>'
+    + '<h2>Stickiness (days active per device, this window)</h2>'
+    + '<div class="tiles">'
+    + tile(ret.oneDay + ' (' + pct(ret.oneDay, retTotal) + ')', 'tried it once')
+    + tile(ret.twoToFourDays + ' (' + pct(ret.twoToFourDays, retTotal) + ')', 'active 2–4 days')
+    + tile(ret.fivePlusDays + ' (' + pct(ret.fivePlusDays, retTotal) + ')', 'active 5+ days')
+    + '</div>'
+    + '<h2>Today</h2>'
+    + '<div class="tiles">' + tile(plat(today.platforms), 'platforms') + tile(versions, 'app versions seen') + '</div>'
+    + '<h2>Last 14 days</h2>'
+    + '<table><tr><th>Date</th><th>Active</th><th>New</th><th>Installed</th><th>Platforms</th></tr>' + rows + '</table>'
+    + '<p class="sub" style="margin-top:14px">Generated ' + esc(new Date(d.generatedAt).toLocaleString('en-GB')) + ' · pings expire after 90 days · <a style="color:var(--accent)" href="javascript:location.reload()">refresh</a></p>';
+}
+
+function tile(big, small) {
+  return '<div class="tile"><div class="big">' + big + '</div><div class="small">' + small + '</div></div>';
+}
+function pct(n, total) { return Math.round((n / total) * 100) + '%'; }
+
+$('save').addEventListener('click', () => {
+  localStorage.setItem(KEY_STORE, $('key').value.trim());
+  load();
+});
+$('key').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('save').click(); });
+load();
+</script>
+</body>
+</html>

@@ -68,7 +68,9 @@ export function AgendaView({
 }: Props) {
   const todayISO = localTodayISO()
   const anchorRef = useRef<HTMLElement | null>(null)
-  const [pastDays, setPastDays] = useState(7)
+  // History stays one tap away ("Show earlier") — the agenda opens at today,
+  // so the next session is always what you land on.
+  const [pastDays, setPastDays] = useState(0)
   const [futureDays, setFutureDays] = useState(60)
 
   // Warm the 7-day forecast once so per-card lookups are synchronous.

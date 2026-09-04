@@ -33,7 +33,7 @@ import {
   localTodayISO,
   weekBounds,
 } from './lib/filters'
-import { daysUntil, isPlacementSession, placementTag, toMinutes } from './lib/format'
+import { daysUntil, isPlacementSession, placementTag } from './lib/format'
 import { fetchGvizTable } from './lib/gviz'
 import { parseTimetable } from './lib/parseTimetable'
 import { expandPlacementSpans } from './lib/placementSpans'
@@ -849,22 +849,13 @@ export default function App() {
         view === 'day' &&
         !searchResults &&
         settings.homeLat != null &&
-        settings.homeLng != null &&
-        (() => {
-          // End of today's last session drives the "head home" card window.
-          const ends = exportSessions
-            .filter((s) => s.dateISO === todayISO && !s.isSelfStudy && !s.isKeyDate)
-            .map((s) => toMinutes(s.end))
-            .filter((n): n is number => n !== null)
-          return (
-            <HomeCard
-              home={{ lat: settings.homeLat, lng: settings.homeLng }}
-              coords={coords}
-              travelMode={travelMode}
-              lastEndMins={ends.length > 0 ? Math.max(...ends) : null}
-            />
-          )
-        })()}
+        settings.homeLng != null && (
+          <HomeCard
+            home={{ lat: settings.homeLat, lng: settings.homeLng }}
+            coords={coords}
+            travelMode={travelMode}
+          />
+        )}
 
       {sessions !== null &&
         view === 'day' &&

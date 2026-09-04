@@ -81,7 +81,7 @@ export function matchBuilding(room: string): Building | null {
   return BUILDINGS.find((b) => b.keywords.some((k) => key.includes(k))) ?? null
 }
 
-function haversineMeters(a: Coords, b: Coords): number {
+export function haversineMeters(a: Coords, b: Coords): number {
   const R = 6371000
   const toRad = (deg: number) => (deg * Math.PI) / 180
   const dLat = toRad(b.lat - a.lat)

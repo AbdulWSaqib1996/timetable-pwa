@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
-import { TRAVEL_MODE_PHRASE, estimateTravelToCoords } from '../lib/campus'
+import { TRAVEL_MODE_PHRASE, estimateTravelToCoords, haversineMeters } from '../lib/campus'
 import { formatRemaining } from '../lib/format'
 import { tflModeIcon, tflRoute } from '../lib/tfl'
 import type { TflRoute } from '../lib/tfl'
@@ -10,17 +10,15 @@ interface Props {
   /** device location (travel times enabled), else null */
   coords: Coords | null
   travelMode: TravelMode
-  /** end of today's last session, in minutes from midnight; null on session-free days */
-  lastEndMins: number | null
 }
 
 /**
- * End-of-day "head home" card: appears from shortly before today's last session
- * ends until the evening, showing the live journey home — time, route and
- * arrival estimate. Home coordinates never leave the device.
+ * "Head home" card: shows whenever you're away from home (leave whenever you
+ * like — no time gating), with the live journey — time, route and arrival
+ * estimate. Hides itself once you're home. Coordinates never leave the device.
  */
-export function HomeCard({ home, coords, travelMode, lastEndMins }: Props) {
-  // A minute tick so the card appears/updates without any other re-render.
+export function HomeCard({ home, coords, travelMode }: Props) {
+  // A minute tick so the ETA stays current without any other re-render.
   const [, setTick] = useState(0)
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 60_000)
@@ -28,9 +26,7 @@ export function HomeCard({ home, coords, travelMode, lastEndMins }: Props) {
   }, [])
 
   const now = new Date()
-  const nowMins = now.getHours() * 60 + now.getMinutes()
-  const visible =
-    lastEndMins !== null && nowMins >= lastEndMins - 30 && nowMins < 23 * 60
+  const visible = coords !== null && haversineMeters(coords, home) > 400
 
   // Live TfL journey in transit mode, refreshed every 5 minutes while visible.
   const [route, setRoute] = useState<TflRoute | null>(null)
