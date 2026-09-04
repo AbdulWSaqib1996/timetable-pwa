@@ -178,10 +178,20 @@ export default function App() {
   }, [changes])
 
   // Anonymous daily usage ping (throttled inside; off switch in Settings).
+  // Fires on open AND on resume — installed PWAs usually resume rather than
+  // relaunch, so a mount-only ping would miss whole days.
   useEffect(() => {
-    const s = settingsRef.current
-    if (!s || s.demo || s.usagePing === false) return
-    void maybePing(s.pushServerBase ?? DEFAULT_PUSH_BASE, WHATSNEW_VERSION)
+    const ping = () => {
+      const s = settingsRef.current
+      if (!s || s.demo || s.usagePing === false) return
+      void maybePing(s.pushServerBase ?? DEFAULT_PUSH_BASE, WHATSNEW_VERSION)
+    }
+    ping()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') ping()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [active?.id])
 
   // PWA shortcut deep-link (?view=keydates) — consume it once.

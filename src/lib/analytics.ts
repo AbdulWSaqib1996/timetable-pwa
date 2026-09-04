@@ -9,7 +9,9 @@ import { isIOS, isStandalone } from './platform'
  */
 
 const DEVICE_KEY = 'timetable.device.v1'
-const LASTPING_KEY = 'timetable.lastping.v1'
+// v2: v1 marked the day as pinged BEFORE sending, so one failed request
+// silenced the ping for the whole day. v2 only marks after a 2xx response.
+const LASTPING_KEY = 'timetable.lastping.v2'
 
 function deviceId(): string {
   try {
@@ -36,13 +38,24 @@ export async function maybePing(base: string, appVersion: number): Promise<void>
     if (!id) return
     const today = new Date().toISOString().slice(0, 10)
     if (localStorage.getItem(LASTPING_KEY) === today) return
-    localStorage.setItem(LASTPING_KEY, today)
-    await fetch(`${base.replace(/\/+$/, '')}/ping`, {
+    const res = await fetch(`${base.replace(/\/+$/, '')}/ping`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ d: id, i: isStandalone(), p: platform(), v: appVersion }),
     })
+    // Only mark the day done on success — a failed attempt retries on the
+    // next open/resume instead of going silent until tomorrow.
+    if (res.ok) localStorage.setItem(LASTPING_KEY, today)
   } catch {
-    /* best effort — never bothers the user */
+    /* best effort — never bothers the user; retried on next open */
+  }
+}
+
+/** The last day a ping was confirmed sent from this device (yyyy-mm-dd), or null. */
+export function lastPingDate(): string | null {
+  try {
+    return localStorage.getItem(LASTPING_KEY)
+  } catch {
+    return null
   }
 }

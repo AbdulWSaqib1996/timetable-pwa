@@ -84,6 +84,8 @@ body {
   align-items: baseline;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .topbar h1 {
@@ -96,11 +98,22 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+@media (max-width: 380px) {
+  .updated {
+    display: none;
+  }
 }
 
 .topbar-actions {
   display: flex;
   gap: 6px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
 }
 
 .btn-icon {

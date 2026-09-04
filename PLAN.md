@@ -317,6 +317,10 @@ Owner reported no devices on the analytics dashboard despite using the app: veri
 
 The full-width Head-home card and "Show earlier" button took too much room. Head-home is now a compact **🏠 pill in the top bar** showing the live minutes ("🏠 30m", cached live-TfL when available); tapping it drops down the full journey (route legs, arrival ETA, Directions) and it still only appears when away from home. History moved behind a **🕰 toggle beside Day/Week/Month**: the agenda always opens at today, and the toggle reveals every retained past day above it (today stays pinned via re-anchor on toggle); the big Show-earlier button is gone. Verified live: pill "🏠30m" → dropdown "≈ 30m by public transport (live TfL) · arrive ~14:11 · 🚶 → 🚇 Piccadilly → 🚌 19 → 🚶"; 🕰 on renders the recovered Sept 2–3 above today.
 
+## Ping reliability + topbar overlap (4 Sep 2026, twenty-sixth pass)
+
+Owner's phone was on the latest build yet the dashboard stayed at 0. Root cause: the analytics ping marked the day as "sent" **before** the request, so a single failed attempt (flaky network at launch) silenced it until the next day. Fixed: the day is only marked after a 2xx (failed attempts retry on every open), the throttle key moved to v2 so already-burned days don't carry over, and the ping also fires on visibilitychange — installed PWAs usually **resume** rather than relaunch, so a mount-only ping would miss whole days. Settings → Support now shows on-device status ("ping sent today ✓ / not sent yet") so this is self-diagnosable. Verified the fixed pipeline live end-to-end (app open → ping → dashboard count), then removed the test device from KV. Also fixed: the 🏠 pill overlapped the "updated Xm ago" text — the topbar title now shrinks with ellipsis, actions never wrap, and the updated label hides under 380px (verified no overlap at 375px and 430px).
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:

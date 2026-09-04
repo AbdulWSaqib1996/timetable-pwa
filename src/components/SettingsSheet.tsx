@@ -5,6 +5,7 @@ import { isPlacementSession, placementTag } from '../lib/format'
 import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
 import { parseSheetUrl } from '../lib/sheetUrl'
+import { lastPingDate } from '../lib/analytics'
 import { geocodeAddress } from '../lib/geocode'
 import { needsIosInstall } from '../lib/platform'
 import { subscribePush, unsubscribePush } from '../lib/push'
@@ -1311,6 +1312,12 @@ export function SettingsSheet({
             (created on this device, tied to nothing), whether the app is installed, the platform
             type and the app version. No location, no identity, no timetable data. It helps the
             developer see whether the app is being used.
+            {settings.usagePing !== false &&
+              ` Status: ${
+                lastPingDate() === new Date().toISOString().slice(0, 10)
+                  ? 'ping sent today ✓'
+                  : 'not sent yet today — it retries each time the app opens.'
+              }`}
           </p>
         </section>
 
