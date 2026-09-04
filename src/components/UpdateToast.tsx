@@ -1,6 +1,10 @@
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
-/** "New version available" prompt + periodic-background-sync registration. */
+/**
+ * Service-worker registration + periodic-background-sync. Updates now apply
+ * automatically (registerType 'autoUpdate'), so the old "new version available"
+ * toast only remains as a fallback for the rare case a refresh is still needed.
+ */
 export function UpdateToast() {
   const {
     needRefresh: [needRefresh],

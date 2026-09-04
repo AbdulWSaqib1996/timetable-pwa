@@ -11,7 +11,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      // Auto-update: new versions activate without a user tap — a cohort never
+      // taps update toasts, and features (like the analytics ping) otherwise
+      // lag behind on installed phones indefinitely.
+      registerType: 'autoUpdate',
       includeAssets: ['apple-touch-icon.png'],
       manifest: {
         name: 'My Timetable',
