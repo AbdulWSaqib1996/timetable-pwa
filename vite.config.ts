@@ -8,6 +8,10 @@ const base = process.env.VERCEL ? '/' : '/timetable-pwa/'
 
 export default defineConfig({
   base,
+  // Build stamp shown in Settings so "am I on the latest version?" is answerable.
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
+  },
   plugins: [
     react(),
     VitePWA({

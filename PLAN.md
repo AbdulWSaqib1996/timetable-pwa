@@ -341,6 +341,10 @@ Audited both workers against the free-tier caps. Requests (100k/day) were never 
 5. **Dashboard:** caches `/stats` (the KV-list-heavy call) for 10 minutes client-side; the refresh link forces.
 Post-change worst-case budget at ~30 active users: a few hundred KV writes/day (pings ≤2/device, real config/sync changes only, movement-gated locations, ~1 hist write/sheet) against the 1,000 cap, with cron overhead constant. Also noted: the "3 devices" briefly visible on the dashboard were this session's test devices, purged after verification — real counts start from zero.
 
+## Post-mortem: the vanished device (4 Sep 2026, thirtieth pass)
+
+Owner's device "not showing despite using the app today" — reconstruction shows the pipeline had actually worked: the phone auto-updated, pinged, and was one of the three devices briefly on the dashboard. Of the three ids purged as test data, two were provably this session's test devices; the third (`14471e…`) matched no test run and was almost certainly the owner's phone — **wrongly deleted in the purge**. Its successful ping means the device correctly won't retry until tomorrow, when it reappears by itself. Rules adopted: never write test pings against production analytics again, and never delete a KV record that wasn't explicitly created by the session. Shipped alongside, to end the "which build am I on?" ambiguity behind this whole saga: a version + build-time stamp in Settings → Support (baked in at build via `__BUILD_TIME__`), and service-worker update checks on every app resume plus hourly (installed PWAs resume rather than relaunch, so the browser's own check could lag builds for hours).
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:

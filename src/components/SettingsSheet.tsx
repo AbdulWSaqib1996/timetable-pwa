@@ -6,6 +6,7 @@ import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
 import { parseSheetUrl } from '../lib/sheetUrl'
 import { lastPingDate } from '../lib/analytics'
+import { WHATSNEW_VERSION } from '../lib/changelog'
 import { geocodeAddress } from '../lib/geocode'
 import { needsIosInstall } from '../lib/platform'
 import { subscribePush, unsubscribePush } from '../lib/push'
@@ -1320,6 +1321,10 @@ export function SettingsSheet({
                   ? 'ping sent today ✓'
                   : 'not sent yet today — it retries each time the app opens.'
               }`}
+          </p>
+          <p className="filter-hint">
+            App version {WHATSNEW_VERSION} · build {__BUILD_TIME__} — updates apply automatically on
+            the next open.
           </p>
         </section>
 

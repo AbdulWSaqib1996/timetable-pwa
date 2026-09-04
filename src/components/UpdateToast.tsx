@@ -12,6 +12,16 @@ export function UpdateToast() {
   } = useRegisterSW({
     onRegisteredSW(_url, registration) {
       void registerPeriodicSync(registration)
+      // Installed PWAs resume rather than relaunch, so the browser's own SW
+      // update check can lag for hours — check on every resume (and hourly)
+      // so auto-update actually reaches phones promptly.
+      if (registration) {
+        const check = () => void registration.update().catch(() => {})
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') check()
+        })
+        setInterval(check, 3600_000)
+      }
     },
   })
 
