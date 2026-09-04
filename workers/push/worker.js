@@ -593,7 +593,7 @@ async function runScheduled(env) {
   const getSheetInfo = async (id, gid) => {
     const key = `${id}|${gid ?? ''}`
     if (!sheetCache.has(key)) {
-      const sessions = await fetchSessions(id, gid)
+      let sessions = await fetchSessions(id, gid)
       let changes = []
       let hadSnapshot = false
       let failCount = 0
@@ -602,6 +602,12 @@ async function runScheduled(env) {
         const old = await env.PUSH.get(snapKey(id, gid), 'json')
         if (old) {
           hadSnapshot = true
+          // The sheet drops past rows daily (rolling TODAY() filter); keep the
+          // history the snapshot has seen so placement-span markers and past
+          // days survive — and snapshots accumulate it through rewrites.
+          const freshDates = new Set(sessions.map((s) => s.dateISO))
+          const retained = old.filter((s) => s.dateISO < now.dateISO && !freshDates.has(s.dateISO))
+          if (retained.length > 0) sessions = sessions.concat(retained)
           changes = diffSheets(old, sessions, now.dateISO)
         }
       } else {
@@ -1035,6 +1041,16 @@ export default {
     if (request.method === 'GET' && url.pathname === '/vapid') {
       const vapid = await getVapid(env)
       return json({ publicKey: vapid.publicKey })
+    }
+    // Sheet history from the cron's snapshot (the sheet itself drops past rows) —
+    // the app back-fills days it lost before local retention shipped. The sheet
+    // is public by definition here, so this exposes nothing new.
+    if (request.method === 'GET' && url.pathname === '/history') {
+      const id = url.searchParams.get('id') ?? ''
+      if (!/^[a-zA-Z0-9_-]{20,}$/.test(id)) return json({ error: 'invalid id' }, 400)
+      const gid = url.searchParams.get('gid')
+      const snap = await env.PUSH.get(snapKey(id, gid || null), 'json')
+      return json({ sessions: snap ?? [] })
     }
     if (request.method === 'POST' && url.pathname === '/subscribe') {
       const body = await request.json().catch(() => null)

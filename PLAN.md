@@ -288,6 +288,15 @@ Theme requested by the owner: **make every piece of PGCE admin loggable in the a
 
 **Suggested order:** 3 → 2 → 1 first (they feed each other: meetings set targets, reflections review them, and all three are needed weekly from placement day one — before SE1a on 28 Sept 2026 ideally), then 4 + 5 as the observation/lesson pair, 8 once three data sources exist, 6 and 7 as fill-ins, 9 + 10 last since they aggregate everything.
 
+## Bug fix — history retention (4 Sep 2026, twenty-first pass)
+
+**Reported:** nothing before today is visible, and yesterday's attendance marks don't count in stats. **Root cause:** the source sheet is built on a rolling TODAY() filter — its GViz feed literally drops each day's rows overnight (verified: on 4 Sep the feed's earliest date was 4 Sep; on 3 Sep it had been 3 Sep). The app faithfully mirrored the feed, so history vanished daily and marks pointed at sessions that no longer existed. **Fix, in three layers, all keeping one rule — retention only ever applies to whole past days that fell off the sheet; the future always comes fresh, so a cancelled future session can never be resurrected (verified by planting fake cancelled-future rows in the cache: both purged on refresh, past-day row survived):**
+1. **App:** `retainHistory` merges cache-held past days missing from each fetch (before placement-span expansion, so past marker rows keep regenerating their spans); key dates get the same treatment. Verified live: agenda shows Wed 2 / Thu 3 Sept before Today, ✓ badges render on yesterday's cards, attendance summary counts them (2 of 9), and history survives repeat refreshes.
+2. **One-time recovery:** the push worker's per-sheet snapshot still held everything back to 2 Sep (it only rewrites on changes); a new `GET /history` endpoint exposes it and the app back-fills lost days once per profile — so the days lost before this fix existed came back.
+3. **Workers:** the push worker's cron retains snapshot history the same way (snapshots accumulate it through rewrites; keeps placement spans alive after their marker date passes, and background features working against past-dependent state), and the ics-feed worker keeps a KV history per sheet (past-from-history + future-from-fresh-only, written only when new rows appear) so subscribed calendars keep past events from now on. Change detection is untouched — the diff was already future-only, so cancellations still push alerts.
+
+Known residual: days that fell off before ~2 Sep (none existed) and feed-history before 4 Sep are unrecoverable; a placement span cancelled *after* its marker row has become history can't be detected from the sheet (the sheet carries no signal either way).
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
+import { DEFAULT_PUSH_BASE } from '../lib/config'
 import { buildDemoSessions } from '../lib/demo'
 import { diffSessions } from '../lib/diff'
 import { applyFilters, localTodayISO } from '../lib/filters'
 import { fetchGvizTable } from '../lib/gviz'
+import { historyRecovered, markHistoryRecovered, recoverHistory, retainHistory } from '../lib/history'
 import { parseTimetable } from '../lib/parseTimetable'
 import { drainPendingActions } from '../lib/pendingActions'
 import { expandPlacementSpans } from '../lib/placementSpans'
@@ -64,8 +66,24 @@ export function useTimetableData(active: ProfileEntry | null) {
           })
           parsed.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
         }
-        parsed = expandPlacementSpans(parsed)
         const prev = loadCache(pid)
+        // The sheet drops past rows (rolling TODAY() filter) — keep the history
+        // this app has already seen, and once per profile back-fill days lost
+        // before retention existed from the push worker's snapshot.
+        parsed = retainHistory(parsed, prev?.sessions, todayISO)
+        if (!historyRecovered(pid)) {
+          const recovered = await recoverHistory(
+            s.pushServerBase ?? DEFAULT_PUSH_BASE,
+            s.sheetId,
+            s.gid,
+            parsed,
+            todayISO
+          )
+          if (recovered.length > 0) parsed = [...parsed, ...recovered]
+          markHistoryRecovered(pid)
+        }
+        parsed.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
+        parsed = expandPlacementSpans(parsed)
         if (prev) {
           // Diff the user's own view of old vs new (their specialism/group filters applied);
           // synthetic placement days are excluded so span expansion never floods the bell.
@@ -87,6 +105,8 @@ export function useTimetableData(active: ProfileEntry | null) {
           try {
             const kdTable = await fetchGvizTable(s.keyDatesSheetId, s.keyDatesGid ?? null)
             kd = parseTimetable(kdTable).sessions.map((k) => ({ ...k, id: `kd-${k.id}`, isKeyDate: true }))
+            // Past deadlines survive too, if that tab also rolls forward.
+            kd = retainHistory(kd, prev?.keyDates, todayISO)
           } catch {
             kd = prev?.keyDates
           }

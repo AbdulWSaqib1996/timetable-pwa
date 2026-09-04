@@ -303,6 +303,34 @@ export default {
 
     let sessions
     try { sessions = parseSessions(json.table) } catch (e) { return new Response(e.message, { status: 422 }) }
+
+    // The sheet drops past rows daily (rolling TODAY() filter). The feed keeps
+    // history in KV so subscribed calendars keep past events. The stored copy is
+    // past-from-history + future-from-fresh-ONLY, so a session cancelled on the
+    // sheet is dropped from storage immediately and can never resurrect when its
+    // day later falls off the sheet.
+    if (env?.RATE) {
+      try {
+        const histKey = `hist:${id}|${gid ?? ''}`
+        const keyOf = (s) => `${s.dateISO}|${s.start}|${(s.title || '').trim().toLowerCase()}`
+        const todayISO = new Date().toISOString().slice(0, 10)
+        const seen = await env.RATE.get(histKey, 'json')
+        if (seen) {
+          const freshDates = new Set(sessions.map((s) => s.dateISO))
+          sessions = sessions.concat(seen.filter((s) => s.dateISO < todayISO && !freshDates.has(s.dateISO)))
+        }
+        const byKey = new Map((seen ?? []).filter((s) => s.dateISO < todayISO).map((s) => [keyOf(s), s]))
+        for (const s of sessions) if (s.dateISO < todayISO) byKey.set(keyOf(s), s)
+        const stored = [...byKey.values(), ...sessions.filter((s) => s.dateISO >= todayISO)]
+        const seenKeys = new Set((seen ?? []).map(keyOf))
+        if (!seen || stored.length !== seen.length || stored.some((s) => !seenKeys.has(keyOf(s)))) {
+          ctx.waitUntil(env.RATE.put(histKey, JSON.stringify(stored)))
+        }
+      } catch {
+        /* history is best-effort; the live feed still works */
+      }
+    }
+
     if (spec.length > 0) {
       sessions = sessions.filter((s) => !s.specialismName || spec.includes(s.specialismName))
     }
