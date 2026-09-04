@@ -2366,3 +2366,21 @@ body {
 .home-pop .route-steps {
   margin: 0;
 }
+
+/* ---------- room chip (building/room split on cards) ---------- */
+
+.room-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.room-chip-tbc {
+  background: var(--error-bg);
+  color: var(--error-text);
+}

@@ -5,6 +5,7 @@ import { geocodeAddress } from '../lib/geocode'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl, isPlacementSession } from '../lib/format'
+import { parseLocation } from '../lib/location'
 import { sessionKey } from '../lib/diff'
 import { trackUse } from '../lib/usage'
 import { addPhoto, compressImage, deletePhoto, getPhotos } from '../lib/photos'
@@ -161,6 +162,19 @@ export function SessionDetail({
 
   const shownMinutes = travelMode === 'transit' && route ? route.minutes : travel?.minutes ?? null
   const liveLabel = travelMode === 'transit' && route ? ' (live TfL)' : ''
+  // The sheet's Location column glues building and room together — split them
+  // into their own rows (with special cases for TBC and leaked booking refs).
+  const loc = parseLocation(session.isSelfStudy ? '' : session.room)
+  const locationRows: { label: string; value: string }[] = loc.building
+    ? [
+        { label: 'Building', value: loc.building },
+        { label: 'Room', value: `${loc.room}${loc.roomName ? ` · ${loc.roomName}` : ''}` },
+      ]
+    : loc.note === 'booking-ref'
+      ? [{ label: 'Room', value: `Not in the sheet yet (booking ref ${loc.raw})` }]
+      : loc.note === 'tbc'
+        ? [{ label: 'Room', value: 'TBC — check nearer the time' }]
+        : [{ label: 'Location', value: loc.raw }]
   const rows: { label: string; value: string }[] = [
     { label: 'Date', value: formatLongDate(session.dateISO) },
     {
@@ -168,7 +182,7 @@ export function SessionDetail({
       value: session.start ? (session.end ? `${session.start} – ${session.end}` : session.start) : '',
     },
     { label: 'Duration', value: duration ?? '' },
-    { label: 'Location', value: session.isSelfStudy ? '' : session.room },
+    ...locationRows,
     { label: 'Tutor', value: session.tutor === 'Self Study' ? '' : session.tutor },
     { label: 'Subject', value: session.subject !== session.title ? session.subject : '' },
     { label: 'Groups', value: session.groups },

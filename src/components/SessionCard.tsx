@@ -1,6 +1,7 @@
 import { TRAVEL_MODE_ICON, estimateTravel } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, isPlacementSession, shortenRoom, subjectColor } from '../lib/format'
+import { parseLocation, shortBuildingName } from '../lib/location'
 import { cachedRouteMinutes } from '../lib/tfl'
 import { weatherEmoji } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
@@ -45,7 +46,25 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
       <div className="session-body">
         <div className="session-title">{session.title}</div>
         <div className="session-meta">
-          {!session.isSelfStudy && session.room && <span>{shortenRoom(session.room)}</span>}
+          {!session.isSelfStudy &&
+            session.room &&
+            (() => {
+              const loc = parseLocation(session.room)
+              if (loc.building && loc.room) {
+                return (
+                  <>
+                    <span>{shortBuildingName(loc)}</span>
+                    <span className="room-chip" title={loc.roomName ?? undefined}>
+                      Rm {loc.room}
+                    </span>
+                  </>
+                )
+              }
+              if (loc.note) {
+                return <span className="room-chip room-chip-tbc">Room TBC</span>
+              }
+              return <span>{shortenRoom(session.room)}</span>
+            })()}
           {session.tutor && session.tutor !== 'Self Study' && <span>{session.tutor}</span>}
           {travelMins != null && (
             <span className="travel-chip" title={travel?.building ?? undefined}>
