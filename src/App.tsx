@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AgendaView } from './components/AgendaView'
 import { FilterBar } from './components/FilterBar'
-import { HomeCard } from './components/HomeCard'
+import { HomePill } from './components/HomeCard'
 import { MonthView } from './components/MonthView'
 import { NowNextCard } from './components/NowNextCard'
 import { SessionDetail } from './components/SessionDetail'
@@ -115,6 +115,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [showBackupNudge, setShowBackupNudge] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowWhatsNew())
   const [notices, setNotices] = useState<Notice[]>([])
   const [dismissedNotices, setDismissedNotices] = useState<Set<string>>(() => loadDismissedNotices())
@@ -628,6 +629,13 @@ export default function App() {
             )}
           </div>
           <div className="topbar-actions">
+            {settings.homeLat != null && settings.homeLng != null && (
+              <HomePill
+                home={{ lat: settings.homeLat, lng: settings.homeLng }}
+                coords={coords}
+                travelMode={travelMode}
+              />
+            )}
             <button
               type="button"
               className="btn-icon"
@@ -691,6 +699,8 @@ export default function App() {
           view={view}
           activeCount={activeFilterCount(settings)}
           placementsOnly={filters.placementsOnly === true}
+          historyOn={showHistory}
+          onToggleHistory={() => setShowHistory((v) => !v)}
           onView={(v) => {
             setJumpDate(null)
             updateSettings({ activeView: v })
@@ -848,18 +858,6 @@ export default function App() {
       {sessions !== null &&
         view === 'day' &&
         !searchResults &&
-        settings.homeLat != null &&
-        settings.homeLng != null && (
-          <HomeCard
-            home={{ lat: settings.homeLat, lng: settings.homeLng }}
-            coords={coords}
-            travelMode={travelMode}
-          />
-        )}
-
-      {sessions !== null &&
-        view === 'day' &&
-        !searchResults &&
         (() => {
           const next = allKeyDates
             .filter((k) => k.dateISO >= todayISO && metaMap[sessionKey(k)]?.status !== 'done')
@@ -931,6 +929,7 @@ export default function App() {
               : undefined
           }
           windowed
+          showAllPast={showHistory}
           emptyMessage={
             sessions.length === 0
               ? 'No sessions found in this sheet.'

@@ -313,6 +313,10 @@ Known residual: days that fell off before ~2 Sep (none existed) and feed-history
 
 Owner reported no devices on the analytics dashboard despite using the app: verified zero pings server-side — the phone was still running a pre-analytics bundle, because `registerType: 'prompt'` holds every new version behind a "Refresh" toast tap that nobody makes. Switched to `registerType: 'autoUpdate'` (the generated SW now skipWaiting/clientsClaims): a device downloads the new SW automatically on launch and runs the new bundle from the next open, no interaction. The toast remains only as a fallback. One-time crossing for devices still on the prompt-mode SW: open the app (tap Refresh if the toast shows), or force-close and reopen twice; from then on updates flow automatically.
 
+## Header pill + history toggle (4 Sep 2026, twenty-fifth pass — owner feedback)
+
+The full-width Head-home card and "Show earlier" button took too much room. Head-home is now a compact **🏠 pill in the top bar** showing the live minutes ("🏠 30m", cached live-TfL when available); tapping it drops down the full journey (route legs, arrival ETA, Directions) and it still only appears when away from home. History moved behind a **🕰 toggle beside Day/Week/Month**: the agenda always opens at today, and the toggle reveals every retained past day above it (today stays pinned via re-anchor on toggle); the big Show-earlier button is gone. Verified live: pill "🏠30m" → dropdown "≈ 30m by public transport (live TfL) · arrive ~14:11 · 🚶 → 🚇 Piccadilly → 🚌 19 → 🚶"; 🕰 on renders the recovered Sept 2–3 above today.
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:

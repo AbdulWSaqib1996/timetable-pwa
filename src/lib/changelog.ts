@@ -2,8 +2,8 @@
 export const WHATSNEW_VERSION = 6
 
 export const WHATSNEW: string[] = [
-  '🕰 Past days are back — the app now keeps history the sheet deletes daily, so yesterday’s sessions and attendance stay put',
-  '🏠 Head home — set your home address in Settings → Travel times and get a live journey-home card (time, TfL route, arrival ETA) as your last session ends',
+  '🕰 Past days are back — tap 🕰 next to Day/Week/Month to show history (the sheet deletes it daily; the app now keeps it, attendance included)',
+  '🏠 Head home — set your home address in Settings → Travel times; a 🏠 pill in the header shows the live journey home (tap for route + arrival ETA) whenever you’re out',
   '🎓 My PGCE file — tap the cap in the top bar: reflections, targets, meetings, observations, lessons, audits, wallet and a full binder export',
   '📋 Friday admin digest push: what’s still outstanding before the weekend',
 ]

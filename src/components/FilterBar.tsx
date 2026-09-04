@@ -4,6 +4,9 @@ interface Props {
   view: ViewMode
   activeCount: number
   placementsOnly: boolean
+  /** history toggle (day view only): show past days above today */
+  historyOn?: boolean
+  onToggleHistory?: () => void
   onView: (view: ViewMode) => void
   onTogglePlacements: () => void
   onOpenFilters: () => void
@@ -15,7 +18,7 @@ const VIEWS: { value: ViewMode; label: string }[] = [
   { value: 'month', label: 'Month' },
 ]
 
-export function FilterBar({ view, activeCount, placementsOnly, onView, onTogglePlacements, onOpenFilters }: Props) {
+export function FilterBar({ view, activeCount, placementsOnly, historyOn, onToggleHistory, onView, onTogglePlacements, onOpenFilters }: Props) {
   return (
     <div className="filterbar">
       <div className="segmented" role="tablist" aria-label="View">
@@ -32,6 +35,18 @@ export function FilterBar({ view, activeCount, placementsOnly, onView, onToggleP
           </button>
         ))}
       </div>
+      {onToggleHistory && view === 'day' && (
+        <button
+          type="button"
+          className={`btn-filters btn-placements${historyOn ? ' on' : ''}`}
+          aria-pressed={historyOn === true}
+          title={historyOn ? 'Hiding history — tap to hide past days' : 'Show past days'}
+          aria-label={historyOn ? 'Hide past days' : 'Show past days'}
+          onClick={onToggleHistory}
+        >
+          🕰
+        </button>
+      )}
       <button
         type="button"
         className={`btn-filters btn-placements${placementsOnly ? ' on' : ''}`}

@@ -2310,3 +2310,40 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- Head-home pill + history toggle ---------- */
+
+.home-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: auto !important;
+  padding: 0 8px;
+  border-radius: 999px;
+}
+
+.home-pill.on {
+  background: var(--accent-soft);
+}
+
+.home-pill-mins {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.home-pop {
+  position: absolute;
+  top: 100%;
+  right: 8px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(420px, calc(100vw - 16px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}

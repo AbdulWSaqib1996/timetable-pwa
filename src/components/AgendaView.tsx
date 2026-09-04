@@ -18,6 +18,8 @@ interface Props {
   travelMode?: TravelMode
   /** limit rendering to a window around today, with show-earlier/show-later controls */
   windowed?: boolean
+  /** header 🕰 toggle: render all past days above today (windowed mode only) */
+  showAllPast?: boolean
   /** user-entered placement details, keyed by placement tag */
   placements?: Record<string, { school?: string }>
   /** overall school-days progress shown on placement-day blocks */
@@ -63,14 +65,15 @@ export function AgendaView({
   coords,
   travelMode,
   windowed,
+  showAllPast,
   placements,
   placementProgress,
 }: Props) {
   const todayISO = localTodayISO()
   const anchorRef = useRef<HTMLElement | null>(null)
-  // History stays one tap away ("Show earlier") — the agenda opens at today,
+  // History lives behind the header 🕰 toggle — the agenda opens at today,
   // so the next session is always what you land on.
-  const [pastDays, setPastDays] = useState(0)
+  const pastDays = showAllPast ? 3650 : 0
   const [futureDays, setFutureDays] = useState(60)
 
   // Warm the 7-day forecast once so per-card lookups are synchronous.
@@ -96,7 +99,7 @@ export function AgendaView({
 
   // Rendering all ~440 sessions at once is heavy on older phones; window around today
   // and extend on demand. The window always stretches to include a jump target.
-  const { days, hiddenEarlier, hiddenLater } = useMemo(() => {
+  const { days, hiddenLater } = useMemo(() => {
     if (!windowed) return { days: allDays, hiddenEarlier: 0, hiddenLater: 0 }
     let from = addDaysISO(todayISO, -pastDays)
     let to = addDaysISO(todayISO, futureDays)
@@ -156,6 +159,12 @@ export function AgendaView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anchorISO])
 
+  // Toggling history on renders past days above the viewport — keep today pinned.
+  useEffect(() => {
+    scrollToAnchor('auto')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAllPast])
+
   const scrollToToday = () => scrollToAnchor('smooth')
 
   if (days.length === 0) {
@@ -164,11 +173,6 @@ export function AgendaView({
 
   return (
     <div className="agenda">
-      {hiddenEarlier > 0 && (
-        <button type="button" className="btn-window" onClick={() => setPastDays((p) => p + 90)}>
-          ↑ Show earlier ({hiddenEarlier} more days)
-        </button>
-      )}
       {days.map(([dateISO, daySessions], dayIdx) => {
         const isToday = dateISO === todayISO
         const isPast = dateISO < todayISO
