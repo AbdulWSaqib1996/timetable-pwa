@@ -2384,3 +2384,35 @@ body {
   background: var(--error-bg);
   color: var(--error-text);
 }
+
+/* ---------- sessions-by-subject list (Term stats) ---------- */
+
+.subject-count-list {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.subject-count-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.subject-count-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subject-count-nums {
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-size: 12.5px;
+}

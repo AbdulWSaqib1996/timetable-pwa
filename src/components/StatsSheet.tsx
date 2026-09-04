@@ -1,7 +1,7 @@
 import { useModalA11y } from '../lib/a11y'
 import { matchBuilding } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
-import { isPlacementSession, placementTag, shortenRoom, toMinutes } from '../lib/format'
+import { baseSubject, isPlacementSession, placementTag, shortenRoom, toMinutes } from '../lib/format'
 import type { MetaMap, Session } from '../types'
 
 interface Props {
@@ -179,6 +179,33 @@ async function shareStatsImage(tiles: { big: string; small: string }[]): Promise
 export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placementTargetDays, adminCounts, onClose }: Props) {
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const stats = computeStats(sessions, metaMap, todayISO, keyDates, placementTargetDays)
+
+  // Sessions per subject: "Maths 1" and "Maths 2" both count as Maths.
+  const subjectGroups = (() => {
+    const bySubject = new Map<string, { count: number; hours: number; attended: number; past: number }>()
+    for (const s of sessions) {
+      const base = baseSubject(s)
+      if (!base) continue
+      const g = bySubject.get(base) ?? { count: 0, hours: 0, attended: 0, past: 0 }
+      g.count++
+      const start = toMinutes(s.start)
+      const end = toMinutes(s.end)
+      if (start !== null && end !== null && end > start) g.hours += (end - start) / 60
+      if (s.dateISO <= todayISO) {
+        g.past++
+        if (metaMap[sessionKey(s)]?.attended) g.attended++
+      }
+      bySubject.set(base, g)
+    }
+    const all = [...bySubject.entries()].sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+    // Sentence-length names are calendar notes (holidays, deferred-assessment
+    // rows), not subjects — bucket them with the one-offs.
+    const isSubjectish = ([name, g]: (typeof all)[number]) => g.count >= 2 && name.length <= 40
+    return {
+      main: all.filter(isSubjectish),
+      oneOffs: all.filter((e) => !isSubjectish(e)).length,
+    }
+  })()
   const tiles = buildTiles(stats)
   if (adminCounts?.lessons) tiles.push({ big: `${adminCounts.lessons}`, small: 'lessons taught (logged)' })
   if (adminCounts?.observations) tiles.push({ big: `${adminCounts.observations}`, small: 'observations received' })
@@ -213,6 +240,31 @@ export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placeme
             {stats.placementBlocks.map((b) => `${b.tag} ${b.attended}/${b.total}`).join(' · ')} — tick
             “Attended” on a placement day to log it.
           </p>
+        )}
+        {subjectGroups.main.length > 0 && (
+          <>
+            <h3 className="subheading">Sessions by subject</h3>
+            <p className="filter-hint">
+              Numbered sessions count as one subject — Maths 1 and Maths 2 are both Maths.
+            </p>
+            <ul className="subject-count-list">
+              {subjectGroups.main.map(([name, g]) => (
+                <li key={name}>
+                  <span className="subject-count-name">{name}</span>
+                  <span className="subject-count-nums">
+                    {g.count} session{g.count === 1 ? '' : 's'}
+                    {g.hours > 0 && ` · ${Math.round(g.hours)}h`}
+                    {g.past > 0 && ` · ${g.attended}/${g.past} attended`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {subjectGroups.oneOffs > 0 && (
+              <p className="filter-hint">
+                + {subjectGroups.oneOffs} one-off entries (audits, admin days…) not listed.
+              </p>
+            )}
+          </>
         )}
         <div className="modal-actions">
           <button type="button" className="btn-primary" onClick={() => void shareStatsImage(tiles)}>

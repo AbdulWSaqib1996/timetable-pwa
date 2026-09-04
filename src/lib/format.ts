@@ -64,6 +64,21 @@ export function placementTag(title: string): string {
   return m ? m[0].replace(/\s/g, '').toUpperCase() : 'PLACEMENT'
 }
 
+/**
+ * Base subject for counting: "Maths 1" and "Maths 2" are both Maths — trailing
+ * numbers are session indexes, not subjects. Specialism rows group under their
+ * specialism name; unnumbered "X - Y" titles group under X. Returns null for
+ * self-study, key dates and placement rows.
+ */
+export function baseSubject(s: Session): string | null {
+  if (s.isSelfStudy || s.isKeyDate || isPlacementSession(s)) return null
+  if (s.isSpecialism && s.specialismName) return s.specialismName
+  let t = (s.subject || s.title).trim().replace(/\s*\(optional\)\s*/i, ' ').trim()
+  const m = t.match(/^([A-Za-z&+' .]*?[A-Za-z&+.])\s*\d+[a-z]?\b/)
+  if (m) return m[1].trim()
+  return t.split(/\s+[-–—]\s+/)[0].trim() || t
+}
+
 /** Whole days from todayISO to dateISO (0 = today, negative = past). */
 export function daysUntil(dateISO: string, todayISO: string): number {
   const toTime = (iso: string) => {
