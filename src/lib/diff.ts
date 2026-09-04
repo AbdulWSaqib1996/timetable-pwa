@@ -1,3 +1,4 @@
+import { describeRoomChange } from './location'
 import type { Session, SessionChange } from '../types'
 
 /** Stable identity for a session across refreshes (row indexes shift when rows are added). */
@@ -27,9 +28,9 @@ export function diffSessions(oldSessions: Session[], newSessions: Session[], tod
     const newS = newMap.get(key)
     if (!newS) return
     const details: string[] = []
-    if (oldS.room !== newS.room) details.push(`room ${oldS.room || '—'} → ${newS.room || '—'}`)
-    if (oldS.tutor !== newS.tutor) details.push(`tutor ${oldS.tutor || '—'} → ${newS.tutor || '—'}`)
-    if (oldS.end !== newS.end) details.push(`ends ${oldS.end || '—'} → ${newS.end || '—'}`)
+    if (oldS.room !== newS.room) details.push(describeRoomChange(oldS.room, newS.room))
+    if (oldS.tutor !== newS.tutor) details.push(`Tutor changed: ${oldS.tutor || '—'} → ${newS.tutor || '—'}`)
+    if (oldS.end !== newS.end) details.push(`End time changed: ${oldS.end || '—'} → ${newS.end || '—'}`)
     if (details.length > 0) {
       out.push({
         type: 'changed',

@@ -524,6 +524,59 @@ const daysBetween = (a, b) => {
   }
   return Math.round((t(a) - t(b)) / 86400000)
 }
+/* ---------- location parsing (compact port of the app's src/lib/location.ts) ---------- */
+function parseLoc(raw) {
+  const text = (raw ?? '').trim()
+  if (!text) return { raw: text }
+  if (/^tbc$/i.test(text)) return { raw: text, note: 'tbc' }
+  if (/^\d{6,}$/.test(text)) return { raw: text, note: 'booking-ref' }
+  let m = text.match(/^IOE\s*[-–]\s*(.+?)\s*\((\d+)\)\s*[-–]\s*(.+)$/)
+  if (m) {
+    const nameMatch = m[3].match(/^([\w.]+)\s*[-–]\s*(.+)$/)
+    return {
+      building: `IOE · ${m[2]} ${m[1]}`,
+      short: 'Bedford Way',
+      room: nameMatch ? nameMatch[1] : m[3].trim(),
+      roomName: nameMatch ? nameMatch[2].trim() : undefined,
+      raw: text,
+    }
+  }
+  m = text.match(/^(Cruciform Building)\s+(.+)$/i)
+  if (m) return { building: m[1], short: 'Cruciform', room: m[2].trim(), raw: text }
+  m = text.match(/^(Christopher Ingold Building)\s*[-–]\s*(.+)$/i)
+  if (m) return { building: m[1], short: 'Christopher Ingold', room: m[2].trim(), raw: text }
+  m = text.match(/^([A-Z]?\d+\w*)\s+Darwin(?:\s+(.*))?$/i)
+  if (m) {
+    const rest = (m[2] || '').trim()
+    return {
+      building: 'Darwin Building',
+      short: 'Darwin',
+      room: m[1],
+      roomName: rest.toUpperCase() === 'LT' ? 'Lecture Theatre' : rest || undefined,
+      raw: text,
+    }
+  }
+  return { raw: text }
+}
+
+/** Human sentence for a location change (mirrors the app's describeRoomChange). */
+function describeRoomChange(oldRoom, newRoom) {
+  const a = parseLoc(oldRoom)
+  const b = parseLoc(newRoom)
+  const roomLabel = (p) => (p.room ? `${p.room}${p.roomName ? ` (${p.roomName})` : ''}` : p.raw || '—')
+  const full = (p) => (p.building ? `${p.short} Rm ${roomLabel(p)}` : p.note ? 'TBC' : p.raw || '—')
+  if (a.note && b.building) return `Room confirmed: ${full(b)} (was TBC)`
+  if (b.note && a.building) return `Room now TBC (was ${full(a)})`
+  if (a.building && b.building) {
+    const sameBuilding = a.building === b.building
+    const sameRoom = roomLabel(a) === roomLabel(b)
+    if (sameBuilding && !sameRoom) return `Room changed: ${roomLabel(a)} → ${roomLabel(b)}`
+    if (!sameBuilding && sameRoom) return `Building changed: ${a.short} → ${b.short} (Rm ${roomLabel(b)})`
+    if (!sameBuilding) return `Building & room changed: ${full(a)} → ${full(b)}`
+  }
+  return `Location changed: ${a.raw || '—'} → ${b.raw || '—'}`
+}
+
 /* ---------- timetable change detection (per-sheet snapshots in KV) ---------- */
 const snapKey = (id, gid) => `snap:${id}|${gid ?? ''}`
 
@@ -543,9 +596,9 @@ function diffSheets(oldSessions, newSessions, todayISO) {
     const n = newMap.get(k)
     if (!n) return
     const details = []
-    if ((o.room || '') !== (n.room || '')) details.push(`room ${o.room || '—'} → ${n.room || '—'}`)
-    if ((o.end || '') !== (n.end || '')) details.push(`ends ${o.end || '—'} → ${n.end || '—'}`)
-    if ((o.tutor || '') !== (n.tutor || '')) details.push(`tutor ${o.tutor || '—'} → ${n.tutor || '—'}`)
+    if ((o.room || '') !== (n.room || '')) details.push(describeRoomChange(o.room || '', n.room || ''))
+    if ((o.end || '') !== (n.end || '')) details.push(`End time changed: ${o.end || '—'} → ${n.end || '—'}`)
+    if ((o.tutor || '') !== (n.tutor || '')) details.push(`Tutor changed: ${o.tutor || '—'} → ${n.tutor || '—'}`)
     if (details.length > 0) out.push({ type: 'changed', s: n, detail: details.join('; ') })
   })
   return out

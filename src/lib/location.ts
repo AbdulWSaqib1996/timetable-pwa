@@ -77,3 +77,36 @@ export function shortBuildingName(p: ParsedLocation): string {
   if (p.building.startsWith('IOE')) return 'Bedford Way'
   return p.building.replace(/\s*Building$/i, '')
 }
+
+/** Room label including a hall name when present ("421 (Nunn Hall)"). */
+function roomLabel(p: ParsedLocation): string {
+  return p.room ? `${p.room}${p.roomName ? ` (${p.roomName})` : ''}` : p.raw || '—'
+}
+
+/**
+ * A human sentence for a location change, using the building/room split:
+ * "Room changed: 642 → 731", "Building changed: …", "Building & room changed: …",
+ * "Room confirmed: 739 (was TBC)". Used by the in-app change log and the
+ * background change-push alike.
+ */
+export function describeRoomChange(oldRoom: string, newRoom: string): string {
+  const a = parseLocation(oldRoom)
+  const b = parseLocation(newRoom)
+  const full = (p: ParsedLocation) =>
+    p.building ? `${shortBuildingName(p)} Rm ${roomLabel(p)}` : p.note ? 'TBC' : p.raw || '—'
+
+  // A room was TBC / a leaked booking ref and now resolves to a real room.
+  if (a.note && b.building) return `Room confirmed: ${full(b)} (was TBC)`
+  // …or the reverse: a known room becomes TBC.
+  if (b.note && a.building) return `Room now TBC (was ${full(a)})`
+
+  if (a.building && b.building) {
+    const sameBuilding = a.building === b.building
+    const sameRoom = roomLabel(a) === roomLabel(b)
+    if (sameBuilding && !sameRoom) return `Room changed: ${roomLabel(a)} → ${roomLabel(b)}`
+    if (!sameBuilding && sameRoom)
+      return `Building changed: ${shortBuildingName(a)} → ${shortBuildingName(b)} (Rm ${roomLabel(b)})`
+    if (!sameBuilding) return `Building & room changed: ${full(a)} → ${full(b)}`
+  }
+  return `Location changed: ${a.raw || '—'} → ${b.raw || '—'}`
+}
