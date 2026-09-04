@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AgendaView } from './components/AgendaView'
 import { FilterBar } from './components/FilterBar'
+import { HomeCard } from './components/HomeCard'
 import { MonthView } from './components/MonthView'
 import { NowNextCard } from './components/NowNextCard'
 import { SessionDetail } from './components/SessionDetail'
@@ -18,7 +19,8 @@ const KeyDatesSheet = lazy(() => import('./components/KeyDatesSheet').then((m) =
 const SettingsSheet = lazy(() => import('./components/SettingsSheet').then((m) => ({ default: m.SettingsSheet })))
 const StatsSheet = lazy(() => import('./components/StatsSheet').then((m) => ({ default: m.StatsSheet })))
 const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((m) => ({ default: m.StudyGroupSheet })))
-import { WHATSNEW, dismissWhatsNew, shouldShowWhatsNew } from './lib/changelog'
+import { WHATSNEW, WHATSNEW_VERSION, dismissWhatsNew, shouldShowWhatsNew } from './lib/changelog'
+import { maybePing } from './lib/analytics'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
 import { sessionKey } from './lib/diff'
@@ -31,7 +33,7 @@ import {
   localTodayISO,
   weekBounds,
 } from './lib/filters'
-import { daysUntil, isPlacementSession, placementTag } from './lib/format'
+import { daysUntil, isPlacementSession, placementTag, toMinutes } from './lib/format'
 import { fetchGvizTable } from './lib/gviz'
 import { parseTimetable } from './lib/parseTimetable'
 import { expandPlacementSpans } from './lib/placementSpans'
@@ -173,6 +175,13 @@ export default function App() {
       /* unsupported */
     }
   }, [changes])
+
+  // Anonymous daily usage ping (throttled inside; off switch in Settings).
+  useEffect(() => {
+    const s = settingsRef.current
+    if (!s || s.demo || s.usagePing === false) return
+    void maybePing(s.pushServerBase ?? DEFAULT_PUSH_BASE, WHATSNEW_VERSION)
+  }, [active?.id])
 
   // PWA shortcut deep-link (?view=keydates) — consume it once.
   useEffect(() => {
@@ -835,6 +844,27 @@ export default function App() {
       {sessions !== null && view === 'day' && !searchResults && (
         <NowNextCard sessions={exportSessions} onSelect={setSelected} />
       )}
+
+      {sessions !== null &&
+        view === 'day' &&
+        !searchResults &&
+        settings.homeLat != null &&
+        settings.homeLng != null &&
+        (() => {
+          // End of today's last session drives the "head home" card window.
+          const ends = exportSessions
+            .filter((s) => s.dateISO === todayISO && !s.isSelfStudy && !s.isKeyDate)
+            .map((s) => toMinutes(s.end))
+            .filter((n): n is number => n !== null)
+          return (
+            <HomeCard
+              home={{ lat: settings.homeLat, lng: settings.homeLng }}
+              coords={coords}
+              travelMode={travelMode}
+              lastEndMins={ends.length > 0 ? Math.max(...ends) : null}
+            />
+          )
+        })()}
 
       {sessions !== null &&
         view === 'day' &&

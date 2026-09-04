@@ -1167,6 +1167,48 @@ export default {
       }
       return json({ ok: true })
     }
+    /* ---------- anonymous usage analytics (self-hosted; a random token per device) ---------- */
+    if (request.method === 'POST' && url.pathname === '/ping') {
+      const body = await request.json().catch(() => null)
+      const d = String(body?.d ?? '')
+      if (!/^[0-9a-f]{8,32}$/.test(d)) return json({ error: 'invalid ping' }, 400)
+      const date = new Date().toISOString().slice(0, 10)
+      const rec = {
+        i: body?.i === true,
+        p: ['ios', 'android', 'desktop'].includes(body?.p) ? body.p : 'other',
+        v: Number(body?.v) || 0,
+      }
+      await env.PUSH.put(`aping:${date}:${d}`, JSON.stringify(rec), { expirationTtl: 90 * 86400 })
+      if (!(await env.PUSH.get(`adev:${d}`))) await env.PUSH.put(`adev:${d}`, date)
+      return json({ ok: true })
+    }
+    if (request.method === 'GET' && url.pathname === '/stats') {
+      const days = Math.min(31, Math.max(1, parseInt(url.searchParams.get('days') ?? '14', 10) || 14))
+      const daily = []
+      const activeWeek = new Set()
+      for (let i = 0; i < days; i++) {
+        const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10)
+        const list = await env.PUSH.list({ prefix: `aping:${date}:` })
+        let installed = 0
+        const platforms = {}
+        let latestVersion = 0
+        for (const k of list.keys) {
+          const rec = await env.PUSH.get(k.name, 'json')
+          if (rec?.i) installed++
+          const p = rec?.p ?? 'other'
+          platforms[p] = (platforms[p] ?? 0) + 1
+          if ((rec?.v ?? 0) > latestVersion) latestVersion = rec.v
+          if (i < 7) activeWeek.add(k.name.split(':')[2])
+        }
+        daily.push({ date, active: list.keys.length, installed, platforms, latestVersion })
+      }
+      const devices = await env.PUSH.list({ prefix: 'adev:' })
+      return json({
+        totalDevicesEver: devices.keys.length,
+        activeLast7Days: activeWeek.size,
+        daily,
+      })
+    }
     /* ---------- cross-device sync: opaque encrypted blobs keyed by a hash of the code ---------- */
     if (request.method === 'POST' && url.pathname === '/sync') {
       const body = await request.json().catch(() => null)

@@ -1,13 +1,10 @@
 /** Bump the version whenever WHATSNEW changes; the app shows the list once per version. */
-export const WHATSNEW_VERSION = 5
+export const WHATSNEW_VERSION = 6
 
 export const WHATSNEW: string[] = [
-  '🎓 My PGCE file — tap the cap in the top bar: your whole admin file in one place',
-  '✍️ Weekly reflections, 🎯 mentor targets and ☐ meeting actions, all logged in seconds',
-  '👀 Observation records (development points become targets) and 🍎 a lessons-taught log',
-  '📚 Subject-knowledge audit tracker and 📎 a document wallet (DBS, certificates, templates)',
-  '📊 Overview dashboard with evidence-gap warnings per Teachers’ Standard',
-  '🖨 One-tap full binder export — the end-of-placement hand-in as a PDF',
+  '🕰 Past days are back — the app now keeps history the sheet deletes daily, so yesterday’s sessions and attendance stay put',
+  '🏠 Head home — set your home address in Settings → Travel times and get a live journey-home card (time, TfL route, arrival ETA) as your last session ends',
+  '🎓 My PGCE file — tap the cap in the top bar: reflections, targets, meetings, observations, lessons, audits, wallet and a full binder export',
   '📋 Friday admin digest push: what’s still outstanding before the weekend',
 ]
 

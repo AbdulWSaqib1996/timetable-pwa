@@ -72,6 +72,10 @@ export interface Settings {
   locationEnabled?: boolean
   /** how travel-time estimates are calculated (default walking) */
   travelMode?: 'walking' | 'transit' | 'driving'
+  /** home address (geocoded once) — powers the end-of-day "head home" card */
+  homeAddress?: string
+  homeLat?: number
+  homeLng?: number
   /** minutes of head start before the computed leave-by time (start − travel) to notify at */
   leaveAlertOffsets?: number[]
   /** key-dates (submission deadlines) tab: source sheet/tab plus the pasted URL for display */
@@ -107,6 +111,8 @@ export interface Settings {
   groupName?: string
   /** setup checklist card permanently dismissed */
   checklistDismissed?: boolean
+  /** anonymous daily usage ping to the push worker (default on; off switch in Settings) */
+  usagePing?: boolean
   /** user-entered placement details, keyed by placement tag (SE1B, SE2…) */
   placements?: Record<
     string,

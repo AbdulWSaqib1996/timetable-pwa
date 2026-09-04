@@ -5,6 +5,7 @@ import { isPlacementSession, placementTag } from '../lib/format'
 import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
 import { parseSheetUrl } from '../lib/sheetUrl'
+import { geocodeAddress } from '../lib/geocode'
 import { needsIosInstall } from '../lib/platform'
 import { subscribePush, unsubscribePush } from '../lib/push'
 import { runPushSelfCheck, sendTestPush } from '../lib/pushCheck'
@@ -120,6 +121,28 @@ export function SettingsSheet({
   const [syncBusy, setSyncBusy] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
   const syncBase = settings.pushServerBase ?? DEFAULT_PUSH_BASE
+  const [homeAddr, setHomeAddr] = useState(settings.homeAddress ?? '')
+  const [homeGeoStatus, setHomeGeoStatus] = useState<'working' | 'ok' | 'fail' | null>(null)
+
+  function saveHomeAddress() {
+    const address = homeAddr.trim()
+    if (!address) {
+      setHomeGeoStatus(null)
+      onUpdateSettings({ homeAddress: undefined, homeLat: undefined, homeLng: undefined })
+      return
+    }
+    if (address === settings.homeAddress && settings.homeLat != null) return
+    setHomeGeoStatus('working')
+    void geocodeAddress(address).then((located) => {
+      if (located) {
+        onUpdateSettings({ homeAddress: address, homeLat: located.lat, homeLng: located.lng })
+        setHomeGeoStatus('ok')
+      } else {
+        onUpdateSettings({ homeAddress: address, homeLat: undefined, homeLng: undefined })
+        setHomeGeoStatus('fail')
+      }
+    })
+  }
 
   async function enableSync() {
     setSyncBusy(true)
@@ -773,6 +796,29 @@ export function SettingsSheet({
             location stays on this device unless you turn on background leave alerts below, which
             store your last app-open location in your own push worker.
           </p>
+          <h3 className="subheading">Home</h3>
+          <div className="feed-row">
+            <input
+              type="text"
+              placeholder="Home address / postcode"
+              aria-label="Home address"
+              value={homeAddr}
+              onChange={(e) => setHomeAddr(e.target.value)}
+              onBlur={saveHomeAddress}
+            />
+          </div>
+          {homeGeoStatus === 'working' && <p className="filter-hint">📍 Locating home…</p>}
+          {homeGeoStatus === 'fail' && (
+            <p className="filter-hint">Couldn't locate that address — try adding the postcode.</p>
+          )}
+          {(homeGeoStatus === 'ok' || (homeGeoStatus === null && settings.homeLat != null)) && (
+            <p className="filter-hint">📍 Home set — a "🏠 Head home" card appears as your last session of the day ends.</p>
+          )}
+          <p className="filter-hint">
+            The card shows the live journey home — time, TfL route and arrival estimate. Your home
+            address stays on this device (and in encrypted sync/backups); it is never sent to the
+            push worker.
+          </p>
         </section>
 
         <section className="filter-section">
@@ -1252,6 +1298,20 @@ export function SettingsSheet({
           >
             ☕ Support on Ko-fi ↗
           </a>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={settings.usagePing !== false}
+              onChange={(e) => onUpdateSettings({ usagePing: e.target.checked })}
+            />
+            Send an anonymous daily usage ping
+          </label>
+          <p className="filter-hint">
+            Once a day the app tells its own server "a device used me today": a random token
+            (created on this device, tied to nothing), whether the app is installed, the platform
+            type and the app version. No location, no identity, no timetable data. It helps the
+            developer see whether the app is being used.
+          </p>
         </section>
 
         <div className="modal-actions">

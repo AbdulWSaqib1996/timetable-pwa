@@ -297,6 +297,12 @@ Theme requested by the owner: **make every piece of PGCE admin loggable in the a
 
 Known residual: days that fell off before ~2 Sep (none existed) and feed-history before 4 Sep are unrecoverable; a placement span cancelled *after* its marker row has become history can't be detected from the sheet (the sheet carries no signal either way).
 
+## Head-home card + self-hosted analytics (4 Sep 2026, twenty-second pass)
+
+**🏠 Head home (owner request):** Settings → Travel times gains a Home field (geocoded like placement addresses; stays on-device and in encrypted sync/backups — never sent to the push worker). From 30 minutes before the day's last session ends until 23:00, the day view shows a "Head home" card with the live journey: minutes (live TfL in transit mode, refreshed every 5 min), arrival ETA, a leg summary and a Directions link. Verified live: "≈ 33m by public transport (live TfL) · arrive ~13:44 · 🚶 → 🚇 Piccadilly → 🚌 153 → 🚶" against a real N7 address.
+
+**📈 Anonymous usage analytics (owner request; resolves the long-carried r7/8-9 analytics half):** self-hosted on the push worker — no third-party vendor, keeping the no-new-vendors rule. Once per day the app POSTs /ping: a random device token (generated locally, tied to nothing), installed-or-browser flag, platform class (ios/android/desktop) and app version. No location, no identity, no timetable data; on by default with an off switch and full disclosure under Settings → Support. Pings live 90 days in KV; `GET /stats?days=N` aggregates on demand: total devices ever, actives last 7 days, and per-day active/installed/platform/version counts — enough for install, use and retention curves at cohort scale. Verified live round-trip (ping → stats) and test entries deleted so counts start from zero. Sentry (the other half of r7/8-9) remains carried.
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:

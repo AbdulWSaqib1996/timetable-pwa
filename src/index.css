@@ -2270,3 +2270,43 @@ body {
   font-size: 12pt;
   margin: 10pt 0 4pt;
 }
+
+/* ---------- Head-home card ---------- */
+
+.home-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 12px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.home-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.home-card-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.home-card-info {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.home-card-route {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
