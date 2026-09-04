@@ -8,8 +8,8 @@ import { formatRemaining, googleCalendarUrl, isPlacementSession } from '../lib/f
 import { sessionKey } from '../lib/diff'
 import { addPhoto, compressImage, deletePhoto, getPhotos } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
-import { tflDeparturesNear, tflDisruptions, tflLineColor, tflModeIcon, tflRoute } from '../lib/tfl'
-import type { TflDepartures, TflDisruption, TflRoute } from '../lib/tfl'
+import { useLiveJourney } from '../hooks/useLiveJourney'
+import { RouteSteps } from './RouteSteps'
 import { weatherEmoji, weatherForHour } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
@@ -126,48 +126,13 @@ export function SessionDetail({
     reloadPhotos()
   }
 
-  // Live TfL journey (time + recommended route, which already avoids closures/strikes),
-  // plus current line disruptions filtered to the lines this route uses.
-  const [route, setRoute] = useState<TflRoute | null>(null)
-  const [disruptions, setDisruptions] = useState<TflDisruption[]>([])
-  const [legDeps, setLegDeps] = useState<Record<number, TflDepartures>>({})
-  useEffect(() => {
-    setRoute(null)
-    setDisruptions([])
-    setLegDeps({})
-    if (travelMode !== 'transit' || !coords || !travel?.location) return
-    let cancelled = false
-    let depsTimer: ReturnType<typeof setInterval> | undefined
-    // Live departures for every transit leg (bus, tube, Overground, Elizabeth line, DLR —
-    // National Rail boards aren't in TfL's arrivals feed and simply won't show).
-    const loadDepartures = (r: TflRoute) => {
-      let fetched = 0
-      r.legs.forEach((leg, i) => {
-        if (leg.mode === 'walking' || !leg.line || leg.fromLat == null || leg.fromLng == null) return
-        if (fetched++ >= 3) return
-        void tflDeparturesNear(leg.fromLat, leg.fromLng, leg.line).then((dep) => {
-          if (!cancelled && dep) setLegDeps((prev) => ({ ...prev, [i]: dep }))
-        })
-      })
-    }
-    void tflRoute(coords, travel.location).then((r) => {
-      if (cancelled) return
-      setRoute(r)
-      if (r) {
-        loadDepartures(r)
-        // Departure boards stay live while the sheet is open.
-        depsTimer = setInterval(() => loadDepartures(r), 30_000)
-      }
-    })
-    void tflDisruptions().then((d) => {
-      if (!cancelled) setDisruptions(d)
-    })
-    return () => {
-      cancelled = true
-      if (depsTimer) clearInterval(depsTimer)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [travelMode, coords?.lat, coords?.lng, session.room, schoolCoords?.lat, schoolCoords?.lng])
+  // Live TfL journey (time + recommended route + per-leg departure boards +
+  // disruptions on the route's lines) — shared with the head-home dropdown.
+  const { route, legDeps, routeDisruptions } = useLiveJourney(
+    coords,
+    travel?.location ?? null,
+    travelMode === 'transit' && !!coords && !!travel?.location
+  )
 
   // Weather for the journey: forecast at the computed leave time (start − travel).
   const [journeyWeather, setJourneyWeather] = useState<{ at: string; w: HourWeather } | null>(null)
@@ -194,9 +159,6 @@ export function SessionDetail({
 
   const shownMinutes = travelMode === 'transit' && route ? route.minutes : travel?.minutes ?? null
   const liveLabel = travelMode === 'transit' && route ? ' (live TfL)' : ''
-  const routeDisruptions = route
-    ? disruptions.filter((d) => route.lines.some((l) => l.toLowerCase().includes(d.line.toLowerCase())))
-    : []
   const rows: { label: string; value: string }[] = [
     { label: 'Date', value: formatLongDate(session.dateISO) },
     {
@@ -255,43 +217,7 @@ export function SessionDetail({
             </a>
           </div>
         )}
-        {route && route.legs.length > 0 && (
-          <div className="route-steps">
-            <div className="route-steps-head">
-              <span>Best route now</span>
-              <span className="route-total">≈ {formatRemaining(route.minutes)}</span>
-            </div>
-            {route.legs.map((leg, i) => {
-              const color = tflLineColor(leg.line, leg.mode)
-              return (
-                <div className="route-step" key={i} style={{ borderLeftColor: color }}>
-                  <span className="route-step-icon">{tflModeIcon(leg.mode)}</span>
-                  <span className="route-step-body">
-                    {leg.mode === 'walking' ? (
-                      <span className="route-step-title">
-                        Walk{leg.to ? ` to ${leg.to}` : ''}
-                      </span>
-                    ) : (
-                      <span className="route-step-title">
-                        <span className="route-line-badge" style={{ background: color }}>
-                          {leg.line}
-                        </span>{' '}
-                        {leg.from} → {leg.to}
-                      </span>
-                    )}
-                    {legDeps[i] && (
-                      <span className="route-step-deps">
-                        🕐 {legDeps[i].mins.map((m) => (m === 0 ? 'due' : `${m}m`)).join(', ')} · {legDeps[i].stop}
-                        <span className="route-live"> · live</span>
-                      </span>
-                    )}
-                  </span>
-                  {leg.minutes > 0 && <span className="route-step-mins">{formatRemaining(leg.minutes)}</span>}
-                </div>
-              )
-            })}
-          </div>
-        )}
+        {route && <RouteSteps route={route} legDeps={legDeps} routeDisruptions={routeDisruptions} />}
         {journeyWeather && (
           <p className="route-info">
             {weatherEmoji(journeyWeather.w.code)} {Math.round(journeyWeather.w.tempC)}°
@@ -302,12 +228,6 @@ export function SessionDetail({
         {route && route.legs.length === 0 && travelMode === 'transit' && (
           <p className="route-info">Best option now: walk (no transit leg needed).</p>
         )}
-        {routeDisruptions.map((d) => (
-          <p className="route-warning" key={d.line}>
-            ⚠ {d.line}: {d.status}
-            {d.reason ? ` — ${d.reason.length > 160 ? d.reason.slice(0, 160) + '…' : d.reason}` : ''}
-          </p>
-        ))}
         {travel?.location && (
           <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} />
         )}

@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
 import { TRAVEL_MODE_PHRASE, estimateTravelToCoords, haversineMeters } from '../lib/campus'
 import { formatRemaining } from '../lib/format'
-import { cachedRouteMinutes, tflModeIcon, tflRoute } from '../lib/tfl'
-import type { TflRoute } from '../lib/tfl'
+import { cachedRouteMinutes } from '../lib/tfl'
+import { cachedWeatherForHour, weatherEmoji, weatherForHour } from '../lib/weather'
+import { useLiveJourney } from '../hooks/useLiveJourney'
+import { RouteSteps } from './RouteSteps'
+import { StaticMap } from './StaticMap'
 
 interface Props {
   home: { lat: number; lng: number }
@@ -14,9 +17,10 @@ interface Props {
 
 /**
  * Compact "head home" pill in the header — shows the journey-home minutes
- * whenever you're away from home (any time of day), and expands into a small
- * dropdown with the live route, arrival ETA and a Directions link. Hides
- * itself at home. Coordinates never leave the device.
+ * whenever you're away from home (any time of day). The dropdown carries the
+ * same end-to-end journey as a session's detail sheet: the visual route
+ * timeline with per-leg live departure boards, disruption warnings, weather
+ * and the map. Hides itself at home. Coordinates never leave the device.
  */
 export function HomePill({ home, coords, travelMode }: Props) {
   const [open, setOpen] = useState(false)
@@ -29,24 +33,20 @@ export function HomePill({ home, coords, travelMode }: Props) {
 
   const visible = coords !== null && haversineMeters(coords, home) > 400
 
-  // Live TfL journey while the dropdown is open (refreshed every 5 minutes).
-  const [route, setRoute] = useState<TflRoute | null>(null)
+  const { route, legDeps, routeDisruptions } = useLiveJourney(
+    coords,
+    home,
+    open && visible && travelMode === 'transit'
+  )
+
+  // Weather for the journey (you're leaving now, so: this hour's forecast).
+  const [weatherReady, setWeatherReady] = useState(false)
+  const now = new Date()
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   useEffect(() => {
-    setRoute(null)
-    if (!open || !visible || travelMode !== 'transit' || !coords) return
-    let live = true
-    const load = () =>
-      void tflRoute(coords, home).then((r) => {
-        if (live) setRoute(r)
-      })
-    load()
-    const t = setInterval(load, 5 * 60_000)
-    return () => {
-      live = false
-      clearInterval(t)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, visible, travelMode, coords?.lat, coords?.lng, home.lat, home.lng])
+    if (!open) return
+    void weatherForHour(todayISO, new Date().getHours()).then((w) => setWeatherReady(w !== null))
+  }, [open, todayISO])
 
   if (!visible || !coords) return null
 
@@ -63,10 +63,7 @@ export function HomePill({ home, coords, travelMode }: Props) {
   if (minutes === null) return null
   const arrive = new Date(Date.now() + minutes * 60_000)
   const arriveLabel = `${String(arrive.getHours()).padStart(2, '0')}:${String(arrive.getMinutes()).padStart(2, '0')}`
-  const legSummary =
-    route && route.legs.length > 0
-      ? route.legs.map((l) => (l.mode === 'walking' ? '🚶' : `${tflModeIcon(l.mode)} ${l.line}`)).join(' → ')
-      : null
+  const forecast = open && weatherReady ? cachedWeatherForHour(todayISO, now.getHours()) : null
 
   return (
     <>
@@ -88,10 +85,20 @@ export function HomePill({ home, coords, travelMode }: Props) {
               ≈ {formatRemaining(minutes)} {TRAVEL_MODE_PHRASE[travelMode]}
               {live ? ' (live TfL)' : ''} · arrive ~{arriveLabel}
             </span>
-            {legSummary && <span className="home-card-route">{legSummary}</span>}
           </div>
-          <a className="travel-link" href={est.mapsUrl} target="_blank" rel="noopener noreferrer">
-            Directions ↗
+          {route && <RouteSteps route={route} legDeps={legDeps} routeDisruptions={routeDisruptions} />}
+          {route && route.legs.length === 0 && travelMode === 'transit' && (
+            <p className="route-info">Best option now: walk (no transit leg needed).</p>
+          )}
+          {forecast && (
+            <p className="route-info">
+              {weatherEmoji(forecast.code)} {Math.round(forecast.tempC)}°
+              {forecast.rainProb >= 30 ? ` · ${forecast.rainProb}% rain` : ''} for the journey
+            </p>
+          )}
+          <StaticMap lat={home.lat} lng={home.lng} label="Home" />
+          <a className="btn-secondary btn-link" href={est.mapsUrl} target="_blank" rel="noopener noreferrer">
+            Directions home ↗
           </a>
         </div>
       )}
