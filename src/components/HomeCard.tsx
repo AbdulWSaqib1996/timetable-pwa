@@ -7,11 +7,14 @@ import { cachedWeatherForHour, weatherEmoji, weatherForHour } from '../lib/weath
 import { useLiveJourney } from '../hooks/useLiveJourney'
 import { RouteSteps } from './RouteSteps'
 import { StaticMap } from './StaticMap'
+import { trackUse } from '../lib/usage'
 
 interface Props {
   home: { lat: number; lng: number }
   /** device location (travel times enabled), else null */
   coords: Coords | null
+  /** travel times switched on in Settings (pill shows a waiting state while a fix is pending) */
+  locationEnabled: boolean
   travelMode: TravelMode
 }
 
@@ -22,7 +25,7 @@ interface Props {
  * timeline with per-leg live departure boards, disruption warnings, weather
  * and the map. Hides itself at home. Coordinates never leave the device.
  */
-export function HomePill({ home, coords, travelMode }: Props) {
+export function HomePill({ home, coords, locationEnabled, travelMode }: Props) {
   const [open, setOpen] = useState(false)
   // A minute tick keeps the pill/ETA current without any other re-render.
   const [, setTick] = useState(0)
@@ -48,7 +51,39 @@ export function HomePill({ home, coords, travelMode }: Props) {
     void weatherForHour(todayISO, new Date().getHours()).then((w) => setWeatherReady(w !== null))
   }, [open, todayISO])
 
-  if (!visible || !coords) return null
+  // At home (within ~400m): nothing to show. Location on but no fix yet: show a
+  // waiting pill instead of vanishing silently (iOS sometimes drops the watch on
+  // resume — a visible "…" is diagnosable, an absent pill is not).
+  if (!locationEnabled) return null
+  if (coords && !visible) return null
+  if (!coords) {
+    return (
+      <>
+        <button
+          type="button"
+          className={`btn-icon home-pill${open ? ' on' : ''}`}
+          aria-expanded={open}
+          aria-label="Journey home: waiting for your location"
+          title="Journey home — waiting for your location"
+          onClick={() => setOpen((v) => !v)}
+        >
+          🏠<span className="home-pill-mins">…</span>
+        </button>
+        {open && (
+          <div className="home-pop" role="region" aria-label="Journey home">
+            <div className="home-card-main">
+              <span className="home-card-title">🏠 Head home</span>
+              <span className="home-card-info">
+                Waiting for your location… if this persists, check the app still has location
+                permission (it can drop after an iOS update), or toggle Travel times off and on in
+                Settings.
+              </span>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
 
   const est = estimateTravelToCoords(home, coords, travelMode, 'Home')
   let minutes = est.minutes
@@ -73,7 +108,12 @@ export function HomePill({ home, coords, travelMode }: Props) {
         aria-expanded={open}
         aria-label={`Journey home: about ${formatRemaining(minutes)}`}
         title="Journey home"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() =>
+          setOpen((v) => {
+            if (!v) trackUse('home')
+            return !v
+          })
+        }
       >
         🏠<span className="home-pill-mins">{formatRemaining(minutes)}</span>
       </button>

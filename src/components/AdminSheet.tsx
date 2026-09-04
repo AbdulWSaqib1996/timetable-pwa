@@ -6,6 +6,7 @@ import { sessionKey } from '../lib/diff'
 import { daysUntil, isPlacementSession, placementTag } from '../lib/format'
 import { printBinder } from '../lib/printBinder'
 import { TEACHERS_STANDARDS } from '../lib/standards'
+import { trackUse } from '../lib/usage'
 import { WALLET_FILE_CAP, addWalletFile, deleteWalletFile, getWalletFiles } from '../lib/wallet'
 import type { WalletFile } from '../lib/wallet'
 import type { MetaMap, Session } from '../types'
@@ -620,9 +621,10 @@ export function AdminSheet(props: Props) {
           <button
             type="button"
             className="btn-primary"
-            onClick={() =>
+            onClick={() => {
+              trackUse('binder')
               void printBinder({ profileId, profileName, sessions, metaMap, admin, placementTargetDays, todayISO })
-            }
+            }}
           >
             🖨 Export full binder (PDF)
           </button>

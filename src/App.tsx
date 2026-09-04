@@ -21,6 +21,8 @@ const StatsSheet = lazy(() => import('./components/StatsSheet').then((m) => ({ d
 const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((m) => ({ default: m.StudyGroupSheet })))
 import { WHATSNEW, WHATSNEW_VERSION, dismissWhatsNew, shouldShowWhatsNew } from './lib/changelog'
 import { maybePing } from './lib/analytics'
+import { loadSyncState as loadSyncStateForPing } from './lib/sync'
+import { trackOpen, trackUse } from './lib/usage'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
 import { sessionKey } from './lib/diff'
@@ -179,20 +181,47 @@ export default function App() {
 
   // Anonymous daily usage ping (throttled inside; off switch in Settings).
   // Fires on open AND on resume — installed PWAs usually resume rather than
-  // relaunch, so a mount-only ping would miss whole days.
+  // relaunch, so a mount-only ping would miss whole days. Feature/opens
+  // counters accumulate locally and travel with the next ping.
   useEffect(() => {
-    const ping = () => {
+    const ping = (countOpen: boolean) => {
       const s = settingsRef.current
       if (!s || s.demo || s.usagePing === false) return
-      void maybePing(s.pushServerBase ?? DEFAULT_PUSH_BASE, WHATSNEW_VERSION)
+      if (countOpen) trackOpen()
+      void maybePing(s.pushServerBase ?? DEFAULT_PUSH_BASE, WHATSNEW_VERSION, {
+        push: s.pushEnabled === true,
+        location: s.locationEnabled === true,
+        home: s.homeLat != null,
+        keyDates: !!s.keyDatesSheetId,
+        sync: loadSyncStateForPing() !== null,
+        placements: Object.keys(s.placements ?? {}).length > 0,
+      })
     }
-    ping()
+    ping(true)
     const onVisible = () => {
-      if (document.visibilityState === 'visible') ping()
+      if (document.visibilityState === 'visible') ping(true)
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [active?.id])
+
+  // Feature-use counters (names only, never content) for the ping.
+  useEffect(() => {
+    if (openSheet !== 'none') trackUse(openSheet)
+  }, [openSheet])
+  useEffect(() => {
+    if (selected) trackUse('detail')
+  }, [selected])
+  const viewForTrack = settings?.activeView ?? 'day'
+  useEffect(() => {
+    if (viewForTrack !== 'day') trackUse(viewForTrack)
+  }, [viewForTrack])
+  useEffect(() => {
+    if (searchOpen) trackUse('search')
+  }, [searchOpen])
+  useEffect(() => {
+    if (showHistory) trackUse('historyview')
+  }, [showHistory])
 
   // PWA shortcut deep-link (?view=keydates) — consume it once.
   useEffect(() => {
@@ -643,6 +672,7 @@ export default function App() {
               <HomePill
                 home={{ lat: settings.homeLat, lng: settings.homeLng }}
                 coords={coords}
+                locationEnabled={locationEnabled}
                 travelMode={travelMode}
               />
             )}

@@ -4,6 +4,7 @@ import type { AdminFile } from '../lib/admin'
 import { sessionKey } from '../lib/diff'
 import { downloadFile } from '../lib/files'
 import { printEvidenceBundle } from '../lib/printBundle'
+import { trackUse } from '../lib/usage'
 import { TEACHERS_STANDARDS, standardLabel } from '../lib/standards'
 import type { MetaMap, Session } from '../types'
 
@@ -217,8 +218,9 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
             type="button"
             className="btn-primary"
             disabled={entries.length === 0}
-            onClick={() =>
-              void printEvidenceBundle(
+            onClick={() => {
+              trackUse('evidenceprint')
+              return void printEvidenceBundle(
                 profileId,
                 entries.map((e) => ({
                   key: e.key,
@@ -230,7 +232,7 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
                   standards: e.standards,
                 }))
               )
-            }
+            }}
           >
             🖨 Print / PDF (with photos)
           </button>

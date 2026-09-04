@@ -37,6 +37,12 @@
   button { cursor:pointer; }
   .err { color:var(--warn); }
   .muted { color:var(--muted); }
+  .feat-list { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:7px; }
+  .feat-row { display:flex; align-items:center; gap:10px; font-size:12.5px; }
+  .feat-name { flex:0 0 130px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .feat-bar { flex:1; height:8px; background:var(--bg); border-radius:4px; overflow:hidden; }
+  .feat-bar span { display:block; height:100%; background:var(--accent); border-radius:4px; }
+  .feat-num { flex:0 0 auto; color:var(--muted); font-size:11.5px; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -117,6 +123,9 @@ function render(d) {
     + tile(ret.twoToFourDays + ' (' + pct(ret.twoToFourDays, retTotal) + ')', 'active 2–4 days')
     + tile(ret.fivePlusDays + ' (' + pct(ret.fivePlusDays, retTotal) + ')', 'active 5+ days')
     + '</div>'
+    + featureSection(d)
+    + setupSection(d)
+    + engagementSection(d)
     + '<h2>Today</h2>'
     + '<div class="tiles">' + tile(plat(today.platforms), 'platforms') + tile(versions, 'app versions seen') + '</div>'
     + '<h2>Last 14 days</h2>'
@@ -128,6 +137,51 @@ function tile(big, small) {
   return '<div class="tile"><div class="big">' + big + '</div><div class="small">' + small + '</div></div>';
 }
 function pct(n, total) { return Math.round((n / total) * 100) + '%'; }
+
+const FEATURE_LABELS = {
+  detail: 'Session details', week: 'Week view', month: 'Month view', search: 'Search',
+  historyview: 'History toggle', home: 'Head home', settings: 'Settings', filters: 'Filters',
+  keydates: 'Key dates', stats: 'Term stats', journal: 'Evidence journal', admin: 'My PGCE file',
+  group: 'Study group', adddl: 'Add deadline', changes: 'Change log', photo: 'Photo added',
+  binder: 'Binder export', evidenceprint: 'Evidence print',
+};
+
+function featureSection(d) {
+  const feats = Object.entries(d.features ?? {}).sort((a, b) => b[1].devices - a[1].devices || b[1].uses - a[1].uses);
+  if (feats.length === 0) return '';
+  const wau = Math.max(1, d.activeLast7Days);
+  const rows = feats.map(([f, x]) => {
+    const share = Math.round((x.devices / wau) * 100);
+    return '<div class="feat-row"><span class="feat-name">' + esc(FEATURE_LABELS[f] ?? f) + '</span>'
+      + '<span class="feat-bar"><span style="width:' + share + '%"></span></span>'
+      + '<span class="feat-num">' + share + '% · ' + x.uses + ' uses</span></div>';
+  }).join('');
+  return '<h2>Feature adoption (last 7 days — % of active devices)</h2><div class="feat-list">' + rows + '</div>';
+}
+
+function setupSection(d) {
+  const s = d.setup ?? { devices: 0, counts: {} };
+  if (!s.devices) return '';
+  const label = { push: 'Background push', location: 'Travel times', home: 'Home address', keyDates: 'Key dates', sync: 'Device sync', placements: 'Placement details' };
+  const tiles = Object.entries(label).map(([k, name]) =>
+    tile(pct(s.counts[k] ?? 0, s.devices), name)
+  ).join('');
+  return '<h2>Setup adoption (devices seen today)</h2><div class="tiles">' + tiles + '</div>';
+}
+
+function engagementSection(d) {
+  if (!d.opensLast7Days) return '';
+  const wau = Math.max(1, d.activeLast7Days);
+  const parts = ['00–04', '04–08', '08–12', '12–16', '16–20', '20–24'];
+  const max = Math.max(1, ...(d.dayparts ?? []));
+  const bars = (d.dayparts ?? []).map((n, i) =>
+    '<div class="bar" data-tip="' + parts[i] + ': ' + n + ' opens"><div class="seg-ret" style="height:' + Math.round((n / max) * 100) + '%"></div></div>'
+  ).join('');
+  return '<h2>Engagement (last 7 days)</h2>'
+    + '<div class="tiles">' + tile(d.opensLast7Days, 'app opens') + tile((d.opensLast7Days / wau).toFixed(1), 'opens per active device') + '</div>'
+    + '<div class="chart" style="height:80px">' + bars + '</div>'
+    + '<p class="legend">Opens by time of day: ' + parts.join(' · ') + '</p>';
+}
 
 $('save').addEventListener('click', () => {
   localStorage.setItem(KEY_STORE, $('key').value.trim());

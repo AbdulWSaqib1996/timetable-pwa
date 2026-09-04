@@ -1310,8 +1310,10 @@ export function SettingsSheet({
           <p className="filter-hint">
             Once a day the app tells its own server "a device used me today": a random token
             (created on this device, tied to nothing), whether the app is installed, the platform
-            type and the app version. No location, no identity, no timetable data. It helps the
-            developer see whether the app is being used.
+            type, the app version, how many times the app was opened (by rough time of day), which
+            features were used (names and counts only — never their content) and which settings are
+            switched on (yes/no only). No location, no identity, no timetable data, no notes. It
+            helps the developer see whether the app — and which parts of it — are being used.
             {settings.usagePing !== false &&
               ` Status: ${
                 lastPingDate() === new Date().toISOString().slice(0, 10)

@@ -6,6 +6,7 @@ import { TEACHERS_STANDARDS } from '../lib/standards'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl, isPlacementSession } from '../lib/format'
 import { sessionKey } from '../lib/diff'
+import { trackUse } from '../lib/usage'
 import { addPhoto, compressImage, deletePhoto, getPhotos } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
 import { useLiveJourney } from '../hooks/useLiveJourney'
@@ -114,6 +115,7 @@ export function SessionDetail({
   }, [session.id, profileId])
 
   async function handleAddPhoto(file: File) {
+    trackUse('photo')
     const blob = await compressImage(file)
     await addPhoto(profileId, sessionKey(session), blob)
     onMeta({ photos: photos.length + 1 })

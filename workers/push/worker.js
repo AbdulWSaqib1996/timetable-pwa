@@ -1173,10 +1173,29 @@ export default {
       const d = String(body?.d ?? '')
       if (!/^[0-9a-f]{8,32}$/.test(d)) return json({ error: 'invalid ping' }, 400)
       const date = new Date().toISOString().slice(0, 10)
+      const clampInt = (n, max) => (Number.isFinite(Number(n)) ? Math.max(0, Math.min(max, Math.round(Number(n)))) : 0)
+      // Feature-use counters: whitelisted names, small ints — counts only, never content.
+      const FEATURES = [
+        'detail', 'week', 'month', 'search', 'historyview', 'home', 'settings', 'filters',
+        'keydates', 'stats', 'journal', 'admin', 'group', 'adddl', 'changes', 'photo',
+        'binder', 'evidenceprint',
+      ]
+      const u = {}
+      if (body?.u && typeof body.u === 'object') {
+        for (const k of FEATURES) if (body.u[k]) u[k] = clampInt(body.u[k], 999)
+      }
+      const s = {}
+      if (body?.s && typeof body.s === 'object') {
+        for (const k of ['push', 'location', 'home', 'keyDates', 'sync', 'placements']) s[k] = body.s[k] === true
+      }
       const rec = {
         i: body?.i === true,
         p: ['ios', 'android', 'desktop'].includes(body?.p) ? body.p : 'other',
         v: Number(body?.v) || 0,
+        o: clampInt(body?.o, 999),
+        h: Array.isArray(body?.h) ? body.h.slice(0, 6).map((n) => clampInt(n, 999)) : undefined,
+        u,
+        s,
       }
       await env.PUSH.put(`aping:${date}:${d}`, JSON.stringify(rec), { expirationTtl: 90 * 86400 })
       if (!(await env.PUSH.get(`adev:${d}`))) await env.PUSH.put(`adev:${d}`, date)
@@ -1200,6 +1219,13 @@ export default {
       const activeMonth = new Set()
       const deviceDays = new Map()
       const versions = {}
+      // Last-7-days aggregates: feature adoption, engagement and setup flags.
+      const featureUses = {}
+      const featureDevices = {}
+      let opens7 = 0
+      const dayparts = [0, 0, 0, 0, 0, 0]
+      const setupCounts = {}
+      let setupDevices = 0
       for (let i = 0; i < days; i++) {
         const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10)
         const list = await env.PUSH.list({ prefix: `aping:${date}:` })
@@ -1213,13 +1239,29 @@ export default {
           const p = rec?.p ?? 'other'
           platforms[p] = (platforms[p] ?? 0) + 1
           if (firstSeen.get(dev) === date) newDevices++
-          if (i < 7) activeWeek.add(dev)
+          if (i < 7) {
+            activeWeek.add(dev)
+            opens7 += rec?.o ?? 0
+            if (Array.isArray(rec?.h)) rec.h.forEach((n, b) => (dayparts[b] += n || 0))
+            for (const [f, n] of Object.entries(rec?.u ?? {})) {
+              featureUses[f] = (featureUses[f] ?? 0) + n
+              featureDevices[f] = (featureDevices[f] ?? new Set())
+              featureDevices[f].add(dev)
+            }
+          }
+          if (i === 0 && rec?.s && Object.keys(rec.s).length > 0) {
+            setupDevices++
+            for (const [flag, on] of Object.entries(rec.s)) if (on) setupCounts[flag] = (setupCounts[flag] ?? 0) + 1
+          }
           if (i < 30) activeMonth.add(dev)
           deviceDays.set(dev, (deviceDays.get(dev) ?? 0) + 1)
           if (i === 0 && rec?.v) versions[rec.v] = (versions[rec.v] ?? 0) + 1
         }
         daily.push({ date, active: list.keys.length, installed, newDevices, platforms })
       }
+      const features = Object.fromEntries(
+        Object.entries(featureUses).map(([f, uses]) => [f, { uses, devices: featureDevices[f]?.size ?? 0 }])
+      )
       // Stickiness: how many distinct days each device appeared in the window.
       let d1 = 0, d2to4 = 0, d5plus = 0
       for (const n of deviceDays.values()) {
@@ -1235,6 +1277,11 @@ export default {
         activeLast30Days: activeMonth.size,
         todayVersions: versions,
         retention: { oneDay: d1, twoToFourDays: d2to4, fivePlusDays: d5plus },
+        // last-7-days usage shape
+        features,
+        opensLast7Days: opens7,
+        dayparts,
+        setup: { devices: setupDevices, counts: setupCounts },
         daily,
       })
     }
