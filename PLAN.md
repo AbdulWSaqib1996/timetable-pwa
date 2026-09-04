@@ -309,6 +309,10 @@ Known residual: days that fell off before ~2 Sep (none existed) and feed-history
 
 **UX fixes from owner feedback:** the day view now opens at today — history sits behind the existing "↑ Show earlier (N more days)" control instead of pushing today down (verified: first header "Friday 4 Sept · Today" with 2 days of recovered history one tap up). The Head-home card lost its end-of-day gate: it now shows **whenever you're away from home** (>400 m, any time — leave early whenever you like) and hides itself once you're home; verified showing mid-day with a live TfL route.
 
+## PWA auto-update (4 Sep 2026, twenty-fourth pass)
+
+Owner reported no devices on the analytics dashboard despite using the app: verified zero pings server-side — the phone was still running a pre-analytics bundle, because `registerType: 'prompt'` holds every new version behind a "Refresh" toast tap that nobody makes. Switched to `registerType: 'autoUpdate'` (the generated SW now skipWaiting/clientsClaims): a device downloads the new SW automatically on launch and runs the new bundle from the next open, no interaction. The toast remains only as a fallback. One-time crossing for devices still on the prompt-mode SW: open the app (tap Refresh if the toast shows), or force-close and reopen twice; from then on updates flow automatically.
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:
