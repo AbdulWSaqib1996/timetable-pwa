@@ -3,7 +3,8 @@
 A free, installable PWA that turns a public Google Sheets timetable into a personal agenda:
 pick your specialisms once, filter what you see, and it remembers everything on your device.
 Built with Vite + React + TypeScript; hosted on GitHub Pages. See [PLAN.md](PLAN.md) for the
-full plan and architecture.
+full plan and architecture, and [DEPLOYMENT.md](DEPLOYMENT.md) for how every piece is
+deployed (automatic and manual).
 
 ## Using it
 

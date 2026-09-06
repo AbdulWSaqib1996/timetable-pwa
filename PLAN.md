@@ -357,6 +357,10 @@ Change detection now speaks the building/room split everywhere a change is descr
 
 Term stats (Settings → Attendance → 📊) gains a **Sessions by subject** list where numbered sessions collapse into one subject — Maths 1…12 are all "Maths" (`baseSubject`: strip the trailing session index; specialism rows group under their specialism name, so a Computing specialist's core + specialism Computing merge; unnumbered "X - Y" titles group under X). Each row shows total sessions, hours, and attended-so-far where marks exist. Grouping audited against every title in the full-year sheet before shipping; sentence-length calendar rows (holidays, deferred-assessment notes) and one-off admin entries collapse into a "+N one-off entries" footer instead of polluting the list. Verified live with a Computing-specialism profile: "Computing 22 sessions · 44h, L&T 16 · 26h, English 11 · 22h, Maths 10 · 20h, PS 10 · 20h · 0/2 attended…", holiday rows excluded.
 
+## Deployment documented (6 Sep 2026, thirty-fourth pass — owner request)
+
+[DEPLOYMENT.md](DEPLOYMENT.md) now captures the whole deployment story in one place: the what-runs-where table (two app hosts, two workers, one shared KV namespace), the automatic paths (push-to-main → Pages with the Playwright gate + Vercel) and their manual equivalents (`gh workflow run`, `npx vercel --prod`, `wrangler deploy` — with the warning that **workers never auto-deploy** and the worker-first ordering rule for cross-cutting changes), first-time setup from clean accounts (KV creation, both wrangler.tomls, statskey, config.ts base URLs, Pages enablement, Vercel linking), the secrets/state inventory (statskey rotation; the never-delete-VAPID warning; every KV key prefix), a post-deploy verification checklist, rollback for app and workers, and the free-tier budget notes. Linked from the README.
+
 ## Monetisation options (explored 2 Sep 2026)
 
 Context: niche audience (one PGCE cohort today — likely low hundreds of users), £0 infrastructure, free-tier hosting. Ordered by fit:
