@@ -57,9 +57,9 @@ so you can always check which build a device runs.
 git push origin main
 ```
 
-- **GitHub Pages**: `.github/workflows/deploy.yml` runs `npm ci` → `npm run
-  build` → installs Chromium → `npm run test:e2e` → publishes `dist/` to Pages.
-  The shared `npm run validate` gate also runs worker/release regression tests; any failure blocks publication.
+- **GitHub Pages**: `.github/workflows/deploy.yml` installs dependencies and Chromium,
+  runs `npm run validate` (build, worker/release unit tests and browser tests), then publishes
+  `dist/`. Any failure blocks publication.
 - **Vercel**: its Git integration builds the same commit independently (with
   `VERCEL` set, so base `/`). `vercel.json` uses `npm run validate:ci`, including the same unit and browser checks. Browser installation or runner-library failures block deployment; never bypass the gate.
 - If SSH port 22 is blocked on your network, push over 443:

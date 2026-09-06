@@ -8,7 +8,7 @@ KV holds worker state. The deployed topology is documented in DEPLOYMENT.md. Pub
 Google Sheets are read using GViz and recognised columns. CSV fallback, tab discovery
 and a mapping/preview wizard described in the historical design below are not implemented.
 
-Phase 1 corrective work (prepared on `codex/phase-1`; not yet deployed):
+Phase 1 corrective work (implementation branch `codex/phase-1`):
 
 - Permanently disable legacy `/test`; add `/test-device` bound to the browser subscription's
   endpoint and auth/public key capability. Preserve worker-first compatibility: newer clients
@@ -27,7 +27,15 @@ Phase 1 corrective work (prepared on `codex/phase-1`; not yet deployed):
   remain later roadmap phases; this release does not claim to fix them.
 
 See tests/README.md for checks and DEPLOYMENT.md for compatible release and recovery.
-The implementation has not invoked production pushes, analytics, KV writes or deployment.
+Validation used synthetic subscriptions and in-memory KV; it did not send production test
+pushes, write analytics pings or modify user KV records. Both Pages-path and Vercel-root
+checks passed: six unit cases and three browser/client cases each. The reminder fix also
+waits for saved completion metadata before the first check at startup/profile switch.
+
+Worker-first release: push version `3f924dfb-0c72-49a4-9426-423ed0f6587e`; unchanged
+calendar worker version `25b774b3-55ac-4e4e-9500-a9fc9ee40fe7`. The frontend is released
+through the gated main-branch workflow. Hosted release outcomes are recorded in the
+Phase 1 handoff; local tests alone do not demonstrate a successful hosted build.
 
 ## Historical design (superseded where it differs from the current architecture)
 
