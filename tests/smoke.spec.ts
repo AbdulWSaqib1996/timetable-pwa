@@ -1,12 +1,12 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 /**
- * Deploy-gate smoke: the built app boots, the demo timetable parses and renders,
- * and a session detail sheet opens. A broken parser or a crash on boot fails this
+ * Deploy-gate smoke: the built app boots, the built-in demo timetable renders,
+ * and a session detail sheet opens. A rendering regression or a crash on boot fails this
  * before anything ships to either host.
  */
 test('demo timetable renders and a session detail opens', async ({ page }) => {
-  await page.goto('/timetable-pwa/')
+  await page.goto('./')
 
   await expect(page.getByRole('heading', { name: 'My Timetable' })).toBeVisible()
   await page.getByRole('button', { name: /demo data/i }).click()

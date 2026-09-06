@@ -6,7 +6,7 @@ that needs a human is explicitly marked. Full background: [DEPLOYMENT.md](DEPLOY
 
 ## System map
 
-- Web app (Vite/React PWA, `src/`) → GitHub Pages `https://abdulwsaqib1996.github.io/timetable-pwa/` and Vercel `https://pgce-timetable.vercel.app/`. Both auto-deploy on push to `main`; Pages is gated by the Playwright smoke test.
+- Web app (Vite/React PWA, `src/`) → GitHub Pages `https://abdulwsaqib1996.github.io/timetable-pwa/` and Vercel `https://pgce-timetable.vercel.app/`. Both auto-deploy on push to `main`; Both hosts use the shared build/unit/Playwright gate.
 - `workers/push/worker.js` → Cloudflare Worker `timetable-push` (push, cron, sync, analytics). **Manual deploy only.**
 - `workers/ics-feed/worker.js` → Cloudflare Worker `timetable-ics` (calendar feed). **Manual deploy only.**
 - One Cloudflare KV namespace (id in both `wrangler.toml`s) holds all worker state.
@@ -54,7 +54,7 @@ a new commit. `all` runs everything in order.
 
 - Log every substantive change in `PLAN.md` (same commit) — it is the running record.
 - CI must stay green; `npm run test:e2e` locally reproduces the gate.
-- Rollback: app = `git revert` + push; workers = `npx wrangler rollback` in the worker dir.
+- Rollback: app = `git revert` + push; workers = a compatible rollback or forward fix. Never restore the legacy broadcasting `/test` handler; retain its 410 response (see DEPLOYMENT.md).
 - KV budget: stay frugal with KV **writes** (~1,000/day account cap); prefer read-only checks.
 
 ## Quick health check (read-only, always safe)

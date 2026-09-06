@@ -136,6 +136,7 @@ export default function App() {
     refreshing,
     error,
     metaMap,
+    metaReady,
     setMetaMap,
     changes,
     setChanges,
@@ -610,6 +611,7 @@ export default function App() {
   const { coords, tubeStatus, locationEnabled, travelMode } = useTravel(settings, exportSessions, todayISO)
 
   useNotifications({
+    metaReady,
     settings,
     exportSessions,
     allKeyDates,
@@ -901,7 +903,7 @@ export default function App() {
         !searchResults &&
         (() => {
           const next = allKeyDates
-            .filter((k) => k.dateISO >= todayISO && metaMap[sessionKey(k)]?.status !== 'done')
+            .filter((k) => metaMap[sessionKey(k)]?.status !== 'done')
             .sort((a, b) => a.dateISO.localeCompare(b.dateISO))[0]
           if (!next) return null
           const days = daysUntil(next.dateISO, todayISO)
@@ -909,7 +911,7 @@ export default function App() {
             <button type="button" className="keydate-strip" onClick={() => setOpenSheet('keydates')}>
               <span className="keydate-title">📌 {next.title}</span>
               <span className={`kd-chip${days <= 7 ? ' urgent' : ''}`}>
-                {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `in ${days}d`}
+                {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `in ${days}d`}
               </span>
             </button>
           )
@@ -1027,7 +1029,7 @@ export default function App() {
           settings={settings}
           filters={filters}
           options={options}
-          hasKeyDates={keyDates.length > 0}
+          hasKeyDates={allKeyDates.length > 0}
           onUpdateSettings={updateSettings}
           onUpdateFilters={updateFilters}
           onOpenKeyDates={() => setOpenSheet('keydates')}

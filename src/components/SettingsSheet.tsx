@@ -591,7 +591,7 @@ export function SettingsSheet({
             <h3>Notices (cohort broadcasts)</h3>
             <p className="filter-hint">
               A tab with Date / Message / Link columns becomes dismissible announcement banners for
-              everyone using that sheet — a broadcast channel for cohort reps, no backend needed.
+              everyone using that sheet. Background delivery uses the push worker.
             </p>
             <div className="feed-row">
               <input
@@ -795,8 +795,9 @@ export function SettingsSheet({
             Shows an estimated journey from where you are to each session's UCL building, on the
             timetable cards and in session details (rooms are matched against the Bloomsbury
             campus). Estimates are approximate — the Directions link gives the exact route. Your
-            location stays on this device unless you turn on background leave alerts below, which
-            store your last app-open location in your own push worker.
+            location and destination are sent to TfL for transit routes; map areas are requested from
+            OpenStreetMap. Background leave alerts additionally store your last app-open location
+            in the push worker.
           </p>
           <h3 className="subheading">Home</h3>
           <div className="feed-row">
@@ -818,8 +819,9 @@ export function SettingsSheet({
           )}
           <p className="filter-hint">
             The card shows the live journey home — time, TfL route and arrival estimate — any time
-            you're out (it hides itself when you're home). Your home address stays on this device
-            (and in encrypted sync/backups); it is never sent to the push worker.
+            you're out (it hides itself when you're home). Address lookup sends the postcode to
+            postcodes.io or the address to OpenStreetMap Nominatim. Home coordinates are used in
+            TfL and map requests. Saved home settings are included in encrypted sync and backups.
           </p>
         </section>
 
@@ -1006,7 +1008,7 @@ export function SettingsSheet({
                   void sendTestPush(pushBase.trim() || DEFAULT_PUSH_BASE).then(setPushMessage)
                 }}
               >
-                Send test push
+                Send test to this device
               </button>
             </div>
             {checkRows && (
@@ -1158,7 +1160,7 @@ export function SettingsSheet({
           <p className="filter-hint">
             Keeps your timetables, filters, notes and attendance the same on your phone and laptop
             via a shared code. Everything is encrypted on this device before it leaves — the server
-            only ever sees scrambled data. Photos stay on each device (use Backup to move them).
+            only ever sees scrambled data. Photo and document files stay on each device (use Backup to move them).
           </p>
           {syncState ? (
             <>
@@ -1306,14 +1308,14 @@ export function SettingsSheet({
               checked={settings.usagePing !== false}
               onChange={(e) => onUpdateSettings({ usagePing: e.target.checked })}
             />
-            Send an anonymous daily usage ping
+            Send a daily device usage ping
           </label>
           <p className="filter-hint">
             Once a day the app tells its own server "a device used me today": a random token
-            (created on this device, tied to nothing), whether the app is installed, the platform
+            (a pseudonymous identifier created on this device), whether the app is installed, the platform
             type, the app version, how many times the app was opened (by rough time of day), which
             features were used (names and counts only — never their content) and which settings are
-            switched on (yes/no only). No location, no identity, no timetable data, no notes. It
+            switched on (yes/no only). No location, name, timetable content or notes are included in the ping. It
             helps the developer see whether the app — and which parts of it — are being used.
             {settings.usagePing !== false &&
               ` Status: ${

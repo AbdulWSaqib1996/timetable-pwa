@@ -13,7 +13,7 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   { icon: '🔔', title: 'Smart reminders', text: 'Session, deadline and “time to leave” alerts — even with the app closed.' },
   { icon: '🚇', title: 'Live travel times', text: 'TfL routes, departures and disruption warnings to every session.' },
   { icon: '🏫', title: 'Placement-aware', text: 'School-experience blocks, day counting and directions to your school.' },
-  { icon: '📲', title: 'Installs like an app', text: 'Free, no account, works offline; your data stays on your device.' },
+  { icon: '📲', title: 'Installs like an app', text: 'Install it for offline access to saved timetables. Optional online features use external services.' },
 ]
 
 export function SetupScreen({ onSubmit, onDemo, onCancel }: Props) {
@@ -41,8 +41,8 @@ export function SetupScreen({ onSubmit, onDemo, onCancel }: Props) {
         <h1>My Timetable</h1>
         {firstRun && (
           <p className="setup-tagline">
-            Turn any Google Sheet timetable into a fast, installable app — reminders, travel times
-            and calendar sync included. Built for course cohorts; free forever.
+            Turn a supported public Google Sheets timetable into a fast, installable app — reminders, travel times
+            and calendar sync included. Built for course cohorts.
           </p>
         )}
         <p className="setup-lead">
@@ -67,7 +67,7 @@ export function SetupScreen({ onSubmit, onDemo, onCancel }: Props) {
         {error && <p className="setup-error">{error}</p>}
         <p className="setup-note">
           The sheet must be shared as <strong>“anyone with the link can view”</strong>. Your URL is
-          saved on this device only — you won’t be asked again.
+          saved on this device, and included if you enable encrypted sync.
         </p>
         <button type="button" className="btn-ghost" onClick={onDemo} disabled={busy}>
           Or try it with demo data

@@ -40,10 +40,11 @@ export function KeyDatesSheet({
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const statusOf = (k: Session): SessionMeta['status'] => metaMap?.[sessionKey(k)]?.status ?? 'todo'
   const upcoming = keyDates
-    .filter((k) => k.dateISO >= todayISO)
+    .filter((k) => k.dateISO >= todayISO || statusOf(k) !== 'done')
     .sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
   const pastCount = keyDates.length - upcoming.length
-  const nextFortnight = upcoming.filter((k) => daysUntil(k.dateISO, todayISO) <= 14 && statusOf(k) !== 'done').length
+  const overdueCount = upcoming.filter((k) => k.dateISO < todayISO && statusOf(k) !== 'done').length
+  const nextFortnight = upcoming.filter((k) => k.dateISO >= todayISO && daysUntil(k.dateISO, todayISO) <= 14 && statusOf(k) !== 'done').length
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -60,6 +61,7 @@ export function KeyDatesSheet({
             your own deadlines below.
           </p>
         )}
+        {overdueCount > 0 && <p className="workload-line heavy">{overdueCount} overdue deadline{overdueCount === 1 ? '' : 's'} still outstanding.</p>}
         {upcoming.length > 0 && (
           <p className={`workload-line${nextFortnight >= 3 ? ' heavy' : ''}`}>
             {nextFortnight === 0
@@ -80,7 +82,7 @@ export function KeyDatesSheet({
                 <div className="keydate-line">
                   <button type="button" className="keydate-row" onClick={() => onSelect(k)}>
                     <span className={`kd-chip${days <= 7 && status !== 'done' ? ' urgent' : ''}`}>
-                      {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `in ${days}d`}
+                      {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `in ${days}d`}
                     </span>
                     <div className="change-body">
                       <span className="change-title">

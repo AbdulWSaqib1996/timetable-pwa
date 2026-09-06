@@ -23,7 +23,7 @@ interface Props {
  * whenever you're away from home (any time of day). The dropdown carries the
  * same end-to-end journey as a session's detail sheet: the visual route
  * timeline with per-leg live departure boards, disruption warnings, weather
- * and the map. Hides itself at home. Coordinates never leave the device.
+ * and the map. Hides itself at home. Transit and map providers receive route/map coordinates.
  */
 export function HomePill({ home, coords, locationEnabled, travelMode }: Props) {
   const [open, setOpen] = useState(false)

@@ -4,6 +4,8 @@
  * Endpoints (CORS-open):
  *   GET  /vapid        → { publicKey }  (ES256 keypair auto-generated into KV on first call)
  *   POST /subscribe    → { subscription, config } stored in KV
+ *   POST /test-device  → one test, authenticated with this subscription’s keys
+ *   POST /test         → 410 (legacy broadcast permanently disabled)
  *   POST /unsubscribe  → { endpoint } removed
  *   POST /snooze       → { endpoint, title, body, key, fireAt } re-delivered by the cron
  *
@@ -85,12 +87,14 @@ async function encryptPayload(payload, p256dh, auth) {
 
 async function sendPushDetailed(env, subscription, payload) {
   try {
+    if (!(await validSubscription(subscription))) return { status: 0, detail: 'invalid subscription' }
     const vapid = await getVapid(env)
     const audience = new URL(subscription.endpoint).origin
     const jwt = await vapidJwt(audience, vapid)
     const body = await encryptPayload(JSON.stringify(payload), subscription.keys.p256dh, subscription.keys.auth)
     const res = await fetch(subscription.endpoint, {
       method: 'POST',
+      redirect: 'manual',
       headers: {
         TTL: '3600',
         Urgency: 'high',
@@ -1095,6 +1099,7 @@ function rateLimited(request, name, max, windowMs = 60_000) {
 // requests per minute per IP, by endpoint
 const RATE_CAPS = {
   '/subscribe': 10,
+  '/test-device': 3,
   '/unsubscribe': 10,
   '/snooze': 10,
   '/location': 10,
@@ -1106,6 +1111,52 @@ const RATE_CAPS = {
   '/group/leave': 10,
   '/stats': 20,
   '/history': 10,
+}
+
+/* Subscription keys act as a device capability. Never log or return them. */
+async function validSubscription(sub) {
+  try {
+    const u = new URL(sub.endpoint)
+    const allowed = ['fcm.googleapis.com', 'updates.push.services.mozilla.com', 'web.push.apple.com'].includes(u.hostname)
+      || u.hostname.endsWith('.notify.windows.com')
+    if (!allowed || u.protocol !== 'https:' || u.port || u.username || u.password || u.hash || sub.endpoint.length > 2048) return false
+    const { auth, p256dh } = sub.keys
+    if (typeof auth !== 'string' || !/^[A-Za-z0-9_-]{22}$/.test(auth)
+      || typeof p256dh !== 'string' || !/^[A-Za-z0-9_-]{87}$/.test(p256dh)) return false
+    const pub = b64urlDecode(p256dh)
+    if (b64urlDecode(auth).length !== 16 || pub.length !== 65 || pub[0] !== 4) return false
+    await crypto.subtle.importKey('raw', pub, { name: 'ECDH', namedCurve: 'P-256' }, false, [])
+    return true
+  } catch { return false }
+}
+
+function sameSubscription(a, b) {
+  if (!a || !b || a.endpoint !== b.endpoint) return false
+  // Compare fixed-length secret material without a character-dependent early exit.
+  const left = `${a.keys?.auth}:${a.keys?.p256dh}`
+  const right = `${b.keys?.auth}:${b.keys?.p256dh}`
+  if (left.length !== right.length) return false
+  let mismatch = 0
+  for (let i = 0; i < left.length; i++) mismatch |= left.charCodeAt(i) ^ right.charCodeAt(i)
+  return mismatch === 0
+}
+
+async function boundedJSON(request, limit) {
+  if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json') || !request.body) return null
+  const reader = request.body.getReader()
+  const chunks = []
+  let size = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.length
+      if (size > limit) { await reader.cancel(); return null }
+      chunks.push(value)
+    }
+    return JSON.parse(new TextDecoder().decode(concat(...chunks)))
+  } catch { return null }
+  finally { reader.releaseLock() }
 }
 
 /* ---------- HTTP ---------- */
@@ -1144,12 +1195,14 @@ export default {
       return json({ sessions: snap ?? [] })
     }
     if (request.method === 'POST' && url.pathname === '/subscribe') {
-      const body = await request.json().catch(() => null)
-      if (!body?.subscription?.endpoint || !body?.subscription?.keys?.p256dh || !body?.config?.sheetId) {
+      const body = await boundedJSON(request, 32768)
+      if (!(await validSubscription(body?.subscription)) || typeof body?.config?.sheetId !== 'string'
+        || !/^[a-zA-Z0-9_-]{20,200}$/.test(body.config.sheetId)) {
         return json({ error: 'invalid subscription' }, 400)
       }
       const subKey = await endpointKey(body.subscription.endpoint)
       const existing = await env.PUSH.get(subKey, 'json')
+      if (existing && !sameSubscription(existing.subscription, body.subscription)) return json({ error: 'subscription credentials do not match' }, 403)
       await env.PUSH.put(
         subKey,
         JSON.stringify({ subscription: body.subscription, config: body.config, base: url.origin, loc: existing?.loc })
@@ -1177,22 +1230,25 @@ export default {
       )
       return json({ ok: true })
     }
-    if (request.method === 'POST' && url.pathname === '/test') {
-      // throttled: at most one test broadcast per 10 minutes
-      if (await env.PUSH.get('testlock')) return json({ error: 'try again in a few minutes' }, 429)
-      await env.PUSH.put('testlock', '1', { expirationTtl: 600 })
-      const list = await env.PUSH.list({ prefix: 'sub:' })
-      const results = []
-      for (const entry of list.keys) {
-        const record = await env.PUSH.get(entry.name, 'json')
-        if (!record?.subscription?.endpoint) continue
-        const r = await sendPushDetailed(env, record.subscription, {
-          title: '✅ Test notification',
-          body: 'Background push is working. This came from the timetable-push worker.',
-        })
-        results.push({ endpointHost: new URL(record.subscription.endpoint).hostname, ...r })
-      }
-      return json({ results })
+    if (url.pathname === '/test') {
+      return json({ error: 'Broadcast tests are disabled. Update the app to test this device.' }, 410)
+    }
+    if (request.method === 'POST' && url.pathname === '/test-device') {
+      const body = await boundedJSON(request, 4096)
+      if (!(await validSubscription(body?.subscription))) return json({ error: 'invalid subscription credentials' }, 400)
+      const subKey = await endpointKey(body.subscription.endpoint)
+      const record = await env.PUSH.get(subKey, 'json')
+      if (!sameSubscription(record?.subscription, body.subscription)) return json({ error: 'subscription credentials do not match' }, 403)
+      const lock = `testlock:${subKey.slice(4)}`
+      if (await env.PUSH.get(lock)) return json({ error: 'try again in a few minutes' }, 429)
+      await env.PUSH.put(lock, '1', { expirationTtl: 600 })
+      const result = await sendPushDetailed(env, record.subscription, {
+        title: '✅ Test notification',
+        body: 'Background push is working on this device.',
+      })
+      // No provider response bodies, endpoints or credentials in the response.
+      if (result.status < 200 || result.status >= 300) return json({ error: 'push delivery failed; try enabling push again' }, 502)
+      return json({ ok: true, sent: 1 })
     }
     /* ---------- study groups: shared free-slot codes (times only, no session details) ---------- */
     const cleanSlots = (slots) =>

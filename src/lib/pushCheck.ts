@@ -118,12 +118,28 @@ export async function runPushSelfCheck(base: string): Promise<CheckRow[]> {
   return rows
 }
 
-/** Ask the worker to broadcast its (rate-limited) test notification. */
+/** Test only the subscription currently installed in this browser. */
 export async function sendTestPush(base: string): Promise<string> {
-  const res = await fetch(`${base.replace(/\/+$/, '')}/test`, { method: 'POST' })
-  if (res.status === 429) return 'The test broadcast ran recently — try again in a few minutes.'
-  if (!res.ok) return 'The push server refused the test.'
-  const json = (await res.json()) as { results?: { status: number }[] }
-  const ok = (json.results ?? []).filter((r) => r.status >= 200 && r.status < 300).length
-  return `Test sent to ${ok} device${ok === 1 ? '' : 's'} — it should arrive within seconds.`
+  try {
+    if (!('serviceWorker' in navigator)) return 'Background push is unavailable in this browser.'
+    const reg = await navigator.serviceWorker.getRegistration()
+    const subscription = await reg?.pushManager.getSubscription()
+    if (!subscription) return 'Enable background push on this device before sending a test.'
+    // Never fall back to /test: older workers broadcast that endpoint to everyone.
+    const res = await fetch(`${base.replace(/\/+$/, '')}/test-device`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ subscription: subscription.toJSON() }),
+    })
+    if (res.status === 404 || res.status === 410) return 'The push server needs an update before device-only tests are available.'
+    if (res.status === 429) return 'A test ran recently for this device — try again in a few minutes.'
+    if (res.status === 403) return 'Enable background push again on this device, then retry the test.'
+    if (!res.ok) return 'The push server could not deliver the test. Try enabling background push again.'
+    const result = (await res.json()) as { ok?: boolean; sent?: number }
+    return result.ok && result.sent === 1
+      ? 'Test sent to this device — it should arrive within seconds.'
+      : 'The push server did not confirm a device-only test.'
+  } catch {
+    return 'Could not reach background push. Check your connection and try again.'
+  }
 }

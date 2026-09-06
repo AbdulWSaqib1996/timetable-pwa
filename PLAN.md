@@ -1,10 +1,37 @@
-# Plan: Timetable Viewer PWA for Google Sheets (FINAL)
+# Timetable PWA — implementation record
 
-**Status: P1–P5 built. Live at https://abdulwsaqib1996.github.io/timetable-pwa/ (repo: AbdulWSaqib1996/timetable-pwa).**
-Remaining: P4b needs the user to run `npx wrangler deploy` in `workers/ics-feed` (Cloudflare login required). Future ideas are tracked in **Future enhancements** below.
+## Current architecture and Phase 1 implementation
 
-- Sheet access: **Option A** — the sheet is public ("anyone with the link can view"), so the app fetches it directly from the browser. No backend, no API keys, no accounts.
-- Hosting: **GitHub Pages** — completely free, no card, no usage tiers. Deployed automatically from the repo via GitHub Actions.
+The React/Vite PWA is hosted on GitHub Pages and Vercel. Two separately deployed
+Cloudflare Workers provide push/cron/sync/analytics/study groups and the calendar feed;
+KV holds worker state. The deployed topology is documented in DEPLOYMENT.md. Public
+Google Sheets are read using GViz and recognised columns. CSV fallback, tab discovery
+and a mapping/preview wizard described in the historical design below are not implemented.
+
+Phase 1 corrective work (prepared on `codex/phase-1`; not yet deployed):
+
+- Permanently disable legacy `/test`; add `/test-device` bound to the browser subscription's
+  endpoint and auth/public key capability. Preserve worker-first compatibility: newer clients
+  never fall back to the broadcasting endpoint on an old worker.
+- Bound subscription/test JSON, validate supported HTTPS push services and encryption keys,
+  reject credential replacement, disable redirects and use per-subscription test cooldowns.
+  No administrator broadcast endpoint is added. Existing VAPID state remains untouched.
+- Keep incomplete past deadlines in the list and summary, expose personal-only key dates,
+  and suppress completed deadlines in the foreground notification loop.
+- Add isolated worker, Web Push encryption/VAPID, client, deadline and deployment regression
+  checks. Share a fail-closed build/test gate across Pages and Vercel, test PRs, and identify
+  manual releases using a unique workflow-dispatch ID plus expected commit. Timeout/failure
+  stops release. Direct worker driver targets now run the gate first.
+- Correct source, attachment-sync, location-provider and pseudonymous-analytics copy.
+- Broader identities, record sync, calendar coverage and background task-completion parity
+  remain later roadmap phases; this release does not claim to fix them.
+
+See tests/README.md for checks and DEPLOYMENT.md for compatible release and recovery.
+The implementation has not invoked production pushes, analytics, KV writes or deployment.
+
+## Historical design (superseded where it differs from the current architecture)
+
+The following is retained as design history, not a statement that every planned feature shipped.
 
 ## Goal
 

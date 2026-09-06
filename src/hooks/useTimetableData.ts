@@ -29,6 +29,7 @@ export function useTimetableData(active: ProfileEntry | null) {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [metaMap, setMetaMap] = useState<MetaMap>({})
+  const [metaProfileId, setMetaProfileId] = useState<string | null>(null)
   const [changes, setChanges] = useState<SessionChange[]>([])
   const [keyDates, setKeyDates] = useState<Session[]>([])
   const todayISO = localTodayISO()
@@ -133,6 +134,7 @@ export function useTimetableData(active: ProfileEntry | null) {
     setSessions(cached && !active.settings.demo ? cached.sessions : null)
     setFetchedAt(cached && !active.settings.demo ? cached.fetchedAt : null)
     setMetaMap(loadMeta(active.id))
+    setMetaProfileId(active.id)
     setChanges(loadChanges(active.id))
     setKeyDates((cached?.keyDates ?? []).map((k) => ({ ...k, isKeyDate: true })))
     // Apply "✓ Attended"/"✗ Absent" taps made on notifications while the app was closed.
@@ -170,6 +172,7 @@ export function useTimetableData(active: ProfileEntry | null) {
     refreshing,
     error,
     metaMap,
+    metaReady: active !== null && metaProfileId === active.id,
     setMetaMap,
     changes,
     setChanges,

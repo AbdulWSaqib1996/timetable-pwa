@@ -38,11 +38,8 @@ preflight() {
 build() {
   echo "== build & smoke test =="
   [ -d node_modules ] || npm ci --no-audit --no-fund || { bad "npm ci"; exit 1; }
-  npm run build || { bad "build"; exit 1; }
-  ok "build"
-  npx playwright install chromium >/dev/null 2>&1 || true
-  npm run test:e2e || { bad "smoke test"; exit 1; }
-  ok "smoke test"
+  npm run validate:ci || { bad "build and regression checks"; exit 1; }
+  ok "build and regression checks"
 }
 
 workers() {
@@ -56,16 +53,33 @@ workers() {
 app() {
   echo "== deploy app (GitHub Pages via Actions + Vercel) =="
   echo "note: the normal path is 'git push origin main'; this target redeploys the current main."
-  gh workflow run deploy.yml || { bad "could not trigger the Pages workflow"; exit 1; }
-  sleep 10
-  RUN_ID=$(gh run list --limit 1 --json databaseId -q '.[0].databaseId')
-  for _ in $(seq 1 40); do
-    STATUS=$(gh run view "$RUN_ID" --json status,conclusion -q '.status + " " + .conclusion')
-    case "$STATUS" in completed\ success) ok "Pages workflow $RUN_ID"; break ;;
-                      completed\ *) bad "Pages workflow $RUN_ID: $STATUS"; exit 1 ;; esac
-    sleep 15
+  local deployment_id expected_sha run_id status
+  deployment_id="timetable-release-$(node -e 'console.log(crypto.randomUUID())')"
+  expected_sha=$(gh api repos/{owner}/{repo}/commits/main --jq .sha) || { bad "could not resolve main"; exit 1; }
+  gh workflow run deploy.yml --ref main -f "deployment_id=$deployment_id" || { bad "could not trigger the Pages workflow"; exit 1; }
+  run_id=""
+  for ((attempt=0; attempt<${TIMETABLE_POLL_ATTEMPTS:-40}; attempt++)); do
+    run_id=$(gh run list --workflow deploy.yml --branch main --event workflow_dispatch --limit 100 \
+      --json databaseId,displayTitle,headSha | node scripts/select-deploy-run.mjs "$deployment_id" "$expected_sha") \
+      || { bad "could not identify the dispatched workflow"; exit 1; }
+    [ -n "$run_id" ] && break
+    sleep "${TIMETABLE_POLL_SECONDS:-15}"
   done
+  [ -n "$run_id" ] || { bad "timed out locating workflow $deployment_id"; exit 1; }
+  local completed=0
+  for ((attempt=0; attempt<${TIMETABLE_POLL_ATTEMPTS:-40}; attempt++)); do
+    status=$(gh run view "$run_id" --json status,conclusion -q '.status + " " + (.conclusion // "")') \
+      || { bad "could not read workflow $run_id"; exit 1; }
+    case "$status" in
+      "completed success") ok "Pages workflow $run_id"; completed=1; break ;;
+      completed*) bad "Pages workflow $run_id: $status"; exit 1 ;;
+    esac
+    sleep "${TIMETABLE_POLL_SECONDS:-15}"
+  done
+  [ "$completed" -eq 1 ] || { bad "timed out waiting for workflow $run_id"; exit 1; }
   if [ -d .vercel ]; then
+    [ "$(git rev-parse HEAD)" = "$expected_sha" ] && [ -z "$(git status --porcelain)" ] \
+      || { bad "Vercel redeploy requires a clean checkout of the validated main commit"; exit 1; }
     npx --yes vercel --prod --yes || { bad "vercel deploy"; exit 1; }
     ok "vercel deployed"
   else
@@ -88,7 +102,7 @@ verify() {
 case "${1:-}" in
   preflight) preflight ;;
   build)     build ;;
-  workers)   workers ;;
+  workers)   build; workers ;;
   app)       app ;;
   verify)    verify ;;
   all)       preflight; build; workers; app; verify ;;

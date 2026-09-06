@@ -25,6 +25,8 @@ import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import type { MetaMap, Session, Settings } from '../types'
 
 interface Options {
+  /** Do not notify before this profile's saved completion state has loaded. */
+  metaReady: boolean
   settings: Settings | null
   /** sessions with the user's filters applied, all dates */
   exportSessions: Session[]
@@ -45,6 +47,7 @@ interface Options {
  * from the service worker, and background-leave location reporting.
  */
 export function useNotifications({
+  metaReady,
   settings,
   exportSessions,
   allKeyDates,
@@ -131,6 +134,7 @@ export function useNotifications({
     const leaveOffsets = (JSON.parse(leaveKey) as number[]).sort((a, b) => a - b)
     const kdDays = (JSON.parse(kdDaysKey) as number[]).sort((a, b) => a - b)
     if (
+      !metaReady ||
       (offsets.length === 0 && leaveOffsets.length === 0 && kdDays.length === 0 && !attendancePrompts) ||
       typeof Notification === 'undefined'
     )
@@ -246,7 +250,7 @@ export function useNotifications({
       if (kdDays.length > 0) {
         const today = localTodayISO()
         for (const kd of keyDatesRef.current) {
-          if (kd.dateISO < today) continue
+          if (kd.dateISO < today || metaRef.current[sessionKey(kd)]?.status === 'done') continue
           const days = daysUntil(kd.dateISO, today)
           const due = kdDays.filter((d) => days <= d && !notified[`${sessionKey(kd)}#kd#${d}`])
           if (due.length === 0) continue
@@ -266,5 +270,5 @@ export function useNotifications({
     check()
     const t = setInterval(check, 30_000)
     return () => clearInterval(t)
-  }, [offsetsKey, leaveKey, kdDaysKey, attendancePrompts])
+  }, [metaReady, offsetsKey, leaveKey, kdDaysKey, attendancePrompts])
 }

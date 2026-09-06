@@ -59,9 +59,9 @@ git push origin main
 
 - **GitHub Pages**: `.github/workflows/deploy.yml` runs `npm ci` → `npm run
   build` → installs Chromium → `npm run test:e2e` → publishes `dist/` to Pages.
-  A failing smoke test blocks the deploy.
+  The shared `npm run validate` gate also runs worker/release regression tests; any failure blocks publication.
 - **Vercel**: its Git integration builds the same commit independently (with
-  `VERCEL` set, so base `/`). No Playwright gate there — Pages is the gated one.
+  `VERCEL` set, so base `/`). `vercel.json` uses `npm run validate:ci`, including the same unit and browser checks. Browser installation or runner-library failures block deployment; never bypass the gate.
 - If SSH port 22 is blocked on your network, push over 443:
   `GIT_SSH_COMMAND="ssh -o HostName=ssh.github.com -o Port=443" git push`
   (or add `Host github.com / HostName ssh.github.com / Port 443` to `~/.ssh/config`).
@@ -70,7 +70,7 @@ git push origin main
 
 ```bash
 # GitHub Pages: re-run the workflow without a new commit
-gh workflow run deploy.yml && gh run watch
+./scripts/deploy.sh app
 # (or: repo → Actions → "Deploy to GitHub Pages" → Run workflow)
 
 # Vercel: deploy the working tree directly
@@ -186,3 +186,44 @@ a subscribed device. `npm run test:e2e` locally reproduces the CI gate.
 - The dashboard (`/analytics.html`) caches `/stats` for 10 minutes per browser;
   the refresh link forces.
 - Full change history and design decisions: [PLAN.md](PLAN.md).
+
+## Phase 1 release and recovery
+
+Phase 1 is prepared on `codex/phase-1`; it is not deployed by running the isolated tests.
+
+1. Run `./scripts/deploy.sh preflight`, then `./scripts/deploy.sh build` on the intended
+   code. Missing authentication is a human setup step, not a reason to bypass checks.
+2. Deploy the corrected worker before the frontend. The `workers` target now repeats the
+   shared validation gate. Preserve existing KV namespace bindings and the `vapid` record.
+3. Release the reviewed frontend commit to main. Pages and Vercel both use the shared gate;
+   PRs validate without deploying Pages. Vercel's root base is covered by the same tests.
+4. Run `./scripts/deploy.sh verify` after deployment and report its output. Do not call
+   a push-test or analytics endpoint as a health check. Hosting verification is still required;
+   a local pass is not evidence that a release has shipped.
+
+The corrected worker returns 410 for legacy `/test`. Old apps receive a refusal instead
+of a broadcast. New apps use only `/test-device`; an old worker returns 404, and the app
+explains that the server needs updating. No fallback and no administrator broadcast exist.
+Device tests present the installed subscription's endpoint, public key and secret auth
+material over HTTPS; the worker compares them with the stored subscription and sends once
+to that record. Credentials/provider responses are not returned or logged. Known HTTPS
+push services are allowed (FCM, Mozilla, Apple and Windows notification hosts); unsupported
+providers are rejected explicitly. Outbound redirects are disabled.
+
+`testlock:<subscription-hash>` is a ten-minute, per-device, expiring operational key.
+No existing `testlock` or user record is deleted during rollout. This KV cooldown is
+best-effort across isolates and is not a global transactional quota.
+
+For a manual Pages redeploy, the driver supplies a unique `deployment_id` input, matches
+both that run title and the expected main SHA, and fails if identification or completion
+times out. It never selects an unrelated latest run. If main changes concurrently, retry
+against the intended commit; do not weaken the match. A direct linked Vercel redeploy also
+requires a clean checkout of that validated SHA, and runs Vercel's configured build gate.
+
+Recovery: revert the frontend if needed while keeping the corrected worker. **Do not roll
+back the push worker to a version that restores the broadcasting `/test` endpoint.** Apply
+a forward fix or another release that retains the 410 response. No data migration is part
+of Phase 1. Do not rotate/delete VAPID or bulk-clear KV during recovery.
+
+Configuration references: [Vercel build commands](https://vercel.com/docs/builds/configure-a-build),
+[GitHub workflow dispatch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow?tool=webui).
