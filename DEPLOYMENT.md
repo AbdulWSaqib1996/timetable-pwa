@@ -4,6 +4,12 @@ Everything needed to deploy My Timetable — the automatic paths, the manual
 equivalents, first-time setup from a clean account, verification, and rollback.
 All hosting is on free tiers; there are no paid services anywhere.
 
+> **Automating this?** [`AGENTS.md`](AGENTS.md) is the runbook for AI agents
+> (ChatGPT/Codex, Claude, CI bots): the same steps as this document, expressed
+> as non-interactive commands with hard rules. [`scripts/deploy.sh`](scripts/deploy.sh)
+> is the prompt-free driver behind it — `preflight | build | workers | app |
+> verify | all`, PASS/FAIL output, meaningful exit codes.
+
 ## 1. What gets deployed where
 
 | Piece | What it is | Where it runs | How it deploys |
