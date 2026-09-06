@@ -6,7 +6,7 @@ that needs a human is explicitly marked. Full background: [DEPLOYMENT.md](DEPLOY
 
 ## System map
 
-- Web app (Vite/React PWA, `src/`) → GitHub Pages `https://abdulwsaqib1996.github.io/timetable-pwa/` and Vercel `https://pgce-timetable.vercel.app/`. Both auto-deploy on push to `main`; Both hosts use the shared build/unit/Playwright gate.
+- Web app (Vite/React PWA, `src/`) → GitHub Pages `https://abdulwsaqib1996.github.io/timetable-pwa/` and Vercel `https://pgce-timetable.vercel.app/`. Both auto-deploy on push to `main`; both run the shared build/unit gate, and GitHub Actions adds the full Playwright gate (Vercel's build image cannot launch Chromium).
 - `workers/push/worker.js` → Cloudflare Worker `timetable-push` (push, cron, sync, analytics). **Manual deploy only.**
 - `workers/ics-feed/worker.js` → Cloudflare Worker `timetable-ics` (calendar feed). **Manual deploy only.**
 - One Cloudflare KV namespace (id in both `wrangler.toml`s) holds all worker state.

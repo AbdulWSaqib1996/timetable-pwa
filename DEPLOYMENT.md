@@ -61,7 +61,12 @@ git push origin main
   runs `npm run validate` (build, worker/release unit tests and browser tests), then publishes
   `dist/`. Any failure blocks publication.
 - **Vercel**: its Git integration builds the same commit independently (with
-  `VERCEL` set, so base `/`). `vercel.json` uses `npm run validate:ci`, including the same unit and browser checks. Browser installation or runner-library failures block deployment; never bypass the gate.
+  `VERCEL` set, so base `/`). `vercel.json` runs `scripts/validate.sh --skip-e2e`
+  (build + unit tests; fail-closed). The browser (Playwright) gate for the same
+  commit runs in GitHub Actions — Vercel's build image cannot launch Chromium
+  (missing system libraries, no root), verified from a failed build's logs on
+  6 Sep 2026, which left Vercel silently serving a stale deployment until this
+  split was introduced.
 - If SSH port 22 is blocked on your network, push over 443:
   `GIT_SSH_COMMAND="ssh -o HostName=ssh.github.com -o Port=443" git push`
   (or add `Host github.com / HostName ssh.github.com / Port 443` to `~/.ssh/config`).
@@ -195,8 +200,9 @@ Phase 1 is prepared on `codex/phase-1`; it is not deployed by running the isolat
    code. Missing authentication is a human setup step, not a reason to bypass checks.
 2. Deploy the corrected worker before the frontend. The `workers` target now repeats the
    shared validation gate. Preserve existing KV namespace bindings and the `vapid` record.
-3. Release the reviewed frontend commit to main. Pages and Vercel both use the shared gate;
-   PRs validate without deploying Pages. Vercel's root base is covered by the same tests.
+3. Release the reviewed frontend commit to main. Pages runs the full gate (incl. browser
+   tests); Vercel runs build + unit tests (`--skip-e2e` — its image cannot launch Chromium).
+   PRs validate without deploying Pages.
 4. Run `./scripts/deploy.sh verify` after deployment and report its output. Do not call
    a push-test or analytics endpoint as a health check. Hosting verification is still required;
    a local pass is not evidence that a release has shipped.

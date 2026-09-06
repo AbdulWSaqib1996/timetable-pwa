@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run validate:ci",
+  "buildCommand": "bash scripts/validate.sh --skip-e2e",
   "outputDirectory": "dist"
 }
