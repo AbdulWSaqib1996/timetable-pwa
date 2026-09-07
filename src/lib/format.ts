@@ -1,3 +1,4 @@
+import { isPlacementTitle, placementTagOf } from '../../shared/eligibility.js'
 import type { Session } from '../types'
 
 /** "IOE - Bedford Way (20) - 631" → "Bedford Way 631" (cards only; detail shows the full name). */
@@ -53,15 +54,14 @@ export function googleCalendarUrl(s: Session): string | null {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
-/** School-experience / placement rows get a calmer rendering. */
+/** School-experience / placement rows get a calmer rendering (shared rule). */
 export function isPlacementSession(session: Session): boolean {
-  return /school experience|placement|\bSE ?\d[a-z]?\b/i.test(session.title)
+  return isPlacementTitle(session.title)
 }
 
 /** Placement block tag ("SE1B", "SE2"…) used to key the user's placement details. */
 export function placementTag(title: string): string {
-  const m = title.match(/SE ?\d[a-z]?/i)
-  return m ? m[0].replace(/\s/g, '').toUpperCase() : 'PLACEMENT'
+  return placementTagOf(title)
 }
 
 /**

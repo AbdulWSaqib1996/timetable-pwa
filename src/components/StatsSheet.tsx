@@ -1,7 +1,8 @@
+import { attendanceSummary, placementDaySummary } from '../../shared/eligibility.js'
 import { useModalA11y } from '../lib/a11y'
 import { matchBuilding } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
-import { baseSubject, isPlacementSession, placementTag, shortenRoom, toMinutes } from '../lib/format'
+import { baseSubject, isPlacementSession, shortenRoom, toMinutes } from '../lib/format'
 import type { MetaMap, Session } from '../types'
 
 interface Props {
@@ -40,9 +41,15 @@ function computeStats(
     return start !== null && end !== null && end > start ? (end - start) / 60 : 0
   }
   const totalHours = taught.reduce((n, s) => n + hours(s), 0)
-  const past = taught.filter((s) => s.dateISO <= todayISO)
-  const attended = past.filter((s) => metaMap[sessionKey(s)]?.attended).length
-  const absent = past.filter((s) => metaMap[sessionKey(s)]?.absent).length
+  // One shared definition of eligible completed sessions (P3-06): attended,
+  // absent and unrecorded are separate — missing data is never absence.
+  const now = new Date()
+  const attendance = attendanceSummary(
+    sessions,
+    (s) => metaMap[sessionKey(s)],
+    todayISO,
+    now.getHours() * 60 + now.getMinutes()
+  )
 
   const byWeek = new Map<string, number>()
   for (const s of taught) byWeek.set(mondayOf(s.dateISO), (byWeek.get(mondayOf(s.dateISO)) ?? 0) + hours(s))
@@ -63,29 +70,18 @@ function computeStats(
   const starts = taught.map((s) => toMinutes(s.start)).filter((n): n is number => n !== null && n > 0)
   const earliest = starts.length > 0 ? Math.min(...starts) : null
 
-  // Placement days: unique dates per block; attended via the ✓ tick on any of the day's entries.
-  const placementByTag = new Map<string, { total: Set<string>; attended: Set<string> }>()
-  for (const s of placementSessions) {
-    const tag = placementTag(s.title)
-    const e = placementByTag.get(tag) ?? { total: new Set<string>(), attended: new Set<string>() }
-    e.total.add(s.dateISO)
-    if (metaMap[sessionKey(s)]?.attended) e.attended.add(s.dateISO)
-    placementByTag.set(tag, e)
-  }
-  const placementBlocks = [...placementByTag.entries()]
-    .map(([tag, e]) => ({ tag, attended: e.attended.size, total: e.total.size }))
-    .sort((a, b) => a.tag.localeCompare(b.tag))
-  const placementAttended = placementBlocks.reduce((n, b) => n + b.attended, 0)
+  // Placement days: unique dates per block; attended via the ✓ tick on any of
+  // the day's entries; span-inferred days are counted but labelled.
+  const placementDays = placementDaySummary(placementSessions, (s) => metaMap[sessionKey(s)])
+  const placementBlocks = placementDays.blocks
+  const placementAttended = placementDays.attendedDays
 
   const deadlinesDone = keyDates.filter((k) => metaMap[sessionKey(k)]?.status === 'done').length
 
   return {
     totalSessions: taught.length,
     totalHours: Math.round(totalHours),
-    pastCount: past.length,
-    attended,
-    attendancePct: past.length > 0 ? Math.round((attended / past.length) * 100) : null,
-    absent,
+    attendance,
     busiestWeek: busiest
       ? {
           label: new Date(busiest[0]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
@@ -98,6 +94,7 @@ function computeStats(
     placementAttended,
     placementTarget: placementTargetDays,
     placementBlocks,
+    placementInferred: placementDays.inferredDays,
     deadlinesDone,
     deadlinesTotal: keyDates.length,
   }
@@ -108,9 +105,12 @@ function buildTiles(stats: ReturnType<typeof computeStats>): { big: string; smal
     { big: `${stats.totalSessions}`, small: 'sessions on the timetable' },
     { big: `${stats.totalHours}h`, small: 'of taught time' },
   ]
-  if (stats.attendancePct !== null)
-    tiles.push({ big: `${stats.attendancePct}%`, small: `attendance (${stats.attended}/${stats.pastCount} marked)` })
-  if (stats.absent > 0) tiles.push({ big: `${stats.absent}`, small: 'absences recorded' })
+  const a = stats.attendance
+  if (a.eligible > 0) {
+    tiles.push({ big: `${a.attended}/${a.eligible}`, small: 'attended of eligible completed sessions' })
+    if (a.absent > 0) tiles.push({ big: `${a.absent}`, small: 'absences recorded' })
+    if (a.unrecorded > 0) tiles.push({ big: `${a.unrecorded}`, small: 'completed sessions unrecorded' })
+  }
   if (stats.placementBlocks.length > 0)
     tiles.push({
       big: `${stats.placementAttended}${stats.placementTarget ? `/${stats.placementTarget}` : ''}`,
@@ -234,11 +234,16 @@ export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placeme
             </div>
           ))}
         </div>
+        <p className="filter-hint">{stats.attendance.sentence} Unrecorded days aren’t absences —
+          they just haven’t been marked yet.</p>
         {stats.placementBlocks.length > 0 && (
           <p className="filter-hint">
             Placement blocks:{' '}
-            {stats.placementBlocks.map((b) => `${b.tag} ${b.attended}/${b.total}`).join(' · ')} — tick
-            “Attended” on a placement day to log it.
+            {stats.placementBlocks
+              .map((b) => `${b.tag} ${b.attended}/${b.total}${b.inferred > 0 ? ` (${b.inferred} inferred)` : ''}`)
+              .join(' · ')}{' '}
+            — tick “Attended” on a placement day to log it. Inferred days come from a block’s date
+            range and can be corrected on the day itself.
           </p>
         )}
         {subjectGroups.main.length > 0 && (

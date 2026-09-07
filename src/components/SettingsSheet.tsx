@@ -2,6 +2,7 @@ import { validateBackup, backupPreview } from '../lib/backup'
 import { reportPersistenceFailure } from '../lib/persistence'
 import { markBackedUp } from '../lib/storage'
 import { useRef, useState } from 'react'
+import { attendanceSummary, isCompleted, isEligibleSession } from '../../shared/eligibility.js'
 import { useModalA11y } from '../lib/a11y'
 import { sessionKey } from '../lib/diff'
 import { isPlacementSession, placementTag } from '../lib/format'
@@ -292,10 +293,13 @@ export function SettingsSheet({
     })().catch(error => window.alert('Restore did not finish: ' + String(error)))
   }
 
-  // Attendance insights over past sessions (self-study excluded).
-  const pastSessions = courseSessions.filter((s) => s.dateISO <= todayISO && !s.isSelfStudy)
-  const attendedCount = pastSessions.filter((s) => metaMap[sessionKey(s)]?.attended).length
-  const absentCount = pastSessions.filter((s) => metaMap[sessionKey(s)]?.absent).length
+  // Attendance insights over eligible completed sessions — the same shared
+  // definition Stats and the binder use (P3-06). The CSV keeps one row per
+  // eligible completed session so its totals match the summary exactly.
+  const attendance = attendanceSummary(courseSessions, (s) => metaMap[sessionKey(s)], todayISO)
+  const pastSessions = courseSessions.filter(
+    (s) => isEligibleSession(s) && isCompleted(s, todayISO)
+  )
   const bySubject = new Map<string, { attended: number; total: number }>()
   for (const s of pastSessions) {
     const key = s.subject || s.title
@@ -1078,13 +1082,11 @@ export function SettingsSheet({
           </button>
         </section>
 
-        {pastSessions.length > 0 && (
+        {attendance.eligible > 0 && (
           <section className="filter-section">
             <h3>Attendance</h3>
             <p className="filter-hint">
-              {attendedCount} of {pastSessions.length} past sessions marked attended (
-              {Math.round((attendedCount / pastSessions.length) * 100)}%)
-              {absentCount > 0 ? `, ${absentCount} absent` : ''}.
+              {attendance.sentence}
             </p>
             {subjectRows.length > 0 && (
               <ul className="attendance-list">

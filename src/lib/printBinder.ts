@@ -3,7 +3,7 @@ import { getPhotos } from './photos'
 import { TEACHERS_STANDARDS } from './standards'
 import type { MetaMap, Session } from '../types'
 import { sessionKey } from './diff'
-import { isPlacementSession, placementTag } from './format'
+import { attendanceSummary, placementDaySummary } from '../../shared/eligibility.js'
 
 /**
  * The full PGCE binder in one print: attendance & placement days, evidence per
@@ -47,28 +47,21 @@ export async function printBinder(input: BinderInput): Promise<void> {
 
   // ---- Attendance & placement days ----
   root.appendChild(el('h2', null, 'Attendance & placement days'))
-  const past = sessions.filter((s) => s.dateISO <= todayISO && !s.isSelfStudy && !s.isKeyDate)
-  const attended = past.filter((s) => metaMap[sessionKey(s)]?.attended).length
-  const absent = past.filter((s) => metaMap[sessionKey(s)]?.absent).length
-  const byTag = new Map<string, { total: Set<string>; done: Set<string> }>()
-  for (const s of sessions) {
-    if (s.isKeyDate || !isPlacementSession(s)) continue
-    const tag = placementTag(s.title)
-    const e = byTag.get(tag) ?? { total: new Set<string>(), done: new Set<string>() }
-    e.total.add(s.dateISO)
-    if (metaMap[sessionKey(s)]?.attended) e.done.add(s.dateISO)
-    byTag.set(tag, e)
-  }
-  const daysDone = [...byTag.values()].reduce((n, e) => n + e.done.size, 0)
+  // Same shared definition as Stats and Settings (P3-06): eligible completed
+  // sessions with attended / absent / unrecorded kept separate.
+  const attendance = attendanceSummary(sessions, (s) => metaMap[sessionKey(s)], todayISO)
+  const placementDays = placementDaySummary(sessions, (s) => metaMap[sessionKey(s)])
   const summary = el('div', 'pb-entry')
   summary.appendChild(
     el(
       'p',
       null,
-      `${attended} of ${past.length} past sessions attended, ${absent} recorded absence${absent === 1 ? '' : 's'}. ` +
-        `School days logged: ${daysDone}${input.placementTargetDays ? ` of ${input.placementTargetDays} required` : ''}` +
-        ([...byTag.entries()].length > 0
-          ? ` (${[...byTag.entries()].map(([t, e]) => `${t} ${e.done.size}/${e.total.size}`).join(' · ')}).`
+      `${attendance.sentence} ` +
+        `School days logged: ${placementDays.attendedDays}${input.placementTargetDays ? ` of ${input.placementTargetDays} required` : ''}` +
+        (placementDays.blocks.length > 0
+          ? ` (${placementDays.blocks
+              .map((b) => `${b.tag} ${b.attended}/${b.total}${b.inferred > 0 ? `, ${b.inferred} inferred` : ''}`)
+              .join(' · ')}).`
           : '.')
     )
   )
