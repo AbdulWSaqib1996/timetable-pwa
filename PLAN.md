@@ -728,3 +728,16 @@ A1 acceptance (spec §9): unauthorized/misconfigured stats never scan or render 
 Rollback: auth fail-closed + no-store are retained under any rollback; rendering changes are independently revertible. The legacy query credential path is documented for removal in A2 and must not outlive it.
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+A1 release verification (7 September 2026): workers deployed FIRST — push worker `1260099d-e4d1-4777-81a7-43b99f585d33`, feed worker `405ac9d0-59f6-46dd-bee4-9c31a9bb573a` (feed redeploy only refreshes bundled shared code; its behaviour is unchanged). Live fail-closed checks against production BEFORE the page shipped: `/stats` with no credential → **401**, wrong Bearer → **401**, `cache-control: no-store` present (the production statskey is configured, so the 503 configuration path is not the live branch; it is unit-covered). Released commit `17ceb61`; GitHub Actions run 34156463597 concluded **success**. Both hosts serve the new dashboard (Admin workspace + legacy-key purge present in served HTML). `./scripts/deploy.sh verify`, verbatim:
+
+```text
+== verify live endpoints ==
+PASS: vercel app 200
+PASS: pages app 200
+PASS: push worker /vapid
+PASS: /stats locked (401)
+PASS: feed worker + cache header
+PASS: analytics dashboard 200
+done.
+```
