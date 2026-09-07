@@ -1,7 +1,10 @@
 /** Runtime-neutral input contracts, shared by browser and workers. */
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 export const MAX_SYNC_BYTES = 2 * 1024 * 1024
-export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits']
+export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments']
+/** Collections added in Phase 5 — absent in older payloads/backups, so their
+ *  arrays are optional on read and treated as empty. */
+export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments']
 export function assert(condition, message) { if (!condition) throw new Error(message) }
 export function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 export function safeURL(value) {
@@ -70,15 +73,25 @@ export function validatePayload(data) {
         assert(object(value), 'Invalid admin records.')
         if (value.deleted !== undefined) assert(object(value.deleted) && Object.values(value.deleted).every(Number.isFinite), 'Invalid deleted records.')
         for (const key of collections) {
+          if (value[key] === undefined && optionalCollections.includes(key)) continue
           assert(Array.isArray(value[key]), 'Invalid admin collection.')
           const seen = new Set()
           for (const item of value[key]) {
             assert(object(item) && typeof item.id === 'string' && !seen.has(item.id) && Number.isFinite(item.at), 'Invalid admin record.')
             seen.add(item.id)
-            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO']}
+            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind']}
             for (const field of strings[key]) assert(typeof item[field] === 'string', 'Invalid admin field: ' + field)
-            for (const field of ['dateISO','weekISO','setISO','metISO']) if (item[field]) assert(validDate(item[field]), 'Invalid admin date.')
+            for (const field of ['dateISO','weekISO','setISO','metISO','dueISO','completedISO']) if (item[field]) assert(validDate(item[field]), 'Invalid admin date.')
+            for (const field of ['dueTime','startTime','endTime']) if (item[field] !== undefined) assert(validTime(item[field]), 'Invalid admin time.')
             if (key === 'meetings') assert(Array.isArray(item.actions) && item.actions.every(a => object(a) && typeof a.id === 'string' && typeof a.text === 'string' && typeof a.done === 'boolean'), 'Invalid meeting actions.')
+            if (key === 'tasks') assert(['todo','doing','done'].includes(item.status), 'Invalid task status.')
+            if (key === 'exceptions') assert(['holiday','inset','part-day','cancelled','hours'].includes(item.kind), 'Invalid placement exception.')
+            if (key === 'exceptions' && item.loggedMins !== undefined) assert(Number.isInteger(item.loggedMins) && item.loggedMins >= 0 && item.loggedMins <= 1440, 'Invalid logged minutes.')
+            if (key === 'plans') assert(['subtask','milestone','block'].includes(item.kind), 'Invalid plan item.')
+            if (key === 'plans' && item.effortMins !== undefined) assert(Number.isInteger(item.effortMins) && item.effortMins >= 0 && item.effortMins <= 100000, 'Invalid effort.')
+            if (key === 'commitments') assert(['appointment','work','study'].includes(item.kind), 'Invalid commitment kind.')
+            if (item.done !== undefined) assert(typeof item.done === 'boolean', 'Invalid completion flag.')
+            if (item.busy !== undefined) assert(typeof item.busy === 'boolean', 'Invalid busy flag.')
             if (item.standards !== undefined) assert(Array.isArray(item.standards) && item.standards.every(x => typeof x === 'string'), 'Invalid admin standards.')
           }
         }

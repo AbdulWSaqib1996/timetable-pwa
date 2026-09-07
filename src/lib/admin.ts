@@ -77,6 +77,67 @@ export interface AuditEntry {
   at: number
 }
 
+/** A personal task (P5-01). Source-imported deadlines stay source-owned
+ *  sessions with progress metadata — these records are user-owned only. */
+export interface TaskRecord {
+  id: string
+  title: string
+  dueISO: string
+  /** optional due time HH:MM */
+  dueTime?: string
+  status: 'todo' | 'doing' | 'done'
+  notes?: string
+  /** completion date, kept for history when reopened/edited */
+  completedISO?: string
+  at: number
+}
+
+/** A per-date placement exception or hours correction (P5-03). */
+export interface PlacementExceptionRec {
+  id: string
+  /** placement block tag (SE1A…) */
+  tag: string
+  dateISO: string
+  kind: 'holiday' | 'inset' | 'part-day' | 'cancelled' | 'hours'
+  /** custom working hours for part-day/hours kinds */
+  startTime?: string
+  endTime?: string
+  /** minutes actually logged on this date (refines the whole-day tick) */
+  loggedMins?: number
+  note?: string
+  at: number
+}
+
+/** A work-plan child under a parent task (P5-05). */
+export interface PlanChildRec {
+  id: string
+  /** parent: a tasks-collection id, or an imported deadline's stable event key */
+  parentId: string
+  kind: 'subtask' | 'milestone' | 'block'
+  title: string
+  done?: boolean
+  effortMins?: number
+  dateISO?: string
+  startTime?: string
+  endTime?: string
+  at: number
+}
+
+/** A personal commitment/study block (P5-06) — imports never overwrite these. */
+export interface CommitmentRec {
+  id: string
+  title: string
+  dateISO: string
+  startTime: string
+  endTime: string
+  kind: 'appointment' | 'work' | 'study'
+  location?: string
+  /** counts as busy time for clashes/group availability (default true) */
+  busy?: boolean
+  notes?: string
+  at: number
+}
+
 export interface AdminFile {
   deleted?: Record<string, number>
   reflections: Reflection[]
@@ -85,6 +146,10 @@ export interface AdminFile {
   observations: Observation[]
   lessons: Lesson[]
   audits: AuditEntry[]
+  tasks: TaskRecord[]
+  exceptions: PlacementExceptionRec[]
+  plans: PlanChildRec[]
+  commitments: CommitmentRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -94,6 +159,10 @@ export const EMPTY_ADMIN: AdminFile = {
   observations: [],
   lessons: [],
   audits: [],
+  tasks: [],
+  exceptions: [],
+  plans: [],
+  commitments: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`
