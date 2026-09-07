@@ -17,11 +17,12 @@ test('demo timetable renders and a session detail opens', async ({ page }) => {
     await picker.getByRole('button').last().click()
   }
 
-  // Phase 4 shell: session cards live in the Schedule destination.
+  // Phase 4 shell: sessions live in the Schedule destination — the week grid
+  // on desktop widths.
   await page.getByRole('button', { name: 'Schedule' }).click()
-  const firstCard = page.locator('.session-card').first()
-  await expect(firstCard).toBeVisible()
-  await firstCard.click()
+  const firstEvent = page.locator('.week-event').first()
+  await expect(firstEvent).toBeVisible()
+  await firstEvent.click()
 
   const detail = page.locator('.modal-card.sheet')
   await expect(detail).toBeVisible()

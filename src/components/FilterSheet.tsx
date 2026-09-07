@@ -1,12 +1,6 @@
 import { useModalA11y } from '../lib/a11y'
 import type { FilterOptions } from '../lib/filters'
-import type { DateRange, Filters, Settings } from '../types'
-
-const RANGES: { value: DateRange; label: string }[] = [
-  { value: 'today', label: 'Today only' },
-  { value: 'week', label: 'This week' },
-  { value: 'all', label: 'All dates' },
-]
+import type { Filters, Settings } from '../types'
 
 interface Props {
   settings: Settings
@@ -111,23 +105,6 @@ export function FilterSheet({
             </p>
           </section>
         )}
-
-        <section className="filter-section">
-          <h3>Date range (day view)</h3>
-          <div className="chip-grid">
-            {RANGES.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                className={`chip${filters.dateRange === value ? ' chip-on' : ''}`}
-                aria-pressed={filters.dateRange === value}
-                onClick={() => onUpdateFilters({ dateRange: value })}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </section>
 
         <section className="filter-section">
           <label className="toggle-row">

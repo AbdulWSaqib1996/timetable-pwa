@@ -41,7 +41,6 @@ import {
   localTodayISO,
   selectCourseSessions,
   selectReminderSessions,
-  weekBounds,
 } from './lib/filters'
 import { daysUntil, isPlacementSession, placementTag } from './lib/format'
 import { fetchGvizTable } from './lib/gviz'
@@ -110,7 +109,6 @@ export default function App() {
   // One date-selection model shared by Day/Week/Month (null = follow today).
   const [selectedDateISO, setSelectedDateISO] = useState<string | null>(null)
   const [showBackupNudge, setShowBackupNudge] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
   const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowWhatsNew())
   const [notices, setNotices] = useState<Notice[]>([])
   // A notification tap carrying an owner: switch to that profile, then open
@@ -272,9 +270,6 @@ export default function App() {
   useEffect(() => {
     if (viewForTrack !== 'day') trackUse(viewForTrack)
   }, [viewForTrack])
-  useEffect(() => {
-    if (showHistory) trackUse('historyview')
-  }, [showHistory])
 
   // PWA shortcut deep-link (?view=keydates) — consume it once.
   useEffect(() => {
@@ -477,13 +472,15 @@ export default function App() {
   const options = useMemo(() => deriveOptions(sessions ?? []), [sessions])
   const view: ViewMode = settings?.activeView ?? 'day'
 
-  // Day view honours the date-range filter; week/month navigate dates themselves.
+  // Temporary display filters over course membership; the selected-day list
+  // and week/month views narrow by date themselves (the old date-range
+  // display filter retired with the Day tab).
   const filteredSessions = useMemo(
     () =>
       sessions && settings
-        ? applyFilters(sessions, settings, todayISO, { ignoreDateRange: view !== 'day' })
+        ? applyFilters(sessions, settings, todayISO, { ignoreDateRange: true })
         : [],
-    [sessions, settings, todayISO, view]
+    [sessions, settings, todayISO]
   )
 
   // Course membership only (specialisms + groups), all dates: the base set for
@@ -550,23 +547,16 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingOpen, active?.id, sessions, allKeyDates])
 
-  // Day view weaves key dates in as highlighted blocks (toggle in Filters); they follow
-  // the same date-range choice as the rest of the day view.
-  const dayViewSessions = useMemo(() => {
+  // Schedule rows: filtered sessions with key dates woven in as highlighted
+  // blocks (toggle in Filters); the selected-day list slices these by date.
+  const scheduleSessions = useMemo(() => {
     if (!settings) return filteredSessions
-    const f = getFilters(settings)
-    if (view !== 'day' || !f.showKeyDates || allKeyDates.length === 0) return filteredSessions
-    const week = f.dateRange === 'week' ? weekBounds(todayISO) : null
-    const inRange = allKeyDates.filter((k) => {
-      if (f.dateRange === 'today') return k.dateISO === todayISO
-      if (week) return k.dateISO >= week.from && k.dateISO <= week.to
-      return true
-    })
-    return [...filteredSessions, ...inRange].sort((a, b) =>
+    if (!getFilters(settings).showKeyDates || allKeyDates.length === 0) return filteredSessions
+    return [...filteredSessions, ...allKeyDates].sort((a, b) =>
       (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99'))
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredSessions, allKeyDates, settings, view, todayISO])
+  }, [filteredSessions, allKeyDates, settings])
 
   const keyDateDays = useMemo(() => new Set(allKeyDates.map((k) => k.dateISO)), [allKeyDates])
 
@@ -926,7 +916,7 @@ export default function App() {
           selectedDateISO={selectedDateISO}
           onSelectDate={setSelectedDateISO}
           filteredSessions={filteredSessions}
-          dayViewSessions={dayViewSessions}
+          scheduleSessions={scheduleSessions}
           courseSessions={courseSessions}
           allKeyDates={allKeyDates}
           keyDateDays={keyDateDays}
@@ -934,32 +924,14 @@ export default function App() {
           metaMap={metaMap}
           coords={coords}
           travelMode={travelMode}
-          showHistory={showHistory}
-          onToggleHistory={() => setShowHistory((v) => !v)}
           activeCount={activeFilterCount(settings)}
           filters={filters}
           sessionsLoaded={sessions !== null}
-          emptyMessage={
-            sessions !== null && sessions.length === 0
-              ? 'No sessions found in this sheet.'
-              : filters.dateRange === 'today'
-                ? 'Nothing on today. 🎉'
-                : 'No sessions match your filters.'
-          }
-          placementProgress={
-            placementStats.totalDays > 0
-              ? {
-                  attended: placementStats.attended,
-                  target: settings.placementTargetDays,
-                  openTargets: adminFile.targets.filter((t) => t.status !== 'met').length,
-                }
-              : undefined
-          }
           onView={(v) => updateSettings({ activeView: v })}
           onTogglePlacements={() => updateFilters({ placementsOnly: !filters.placementsOnly })}
           onOpenFilters={() => setOpenSheet('filters')}
+          onClearFilters={() => updateSettings({ filters: { ...DEFAULT_FILTERS } })}
           onSelect={setSelected}
-          onUpdateFilters={updateFilters}
         />
       ) : sessions === null && !settings.demo ? (
         <div className="empty-state">Loading timetable…</div>

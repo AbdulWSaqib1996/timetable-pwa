@@ -2908,3 +2908,93 @@ body {
 .schedule-toolbar {
   padding-top: 4px;
 }
+
+/* ---------- Mobile Schedule (P4-03) ---------- */
+
+.week-strip-wrap {
+  margin: 4px 0 12px;
+}
+
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.week-strip-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-height: 52px;
+  padding: 6px 0 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.week-strip-day.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.week-strip-day.today .week-strip-num {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--accent);
+}
+
+.week-strip-dow {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.week-strip-day.selected .week-strip-dow {
+  color: var(--accent);
+}
+
+.week-strip-num {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.week-strip-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.week-strip-dot.on {
+  background: var(--accent);
+}
+
+.day-list-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+
+.day-list-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+}
+
+.day-list-empty-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0 16px;
+}

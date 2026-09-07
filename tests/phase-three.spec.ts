@@ -14,7 +14,7 @@ async function openDemo(page: import('@playwright/test').Page) {
     await picker.getByRole('button').last().click()
   }
   await page.getByRole('button', { name: 'Schedule' }).click()
-  await expect(page.locator('.session-card').first()).toBeVisible()
+  await expect(page.locator('.week-grid, .week-strip').first()).toBeVisible()
 }
 
 test('week and month navigation share one selected date and survive view switches', async ({ page }) => {
@@ -40,13 +40,13 @@ test('week and month navigation share one selected date and survive view switche
   await page.locator('.week-label').click()
   expect(await weekLabel()).toEqual(thisWeek)
 
-  // Month: previous month then a day pick lands the day list on that date.
+  // Month: a day pick drives the shared selection — desktop jumps to the
+  // week grid containing that day.
   await page.getByRole('tab', { name: 'Month' }).click()
-  await page.getByRole('button', { name: 'Next month' }).click()
   const dayCell = page.locator('.month-cell.has-sessions').first()
   if (await dayCell.isVisible({ timeout: 1000 }).catch(() => false)) {
     await dayCell.click()
-    await expect(page.locator('.agenda')).toBeVisible()
+    await expect(page.locator('.week-grid')).toBeVisible()
   }
 })
 
@@ -69,4 +69,24 @@ test('clearing filters keeps group/specialism membership', async ({ page }) => {
   await expect(sheet.getByLabel(/Show self-study blocks/i)).toBeChecked()
   // …but membership survives the clear.
   if (hasMembership) await expect(membershipChip).toHaveClass(/chip-on/)
+})
+
+test('mobile Schedule: seven-day strip drives one selected-day list', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await openDemo(page)
+  await expect(page.locator('.week-strip')).toBeVisible()
+  await expect(page.locator('.week-strip-day')).toHaveCount(7)
+  // Selecting a different day swaps the single day list — no scrolling through
+  // other days (P4-03).
+  const heading = page.locator('.day-list-heading h2')
+  const before = await heading.innerText()
+  await page.locator('.week-strip-day').nth(3).click() // Thursday
+  await expect(heading).not.toHaveText(before)
+  await expect(page.locator('.week-strip-day.selected')).toHaveCount(1)
+  // Month mode keeps the same list below the calendar.
+  await page.getByRole('tab', { name: 'Month' }).click()
+  await expect(page.locator('.month-grid')).toBeVisible()
+  await expect(heading).toBeVisible()
+  // Bottom navigation stays present on the top-level Schedule screen.
+  await expect(page.locator('.bottom-nav')).toBeVisible()
 })
