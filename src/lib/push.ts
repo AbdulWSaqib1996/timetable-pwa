@@ -38,6 +38,8 @@ export async function subscribePush(
     applicationServerKey: urlBase64ToUint8Array(publicKey).buffer as ArrayBuffer,
   })
   const config = {
+    // Owning profile for notification routing (P3-05).
+    profileId,
     sheetId: settings.sheetId,
     gid: settings.gid,
     kdSheetId: settings.keyDatesSheetId,

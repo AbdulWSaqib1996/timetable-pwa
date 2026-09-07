@@ -100,6 +100,7 @@ export function validWorkerConfig(config) {
   try {
     validateTree(config)
     assert(object(config) && /^[\w-]{20,200}$/.test(config.sheetId), 'Invalid sheet ID.')
+    if (config.profileId !== undefined) assert(typeof config.profileId === 'string' && /^[\w-]{1,100}$/.test(config.profileId), 'Invalid profile.')
     for (const key of ['gid','kdGid','noticesGid']) if (config[key] != null) assert(typeof config[key] === 'string' && /^\d{1,20}$/.test(config[key]), 'Invalid tab.')
     for (const key of ['kdSheetId','noticesSheetId']) if (config[key]) assert(typeof config[key] === 'string' && /^[\w-]{20,200}$/.test(config[key]), 'Invalid source.')
     for (const key of ['reminderOffsets','leaveAlertOffsets','keyDateReminderDays']) if (config[key] !== undefined) assert(Array.isArray(config[key]) && config[key].length <= 20 && config[key].every(n => Number.isInteger(n) && n >= 0 && n <= 10080), 'Invalid reminder offsets.')

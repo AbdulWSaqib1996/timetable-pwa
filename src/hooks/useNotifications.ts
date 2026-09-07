@@ -27,6 +27,8 @@ import type { MetaMap, Session, Settings } from '../types'
 interface Options {
   /** Do not notify before this profile's saved completion state has loaded. */
   metaReady: boolean
+  /** owning profile id, stamped into every notification payload (P3-05) */
+  profileId: string | null
   settings: Settings | null
   /** reminder-eligible sessions: course membership + the explicit optional/
    *  self-study reminder preferences — display filters play no part */
@@ -38,8 +40,9 @@ interface Options {
   travelMode: TravelMode
   locationEnabled: boolean
   tubeStatus: TflDisruption[]
-  /** apply a "✓ Attended"/"✗ Absent" tap that arrived via a notification action */
-  onMark: (key: string, kind: 'attended' | 'absent') => void
+  /** apply an attendance/task action that arrived via a notification, scoped
+   *  to its owning profile */
+  onMark: (key: string, kind: 'attended' | 'absent' | 'done', profileId?: string) => void
 }
 
 /**
@@ -49,6 +52,7 @@ interface Options {
  */
 export function useNotifications({
   metaReady,
+  profileId,
   settings,
   reminderSessions,
   allKeyDates,
@@ -75,18 +79,37 @@ export function useNotifications({
   onMarkRef.current = onMark
   const snoozeUrlRef = useRef<string | undefined>(undefined)
   snoozeUrlRef.current = settings?.pushEnabled ? settings.pushServerBase ?? DEFAULT_PUSH_BASE : undefined
+  const profileIdRef = useRef(profileId)
+  profileIdRef.current = profileId
 
   // Notification action buttons: the service worker relays "attended"/"snooze"
   // taps to an open window via postMessage.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     const onMessage = (event: MessageEvent) => {
-      const msg = event.data as { type?: string; action?: string; key?: string; title?: string; body?: string }
+      const msg = event.data as {
+        type?: string
+        action?: string
+        key?: string
+        title?: string
+        body?: string
+        profileId?: string
+        kind?: string
+      }
       if (msg?.type !== 'timetable-action' || !msg.key) return
-      if (msg.action === 'attended' || msg.action === 'absent') {
-        onMarkRef.current(msg.key, msg.action)
+      if (msg.action === 'attended' || msg.action === 'absent' || msg.action === 'done') {
+        onMarkRef.current(msg.key, msg.action, msg.profileId)
       } else if (msg.action === 'snooze' && msg.title) {
-        setTimeout(() => showReminder(msg.title!, msg.body ?? '', msg.key, snoozeUrlRef.current), 10 * 60_000)
+        setTimeout(
+          () =>
+            showReminder(msg.title!, msg.body ?? '', {
+              key: msg.key,
+              profileId: msg.profileId ?? profileIdRef.current ?? undefined,
+              kind: msg.kind === 'task' ? 'task' : 'session',
+              snoozeUrl: snoozeUrlRef.current,
+            }),
+          10 * 60_000
+        )
       }
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
@@ -140,8 +163,13 @@ export function useNotifications({
       typeof Notification === 'undefined'
     )
       return
-    const notify = (title: string, body: string, key?: string) =>
-      showReminder(title, body, key, snoozeUrlRef.current)
+    const notify = (title: string, body: string, key?: string, kind: 'session' | 'task' = 'session') =>
+      showReminder(title, body, {
+        key,
+        kind,
+        profileId: profileIdRef.current ?? undefined,
+        snoozeUrl: snoozeUrlRef.current,
+      })
     const check = () => {
       if (Notification.permission !== 'granted') return
       const now = new Date()
@@ -242,7 +270,12 @@ export function useNotifications({
           const key = sessionKey(s)
           const marked = metaRef.current[key]?.attended || metaRef.current[key]?.absent
           if (since < 0 || since > 30 || notified[`${key}#att`] || marked) continue
-          showReminder(`Did you attend ${s.title}?`, 'Tap ✓ Attended to log it.', key, snoozeUrlRef.current, `att-${key}`)
+          showReminder(`Did you attend ${s.title}?`, 'Tap ✓ Attended to log it.', {
+            key,
+            profileId: profileIdRef.current ?? undefined,
+            snoozeUrl: snoozeUrlRef.current,
+            tag: `att-${key}`,
+          })
           notified[`${key}#att`] = Date.now()
           dirty = true
         }
@@ -260,7 +293,8 @@ export function useNotifications({
             days === 0
               ? `Due today${kd.start ? ` at ${kd.start}` : ''}`
               : `Due in ${days} day${days === 1 ? '' : 's'} (${kd.dateISO.split('-').reverse().join('/')})`,
-            sessionKey(kd)
+            sessionKey(kd),
+            'task' // deadlines get task actions (Open / Mark done / Snooze), never "Attended"
           )
           for (const d of due) notified[`${sessionKey(kd)}#kd#${d}`] = Date.now()
           dirty = true

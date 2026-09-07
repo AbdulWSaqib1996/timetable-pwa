@@ -10,7 +10,7 @@ import { localTodayISO, selectCourseSessions } from '../lib/filters'
 import { fetchGvizTable } from '../lib/gviz'
 import { historyRecovered, markHistoryRecovered, recoverHistory, retainHistory } from '../lib/history'
 import { parseTimetable } from '../lib/parseTimetable'
-import { drainPendingActions } from '../lib/pendingActions'
+import { applyPendingNotificationActions } from '../lib/pendingActions'
 import { expandPlacementSpans } from '../lib/placementSpans'
 import {
   loadCache,
@@ -19,7 +19,6 @@ import {
   loadStore,
   saveCache,
   saveChanges,
-  saveMeta,
 } from '../lib/storage'
 import type { MetaMap, ProfileEntry, Session, SessionChange, Settings } from '../types'
 
@@ -237,19 +236,14 @@ export function useTimetableData(active: ProfileEntry | null) {
     )
     setSources([])
     lastStatusesRef.current = []
-    // Apply "✓ Attended"/"✗ Absent" taps made on notifications while the app was closed.
+    // Apply notification actions queued while the app was closed — each to its
+    // OWNING profile (P3-05), not whichever profile happens to be active.
     const pid = active.id
-    void drainPendingActions().then((actions) => {
-      const marks = actions.filter((a) => (a.action === 'attended' || a.action === 'absent') && a.key)
-      if (marks.length === 0) return
-      setMetaMap((prev) => {
-        const next = { ...prev }
-        for (const { action, key } of marks) {
-          next[key] = { ...next[key], deleted: undefined, attended: action === 'attended', absent: action === 'absent', at: Date.now() }
-        }
-        saveMeta(pid, next)
-        return next
-      })
+    void applyPendingNotificationActions().then((res) => {
+      if (res.changedProfiles.has(pid)) setMetaMap(loadMeta(pid))
+      for (const o of res.open) {
+        window.dispatchEvent(new CustomEvent('timetable-open-request', { detail: o }))
+      }
     })
     setError(null)
     void refresh(active.settings, active.id)

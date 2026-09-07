@@ -31,6 +31,7 @@ import { loadSyncState as loadSyncStateForPing } from './lib/sync'
 import { trackOpen, trackUse } from './lib/usage'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
+import { legacyKey } from '../shared/identity.js'
 import { sessionKey } from './lib/diff'
 import {
   DEFAULT_FILTERS,
@@ -129,6 +130,10 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false)
   const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowWhatsNew())
   const [notices, setNotices] = useState<Notice[]>([])
+  // A notification tap carrying an owner: switch to that profile, then open
+  // the stable event (P3-05). Falls back to a safe notice when it's gone.
+  const [pendingOpen, setPendingOpen] = useState<{ profileId: string; key: string } | null>(null)
+  const [openNotice, setOpenNotice] = useState<string | null>(null)
   const [dismissedNotices, setDismissedNotices] = useState<Set<string>>(() => loadDismissedNotices())
   const [adminFile, setAdminFile] = useState<AdminFile>(EMPTY_ADMIN)
 
@@ -178,6 +183,27 @@ export default function App() {
       return next
     })
   }
+
+  // Notification taps and queued 'open' actions arrive here with their owner.
+  useEffect(() => {
+    const onOpenRequest = (e: Event) => {
+      const d = (e as CustomEvent).detail as { profileId?: string; key?: string }
+      if (d?.profileId && d?.key) setPendingOpen({ profileId: d.profileId, key: d.key })
+    }
+    const onSwMessage = (event: MessageEvent) => {
+      const msg = event.data as { type?: string; profileId?: string; key?: string }
+      if (msg?.type !== 'timetable-open' || !msg.key) return
+      const profiles = loadStore()?.profiles ?? []
+      const owner = msg.profileId ?? (profiles.length === 1 ? profiles[0].id : undefined)
+      if (owner) setPendingOpen({ profileId: owner, key: msg.key })
+    }
+    window.addEventListener('timetable-open-request', onOpenRequest)
+    if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', onSwMessage)
+    return () => {
+      window.removeEventListener('timetable-open-request', onOpenRequest)
+      if ('serviceWorker' in navigator) navigator.serviceWorker.removeEventListener('message', onSwMessage)
+    }
+  }, [])
 
   // Manual theme override (default: follow the system).
   useEffect(() => {
@@ -491,6 +517,32 @@ export default function App() {
     return [...keyDates, ...custom].sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
   }, [keyDates, settings?.customKeyDates])
 
+  // Resolve a pending open once the owning profile's sessions are loaded.
+  useEffect(() => {
+    if (!pendingOpen || !active) return
+    if (active.id !== pendingOpen.profileId) {
+      if (store?.profiles.some((p) => p.id === pendingOpen.profileId)) {
+        handleSwitchProfile(pendingOpen.profileId)
+      } else {
+        setOpenNotice('That notification belongs to a timetable no longer on this device.')
+        setPendingOpen(null)
+      }
+      return
+    }
+    if (sessions === null) return
+    const all = [...sessions, ...allKeyDates]
+    const target =
+      all.find((x) => sessionKey(x) === pendingOpen.key) ?? all.find((x) => legacyKey(x) === pendingOpen.key)
+    if (target) {
+      setSelected(target)
+    } else {
+      setOpenNotice('That session is no longer on your timetable — Changes shows what moved or was cancelled.')
+      setOpenSheet('changes')
+    }
+    setPendingOpen(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOpen, active?.id, sessions, allKeyDates])
+
   const searchResults = useMemo(() => {
     const q = query.trim()
     return q ? [...courseSessions, ...allKeyDates].filter((s) => matchesQuery(s, q)) : null
@@ -637,6 +689,7 @@ export default function App() {
 
   useNotifications({
     metaReady,
+    profileId: active?.id ?? null,
     settings,
     reminderSessions,
     allKeyDates,
@@ -645,15 +698,23 @@ export default function App() {
     travelMode,
     locationEnabled,
     tubeStatus,
-    onMark: (key, kind) => {
-      const pid = active?.id
-      if (!pid) return
+    onMark: (key, kind, ownerPid) => {
+      const target = ownerPid ?? active?.id
+      if (!target) return
+      const patch = (entry: SessionMeta | undefined): SessionMeta =>
+        kind === 'done'
+          ? { ...entry, deleted: undefined, status: 'done', at: Date.now() }
+          : { ...entry, deleted: undefined, attended: kind === 'attended', absent: kind === 'absent', at: Date.now() }
+      if (target !== active?.id) {
+        // Action owned by another profile: update that profile's saved records
+        // directly — never the active one's (P3-05).
+        const other = loadMeta(target)
+        saveMeta(target, { ...other, [key]: patch(other[key]) })
+        return
+      }
       setMetaMap((prev) => {
-        const next = {
-          ...prev,
-          [key]: { ...prev[key], attended: kind === 'attended', absent: kind === 'absent', at: Date.now() },
-        }
-        saveMeta(pid, next)
+        const next = { ...prev, [key]: patch(prev[key]) }
+        saveMeta(target, next)
         return next
       })
     },
@@ -794,6 +855,15 @@ export default function App() {
             {identityReview[0].title.slice(0, 40)}. Affected sessions carry a 🔗 badge.
           </span>
         </button>
+      )}
+
+      {openNotice && (
+        <div className="backup-banner notice-banner">
+          <span>🔔 {openNotice}</span>
+          <button type="button" className="btn-icon" aria-label="Dismiss" onClick={() => setOpenNotice(null)}>
+            ✕
+          </button>
+        </div>
       )}
 
       {error && (

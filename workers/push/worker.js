@@ -928,9 +928,12 @@ async function runScheduled(env) {
         const days = daysBetween(kd.dateISO, now.dateISO)
         for (const d of config.keyDateReminderDays) {
           if (days === d) {
+            const kdKey = eventKey(kd)
             due.push({
               dedupe: `kd|${kd.dateISO}|${kd.title}|${d}`,
-              key: eventKey(kd),
+              key: kdKey,
+              kind: 'task', // deadlines get task actions, never "Attended"
+              tag: `task-${kdKey}`,
               title: `📌 ${kd.title}`,
               body: days === 0 ? 'Due today' : `Due in ${days} day${days === 1 ? '' : 's'}`,
             })
@@ -949,7 +952,15 @@ async function runScheduled(env) {
     if (unsent.length === 0) continue
     const payload =
       unsent.length === 1
-        ? { title: unsent[0].title, body: unsent[0].body, key: unsent[0].key, tag: unsent[0].tag, snoozeUrl: record.base }
+        ? {
+            title: unsent[0].title,
+            body: unsent[0].body,
+            key: unsent[0].key,
+            kind: unsent[0].kind,
+            tag: unsent[0].tag,
+            profileId: config.profileId,
+            snoozeUrl: record.base,
+          }
         : {
             title: `${unsent.length} timetable updates`,
             body: unsent
