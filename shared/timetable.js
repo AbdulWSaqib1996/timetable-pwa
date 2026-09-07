@@ -242,7 +242,10 @@ export function parseTimetable(table) {
         }
         const start = parseTimeCell(colMap.start !== undefined ? cells[colMap.start] ?? null : null);
         const end = parseTimeCell(colMap.end !== undefined ? cells[colMap.end] ?? null : null);
-        if ((get('start') && !start) || (get('end') && !end) || (start && end && end <= start && !(start === '00:00' && end === '00:00'))) {
+        // Zero-duration rows (end === start) are legitimate point-in-time markers —
+        // the sheet uses them for PLT tasks, audit open/close dates and submission
+        // deadlines (56 real rows as of Sep 2026). Only genuinely inverted times are bad.
+        if ((get('start') && !start) || (get('end') && !end) || (start && end && end < start)) {
             warnings.push(`Row ${r + 1}: invalid time or end before start. Row skipped.`);
             continue;
         }
