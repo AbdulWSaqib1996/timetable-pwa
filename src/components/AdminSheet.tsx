@@ -5,6 +5,9 @@ import { mondayOfISO, newAdminId, reflectionStreak } from '../lib/admin'
 import { sessionKey } from '../lib/diff'
 import { daysUntil, isPlacementSession, placementTag } from '../lib/format'
 import { printBinder } from '../lib/printBinder'
+import type { BinderSection } from '../lib/printBinder'
+import { readAttachments } from '../lib/attachments'
+import { Dialog, Field } from './ui'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import { trackUse } from '../lib/usage'
 import { RecordEditSheet } from './RecordEditSheet'
@@ -604,6 +607,7 @@ export function AdminSheet(props: Props) {
   const [tab, setTab] = useState<Tab>(props.initialTab ?? 'overview')
   const [editing, setEditing] = useState<{ kind: RecordKind; id: string } | null>(null)
   const [undoRec, setUndoRec] = useState<{ kind: RecordKind; record: { id: string; at: number } } | null>(null)
+  const [binderPreview, setBinderPreview] = useState(false)
   const onEdit = (kind: RecordKind, id: string) => setEditing({ kind, id })
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -695,16 +699,25 @@ export function AdminSheet(props: Props) {
               />
             )
           })()}
+        {binderPreview && (
+          <BinderPreviewSheet
+            profileId={profileId}
+            profileName={profileName}
+            sessions={sessions}
+            metaMap={metaMap}
+            admin={admin}
+            placementTargetDays={placementTargetDays}
+            todayISO={todayISO}
+            onClose={() => setBinderPreview(false)}
+          />
+        )}
         <div className="modal-actions">
           <button
             type="button"
             className="btn-primary"
-            onClick={() => {
-              trackUse('binder')
-              void printBinder({ profileId, profileName, sessions, metaMap, admin, placementTargetDays, todayISO })
-            }}
+            onClick={() => setBinderPreview(true)}
           >
-            🖨 Export full binder (PDF)
+            🖨 Export binder (preview first)
           </button>
           <button type="button" className="btn-ghost" onClick={onClose}>
             Close
@@ -712,5 +725,140 @@ export function AdminSheet(props: Props) {
         </div>
       </div>
     </div>
+  )
+}
+
+
+const BINDER_SECTIONS: { id: BinderSection; label: string }[] = [
+  { id: 'attendance', label: 'Attendance & placement days' },
+  { id: 'evidence', label: 'Evidence by Teachers’ Standard' },
+  { id: 'targets', label: 'Targets' },
+  { id: 'meetings', label: 'Mentor meetings' },
+  { id: 'observations', label: 'Observations' },
+  { id: 'lessons', label: 'Lessons taught' },
+  { id: 'audits', label: 'Subject-knowledge audits' },
+]
+
+/** Binder preview (P5-04): date range, section choice with live counts and
+ *  honest file availability BEFORE anything prints — a missing photo is
+ *  labelled in the output, never silently omitted. */
+function BinderPreviewSheet({
+  profileId,
+  profileName,
+  sessions,
+  metaMap,
+  admin,
+  placementTargetDays,
+  todayISO,
+  onClose,
+}: {
+  profileId: string
+  profileName: string
+  sessions: Session[]
+  metaMap: MetaMap
+  admin: AdminFile
+  placementTargetDays?: number
+  todayISO: string
+  onClose: () => void
+}) {
+  const [fromISO, setFromISO] = useState('')
+  const [toISO, setToISO] = useState('')
+  const [sections, setSections] = useState<BinderSection[]>(BINDER_SECTIONS.map((s) => s.id))
+  const [localPhotos, setLocalPhotos] = useState<number | null>(null)
+  const [printing, setPrinting] = useState(false)
+  useEffect(() => {
+    let live = true
+    void readAttachments('photos')
+      .then((all) => live && setLocalPhotos(all.filter((p) => p.owner.startsWith(profileId + '|')).length))
+      .catch(() => live && setLocalPhotos(null))
+    return () => {
+      live = false
+    }
+  }, [profileId])
+
+  const inRange = (d: string) => (!fromISO || d >= fromISO) && (!toISO || d <= toISO)
+  const evidenceCount =
+    Object.entries(metaMap).filter(([key, m]) => {
+      if (m.deleted || (!m.note && !m.photos && !(m.standards ?? []).length)) return false
+      const date = key.split('|')[0]
+      return /^\d{4}-\d{2}-\d{2}$/.test(date) ? inRange(date) : true
+    }).length +
+    admin.reflections.filter((r) => inRange(r.weekISO)).length +
+    admin.lessons.filter((l) => inRange(l.dateISO) && (l.evaluation || l.standards.length > 0)).length
+  const recordedPhotos = Object.values(metaMap).reduce((n, m) => n + (m.deleted ? 0 : m.photos ?? 0), 0)
+  const counts: Record<BinderSection, number> = {
+    attendance: sessions.filter((s) => inRange(s.dateISO)).length,
+    evidence: evidenceCount,
+    targets: admin.targets.filter((t) => inRange(t.setISO)).length,
+    meetings: admin.meetings.filter((m) => inRange(m.dateISO)).length,
+    observations: admin.observations.filter((o) => inRange(o.dateISO)).length,
+    lessons: admin.lessons.filter((l) => inRange(l.dateISO)).length,
+    audits: admin.audits.filter((a) => inRange(a.dateISO)).length,
+  }
+
+  return (
+    <Dialog label="Binder preview" onClose={onClose}>
+      <div className="sheet-header">
+        <h2>Binder preview</h2>
+        <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
+      </div>
+      <div className="task-edit-row">
+        <Field label="From">
+          <input type="date" className="date-input" value={fromISO} onChange={(e) => setFromISO(e.target.value)} />
+        </Field>
+        <Field label="To">
+          <input type="date" className="date-input" value={toISO} onChange={(e) => setToISO(e.target.value)} />
+        </Field>
+      </div>
+      {BINDER_SECTIONS.map((s) => (
+        <label className="toggle-row" key={s.id}>
+          <input
+            type="checkbox"
+            checked={sections.includes(s.id)}
+            onChange={(e) =>
+              setSections((prev) => (e.target.checked ? [...prev, s.id] : prev.filter((x) => x !== s.id)))
+            }
+          />
+          {s.label} ({counts[s.id]})
+        </label>
+      ))}
+      <p className="filter-hint">
+        {localPhotos === null
+          ? 'Checking photo availability…'
+          : recordedPhotos <= localPhotos
+            ? `${localPhotos} photo${localPhotos === 1 ? '' : 's'} available on this device will be embedded.`
+            : `${localPhotos} of ${recordedPhotos} recorded photos are on this device — the ${recordedPhotos - localPhotos} elsewhere will be LABELLED as missing, not silently dropped.`}
+      </p>
+      <div className="modal-actions">
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={printing || sections.length === 0}
+          onClick={() => {
+            setPrinting(true)
+            trackUse('binder')
+            void printBinder({
+              profileId,
+              profileName,
+              sessions,
+              metaMap,
+              admin,
+              placementTargetDays,
+              todayISO,
+              options: { fromISO: fromISO || undefined, toISO: toISO || undefined, sections },
+            })
+              .catch(() => {})
+              .finally(() => setPrinting(false))
+          }}
+        >
+          {printing ? 'Preparing…' : '🖨 Print / save as PDF'}
+        </button>
+        <button type="button" className="btn-ghost" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </Dialog>
   )
 }

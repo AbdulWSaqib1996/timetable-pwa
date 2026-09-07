@@ -11,7 +11,7 @@ import { formatRemaining, googleCalendarUrl, isPlacementSession } from '../lib/f
 import { parseLocation } from '../lib/location'
 import { sessionKey } from '../lib/diff'
 import { trackUse } from '../lib/usage'
-import { addPhoto, compressImage, deletePhoto, getPhotos } from '../lib/photos'
+import { PHOTO_CAPTION_MAX, addPhoto, compressImage, deletePhoto, getPhotos, setPhotoCaption } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
 import { useLiveJourney } from '../hooks/useLiveJourney'
 import { RouteSteps } from './RouteSteps'
@@ -423,8 +423,21 @@ export function SessionDetail({
               {photos.map((p, i) => (
                 <span className="photo-thumb" key={p.id}>
                   <a href={photoUrls.current[i]} target="_blank" rel="noopener noreferrer">
-                    <img src={photoUrls.current[i]} alt="Session photo" loading="lazy" />
+                    <img src={photoUrls.current[i]} alt={p.caption || 'Session photo'} loading="lazy" />
                   </a>
+                  <input
+                    type="text"
+                    className="photo-caption-input"
+                    placeholder="Caption…"
+                    aria-label="Photo caption"
+                    maxLength={PHOTO_CAPTION_MAX}
+                    defaultValue={p.caption ?? ''}
+                    onBlur={(e) =>
+                      void setPhotoCaption(p.id, e.target.value)
+                        .then(reloadPhotos)
+                        .catch((error) => reportPersistenceFailure('Caption save failed: ' + String(error)))
+                    }
+                  />
                   <button
                     type="button"
                     className="photo-delete"

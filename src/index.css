@@ -3452,3 +3452,33 @@ body {
 .placement-block {
   margin-bottom: 12px;
 }
+
+/* Evidence search + binder preview (P5-04) */
+.journal-range {
+  display: flex;
+  gap: 12px;
+}
+
+.journal-range .ui-field {
+  flex: 1;
+}
+
+.photo-caption-input {
+  width: 100%;
+  font-size: 11px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-badge);
+  background: var(--surface);
+  color: var(--text);
+  margin-top: 2px;
+}
+
+.pb-caption {
+  font-size: 11px;
+  color: #444;
+}
+
+.pb-missing {
+  font-style: italic;
+}

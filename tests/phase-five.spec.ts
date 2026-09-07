@@ -210,3 +210,59 @@ test('every PGCE record type is editable; a reflection draft survives reload wit
   expect(after.meetings.length).toBe(1)
   expect(after.meetings[0].at).toBeGreaterThanOrEqual(after.deleted['meetings:m1'])
 })
+
+test('evidence search: query/type/untagged filters, captions indexed, honest empty state', async ({ page }) => {
+  await seed(page)
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'timetable.admin.v1.fx',
+      JSON.stringify({
+        tasks: [], exceptions: [], plans: [], commitments: [], meetings: [], observations: [], audits: [],
+        reflections: [{ id: 'r1', weekISO: '2026-08-31', wentWell: 'Phonics went well', challenges: '', focus: '', standards: ['TS3'], at: 1 }],
+        targets: [{ id: 't1', text: 'Improve questioning depth', standards: [], setISO: '2026-09-01', status: 'open', at: 1 }],
+        lessons: [{ id: 'l1', dateISO: '2026-09-02', classGroup: 'Y2', subject: 'Maths', evaluation: 'Pacing drifted', standards: [], at: 1 }],
+      })
+    )
+  })
+  await page.goto('./#/pgce')
+  await page.getByRole('button', { name: 'Evidence journal' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Evidence journal' })
+  await expect(dialog).toBeVisible()
+  // Query search reaches reflections and targets.
+  await dialog.getByLabel('Search evidence').fill('questioning')
+  await expect(dialog.locator('.journal-list li')).toHaveCount(1)
+  await expect(dialog).toContainText('Improve questioning depth')
+  // Untagged filter: the target and lesson lack standards; the reflection has TS3.
+  await dialog.getByLabel('Search evidence').fill('')
+  await dialog.getByRole('button', { name: /^Untagged/ }).click()
+  await expect(dialog).not.toContainText('Phonics went well')
+  // Over-restrictive filters name the real total instead of claiming no evidence.
+  await dialog.getByLabel('Search evidence').fill('zzz-no-match')
+  await expect(dialog.getByText(/Nothing matches these filters — you have 3 evidence records/)).toBeVisible()
+  await dialog.getByRole('button', { name: 'Clear filters' }).click()
+  await expect(dialog.locator('.journal-list li')).toHaveCount(3)
+})
+
+test('binder preview shows counts and file availability before printing', async ({ page }) => {
+  await seed(page)
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'timetable.admin.v1.fx',
+      JSON.stringify({
+        tasks: [], exceptions: [], plans: [], commitments: [], meetings: [], observations: [], audits: [],
+        reflections: [], lessons: [],
+        targets: [{ id: 't1', text: 'A target', standards: [], setISO: '2026-09-01', status: 'open', at: 1 }],
+      })
+    )
+  })
+  await page.goto('./#/pgce')
+  await page.getByRole('button', { name: 'Print binder & exports' }).click()
+  await page.getByRole('button', { name: /Export binder \(preview first\)/ }).click()
+  const preview = page.getByRole('dialog', { name: 'Binder preview' })
+  await expect(preview).toBeVisible()
+  await expect(preview.getByText('Targets (1)')).toBeVisible()
+  await expect(preview.getByText(/photos? available on this device|Checking photo availability/)).toBeVisible()
+  // Narrow the range so the target falls out — the count updates before print.
+  await preview.getByLabel('From').fill('2026-09-05')
+  await expect(preview.getByText('Targets (0)')).toBeVisible()
+})

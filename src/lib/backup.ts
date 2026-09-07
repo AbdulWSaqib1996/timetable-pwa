@@ -20,6 +20,7 @@ export function validateBackup(text: string): Backup {
       assert(object(file) && typeof file.owner === 'string' && ids.has(file.owner.split('|')[0]) && Number.isFinite(file.at) && typeof file.data === 'string', 'Invalid attachment owner or data.')
       assert(file.uid === undefined || typeof file.uid === 'string', 'Invalid attachment identity.')
       if (kind === 'photos') assert(file.owner.includes('|') && /^data:image\/[\w.+-]+;base64,[A-Za-z0-9+/]*={0,2}$/.test(file.data), 'Invalid photo data.')
+      if (kind === 'photos' && (file as { caption?: unknown }).caption !== undefined) assert(typeof (file as { caption?: unknown }).caption === 'string' && ((file as { caption: string }).caption).length <= 300, 'Invalid photo caption.')
       else assert(typeof (file as WalletExport).name === 'string' && typeof (file as WalletExport).type === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(file.data) && file.data.length <= 14 * 1024 * 1024, 'Invalid wallet file.')
     }
   }

@@ -1,7 +1,8 @@
 import { addAttachment, removeAttachment, readAttachments, attachmentUid, blobDataURL, withDataLock, replaceAttachments, decodeBase64 } from './attachments'
 import type { Attachment } from './attachments'
-export interface StoredPhoto extends Attachment {}
-export interface PhotoExport { uid?: string; owner: string; at: number; data: string }
+export interface StoredPhoto extends Attachment { caption?: string }
+export interface PhotoExport { uid?: string; owner: string; at: number; data: string; caption?: string }
+export const PHOTO_CAPTION_MAX = 300
 
 /** Downscale to ≤1600px JPEG so photos stay a few hundred KB each. */
 export async function compressImage(file: File | Blob, maxDim = 1600, quality = 0.8): Promise<Blob> {
@@ -20,15 +21,28 @@ export async function compressImage(file: File | Blob, maxDim = 1600, quality = 
   }
 }
 
-export async function addPhoto(pid: string, sessionKey: string, blob: Blob): Promise<void> {
-  await addAttachment('photos', { owner: `${pid}|${sessionKey}`, blob, at: Date.now() })
+export async function addPhoto(pid: string, sessionKey: string, blob: Blob, caption?: string): Promise<void> {
+  await addAttachment('photos', { owner: `${pid}|${sessionKey}`, blob, at: Date.now(), ...(caption ? { caption: caption.slice(0, PHOTO_CAPTION_MAX) } : {}) })
+}
+
+/** Set/replace a photo's caption — separately validated metadata (P5-04);
+ *  the caption rides backups while the bytes stay local until Phase 7. */
+export async function setPhotoCaption(id: number, caption: string): Promise<void> {
+  const trimmed = caption.trim().slice(0, PHOTO_CAPTION_MAX)
+  await withDataLock(async () => {
+    const all = await readAttachments('photos')
+    await replaceAttachments(
+      'photos',
+      all.map((p) => (p.id === id ? { ...p, caption: trimmed || undefined } : p))
+    )
+  })
 }
 export async function getPhotos(pid: string, sessionKey: string): Promise<StoredPhoto[]> {
   return (await readAttachments('photos')).filter(p => p.owner === `${pid}|${sessionKey}`)
 }
 export const deletePhoto = (id: number) => removeAttachment('photos', id)
 export async function exportPhotos(): Promise<PhotoExport[]> {
-  return Promise.all((await readAttachments('photos')).map(async p => ({ uid: await attachmentUid(p), owner: p.owner, at: p.at, data: await blobDataURL(p.blob) })))
+  return Promise.all((await readAttachments('photos')).map(async p => ({ uid: await attachmentUid(p), owner: p.owner, at: p.at, data: await blobDataURL(p.blob), caption: (p as StoredPhoto).caption })))
 }
 export async function preparePhotos(existing: Attachment[], items: PhotoExport[]): Promise<Attachment[]> {
   const out = [...existing]
@@ -38,7 +52,8 @@ export async function preparePhotos(existing: Attachment[], items: PhotoExport[]
     const match = item.data.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/s)
     if (!match) throw new Error('Backup contains an invalid photo.')
     const blob = decodeBase64(match[2], match[1])
-    const candidate = { owner: item.owner, at: item.at, blob }
+    const caption = typeof item.caption === 'string' ? item.caption.slice(0, PHOTO_CAPTION_MAX) : undefined
+    const candidate = { owner: item.owner, at: item.at, blob, ...(caption ? { caption } : {}) }
     const uid = item.uid ?? await attachmentUid(candidate)
     const prior = ids.get(uid)
     if (prior) {
