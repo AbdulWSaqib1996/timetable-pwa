@@ -30,6 +30,7 @@ const SettingsSheet = lazy(() => import('./components/SettingsSheet').then((m) =
 type SettingsSection = import('./components/SettingsSheet').SettingsSection
 const StatsSheet = lazy(() => import('./components/StatsSheet').then((m) => ({ default: m.StatsSheet })))
 const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((m) => ({ default: m.StudyGroupSheet })))
+const CourseSheet = lazy(() => import('./components/CourseSheet').then((m) => ({ default: m.CourseSheet })))
 import { WHATSNEW_VERSION } from './lib/changelog'
 import { maybePing } from './lib/analytics'
 import { loadSyncState as loadSyncStateForPing } from './lib/sync'
@@ -68,6 +69,7 @@ import { downloadFile } from './lib/files'
 import { useNotifications } from './hooks/useNotifications'
 import { useTimetableData } from './hooks/useTimetableData'
 import { useTravel } from './hooks/useTravel'
+import { activeCourse, setActiveCourse } from './lib/course'
 import {
   clearProfileData,
   exportBackup,
@@ -90,7 +92,7 @@ import type {
   ViewMode,
 } from './types'
 
-type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin'
+type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -136,16 +138,22 @@ export default function App() {
   const settings = active?.settings ?? null
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+  // Activate this profile's course configuration BEFORE anything derives
+  // today/zone/campus from it (P7-01); idempotent, falls back to UCL built-in.
+  setActiveCourse(settings?.courseConfig)
+  const course = activeCourse()
   // Course-timezone today, refreshed each minute so midnight rollover moves the
-  // Today marker without touching the user's date selection.
+  // Today marker without touching the user's date selection; a course/timezone
+  // change recomputes it immediately.
   const [todayISO, setTodayISO] = useState(() => localTodayISO())
   useEffect(() => {
+    setTodayISO(localTodayISO())
     const t = setInterval(() => {
       const next = localTodayISO()
       setTodayISO((prev) => (prev === next ? prev : next))
     }, 60_000)
     return () => clearInterval(t)
-  }, [])
+  }, [course.timezone])
 
   // Phase 4 shell: hash routing across Today · Schedule · Tasks · PGCE file.
   const [route, navigate] = useRoute()
@@ -1064,6 +1072,7 @@ export default function App() {
             courseSessions={courseSessions}
             keyDates={allKeyDates}
             onOpenGroup={() => setOpenSheet('group')}
+            onOpenCourse={() => setOpenSheet('course')}
             metaMap={metaMap}
             todayISO={todayISO}
             placementBlocks={placementStats.blocks}
@@ -1372,6 +1381,14 @@ export default function App() {
           profileId={active.id}
           admin={adminFile}
           onSelect={openSession}
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'course' && settings && (
+        <CourseSheet
+          settings={settings}
+          onUpdateSettings={updateSettings}
           onClose={() => setOpenSheet('none')}
         />
       )}

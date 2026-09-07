@@ -13,6 +13,7 @@ import { trackUse } from '../lib/usage'
 import { PHOTO_CAPTION_MAX, addPhoto, compressImage, deletePhoto, getPhotos, setPhotoCaption } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
 import { wallToUTC, utcToZonedParts } from '../../shared/calendar-time.js'
+import { courseZone } from '../lib/course'
 import { requiredArrivalMs } from '../../shared/journey.js'
 import { useJourney } from '../hooks/useJourney'
 import { ItinerarySteps } from './ItinerarySteps'
@@ -169,7 +170,7 @@ export function SessionDetail({
   // arrive-by plan for its actual date/time with the chosen buffer; a
   // session happening about now gets a leave-now route. Driving stays a
   // labelled distance estimate — nothing future is fabricated for it.
-  const startMs = !isTask && session.start ? wallToUTC(session.dateISO, session.start).utcMs : null
+  const startMs = !isTask && session.start ? wallToUTC(session.dateISO, session.start, courseZone()).utcMs : null
   const planable = !isTask && !!travel?.location && travelMode !== 'driving'
   const futurePlan = planable && startMs !== null && startMs > Date.now() + 5 * 60_000
   const [originId, setOriginId] = useState<string | null>(
@@ -191,7 +192,7 @@ export function SessionDetail({
     mode: travelMode,
     intent:
       futurePlan && startMs !== null
-        ? { kind: 'arrive-by', arriveByMs: requiredArrivalMs(startMs, arrivalBufferMins), eventKey: sessionKey(session) }
+        ? { kind: 'arrive-by', arriveByMs: requiredArrivalMs(startMs, arrivalBufferMins), timeZone: courseZone(), eventKey: sessionKey(session) }
         : { kind: 'leave-now' },
     eventKey: sessionKey(session),
     enabled: tab === 'travel' && planable,
@@ -217,7 +218,7 @@ export function SessionDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [journey.leaveByMs, shownItinerary, travel?.location?.lat])
 
-  const hhmm = (ms: number) => utcToZonedParts(ms).hhmm
+  const hhmm = (ms: number) => utcToZonedParts(ms, courseZone()).hhmm
 
   // The sheet's Location column glues building and room together — split them.
   const loc = parseLocation(session.isSelfStudy || isTask ? '' : session.room)

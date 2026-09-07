@@ -3587,3 +3587,27 @@ body {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* ---- course setup (P7-01) ---- */
+.course-grid {
+  display: flex;
+  gap: 8px;
+}
+.course-grid input {
+  min-width: 0;
+  flex: 1;
+}
+.course-building-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 72px 72px auto;
+  gap: 6px;
+  align-items: center;
+}
+.course-building-row input {
+  min-width: 0;
+}
+@media (max-width: 480px) {
+  .course-building-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}

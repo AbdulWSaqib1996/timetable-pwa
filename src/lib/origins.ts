@@ -1,4 +1,5 @@
 import type { Coords } from './campus'
+import { activeCourse } from './course'
 import type { Settings } from '../types'
 
 /**
@@ -17,8 +18,6 @@ export interface OriginOption {
   /** device basis only: when the fix was taken */
   fixAt?: number | null
 }
-
-const CAMPUS: Coords = { lat: 51.5227, lng: -0.1276 }
 
 export function availableOrigins(
   settings: Settings,
@@ -43,9 +42,9 @@ export function availableOrigins(
     {
       id: 'campus',
       basis: 'campus',
-      label: 'Campus (IOE, 20 Bedford Way)',
+      label: activeCourse().campus.label,
       detail: 'approximate building centre',
-      coords: CAMPUS,
+      coords: { lat: activeCourse().campus.lat, lng: activeCourse().campus.lng },
     },
   ]
   if (settings.homeLat != null && settings.homeLng != null) {

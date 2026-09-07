@@ -3,6 +3,7 @@ import { Card, PageHeader } from '../../components/ui'
 import type { AdminFile } from '../../lib/admin'
 import { getWalletFiles } from '../../lib/wallet'
 import type { MetaMap } from '../../types'
+import { activeCourse } from '../../lib/course'
 
 export type AdminTab = 'overview' | 'reflect' | 'targets' | 'meetings' | 'obs' | 'lessons' | 'audits' | 'wallet'
 
@@ -57,6 +58,7 @@ export function PGCEPage({
     <div className="page page-pgce">
       <PageHeader title="PGCE file" subtitle={profileName} />
 
+      {activeCourse().features.placement && (
       <Card className="pgce-section">
         <div className="pgce-section-head">
           <h2>Placement</h2>
@@ -70,6 +72,7 @@ export function PGCEPage({
             : 'Placement blocks from your timetable appear here — school details, mentor and logged days.'}
         </p>
       </Card>
+      )}
 
       <Card className="pgce-section">
         <div className="pgce-section-head">

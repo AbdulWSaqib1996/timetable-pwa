@@ -68,6 +68,7 @@ interface Props {
   onUpdateSettings: (patch: Partial<Settings>) => void
   onOpenStats: () => void
   onOpenGroup: () => void
+  onOpenCourse: () => void
   onRechooseSpecialisms: () => void
   onSwitchProfile: (id: string) => void
   onAddProfile: () => void
@@ -76,6 +77,7 @@ interface Props {
 }
 
 import { DEFAULT_ICS_FEED_BASE, DEFAULT_PUSH_BASE } from '../lib/config'
+import { activeCourse, courseZone } from '../lib/course'
 import { downloadFile } from '../lib/files'
 
 /** Build the subscribable feed URL for a deployed ics-feed worker. */
@@ -100,6 +102,8 @@ export function buildFeedUrl(base: string, settings: Settings, calendarName?: st
       .map(([tag, p]) => [tag, { s: p.school ?? '', a: p.address ?? '' }])
   )
   if (Object.keys(plc).length > 0) url.searchParams.set('plc', JSON.stringify(plc))
+  // A configured non-London course keeps its subscribed feed on course wall time.
+  if (courseZone() !== 'Europe/London') url.searchParams.set('tz', courseZone())
   return url.toString()
 }
 
@@ -129,6 +133,7 @@ export function SettingsSheet({
   onUpdateSettings,
   onOpenStats,
   onOpenGroup,
+  onOpenCourse,
   onRechooseSpecialisms,
   onSwitchProfile,
   onAddProfile,
@@ -723,6 +728,18 @@ export function SettingsSheet({
           />
         </section>
 
+
+        <section className="filter-section">
+          <h3>Course</h3>
+          <p className="filter-hint">
+            {activeCourse().name} · timezone {courseZone()} — campus, buildings, terminology and
+            sections come from the course configuration; import a template or set up another
+            course without touching your personal data.
+          </p>
+          <button type="button" className="btn-secondary" onClick={onOpenCourse}>
+            🎓 Course setup
+          </button>
+        </section>
 
         <section className="filter-section">
           <h3>Study group</h3>

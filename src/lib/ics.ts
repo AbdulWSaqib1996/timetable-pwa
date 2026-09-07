@@ -1,5 +1,6 @@
 import { buildICSCalendar } from '../../shared/calendar-time.js'
 import type { Session } from '../types'
+import { courseZone } from './course'
 
 /**
  * The .ics download shares one generator with the subscribed feed worker
@@ -8,7 +9,7 @@ import type { Session } from '../types'
  * octet-based line folding.
  */
 export function buildICS(sessions: Session[], calendarName: string): string {
-  return buildICSCalendar(sessions, calendarName)
+  return buildICSCalendar(sessions, calendarName, { zone: courseZone() })
 }
 
 export function downloadICS(sessions: Session[], calendarName: string, filename = 'my-timetable.ics'): void {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Route } from '../lib/router'
+import { activeCourse } from '../lib/course'
 import { IconPGCE, IconSchedule, IconSettings, IconTasks, IconToday } from './ui'
 
 interface Props {
@@ -13,11 +14,15 @@ interface Props {
   children: ReactNode
 }
 
-const DESTINATIONS: { route: Route; label: string; icon: (props: { size?: number }) => ReactNode }[] = [
+const destinations = (): { route: Route; label: string; icon: (props: { size?: number }) => ReactNode }[] => [
   { route: { name: 'today' }, label: 'Today', icon: IconToday },
   { route: { name: 'schedule' }, label: 'Schedule', icon: IconSchedule },
   { route: { name: 'tasks' }, label: 'Tasks', icon: IconTasks },
-  { route: { name: 'pgce' }, label: 'PGCE file', icon: IconPGCE },
+  // A course without the PGCE file feature (P7-01) drops the destination —
+  // the shell itself stays exactly the Phase 4 shell.
+  ...(activeCourse().features.pgceFile
+    ? [{ route: { name: 'pgce' } as Route, label: 'PGCE file', icon: IconPGCE }]
+    : []),
 ]
 
 /**
@@ -39,7 +44,7 @@ export function AppShell({ route, onNavigate, hideNav, profileName, children }: 
   const isActive = (dest: Route) => dest.name === route.name
   const nav = (variant: 'bottom' | 'side') => (
     <nav className={variant === 'bottom' ? 'bottom-nav' : 'side-nav'} aria-label="Main">
-      {DESTINATIONS.map(({ route: dest, label, icon: Icon }) => (
+      {destinations().map(({ route: dest, label, icon: Icon }) => (
         <button
           key={dest.name}
           type="button"
