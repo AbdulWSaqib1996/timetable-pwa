@@ -24,3 +24,11 @@ class_name = "GroupStore"
 [[migrations]]
 tag = "groups-v1"
 new_sqlite_classes = ["GroupStore"]
+
+[[durable_objects.bindings]]
+name = "ANALYTICS"
+class_name = "AnalyticsStore"
+
+[[migrations]]
+tag = "analytics-v1"
+new_sqlite_classes = ["AnalyticsStore"]

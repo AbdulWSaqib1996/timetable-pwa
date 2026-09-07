@@ -31,8 +31,8 @@ type SettingsSection = import('./components/SettingsSheet').SettingsSection
 const StatsSheet = lazy(() => import('./components/StatsSheet').then((m) => ({ default: m.StatsSheet })))
 const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((m) => ({ default: m.StudyGroupSheet })))
 const CourseSheet = lazy(() => import('./components/CourseSheet').then((m) => ({ default: m.CourseSheet })))
-import { WHATSNEW_VERSION } from './lib/changelog'
-import { maybePing } from './lib/analytics'
+import { sendTelemetry } from './lib/analytics'
+import { configureTelemetry } from './lib/telemetry'
 import { loadSyncState as loadSyncStateForPing } from './lib/sync'
 import { trackOpen, trackUse } from './lib/usage'
 import { UpdateToast } from './components/UpdateToast'
@@ -312,16 +312,25 @@ export default function App() {
     }
   }, [changes])
 
-  // Anonymous daily usage ping (throttled inside; off switch in Settings).
+  // Consent gate (A2 / ADM-07): telemetry reads the ACTIVE profile's consent
+  // on every call; switching to demo/opted-out clears pending counters and
+  // starts a fresh collection generation. Gating both here AND inside the
+  // collector means no ungated call site can leak an opted-out action.
+  useEffect(() => {
+    const s = settingsRef.current
+    configureTelemetry(!!s && s.demo !== true && s.usagePing !== false)
+  }, [active?.id, settings?.demo, settings?.usagePing])
+
+  // Anonymous usage reporting (consent-gated inside; off switch in Settings).
   // Fires on open AND on resume — installed PWAs usually resume rather than
-  // relaunch, so a mount-only ping would miss whole days. Feature/opens
-  // counters accumulate locally and travel with the next ping.
+  // relaunch. Counters queue under their UTC observed date and travel as
+  // immutable batches the worker deduplicates; a flush is always safe.
   useEffect(() => {
     const ping = (countOpen: boolean) => {
       const s = settingsRef.current
       if (!s || s.demo || s.usagePing === false) return
       if (countOpen) trackOpen()
-      void maybePing(s.pushServerBase ?? DEFAULT_PUSH_BASE, WHATSNEW_VERSION, {
+      void sendTelemetry(s.pushServerBase ?? DEFAULT_PUSH_BASE, {
         push: s.pushEnabled === true,
         location: s.locationEnabled === true,
         home: s.homeLat != null,
@@ -331,11 +340,22 @@ export default function App() {
       })
     }
     ping(true)
+    // Flush again on resume, on restored connectivity, and on a coarse
+    // 15-minute interval while foregrounded with pending data.
     const onVisible = () => {
       if (document.visibilityState === 'visible') ping(true)
     }
+    const onOnline = () => ping(false)
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') ping(false)
+    }, 15 * 60_000)
     document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onOnline)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onOnline)
+      clearInterval(interval)
+    }
   }, [active?.id])
 
   // Feature-use counters (names only, never content) for the ping.

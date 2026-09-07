@@ -4,6 +4,8 @@ import { parseTimetable, parseDateCell } from '../../shared/timetable.js'
 import { reconcileEvents, eventKey } from '../../shared/identity.js'
 export { SyncStore } from './sync-store.js'
 export { GroupStore } from './group-store.js'
+export { AnalyticsStore } from './analytics-store.js'
+import { MAX_BATCH_BYTES, validateBatch } from '../../shared/analytics-contracts.js'
 /**
  * timetable-push worker — background Web Push for My Timetable.
  *
@@ -989,6 +991,32 @@ async function runScheduled(env) {
   for (const [seenKey, ids] of noticesDirty) {
     await env.PUSH.put(seenKey, JSON.stringify(ids))
   }
+
+  await publishAnalyticsSnapshot(env)
+}
+
+/**
+ * Publish the v2 analytics aggregate (A2): the DO computes a complete
+ * snapshot; /stats/v2 serves the PUBLISHED copy instead of scanning raw
+ * rows per refresh. A failed aggregation keeps the last valid snapshot
+ * (staleness is visible via its generatedAt). The KV write is skipped when
+ * nothing but the timestamp changed, protecting the daily write budget.
+ */
+async function publishAnalyticsSnapshot(env) {
+  if (!env.ANALYTICS) return
+  try {
+    const stub = env.ANALYTICS.get(env.ANALYTICS.idFromName('analytics-v2'))
+    const res = await stub.fetch(new Request('https://analytics/v2/aggregate', { method: 'POST' }))
+    if (!res.ok) return
+    const snapshot = await res.json()
+    if (snapshot?.schemaVersion !== 2) return
+    const previous = await env.PUSH.get('astats:latest', 'json')
+    const essence = (x) => JSON.stringify({ m: x?.metrics, d: x?.daily, f: x?.features, o: x?.observedThrough })
+    if (previous && essence(previous) === essence(snapshot)) return
+    await env.PUSH.put('astats:latest', JSON.stringify(snapshot))
+  } catch {
+    // Keep the previous snapshot on any failure; never publish a partial one.
+  }
 }
 
 /* ---------- per-user rate limiting (in-memory, per isolate) ----------
@@ -1027,6 +1055,8 @@ const RATE_CAPS = {
   '/group/propose': 10,
   '/group/proposal/respond': 10,
   '/stats': 20,
+  '/stats/v2': 20,
+  '/v2/batch': 20,
   '/history': 10,
 }
 
@@ -1254,6 +1284,51 @@ export default {
       return json(res.body, res.status)
     }
     /* ---------- anonymous usage analytics (self-hosted; a random token per device) ---------- */
+    /* ---------- v2 telemetry (A2): validated batches, atomic DO dedupe ---------- */
+    if (request.method === 'POST' && url.pathname === '/v2/batch') {
+      const raw = await boundedJSON(request, MAX_BATCH_BYTES)
+      if (!raw) return json({ error: 'invalid or oversized batch' }, 400)
+      const { ok, errors, batch } = validateBatch(raw)
+      // Any invalid day fails the WHOLE batch before a single write — the
+      // batch is the idempotence unit, so partial acceptance is forbidden.
+      if (!ok || !batch) return json({ error: 'invalid batch', reasons: errors.slice(0, 5) }, 400)
+      // Keep the legacy first-seen union: v2 uses the SAME token namespace,
+      // so one browser never counts twice across contracts.
+      if (!(await env.PUSH.get(`adev:${batch.token}`))) {
+        await env.PUSH.put(`adev:${batch.token}`, batch.days.map((d) => d.date).sort()[0])
+      }
+      const stub = env.ANALYTICS.get(env.ANALYTICS.idFromName('analytics-v2'))
+      const res = await stub.fetch(
+        new Request('https://analytics/v2/batch', {
+          method: 'POST',
+          body: JSON.stringify(batch),
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+      return json(await res.json(), res.status)
+    }
+    if (request.method === 'GET' && url.pathname === '/stats/v2') {
+      const noStore = (obj, status = 200) =>
+        new Response(JSON.stringify(obj), {
+          status,
+          headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...CORS },
+        })
+      // Same fail-closed authentication as /stats; Bearer only.
+      const requiredKey = await env.PUSH.get('statskey')
+      if (!requiredKey || !String(requiredKey).trim()) return noStore({ error: 'configuration unavailable' }, 503)
+      const auth = request.headers.get('authorization') ?? ''
+      const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
+      if (!constantEquals(bearer, requiredKey)) return noStore({ error: 'unauthorized' }, 401)
+      const section = url.searchParams.get('section') ?? 'overview'
+      if (!['overview', 'adoption', 'returning'].includes(section)) {
+        return noStore({ error: 'unknown section' }, 400)
+      }
+      // Serve the PUBLISHED aggregate — never a full raw scan per refresh
+      // (ADM-17). Absent snapshot = aggregation not run yet, a typed 503.
+      const snapshot = await env.PUSH.get('astats:latest', 'json')
+      if (!snapshot) return noStore({ error: 'aggregate unavailable' }, 503)
+      return noStore(snapshot)
+    }
     if (request.method === 'POST' && url.pathname === '/ping') {
       // ADM-16 (bounds): a ping is tiny — anything oversized or non-JSON is
       // rejected before parsing; every stored number is a clamped finite int.
@@ -1312,14 +1387,11 @@ export default {
       if (!requiredKey || !String(requiredKey).trim()) {
         return noStore({ error: 'configuration unavailable' }, 503)
       }
-      // ADM-03: Authorization: Bearer is the supported credential. The legacy
-      // ?key= query form is accepted for a transition window (until
-      // 21 Sep 2026 — remove with the A2 worker deploy) so stale installed
-      // dashboards keep working. Neither form is ever logged.
+      // ADM-03: Authorization: Bearer is the ONLY credential (the legacy
+      // ?key= window closed with the A2 deploy). Never logged.
       const auth = request.headers.get('authorization') ?? ''
       const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
-      const presented = bearer || url.searchParams.get('key') || ''
-      if (!constantEquals(presented, requiredKey)) return noStore({ error: 'unauthorized' }, 401)
+      if (!constantEquals(bearer, requiredKey)) return noStore({ error: 'unauthorized' }, 401)
 
       const days = Math.min(62, Math.max(1, parseInt(url.searchParams.get('days') ?? '31', 10) || 31))
       // Completeness metadata (ADM-10/11): rows that vanished or failed to

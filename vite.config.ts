@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -11,6 +12,20 @@ export default defineConfig({
   // Build stamp shown in Settings so "am I on the latest version?" is answerable.
   define: {
     __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
+    // Immutable build identity for release analytics (ADM-14): the git commit,
+    // not the What's-new marker. Falls back to 'dev' outside a checkout.
+    __BUILD_ID__: JSON.stringify(
+      (() => {
+        try {
+          return (
+            process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ??
+            execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+          )
+        } catch {
+          return 'dev'
+        }
+      })()
+    ),
   },
   plugins: [
     react(),
