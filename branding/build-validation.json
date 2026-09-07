@@ -1,0 +1,49 @@
+[
+  {
+    "build": "dist",
+    "manifest": "manifest.webmanifest",
+    "icon_count": 4,
+    "all_exist": true
+  },
+  {
+    "build": "dist",
+    "manifest": "analytics.webmanifest",
+    "icon_count": 4,
+    "all_exist": true
+  },
+  {
+    "build": "dist",
+    "html": "index.html",
+    "icon_links_resolve": true
+  },
+  {
+    "build": "dist",
+    "html": "analytics.html",
+    "icon_links_resolve": true
+  },
+  {
+    "build": "dist-vercel",
+    "manifest": "manifest.webmanifest",
+    "icon_count": 4,
+    "all_exist": true
+  },
+  {
+    "build": "dist-vercel",
+    "manifest": "analytics.webmanifest",
+    "icon_count": 4,
+    "all_exist": true
+  },
+  {
+    "build": "dist-vercel",
+    "html": "index.html",
+    "icon_links_resolve": true
+  },
+  {
+    "build": "dist-vercel",
+    "html": "analytics.html",
+    "icon_links_resolve": true
+  },
+  {
+    "ico_containers": "valid 16/32/48 PNG entries"
+  }
+]

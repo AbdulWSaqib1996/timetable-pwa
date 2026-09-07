@@ -1,0 +1,94 @@
+[
+  {
+    "file": "icon-192.png",
+    "width": 192,
+    "height": 192
+  },
+  {
+    "file": "icon-512.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "file": "icon-maskable-192.png",
+    "width": 192,
+    "height": 192
+  },
+  {
+    "file": "icon-maskable-512.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "file": "apple-touch-icon.png",
+    "width": 180,
+    "height": 180
+  },
+  {
+    "file": "favicon-16.png",
+    "width": 16,
+    "height": 16
+  },
+  {
+    "file": "favicon-32.png",
+    "width": 32,
+    "height": 32
+  },
+  {
+    "file": "favicon-48.png",
+    "width": 48,
+    "height": 48
+  },
+  {
+    "family": "timetable",
+    "glyphMaxRadius": 196.19505600294823,
+    "safeCircleRadius": 204.8,
+    "pass": true
+  },
+  {
+    "file": "admin/icon-192.png",
+    "width": 192,
+    "height": 192
+  },
+  {
+    "file": "admin/icon-512.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "file": "admin/icon-maskable-192.png",
+    "width": 192,
+    "height": 192
+  },
+  {
+    "file": "admin/icon-maskable-512.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "file": "admin/apple-touch-icon.png",
+    "width": 180,
+    "height": 180
+  },
+  {
+    "file": "admin/favicon-16.png",
+    "width": 16,
+    "height": 16
+  },
+  {
+    "file": "admin/favicon-32.png",
+    "width": 32,
+    "height": 32
+  },
+  {
+    "file": "admin/favicon-48.png",
+    "width": 48,
+    "height": 48
+  },
+  {
+    "family": "admin/",
+    "glyphMaxRadius": 196.19505600294823,
+    "safeCircleRadius": 204.8,
+    "pass": true
+  }
+]
