@@ -695,3 +695,16 @@ Release-gate check (§8, minus the excluded P7-02 clause): another course works 
 Known limitations / intentionally deferred: P7-02 excluded by instruction (above). Placement tag patterns and source parsing remain UCL-sheet-shaped (a new course reuses the same sheet format); course templates carry no placement policy overrides yet. Route maps have no pan/zoom gestures (static fitted view + OSM link, by design); tile requests use the standard OSM tile server under its usage policy with normal browser/SW caching only — no bulk tile prefetching.
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+Phase 7 release verification (7 September 2026): workers deployed FIRST per the runbook (shared/ and workers/ics-feed changed) — push worker `e736c7a7-9ae5-4773-ae73-5535706af486`, feed worker `5df0f491-fdbb-43e3-b9dc-5b5af5ecf60d`; the feed worker's `tz` param is additive (default behaviour byte-identical), the push worker redeploy only refreshes bundled shared code. Released commit `8ae19f4` (merge of `phase-7`); GitHub Actions run 34155245893 for that exact commit concluded **success** (full browser gate incl. the 3 phase-seven specs + Pages deploy). Both validates ran green before the push (97 unit + 40 browser, both hosting layouts). The deployed Vercel bundle contains the Phase 7 route-map surfaces ("Powered by TfL Open Data"). `./scripts/deploy.sh verify`, verbatim:
+
+```text
+== verify live endpoints ==
+PASS: vercel app 200
+PASS: pages app 200
+PASS: push worker /vapid
+PASS: /stats locked (401)
+PASS: feed worker + cache header
+PASS: analytics dashboard 200
+done.
+```
