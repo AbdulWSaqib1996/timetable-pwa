@@ -3539,3 +3539,51 @@ body {
   padding-top: 8px;
   margin-top: 8px;
 }
+
+/* ---------- Journey planning (P6) ---------- */
+
+.buffer-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.origin-selector {
+  margin-bottom: 6px;
+}
+
+.route-leg-warning {
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* ---- study group (P6-05) ---- */
+.group-hours {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.group-hours .date-input {
+  width: auto;
+}
+.btn-inline {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+.group-propose-confirm {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  background: var(--surface);
+}
+.group-proposal {
+  flex-wrap: wrap;
+}
+.group-proposal-actions {
+  gap: 6px;
+  flex-wrap: wrap;
+}

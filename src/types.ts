@@ -91,6 +91,8 @@ export interface Settings {
   homeLng?: number
   /** minutes of head start before the computed leave-by time (start − travel) to notify at */
   leaveAlertOffsets?: number[]
+  /** arrive-early buffer for date-specific journey planning (default 10, P6-01) */
+  arrivalBufferMins?: number
   /** key-dates (submission deadlines) tab: source sheet/tab plus the pasted URL for display */
   keyDatesUrl?: string
   keyDatesSheetId?: string
@@ -128,6 +130,10 @@ export interface Settings {
   groupMemberId?: string
   /** device-held membership capability — never synced to other devices */
   groupToken?: string
+  /** study-group working hours (minutes from midnight) and minimum meeting length */
+  groupWorkStart?: number
+  groupWorkEnd?: number
+  groupMinMeeting?: number
   /** setup checklist card permanently dismissed */
   checklistDismissed?: boolean
   /** anonymous daily usage ping to the push worker (default on; off switch in Settings) */

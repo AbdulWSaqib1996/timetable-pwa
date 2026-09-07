@@ -4,6 +4,7 @@ export function addDaysISO(dateISO: string, days: number): string
 export function mondayOfISO(dateISO: string): string
 export function shiftMonthISO(dateISO: string, deltaMonths: number): string
 export function zoneOffsetMs(utcMs: number, zone?: string): number
+export function utcToZonedParts(utcMs: number, zone?: string): { dateISO: string; hhmm: string }
 export function wallToUTC(
   dateISO: string,
   hhmm: string,

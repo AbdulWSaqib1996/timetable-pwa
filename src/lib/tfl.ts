@@ -168,6 +168,8 @@ export async function tflTransitMinutes(from: Coords, to: Coords): Promise<numbe
 export interface TflDepartures {
   stop: string
   mins: number[]
+  /** direction context from the arrivals feed (e.g. "Walthamstow Central") */
+  towards?: string
 }
 
 /**
@@ -189,9 +191,14 @@ export async function tflDeparturesNear(lat: number, lng: number, line: string):
     if (!stop?.naptanId) return null
     const arrRes = await fetch(`https://api.tfl.gov.uk/StopPoint/${encodeURIComponent(stop.naptanId)}/Arrivals`)
     if (!arrRes.ok) return null
-    const arrivals = (await arrRes.json()) as { lineName?: string; timeToStation?: number }[]
-    const mins = arrivals
-      .filter((a) => (a.lineName ?? '').toLowerCase() === line.toLowerCase())
+    const arrivals = (await arrRes.json()) as {
+      lineName?: string
+      timeToStation?: number
+      towards?: string
+      destinationName?: string
+    }[]
+    const mine = arrivals.filter((a) => (a.lineName ?? '').toLowerCase() === line.toLowerCase())
+    const mins = mine
       .map((a) => Math.max(0, Math.round((a.timeToStation ?? 0) / 60)))
       .sort((a, b) => a - b)
       .slice(0, 3)
@@ -199,6 +206,7 @@ export async function tflDeparturesNear(lat: number, lng: number, line: string):
     return {
       stop: `${stop.commonName ?? 'stop'}${stop.stopLetter ? ` (Stop ${stop.stopLetter})` : ''}`,
       mins,
+      towards: mine[0]?.towards || mine[0]?.destinationName || undefined,
     }
   } catch {
     return null

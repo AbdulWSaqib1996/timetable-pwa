@@ -13,6 +13,7 @@ import type { Session, Settings } from '../types'
  */
 export function useTravel(settings: Settings | null, exportSessions: Session[], todayISO: string) {
   const [coords, setCoords] = useState<Coords | null>(null)
+  const [coordsAt, setCoordsAt] = useState<number | null>(null)
   const [tubeStatus, setTubeStatus] = useState<TflDisruption[]>([])
   const locationEnabled = settings?.locationEnabled ?? false
   const travelMode = settings?.travelMode ?? 'walking'
@@ -27,8 +28,14 @@ export function useTravel(settings: Settings | null, exportSessions: Session[], 
       return
     }
     const id = navigator.geolocation.watchPosition(
-      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setCoords(null),
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setCoordsAt(Date.now())
+      },
+      () => {
+        setCoords(null)
+        setCoordsAt(null)
+      },
       { enableHighAccuracy: false, maximumAge: 120_000 }
     )
     return () => navigator.geolocation.clearWatch(id)
@@ -80,5 +87,5 @@ export function useTravel(settings: Settings | null, exportSessions: Session[], 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [travelMode, coords?.lat, coords?.lng])
 
-  return { coords, tubeStatus, locationEnabled, travelMode }
+  return { coords, coordsAt, tubeStatus, locationEnabled, travelMode }
 }

@@ -56,6 +56,7 @@ import { EMPTY_ADMIN, loadAdminFile, saveAdminFile } from './lib/admin'
 import type { AdminFile, CommitmentRec, PlanChildRec, TaskRecord } from './lib/admin'
 import { duplicateTask, migrateCustomKeyDates, overlayTaskMeta, taskEventKey, taskToSession } from './lib/tasks'
 import { applyPlacementExceptions } from './lib/placement'
+import { availableOrigins } from './lib/origins'
 import { busyCommitmentSessions, commitmentToSession, remindableCommitmentSessions } from './lib/commitments'
 import { CommitmentSheet } from './components/CommitmentSheet'
 import { PlacementPage } from './features/pgce/PlacementPage'
@@ -792,7 +793,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingShare, active?.id, courseSessions.length])
 
-  const { coords, tubeStatus, locationEnabled, travelMode } = useTravel(settings, courseSessions, todayISO)
+  const { coords, coordsAt, tubeStatus, locationEnabled, travelMode } = useTravel(settings, courseSessions, todayISO)
+
+  // Explicit journey origins (P6-02): device fix + saved home/campus/placements.
+  const journeyOrigins = useMemo(
+    () => (settings ? availableOrigins(settings, coords, coordsAt) : []),
+    [settings, coords, coordsAt]
+  )
 
   useNotifications({
     metaReady,
@@ -1040,6 +1047,7 @@ export default function App() {
           coords={coords}
           locationEnabled={locationEnabled}
           travelMode={travelMode}
+          origins={journeyOrigins}
           onBack={() => goBackOr({ name: 'today' })}
           onOpenSettings={() => navigate({ name: 'settings' })}
         />
@@ -1267,6 +1275,9 @@ export default function App() {
           session={selected}
           presentation={detailAsSheet ? 'sheet' : 'page'}
           backLabel="Back"
+          origins={journeyOrigins}
+          arrivalBufferMins={settings.arrivalBufferMins ?? 10}
+          onSetArrivalBuffer={(mins) => updateSettings({ arrivalBufferMins: mins })}
           meta={metaMap[sessionKey(selected)]}
           coords={coords}
           locationEnabled={locationEnabled}

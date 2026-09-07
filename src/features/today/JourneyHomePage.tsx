@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
-import { freshnessLabel } from '../../../shared/travel-state.js'
-import { RouteSteps } from '../../components/RouteSteps'
+import { ItinerarySteps } from '../../components/ItinerarySteps'
+import { OriginSelector } from '../../components/OriginSelector'
 import { StaticMap } from '../../components/StaticMap'
 import { EmptyState, PageHeader } from '../../components/ui'
-import { useLiveJourney } from '../../hooks/useLiveJourney'
+import { useJourney } from '../../hooks/useJourney'
 import { TRAVEL_MODE_PHRASE, estimateTravelToCoords, haversineMeters } from '../../lib/campus'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { formatRemaining } from '../../lib/format'
-import { cachedRouteInfo } from '../../lib/tfl'
+import type { OriginOption } from '../../lib/origins'
 import { cachedWeatherForHour, weatherEmoji, weatherForHour } from '../../lib/weather'
 import type { Settings } from '../../types'
 
@@ -16,6 +16,8 @@ interface Props {
   coords: Coords | null
   locationEnabled: boolean
   travelMode: TravelMode
+  /** selectable origins (home itself is filtered out) */
+  origins: OriginOption[]
   onBack: () => void
   onOpenSettings: () => void
 }
@@ -27,16 +29,34 @@ interface Props {
  * map, collapsible steps, external directions. Intent is leave-now to home;
  * never an arrival-by plan (Phase 6).
  */
-export function JourneyHomePage({ settings, coords, locationEnabled, travelMode, onBack, onOpenSettings }: Props) {
+export function JourneyHomePage({ settings, coords, locationEnabled, travelMode, origins, onBack, onOpenSettings }: Props) {
   const homeSet = settings.homeLat != null && settings.homeLng != null
   const home = homeSet ? { lat: settings.homeLat!, lng: settings.homeLng! } : null
   const nearHome = home && coords ? haversineMeters(coords, home) <= 400 : false
 
-  const { route, routeFetchedAt, legDeps, routeDisruptions } = useLiveJourney(
-    coords,
-    home,
-    travelMode === 'transit' && !!coords && !!home
+  // Home is the DESTINATION — it never appears as an origin here, and the
+  // request is always leave-now (an earlier session's arrive-by plan can
+  // never be reused: the request identity differs by construction, P6-04).
+  const originOptions = origins.filter((o) => o.basis !== 'home')
+  const [originId, setOriginId] = useState<string | null>(
+    () => originOptions.find((o) => o.basis === 'device' && o.coords)?.id ?? null
   )
+  useEffect(() => {
+    if (originId === null) {
+      const device = originOptions.find((o) => o.basis === 'device' && o.coords)
+      if (device) setOriginId(device.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [originOptions.find((o) => o.basis === 'device')?.coords != null])
+  const origin = originOptions.find((o) => o.id === originId && o.coords) ?? null
+
+  const journey = useJourney({
+    origin,
+    destination: home ? { coords: home, label: 'Home' } : null,
+    mode: travelMode,
+    intent: { kind: 'leave-now' },
+    enabled: travelMode !== 'driving' && !!home && !!origin,
+  })
 
   // A minute tick keeps the arrival estimate current.
   const [, setTick] = useState(0)
@@ -80,20 +100,14 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
     )
   }
 
-  const est = coords ? estimateTravelToCoords(home, coords, travelMode, 'Home') : null
+  const est = origin?.coords ? estimateTravelToCoords(home, origin.coords, travelMode, 'Home') : null
   let minutes = est?.minutes ?? null
   let basisLabel = 'estimate from distance'
-  if (travelMode === 'transit' && coords) {
-    if (route) {
-      minutes = route.minutes
-      basisLabel = freshnessLabel({ basis: 'provider', fetchedAt: routeFetchedAt })
-    } else {
-      const info = cachedRouteInfo(coords, home)
-      if (info) {
-        minutes = info.route.minutes
-        basisLabel = freshnessLabel({ basis: 'provider', fetchedAt: info.fetchedAt })
-      }
-    }
+  if (journey.itinerary) {
+    minutes = journey.itinerary.durationMins
+    basisLabel = `live TfL${journey.fetchedAt ? ` · checked ${new Date(journey.fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : ''}`
+  } else if (journey.status === 'error' && minutes !== null) {
+    basisLabel = "estimate from distance — couldn't reach TfL"
   }
   const arrive = minutes !== null ? new Date(Date.now() + minutes * 60_000) : null
   const arriveLabel = arrive
@@ -136,13 +150,14 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
         )}
       </div>
 
-      <p className="filter-hint journey-origin">
-        {coords
-          ? 'From your current location (live device fix)'
-          : locationEnabled
-            ? 'Origin: waiting for a device location fix'
-            : 'Origin: unavailable — location is off'}
-      </p>
+      <OriginSelector options={originOptions} selectedId={originId} onSelect={setOriginId} />
+      {!origin && (
+        <p className="filter-hint journey-origin">
+          {locationEnabled
+            ? 'Waiting for a device fix — or pick a saved origin above.'
+            : 'Location is off — pick a saved origin above, or use the external directions below.'}
+        </p>
+      )}
 
       <div className="ui-card destination-card">
         <span className="today-hero-room-name">Home</span>
@@ -160,18 +175,18 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
 
       <StaticMap lat={home.lat} lng={home.lng} label="Home" />
 
-      {route && route.legs.length > 0 ? (
+      {journey.itinerary && journey.itinerary.legs.length > 0 ? (
         <details className="journey-steps" open>
           <summary>
             <span>Journey steps</span>
             <span className="route-total">
-              ≈ {formatRemaining(route.minutes)} ·{' '}
-              {[...new Set(route.legs.map((l) => (l.mode === 'walking' ? 'walk' : l.line || l.mode)))].join(' · ')}
+              ≈ {formatRemaining(journey.itinerary.durationMins)} ·{' '}
+              {[...new Set(journey.itinerary.legs.map((l) => (l.mode === 'walking' ? 'walk' : l.line || l.mode)))].join(' · ')}
             </span>
           </summary>
-          <RouteSteps route={route} legDeps={legDeps} routeDisruptions={routeDisruptions} />
+          <ItinerarySteps itinerary={journey.itinerary} legDeps={journey.legDeps} disruptions={journey.disruptions} />
         </details>
-      ) : route && route.legs.length === 0 && travelMode === 'transit' ? (
+      ) : journey.itinerary && journey.itinerary.legs.length === 0 && travelMode === 'transit' ? (
         <p className="route-info">Best option now: walk (no transit leg needed).</p>
       ) : null}
 
