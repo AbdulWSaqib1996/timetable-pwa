@@ -626,6 +626,8 @@ Generated native vector icon families matching the updated UI: an indigo session
 
 Icon verification: isolated snapshot `npm run build` (TypeScript + GitHub Pages Vite/PWA build) passed; `VERCEL=1 vite build --outDir dist-vercel` passed. Both generated manifests and both HTML pages resolve all icon assets under both host base paths. Both ICO containers validate as 16/32/48 PNG entries. All maskable glyph pixels fit inside the safe circle. Existing unrelated dynamic/static import warnings remain. No production request or deployment was made.
 
+Deployment note: committed as `1957c18` and released together with Phase 6 (Pass 43) — the full validate gate was re-run on the combined state (icons + Phase 6) before the push, and the live verification below covers both. Only icon links and manifest icon entries changed; registerType, launch URLs and scope verified untouched in the released diff.
+
 ### Pass 43 — Phase 6 complete: accurate travel planning and collaboration — 7 September 2026
 
 Phase / work-item IDs completed: P6-01 … P6-05 (all five), per TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md §7.
