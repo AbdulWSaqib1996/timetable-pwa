@@ -785,3 +785,5 @@ Known limitations / deferred by design: a global period selector is deferred (th
 Rollback: revert the merge and the previous static dashboard returns at the same URL with the same worker contract; the SW denylist is retained under any rollback (it only ever prevents wrong fallbacks).
 
 Hosted commit statuses: recorded after deployment below.
+
+A3 release verification (7 September 2026): frontend-only release — no worker deploy (workers/ and shared/ untouched; push worker stays `e51c6009`, feed `e6225441`). Released commit `c69503f`; GitHub Actions concluded **success** (full browser gate incl. the 11 admin specs + Pages deploy). Live: both hosts serve the new Vite admin entry (Vercel HTML references the hashed analytics module; Pages likewise), the deployed learner sw.js carries the analytics navigateFallback denylist, and `./scripts/deploy.sh verify` reports all six PASS lines (verbatim in the run log; unchanged set).
