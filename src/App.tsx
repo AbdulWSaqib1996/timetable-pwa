@@ -11,7 +11,7 @@ import { SetupScreen } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
 import { SchedulePage } from './features/schedule/SchedulePage'
 import { TodayPage } from './features/today/TodayPage'
-import { useRoute } from './lib/router'
+import { parseRoute, useRoute } from './lib/router'
 import type { Route } from './lib/router'
 
 // The bottom sheets are modal and rarely part of first paint — split them out
@@ -105,7 +105,6 @@ export default function App() {
   const [addingProfile, setAddingProfile] = useState(false)
   const [openSheet, setOpenSheet] = useState<SheetName>('none')
   const [rechoosing, setRechoosing] = useState(false)
-  const [selected, setSelected] = useState<Session | null>(null)
   // One date-selection model shared by Day/Week/Month (null = follow today).
   const [selectedDateISO, setSelectedDateISO] = useState<string | null>(null)
   const [showBackupNudge, setShowBackupNudge] = useState(false)
@@ -135,6 +134,15 @@ export default function App() {
 
   // Phase 4 shell: hash routing across Today · Schedule · Tasks · PGCE file.
   const [route, navigate] = useRoute()
+  // Desktop keeps the detail as an accessible dialog sheet; phones get a full
+  // page that replaces the bottom navigation (P4-05).
+  const [detailAsSheet, setDetailAsSheet] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const onChange = (e: MediaQueryListEvent) => setDetailAsSheet(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
   const goBackOr = (fallback: Route) => {
     if (window.history.length > 1) window.history.back()
     else navigate(fallback, { replace: true })
@@ -177,7 +185,7 @@ export default function App() {
 
   // Close any open detail/date selection when the active profile switches.
   useEffect(() => {
-    setSelected(null)
+    if (parseRoute(window.location.hash).name === 'session') navigate({ name: 'today' }, { replace: true })
     setSelectedDateISO(null)
     setAdminFile(active ? loadAdminFile(active.id) : EMPTY_ADMIN)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,8 +272,8 @@ export default function App() {
     if (openSheet !== 'none') trackUse(openSheet)
   }, [openSheet])
   useEffect(() => {
-    if (selected) trackUse('detail')
-  }, [selected])
+    if (route.name === 'session') trackUse('detail')
+  }, [route.name])
   const viewForTrack = settings?.activeView ?? 'day'
   useEffect(() => {
     if (viewForTrack !== 'day') trackUse(viewForTrack)
@@ -346,10 +354,11 @@ export default function App() {
     window.addEventListener(SYNC_APPLIED_EVENT, applied)
     return () => window.removeEventListener(SYNC_APPLIED_EVENT, applied)
   }, [setMetaMap])
+  const detailOpen = route.name === 'session'
   useEffect(() => {
-    if (openSheet === 'none' && !selected && externalRefreshPending.current) window.dispatchEvent(new Event(SYNC_APPLIED_EVENT))
-    if (openSheet === 'none' && !selected) void syncPullApply(settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE).catch(() => {})
-  }, [openSheet, selected])
+    if (openSheet === 'none' && !detailOpen && externalRefreshPending.current) window.dispatchEvent(new Event(SYNC_APPLIED_EVENT))
+    if (openSheet === 'none' && !detailOpen) void syncPullApply(settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE).catch(() => {})
+  }, [openSheet, detailOpen])
 
   // Keep the push worker's copy of placement details and admin-summary counts
   // fresh (they feed background briefings/leave alerts and the Friday digest).
@@ -521,6 +530,23 @@ export default function App() {
     return [...keyDates, ...custom].sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
   }, [keyDates, settings?.customKeyDates])
 
+  // The open session detail is a ROUTE (#/session/<key>): Back returns to the
+  // caller, notification opens deep-link, and profile switches clear it.
+  const openSession = (s: Session) => navigate({ name: 'session', key: sessionKey(s) })
+  const selected = useMemo(() => {
+    if (route.name !== 'session' || sessions === null) return null
+    const all = [...sessions, ...allKeyDates]
+    return all.find((x) => sessionKey(x) === route.key) ?? all.find((x) => legacyKey(x) === route.key) ?? null
+  }, [route, sessions, allKeyDates])
+  // A session link that no longer resolves gets a safe notice, not a blank page.
+  useEffect(() => {
+    if (route.name === 'session' && sessions !== null && !selected) {
+      setOpenNotice('That session is no longer on your timetable — Changes shows what moved or was cancelled.')
+      navigate({ name: 'today' }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, sessions, selected])
+
   // Resolve a pending open once the owning profile's sessions are loaded.
   useEffect(() => {
     if (!pendingOpen || !active) return
@@ -538,7 +564,7 @@ export default function App() {
     const target =
       all.find((x) => sessionKey(x) === pendingOpen.key) ?? all.find((x) => legacyKey(x) === pendingOpen.key)
     if (target) {
-      setSelected(target)
+      openSession(target)
     } else {
       setOpenNotice('That session is no longer on your timetable — Changes shows what moved or was cancelled.')
       setOpenSheet('changes')
@@ -672,7 +698,7 @@ export default function App() {
         await addPhoto(active.id, key, await compressImage(new File([blob], 'shared.jpg', { type: blob.type || 'image/jpeg' })))
       }
       handleMeta(target, { photos: (metaMap[key]?.photos ?? 0) + blobs.length })
-      setSelected(target)
+      openSession(target)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingShare, active?.id, courseSessions.length])
@@ -737,7 +763,12 @@ export default function App() {
   }
 
   return (
-    <AppShell route={route} onNavigate={handleNavigate} profileName={active.name}>
+    <AppShell
+      route={route}
+      onNavigate={handleNavigate}
+      profileName={active.name}
+      hideNav={route.name === 'session' && !detailAsSheet}
+    >
       <PersistenceNotice />
       <SyncNotice />
 
@@ -745,7 +776,7 @@ export default function App() {
         <button
           type="button"
           className="backup-banner identity-banner"
-          onClick={() => setSelected(identityReview[0])}
+          onClick={() => openSession(identityReview[0])}
         >
           <span>
             🔗 {identityReview.length} event{identityReview.length === 1 ? '' : 's'} need
@@ -907,7 +938,7 @@ export default function App() {
         </details>
       )}
 
-      {route.name === 'schedule' ? (
+      {selected && !detailAsSheet ? null : route.name === 'schedule' ? (
         <SchedulePage
           settings={settings}
           profileName={active.name}
@@ -931,7 +962,7 @@ export default function App() {
           onTogglePlacements={() => updateFilters({ placementsOnly: !filters.placementsOnly })}
           onOpenFilters={() => setOpenSheet('filters')}
           onClearFilters={() => updateSettings({ filters: { ...DEFAULT_FILTERS } })}
-          onSelect={setSelected}
+          onSelect={openSession}
           onMeta={handleMeta}
         />
       ) : sessions === null && !settings.demo ? (
@@ -953,7 +984,7 @@ export default function App() {
           coords={coords}
           travelMode={travelMode}
           locationEnabled={locationEnabled}
-          onSelect={setSelected}
+          onSelect={openSession}
           onOpenChanges={openChanges}
           onOpenSettings={() => setOpenSheet('settings')}
           onOpenTasks={() => navigate({ name: 'tasks' })}
@@ -964,6 +995,8 @@ export default function App() {
       {selected && (
         <SessionDetail
           session={selected}
+          presentation={detailAsSheet ? 'sheet' : 'page'}
+          backLabel="Back"
           meta={metaMap[sessionKey(selected)]}
           coords={coords}
           locationEnabled={locationEnabled}
@@ -982,7 +1015,7 @@ export default function App() {
             })
           }}
           onMeta={(patch) => handleMeta(selected, patch)}
-          onClose={() => setSelected(null)}
+          onClose={() => goBackOr({ name: 'today' })}
         />
       )}
 
@@ -1053,7 +1086,7 @@ export default function App() {
           metaMap={metaMap}
           profileId={active.id}
           admin={adminFile}
-          onSelect={setSelected}
+          onSelect={openSession}
           onClose={() => setOpenSheet('none')}
         />
       )}
@@ -1064,7 +1097,7 @@ export default function App() {
           todayISO={todayISO}
           configured={!!settings.keyDatesSheetId}
           metaMap={metaMap}
-          onSelect={setSelected}
+          onSelect={openSession}
           onSetStatus={(kd, status) => handleMeta(kd, { status })}
           onDeleteCustom={(id) =>
             updateSettings({

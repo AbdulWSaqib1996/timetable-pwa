@@ -3057,3 +3057,110 @@ body {
     min-width: 0;
   }
 }
+
+/* ---------- Session detail (P4-05) ---------- */
+
+.detail-page {
+  padding-top: 8px;
+}
+
+.detail-concise {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.detail-tabs {
+  margin: 4px 0 12px;
+}
+
+.detail-tabs .segmented {
+  width: 100%;
+}
+
+.detail-tabs .segment {
+  flex: 1;
+  text-align: center;
+  min-height: 40px;
+}
+
+.detail-tabpanel[hidden] {
+  display: none;
+}
+
+.travel-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.travel-summary-mins {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.destination-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.copy-address {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.journey-steps {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  padding: 0 12px;
+  margin: 10px 0;
+}
+
+.journey-steps summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 46px;
+  padding: 8px 0;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.journey-steps summary::after {
+  content: '▾';
+  color: var(--text-muted);
+}
+
+.journey-steps[open] summary::after {
+  content: '▴';
+}
+
+.external-nav {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 10px;
+}
+
+.external-nav-caption {
+  text-align: center;
+  margin-top: 4px;
+}
+
+.map-fallback {
+  margin: 10px 0;
+}

@@ -2,6 +2,7 @@ import { IdentityReview } from './IdentityReview'
 import { reportPersistenceFailure } from '../lib/persistence'
 import { useEffect, useRef, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
+import { freshnessLabel } from '../../shared/travel-state.js'
 import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords } from '../lib/campus'
 import { geocodeAddress } from '../lib/geocode'
 import { TEACHERS_STANDARDS } from '../lib/standards'
@@ -12,12 +13,12 @@ import { sessionKey } from '../lib/diff'
 import { trackUse } from '../lib/usage'
 import { addPhoto, compressImage, deletePhoto, getPhotos } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
-import { freshnessLabel } from '../../shared/travel-state.js'
 import { useLiveJourney } from '../hooks/useLiveJourney'
 import { RouteSteps } from './RouteSteps'
 import { weatherEmoji, weatherForHour } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
+import { SegmentedControl } from './ui'
 import { StaticMap } from './StaticMap'
 
 interface Props {
@@ -29,6 +30,10 @@ interface Props {
   travelMode: TravelMode
   /** active profile id, for the photo store */
   profileId: string
+  /** full page (mobile) or dialog sheet (desktop) */
+  presentation: 'page' | 'sheet'
+  /** label for the Back control in page presentation */
+  backLabel?: string
   /** placement details for this session's SE block (placement sessions only) */
   placementInfo?: { school?: string; address?: string; mentor?: string; notes?: string; lat?: number; lng?: number }
   onPlacementInfo?: (patch: {
@@ -53,6 +58,11 @@ function formatLongDate(dateISO: string): string {
   })
 }
 
+function shortDate(dateISO: string): string {
+  const [y, m, d] = dateISO.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
 function toMinutes(time: string): number | null {
   const m = time.match(/^(\d{1,2}):(\d{2})$/)
   return m ? Number(m[1]) * 60 + Number(m[2]) : null
@@ -70,6 +80,12 @@ function formatDuration(start: string, end: string): string | null {
   return rest > 0 ? `${hourPart} ${rest} minutes` : hourPart
 }
 
+/**
+ * Session detail (P4-05): full-page on mobile with Back, dialog sheet on
+ * desktop. Overview and Travel & map tabs stay mounted so entered notes and
+ * draft state survive tab switches. A deadline opens task detail instead —
+ * no attendance controls or campus travel for a submission.
+ */
 export function SessionDetail({
   session,
   meta,
@@ -77,26 +93,32 @@ export function SessionDetail({
   locationEnabled,
   travelMode,
   profileId,
+  presentation,
+  backLabel = 'Back',
   placementInfo,
   onPlacementInfo,
   onMeta,
   onClose,
 }: Props) {
+  const isTask = session.isKeyDate === true
+  const [tab, setTab] = useState<'overview' | 'travel'>('overview')
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const duration = formatDuration(session.start, session.end)
   const gcalUrl = googleCalendarUrl(session)
-  // Placement sessions with a geocoded school address target the school; everything
-  // else targets the matched campus building. All travel machinery (map, live route,
-  // departures, leave-time weather) follows this target.
+
+  // Placement sessions with a geocoded school address target the school;
+  // everything else targets the matched campus building.
   const schoolCoords =
     isPlacementSession(session) && placementInfo?.lat != null && placementInfo?.lng != null
       ? { lat: placementInfo.lat, lng: placementInfo.lng }
       : null
-  const travel = schoolCoords
-    ? estimateTravelToCoords(schoolCoords, coords, travelMode, placementInfo?.school || 'Placement school')
-    : session.room && !session.isSelfStudy
-      ? estimateTravel(session.room, coords, travelMode)
-      : null
+  const travel = isTask
+    ? null
+    : schoolCoords
+      ? estimateTravelToCoords(schoolCoords, coords, travelMode, placementInfo?.school || 'Placement school')
+      : session.room && !session.isSelfStudy
+        ? estimateTravel(session.room, coords, travelMode)
+        : null
 
   const [geoStatus, setGeoStatus] = useState<'working' | 'ok' | 'fail' | null>(null)
 
@@ -132,12 +154,11 @@ export function SessionDetail({
     reloadPhotos()
   }
 
-  // Live TfL journey (time + recommended route + per-leg departure boards +
-  // disruptions on the route's lines) — shared with the head-home dropdown.
+  // Live TfL journey — departure boards poll only while Travel & map shows.
   const { route, routeFetchedAt, legDeps, routeDisruptions } = useLiveJourney(
     coords,
     travel?.location ?? null,
-    travelMode === 'transit' && !!coords && !!travel?.location
+    tab === 'travel' && travelMode === 'transit' && !!coords && !!travel?.location
   )
 
   // Weather for the journey: forecast at the computed leave time (start − travel).
@@ -164,17 +185,13 @@ export function SessionDetail({
   }, [session.dateISO, startMins, travelMins])
 
   const shownMinutes = travelMode === 'transit' && route ? route.minutes : travel?.minutes ?? null
-  // Honest freshness (P3-08): provider data says live/cached with its age;
-  // the distance heuristic is always labelled an estimate.
-  const liveLabel =
+  const basisLabel =
     travelMode === 'transit' && route
-      ? ` (${freshnessLabel({ basis: 'provider', fetchedAt: routeFetchedAt })})`
-      : shownMinutes !== null
-        ? ' (estimate)'
-        : ''
-  // The sheet's Location column glues building and room together — split them
-  // into their own rows (with special cases for TBC and leaked booking refs).
-  const loc = parseLocation(session.isSelfStudy ? '' : session.room)
+      ? freshnessLabel({ basis: 'provider', fetchedAt: routeFetchedAt })
+      : 'estimate from distance'
+
+  // The sheet's Location column glues building and room together — split them.
+  const loc = parseLocation(session.isSelfStudy || isTask ? '' : session.room)
   const locationRows: { label: string; value: string }[] = loc.building
     ? [
         { label: 'Building', value: loc.building },
@@ -184,19 +201,378 @@ export function SessionDetail({
       ? [{ label: 'Room', value: `Not in the sheet yet (booking ref ${loc.raw})` }]
       : loc.note === 'tbc'
         ? [{ label: 'Room', value: 'TBC — check nearer the time' }]
-        : [{ label: 'Location', value: loc.raw }]
+        : loc.raw
+          ? [{ label: 'Location', value: loc.raw }]
+          : []
   const rows: { label: string; value: string }[] = [
-    { label: 'Date', value: formatLongDate(session.dateISO) },
+    {
+      label: isTask ? 'Due' : 'Date',
+      value: formatLongDate(session.dateISO) + (isTask && session.start ? ` · ${session.start}` : ''),
+    },
     {
       label: 'Time',
-      value: session.start ? (session.end ? `${session.start} – ${session.end}` : session.start) : '',
+      value: !isTask && session.start ? (session.end ? `${session.start} – ${session.end}` : session.start) : '',
     },
-    { label: 'Duration', value: duration ?? '' },
+    { label: 'Duration', value: !isTask ? duration ?? '' : '' },
     ...locationRows,
     { label: 'Tutor', value: session.tutor === 'Self Study' ? '' : session.tutor },
     { label: 'Subject', value: session.subject !== session.title ? session.subject : '' },
     { label: 'Groups', value: session.groups },
   ].filter((r) => r.value !== '')
+
+  const conciseLine = [
+    shortDate(session.dateISO),
+    !isTask && session.start
+      ? `${session.start}${session.end && session.end !== session.start ? `–${session.end}` : ''}`
+      : isTask && session.start
+        ? `due ${session.start}`
+        : '',
+    loc.building && loc.room ? `Room ${loc.room}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  const overview = (
+    <div className="detail-tabpanel" role="tabpanel" aria-label="Overview" hidden={tab !== 'overview'}>
+      {session.isSpecialism && session.specialismName && (
+        <span className="badge badge-specialism">Specialism · {session.specialismName}</span>
+      )}
+      {session.isSelfStudy && <span className="badge badge-selfstudy">Self study</span>}
+      {session.isOptional && <span className="badge badge-optional">Optional</span>}
+      <dl className="detail-list">
+        {rows.map(({ label, value }) => (
+          <div className="detail-row" key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {session.link ? (
+        <a className="btn-primary btn-link" href={session.link} target="_blank" rel="noopener noreferrer">
+          Open in Moodle ↗
+        </a>
+      ) : null}
+      {gcalUrl && (
+        <a className="btn-secondary btn-link" href={gcalUrl} target="_blank" rel="noopener noreferrer">
+          Add to Google Calendar
+        </a>
+      )}
+      {isTask ? (
+        <section className="detail-notes">
+          <div className="chip-grid attendance-chips" role="group" aria-label="Task status">
+            {(['todo', 'doing', 'done'] as const).map((status) => (
+              <button
+                key={status}
+                type="button"
+                className={`chip${(meta?.status ?? 'todo') === status ? ' chip-on' : ''}`}
+                aria-pressed={(meta?.status ?? 'todo') === status}
+                onClick={() => onMeta({ status })}
+              >
+                {status === 'todo' ? 'To do' : status === 'doing' ? 'In progress' : '✓ Done'}
+              </button>
+            ))}
+          </div>
+          <textarea
+            className="note-input"
+            placeholder="Notes for this task (saved on this device)…"
+            rows={2}
+            value={meta?.note ?? ''}
+            onChange={(e) => onMeta({ note: e.target.value })}
+          />
+        </section>
+      ) : (
+        <>
+          {isPlacementSession(session) && onPlacementInfo && (
+            <section className="detail-notes placement-details">
+              <h3 className="subheading">🏫 Placement details</h3>
+              <input
+                type="text"
+                className="placement-input"
+                placeholder="School name"
+                value={placementInfo?.school ?? ''}
+                onChange={(e) => onPlacementInfo({ school: e.target.value })}
+              />
+              <input
+                type="text"
+                className="placement-input"
+                placeholder="Address / postcode"
+                value={placementInfo?.address ?? ''}
+                onChange={(e) => onPlacementInfo({ address: e.target.value })}
+                onBlur={(e) => {
+                  const address = e.target.value.trim()
+                  if (!address) return
+                  setGeoStatus('working')
+                  void geocodeAddress(address).then((located) => {
+                    if (located) {
+                      onPlacementInfo({ lat: located.lat, lng: located.lng })
+                      setGeoStatus('ok')
+                    } else {
+                      setGeoStatus('fail')
+                    }
+                  })
+                }}
+              />
+              {geoStatus === 'working' && <p className="filter-hint">📍 Locating the school…</p>}
+              {geoStatus === 'fail' && (
+                <p className="filter-hint">Couldn't locate that address — try adding the postcode.</p>
+              )}
+              {(geoStatus === 'ok' || (geoStatus === null && schoolCoords)) && (
+                <p className="filter-hint">📍 Located — Travel & map now points at the school.</p>
+              )}
+              <input
+                type="text"
+                className="placement-input"
+                placeholder="Mentor / contact"
+                value={placementInfo?.mentor ?? ''}
+                onChange={(e) => onPlacementInfo({ mentor: e.target.value })}
+              />
+              <textarea
+                className="note-input"
+                rows={2}
+                placeholder="Placement notes (times, entry instructions, what to bring…)"
+                value={placementInfo?.notes ?? ''}
+                onChange={(e) => onPlacementInfo({ notes: e.target.value })}
+              />
+              <p className="filter-hint">Shared across all sessions of this placement block; saved on this device.</p>
+            </section>
+          )}
+          <section className="detail-notes">
+            <div className="chip-grid attendance-chips">
+              <button
+                type="button"
+                className={`chip${meta?.attended ? ' chip-on' : ''}`}
+                aria-pressed={meta?.attended === true}
+                onClick={() =>
+                  onMeta(
+                    meta?.attended
+                      ? { attended: false }
+                      : { attended: true, absent: false, absentReason: undefined }
+                  )
+                }
+              >
+                ✓ Attended
+              </button>
+              <button
+                type="button"
+                className={`chip${meta?.absent ? ' chip-on chip-absent' : ''}`}
+                aria-pressed={meta?.absent === true}
+                onClick={() =>
+                  onMeta(
+                    meta?.absent
+                      ? { absent: false, absentReason: undefined }
+                      : { absent: true, attended: false }
+                  )
+                }
+              >
+                ✗ Absent
+              </button>
+              {!meta?.attended && !meta?.absent && !session.isSelfStudy && (
+                <span className="badge">Unrecorded</span>
+              )}
+              {meta?.absent && (
+                <select
+                  className="absent-reason"
+                  aria-label="Absence reason"
+                  value={meta?.absentReason ?? ''}
+                  onChange={(e) => onMeta({ absentReason: e.target.value || undefined })}
+                >
+                  <option value="">Reason…</option>
+                  <option value="Sick">Sick</option>
+                  <option value="Travel">Travel</option>
+                  <option value="Personal">Personal</option>
+                  <option value="Other">Other</option>
+                </select>
+              )}
+            </div>
+            <textarea
+              className="note-input"
+              placeholder="Notes for this session (saved on this device)…"
+              rows={2}
+              value={meta?.note ?? ''}
+              onChange={(e) => onMeta({ note: e.target.value })}
+            />
+            <div className="chip-grid ts-chips">
+              {TEACHERS_STANDARDS.map((ts) => {
+                const on = (meta?.standards ?? []).includes(ts.id)
+                return (
+                  <button
+                    key={ts.id}
+                    type="button"
+                    className={`chip chip-small${on ? ' chip-on' : ''}`}
+                    aria-pressed={on}
+                    title={ts.label}
+                    onClick={() => {
+                      const cur = meta?.standards ?? []
+                      onMeta({ standards: on ? cur.filter((x) => x !== ts.id) : [...cur, ts.id].sort() })
+                    }}
+                  >
+                    {ts.id}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="filter-hint">
+              Tag notes/photos against the Teachers' Standards — they build your evidence journal.
+            </p>
+            <p className="filter-hint">{photos.length} photos available on this device.{(meta?.photos ?? 0) > photos.length ? ` ${(meta?.photos ?? 0) - photos.length} more recorded elsewhere; import a backup from that device to view them.` : ''}</p>
+            <div className="photo-grid">
+              {photos.map((p, i) => (
+                <span className="photo-thumb" key={p.id}>
+                  <a href={photoUrls.current[i]} target="_blank" rel="noopener noreferrer">
+                    <img src={photoUrls.current[i]} alt="Session photo" loading="lazy" />
+                  </a>
+                  <button
+                    type="button"
+                    className="photo-delete"
+                    aria-label="Delete photo"
+                    onClick={() => void handleDeletePhoto(p.id).catch(error => reportPersistenceFailure('Photo deletion failed: ' + String(error)))}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+              <label className="photo-add">
+                📷 Add photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void handleAddPhoto(file).catch(error => reportPersistenceFailure('Photo save failed: ' + String(error)))
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  )
+
+  const travelPanel = !isTask && travel && (
+    <div className="detail-tabpanel" role="tabpanel" aria-label="Travel and map" hidden={tab !== 'travel'}>
+      <div className="travel-summary">
+        {shownMinutes !== null ? (
+          <>
+            <span className="travel-summary-mins">
+              ≈ {formatRemaining(shownMinutes)} {TRAVEL_MODE_PHRASE[travelMode]}
+            </span>
+            <span className="filter-hint">
+              {basisLabel}
+              {coords ? ' · from your current location' : ''}
+            </span>
+          </>
+        ) : locationEnabled ? (
+          <span className="filter-hint">Waiting for your location… address and directions still work below.</span>
+        ) : (
+          <span className="filter-hint">
+            Turn on travel times in Settings for a journey estimate — the address and directions work without it.
+          </span>
+        )}
+      </div>
+      <div className="ui-card destination-card">
+        <span className="today-hero-room-name">{travel.building ?? (loc.raw || session.room)}</span>
+        {loc.room && (
+          <span className="today-hero-building">
+            Room {loc.room}
+            {loc.roomName ? ` · ${loc.roomName}` : ''}
+          </span>
+        )}
+        {placementInfo?.address && <span className="today-hero-building">{placementInfo.address}</span>}
+        <button
+          type="button"
+          className="travel-link copy-address"
+          onClick={() => void navigator.clipboard?.writeText(placementInfo?.address || session.room).catch(() => {})}
+        >
+          Copy address
+        </button>
+      </div>
+      {travel.location ? (
+        <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} />
+      ) : (
+        <div className="ui-card map-fallback">
+          <p className="filter-hint">
+            No map match for this location — the address and external directions below still work.
+          </p>
+        </div>
+      )}
+      {route && route.legs.length > 0 ? (
+        <details className="journey-steps">
+          <summary>
+            <span>Journey steps</span>
+            <span className="route-total">
+              ≈ {formatRemaining(route.minutes)} ·{' '}
+              {[...new Set(route.legs.map((l) => (l.mode === 'walking' ? 'walk' : l.line || l.mode)))].join(' · ')}
+            </span>
+          </summary>
+          <RouteSteps route={route} legDeps={legDeps} routeDisruptions={routeDisruptions} />
+        </details>
+      ) : route && route.legs.length === 0 && travelMode === 'transit' ? (
+        <p className="route-info">Best option now: walk (no transit leg needed).</p>
+      ) : null}
+      {journeyWeather && (
+        <p className="route-info">
+          {weatherEmoji(journeyWeather.w.code)} {Math.round(journeyWeather.w.tempC)}°
+          {journeyWeather.w.rainProb >= 30 ? ` · ${journeyWeather.w.rainProb}% rain` : ''} around your leave
+          time ({journeyWeather.at})
+        </p>
+      )}
+      <a className="btn-primary btn-link external-nav" href={travel.mapsUrl} target="_blank" rel="noopener noreferrer">
+        Open in Google Maps ↗
+      </a>
+      <p className="filter-hint external-nav-caption">Opens navigation outside My Timetable</p>
+    </div>
+  )
+
+  const body = (
+    <>
+      <div className="sheet-header">
+        <h2 className="detail-title">{session.title}</h2>
+        <IdentityReview session={session} profileId={profileId} />
+        {presentation === 'sheet' && (
+          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        )}
+      </div>
+      {conciseLine && <p className="detail-concise">{conciseLine}</p>}
+      {!isTask && travel && (
+        <div className="detail-tabs">
+          <SegmentedControl
+            label="Session detail sections"
+            value={tab}
+            options={[
+              { value: 'overview', label: 'Overview' },
+              { value: 'travel', label: 'Travel & map' },
+            ]}
+            onChange={setTab}
+          />
+        </div>
+      )}
+      {overview}
+      {travelPanel}
+      {presentation === 'sheet' && (
+        <div className="modal-actions">
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      )}
+    </>
+  )
+
+  if (presentation === 'page') {
+    return (
+      <div className="page detail-page">
+        <button type="button" className="page-back" onClick={onClose}>
+          ‹ {backLabel}
+        </button>
+        {body}
+      </div>
+    )
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -208,245 +584,7 @@ export function SessionDetail({
         aria-label={session.title}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sheet-header">
-          <h2 className="detail-title">{session.title}</h2>
-          <IdentityReview session={session} profileId={profileId} />
-          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-        {session.isSpecialism && session.specialismName && (
-          <span className="badge badge-specialism">Specialism · {session.specialismName}</span>
-        )}
-        {session.isSelfStudy && <span className="badge badge-selfstudy">Self study</span>}
-        {session.isOptional && <span className="badge badge-optional">Optional</span>}
-        <dl className="detail-list">
-          {rows.map(({ label, value }) => (
-            <div className="detail-row" key={label}>
-              <dt>{label}</dt>
-              <dd>{value}</dd>
-            </div>
-          ))}
-        </dl>
-        {travel && (
-          <div className="travel-row">
-            <span className="travel-info">
-              {travel.building
-                ? shownMinutes !== null
-                  ? `≈ ${formatRemaining(shownMinutes)} ${TRAVEL_MODE_PHRASE[travelMode]}${liveLabel} · ${travel.building}`
-                  : locationEnabled
-                    ? `${travel.building} (waiting for your location…)`
-                    : `${travel.building} — enable travel times in Settings for an estimate`
-                : 'Not matched to a UCL campus building'}
-            </span>
-            <a className="travel-link" href={travel.mapsUrl} target="_blank" rel="noopener noreferrer">
-              Directions ↗
-            </a>
-          </div>
-        )}
-        {route && <RouteSteps route={route} legDeps={legDeps} routeDisruptions={routeDisruptions} />}
-        {journeyWeather && (
-          <p className="route-info">
-            {weatherEmoji(journeyWeather.w.code)} {Math.round(journeyWeather.w.tempC)}°
-            {journeyWeather.w.rainProb >= 30 ? ` · ${journeyWeather.w.rainProb}% rain` : ''} around your
-            leave time ({journeyWeather.at})
-          </p>
-        )}
-        {route && route.legs.length === 0 && travelMode === 'transit' && (
-          <p className="route-info">Best option now: walk (no transit leg needed).</p>
-        )}
-        {travel?.location && (
-          <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} />
-        )}
-        {session.link && (
-          <a className="btn-primary btn-link" href={session.link} target="_blank" rel="noopener noreferrer">
-            Open in Moodle ↗
-          </a>
-        )}
-        {gcalUrl && (
-          <a className="btn-secondary btn-link" href={gcalUrl} target="_blank" rel="noopener noreferrer">
-            Add to Google Calendar
-          </a>
-        )}
-        {isPlacementSession(session) && onPlacementInfo && (
-          <section className="detail-notes placement-details">
-            <h3 className="subheading">🏫 Placement details</h3>
-            <input
-              type="text"
-              className="placement-input"
-              placeholder="School name"
-              value={placementInfo?.school ?? ''}
-              onChange={(e) => onPlacementInfo({ school: e.target.value })}
-            />
-            <input
-              type="text"
-              className="placement-input"
-              placeholder="Address / postcode"
-              value={placementInfo?.address ?? ''}
-              onChange={(e) => onPlacementInfo({ address: e.target.value })}
-              onBlur={(e) => {
-                const address = e.target.value.trim()
-                if (!address) return
-                setGeoStatus('working')
-                void geocodeAddress(address).then((located) => {
-                  if (located) {
-                    onPlacementInfo({ lat: located.lat, lng: located.lng })
-                    setGeoStatus('ok')
-                  } else {
-                    setGeoStatus('fail')
-                  }
-                })
-              }}
-            />
-            {geoStatus === 'working' && <p className="filter-hint">📍 Locating the school…</p>}
-            {geoStatus === 'fail' && (
-              <p className="filter-hint">Couldn't locate that address — try adding the postcode.</p>
-            )}
-            {(geoStatus === 'ok' || (geoStatus === null && schoolCoords)) && (
-              <p className="filter-hint">
-                📍 Located — the map and travel details below now point at the school.
-              </p>
-            )}
-            <input
-              type="text"
-              className="placement-input"
-              placeholder="Mentor / contact"
-              value={placementInfo?.mentor ?? ''}
-              onChange={(e) => onPlacementInfo({ mentor: e.target.value })}
-            />
-            <textarea
-              className="note-input"
-              rows={2}
-              placeholder="Placement notes (times, entry instructions, what to bring…)"
-              value={placementInfo?.notes ?? ''}
-              onChange={(e) => onPlacementInfo({ notes: e.target.value })}
-            />
-            {placementInfo?.address && (
-              <a
-                className="travel-link"
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placementInfo.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Directions to the school ↗
-              </a>
-            )}
-            <p className="filter-hint">Shared across all sessions of this placement block; saved on this device.</p>
-          </section>
-        )}
-        <section className="detail-notes">
-          <div className="chip-grid attendance-chips">
-            <button
-              type="button"
-              className={`chip${meta?.attended ? ' chip-on' : ''}`}
-              aria-pressed={meta?.attended === true}
-              onClick={() =>
-                onMeta(
-                  meta?.attended
-                    ? { attended: false }
-                    : { attended: true, absent: false, absentReason: undefined }
-                )
-              }
-            >
-              ✓ Attended
-            </button>
-            <button
-              type="button"
-              className={`chip${meta?.absent ? ' chip-on chip-absent' : ''}`}
-              aria-pressed={meta?.absent === true}
-              onClick={() =>
-                onMeta(
-                  meta?.absent
-                    ? { absent: false, absentReason: undefined }
-                    : { absent: true, attended: false }
-                )
-              }
-            >
-              ✗ Absent
-            </button>
-            {meta?.absent && (
-              <select
-                className="absent-reason"
-                aria-label="Absence reason"
-                value={meta?.absentReason ?? ''}
-                onChange={(e) => onMeta({ absentReason: e.target.value || undefined })}
-              >
-                <option value="">Reason…</option>
-                <option value="Sick">Sick</option>
-                <option value="Travel">Travel</option>
-                <option value="Personal">Personal</option>
-                <option value="Other">Other</option>
-              </select>
-            )}
-          </div>
-          <textarea
-            className="note-input"
-            placeholder="Notes for this session (saved on this device)…"
-            rows={2}
-            value={meta?.note ?? ''}
-            onChange={(e) => onMeta({ note: e.target.value })}
-          />
-          <div className="chip-grid ts-chips">
-            {TEACHERS_STANDARDS.map((ts) => {
-              const on = (meta?.standards ?? []).includes(ts.id)
-              return (
-                <button
-                  key={ts.id}
-                  type="button"
-                  className={`chip chip-small${on ? ' chip-on' : ''}`}
-                  aria-pressed={on}
-                  title={ts.label}
-                  onClick={() => {
-                    const cur = meta?.standards ?? []
-                    onMeta({ standards: on ? cur.filter((x) => x !== ts.id) : [...cur, ts.id].sort() })
-                  }}
-                >
-                  {ts.id}
-                </button>
-              )
-            })}
-          </div>
-          <p className="filter-hint">
-            Tag notes/photos against the Teachers' Standards — they build your evidence journal
-            (Settings → Evidence journal).
-          </p>
-          <p className="filter-hint">{photos.length} photos available on this device.{(meta?.photos ?? 0) > photos.length ? ` ${(meta?.photos ?? 0) - photos.length} more recorded elsewhere; import a backup from that device to view them.` : ''}</p>
-          <div className="photo-grid">
-            {photos.map((p, i) => (
-              <span className="photo-thumb" key={p.id}>
-                <a href={photoUrls.current[i]} target="_blank" rel="noopener noreferrer">
-                  <img src={photoUrls.current[i]} alt="Session photo" loading="lazy" />
-                </a>
-                <button
-                  type="button"
-                  className="photo-delete"
-                  aria-label="Delete photo"
-                  onClick={() => void handleDeletePhoto(p.id).catch(error => reportPersistenceFailure('Photo deletion failed: ' + String(error)))}
-                >
-                  ✕
-                </button>
-              </span>
-            ))}
-            <label className="photo-add">
-              📷 Add photo
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) void handleAddPhoto(file).catch(error => reportPersistenceFailure('Photo save failed: ' + String(error)))
-                  e.target.value = ''
-                }}
-              />
-            </label>
-          </div>
-        </section>
-        <div className="modal-actions">
-          <button type="button" className="btn-ghost" onClick={onClose}>
-            Close
-          </button>
-        </div>
+        {body}
       </div>
     </div>
   )
