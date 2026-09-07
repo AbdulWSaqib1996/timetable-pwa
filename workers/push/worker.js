@@ -1080,7 +1080,7 @@ async function boundedJSON(request, limit) {
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
-  'access-control-allow-headers': 'content-type',
+  'access-control-allow-headers': 'content-type, authorization',
 }
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json', ...CORS } })
 
@@ -1102,6 +1102,30 @@ export async function listAllKeys(kv, options, maxPages = 50) {
     cursor = res.cursor
   }
   return keys
+}
+
+/** Analytics-only scan that says whether pagination actually finished —
+ *  a capped scan must surface as incomplete, never as a smaller total. */
+export async function listAllKeysChecked(kv, options, maxPages = 50) {
+  const keys = []
+  let cursor
+  for (let page = 0; page < maxPages; page++) {
+    const res = await kv.list(cursor ? { ...options, cursor } : options)
+    keys.push(...res.keys)
+    if (res.list_complete) return { keys, complete: true }
+    cursor = res.cursor
+  }
+  return { keys, complete: false }
+}
+
+/* Constant-time credential comparison — no early exit on length or prefix. */
+const constantEquals = (a, b) => {
+  const left = String(a ?? '')
+  const right = String(b ?? '')
+  if (left.length !== right.length) return false
+  let mismatch = 0
+  for (let i = 0; i < left.length; i++) mismatch |= left.charCodeAt(i) ^ right.charCodeAt(i)
+  return mismatch === 0
 }
 
 export default {
@@ -1231,7 +1255,10 @@ export default {
     }
     /* ---------- anonymous usage analytics (self-hosted; a random token per device) ---------- */
     if (request.method === 'POST' && url.pathname === '/ping') {
-      const body = await request.json().catch(() => null)
+      // ADM-16 (bounds): a ping is tiny — anything oversized or non-JSON is
+      // rejected before parsing; every stored number is a clamped finite int.
+      const body = await boundedJSON(request, 8192)
+      if (!body) return json({ error: 'invalid ping' }, 400)
       const d = String(body?.d ?? '')
       if (!/^[0-9a-f]{8,32}$/.test(d)) return json({ error: 'invalid ping' }, 400)
       const date = new Date().toISOString().slice(0, 10)
@@ -1244,11 +1271,20 @@ export default {
       ]
       const u = {}
       if (body?.u && typeof body.u === 'object') {
-        for (const k of FEATURES) if (body.u[k]) u[k] = clampInt(body.u[k], 999)
+        // ADM-12: keep only counters that are still positive after clamping —
+        // a negative or zero value must never mint a feature adopter.
+        for (const k of FEATURES) {
+          const n = clampInt(body.u[k], 999)
+          if (n > 0) u[k] = n
+        }
       }
       const s = {}
       if (body?.s && typeof body.s === 'object') {
-        for (const k of ['push', 'location', 'home', 'keyDates', 'sync', 'placements']) s[k] = body.s[k] === true
+        // ADM-12: store only flags the client actually reported as booleans.
+        // An empty setup object must not fabricate six "false" answers.
+        for (const k of ['push', 'location', 'home', 'keyDates', 'sync', 'placements']) {
+          if (typeof body.s[k] === 'boolean') s[k] = body.s[k]
+        }
       }
       const rec = {
         i: body?.i === true,
@@ -1264,86 +1300,143 @@ export default {
       return json({ ok: true })
     }
     if (request.method === 'GET' && url.pathname === '/stats') {
-      // Owner-only: when a 'statskey' exists in KV, ?key= must match it.
+      // ADM-03: every stats response — success or error — is no-store.
+      const noStore = (obj, status = 200) =>
+        new Response(JSON.stringify(obj), {
+          status,
+          headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...CORS },
+        })
+      // ADM-01: fail CLOSED. No configured key means the endpoint is
+      // unavailable — never open. Nothing is scanned before authentication.
       const requiredKey = await env.PUSH.get('statskey')
-      if (requiredKey && url.searchParams.get('key') !== requiredKey) {
-        return json({ error: 'unauthorized' }, 401)
+      if (!requiredKey || !String(requiredKey).trim()) {
+        return noStore({ error: 'configuration unavailable' }, 503)
       }
+      // ADM-03: Authorization: Bearer is the supported credential. The legacy
+      // ?key= query form is accepted for a transition window (until
+      // 21 Sep 2026 — remove with the A2 worker deploy) so stale installed
+      // dashboards keep working. Neither form is ever logged.
+      const auth = request.headers.get('authorization') ?? ''
+      const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
+      const presented = bearer || url.searchParams.get('key') || ''
+      if (!constantEquals(presented, requiredKey)) return noStore({ error: 'unauthorized' }, 401)
+
       const days = Math.min(62, Math.max(1, parseInt(url.searchParams.get('days') ?? '31', 10) || 31))
-      // First-seen dates per device → new-device counts and retention.
+      // Completeness metadata (ADM-10/11): rows that vanished or failed to
+      // parse are reported, never silently counted or dropped into totals.
+      let missingRows = 0
+      let invalidRows = 0
+      // First-seen dates per device -> new-device counts and retention.
+      const devScan = await listAllKeysChecked(env.PUSH, { prefix: 'adev:' })
+      let scanComplete = devScan.complete
       const firstSeen = new Map()
-      const devList = { keys: await listAllKeys(env.PUSH, { prefix: 'adev:' }) }
-      for (const k of devList.keys) {
-        firstSeen.set(k.name.slice(5), await env.PUSH.get(k.name))
+      for (const k of devScan.keys) {
+        const v = await env.PUSH.get(k.name)
+        if (v === null) missingRows++
+        else firstSeen.set(k.name.slice(5), v)
       }
       const daily = []
       const activeWeek = new Set()
       const activeMonth = new Set()
       const deviceDays = new Map()
       const versions = {}
-      // Last-7-days aggregates: feature adoption, engagement and setup flags.
+      // Fixed-window aggregates: feature adoption, engagement and setup flags.
       const featureUses = {}
       const featureDevices = {}
       let opens7 = 0
       const dayparts = [0, 0, 0, 0, 0, 0]
       const setupCounts = {}
+      const setupKnown = {}
       let setupDevices = 0
-      for (let i = 0; i < days; i++) {
+      // ADM-09: the figures NAMED 7-day/30-day always scan their own fixed
+      // windows, however short the requested chart range is.
+      const scanDays = Math.max(30, days)
+      for (let i = 0; i < scanDays; i++) {
         const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10)
-        const list = { keys: await listAllKeys(env.PUSH, { prefix: `aping:${date}:` }) }
+        const scan = await listAllKeysChecked(env.PUSH, { prefix: `aping:${date}:` })
+        if (!scan.complete) scanComplete = false
+        let active = 0
         let installed = 0
         let newDevices = 0
         const platforms = {}
-        for (const k of list.keys) {
+        for (const k of scan.keys) {
           const rec = await env.PUSH.get(k.name, 'json')
           const dev = k.name.split(':')[2]
-          if (rec?.i) installed++
-          const p = rec?.p ?? 'other'
+          // ADM-10: only a successfully read, plausible row is activity. A
+          // listed key whose read returns null is completeness metadata.
+          if (rec === null) {
+            missingRows++
+            continue
+          }
+          if (typeof rec !== 'object' || Array.isArray(rec)) {
+            invalidRows++
+            continue
+          }
+          active++
+          if (rec.i === true) installed++
+          const p = typeof rec.p === 'string' ? rec.p : 'other'
           platforms[p] = (platforms[p] ?? 0) + 1
           if (firstSeen.get(dev) === date) newDevices++
           if (i < 7) {
             activeWeek.add(dev)
-            opens7 += rec?.o ?? 0
-            if (Array.isArray(rec?.h)) rec.h.forEach((n, b) => (dayparts[b] += n || 0))
-            for (const [f, n] of Object.entries(rec?.u ?? {})) {
-              featureUses[f] = (featureUses[f] ?? 0) + n
-              featureDevices[f] = (featureDevices[f] ?? new Set())
+            opens7 += Number(rec.o) > 0 ? Math.round(Number(rec.o)) : 0
+            if (Array.isArray(rec.h)) rec.h.slice(0, 6).forEach((n, b) => (dayparts[b] += Number(n) > 0 ? Math.round(Number(n)) : 0))
+            for (const [f, n] of Object.entries(rec.u ?? {})) {
+              // ADM-12: only a POSITIVE count makes an adopter; zero or
+              // garbage never contributes a device or a use.
+              const uses = Number(n)
+              if (!Number.isFinite(uses) || uses <= 0) continue
+              featureUses[f] = (featureUses[f] ?? 0) + Math.round(uses)
+              featureDevices[f] = featureDevices[f] ?? new Set()
               featureDevices[f].add(dev)
             }
           }
-          if (i === 0 && rec?.s && Object.keys(rec.s).length > 0) {
-            setupDevices++
-            for (const [flag, on] of Object.entries(rec.s)) if (on) setupCounts[flag] = (setupCounts[flag] ?? 0) + 1
+          if (i === 0 && rec.s && typeof rec.s === 'object') {
+            // ADM-12: unknown is not false — each flag gets its own
+            // known-value denominator; absent flags count nowhere.
+            let known = 0
+            for (const [flag, v] of Object.entries(rec.s)) {
+              if (typeof v !== 'boolean') continue
+              known++
+              setupKnown[flag] = (setupKnown[flag] ?? 0) + 1
+              if (v) setupCounts[flag] = (setupCounts[flag] ?? 0) + 1
+            }
+            if (known > 0) setupDevices++
           }
           if (i < 30) activeMonth.add(dev)
-          deviceDays.set(dev, (deviceDays.get(dev) ?? 0) + 1)
-          if (i === 0 && rec?.v) versions[rec.v] = (versions[rec.v] ?? 0) + 1
+          if (i < days) deviceDays.set(dev, (deviceDays.get(dev) ?? 0) + 1)
+          if (i === 0 && rec.v) versions[rec.v] = (versions[rec.v] ?? 0) + 1
         }
-        daily.push({ date, active: list.keys.length, installed, newDevices, platforms })
+        if (i < days) daily.push({ date, active, listed: scan.keys.length, installed, newDevices, platforms })
       }
       const features = Object.fromEntries(
         Object.entries(featureUses).map(([f, uses]) => [f, { uses, devices: featureDevices[f]?.size ?? 0 }])
       )
-      // Stickiness: how many distinct days each device appeared in the window.
-      let d1 = 0, d2to4 = 0, d5plus = 0
+      // Return frequency: distinct observed days per device in the REQUESTED window.
+      let d1 = 0
+      let d2to4 = 0
+      let d5plus = 0
       for (const n of deviceDays.values()) {
         if (n >= 5) d5plus++
         else if (n >= 2) d2to4++
         else d1++
       }
-      return json({
+      return noStore({
         generatedAt: new Date().toISOString(),
         windowDays: days,
-        totalDevicesEver: devList.keys.length,
+        timezone: 'UTC',
+        includesPartialToday: true,
+        completeness: { scanComplete, missingRows, invalidRows },
+        totalDevicesEver: devScan.keys.length,
         activeLast7Days: activeWeek.size,
         activeLast30Days: activeMonth.size,
         todayVersions: versions,
         retention: { oneDay: d1, twoToFourDays: d2to4, fivePlusDays: d5plus },
-        // last-7-days usage shape
+        // fixed-last-7-days usage shape (independent of windowDays)
         features,
         opensLast7Days: opens7,
         dayparts,
-        setup: { devices: setupDevices, counts: setupCounts },
+        setup: { devices: setupDevices, counts: setupCounts, known: setupKnown },
         daily,
       })
     }
