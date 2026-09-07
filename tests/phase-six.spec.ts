@@ -129,6 +129,61 @@ test('provider failure keeps the destination usable: address, map area and exter
   await expect(page.getByRole('link', { name: /Open in Google Maps/ })).toBeVisible()
 })
 
+test('study group: freshness-labelled members, stale never counted free, explicit proposal send, intervals-only payloads', async ({ page, context }) => {
+  const NOW = Date.parse('2026-09-07T07:15:00Z')
+  const bodies: Record<string, unknown>[] = []
+  const groupState = {
+    members: [
+      { memberId: 'me1', name: 'Me', at: NOW - 5 * 60_000, slots: [{ d: '2026-09-08', from: 540, to: 1020 }] },
+      { memberId: 'm2', name: 'Riya', at: NOW - 30 * 3_600_000, slots: [{ d: '2026-09-08', from: 540, to: 1020 }] },
+    ],
+    proposals: [] as Record<string, unknown>[],
+  }
+  await context.route('**/timetable-push.ics-feed.workers.dev/**', (route: Route) => {
+    const req = route.request()
+    const path = new URL(req.url()).pathname
+    if (req.method() === 'POST') bodies.push({ path, ...(req.postDataJSON() as Record<string, unknown>) })
+    if (path === '/group' && req.method() === 'POST') {
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, code: 'K7M2PQ', memberId: 'me1', token: 'tok1' }) })
+    }
+    if (path === '/group' && req.method() === 'GET') {
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify(groupState) })
+    }
+    if (path === '/group/propose') {
+      const slot = (req.postDataJSON() as { slot: { d: string; from: number; to: number } }).slot
+      const proposal = { id: 'p1', rev: 1, by: 'me1', slot, status: 'open', participants: ['me1', 'm2'], responses: { me1: 'yes' }, at: NOW }
+      groupState.proposals = [proposal]
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, proposal }) })
+    }
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) })
+  })
+  await seed(page)
+  await page.goto('./#/settings/timetable')
+  await page.getByRole('button', { name: /Set up a study group/ }).click()
+  await page.getByPlaceholder('Your display name').fill('Me')
+  await page.getByRole('button', { name: 'Create a group' }).click()
+  // Freshness is explicit: my row is recent, Riya's availability is 30h old
+  // and she is excluded from the common slots by name.
+  await expect(page.getByText('updated 5 min ago')).toBeVisible()
+  await expect(page.getByText(/out of date, not counted as free/)).toBeVisible()
+  await expect(page.getByText(/Not counted \(availability out of date\): Riya/)).toBeVisible()
+  // Proposing is a two-step explicit send.
+  await page.getByRole('button', { name: 'Propose' }).first().click()
+  await expect(page.getByText(/Nothing is sent until you press Send/)).toBeVisible()
+  await page.getByRole('button', { name: 'Send proposal' }).click()
+  await expect(page.getByText(/by Me/)).toBeVisible()
+  // Privacy: every payload that left the app carries intervals and identity
+  // only — no session titles, rooms or other content fields.
+  const allowed = new Set(['path', 'code', 'name', 'slots', 'tz', 'horizonDays', 'wantCredentials', 'memberId', 'token', 'slot'])
+  for (const b of bodies.filter((x) => String(x.path).startsWith('/group'))) {
+    expect(Object.keys(b).every((k) => allowed.has(k))).toBe(true)
+    for (const s of [...((b.slots as unknown[]) ?? []), ...(b.slot ? [b.slot] : [])]) {
+      expect(Object.keys(s as object).sort()).toEqual(['d', 'from', 'to'])
+    }
+  }
+  expect(bodies.some((b) => b.path === '/group/propose')).toBe(true)
+})
+
 test('journey home is leave-now with an explicit origin and never a fabricated plan', async ({ page, context }) => {
   const urls: string[] = []
   await context.route('**/api.tfl.gov.uk/Journey/**', (route: Route) => {

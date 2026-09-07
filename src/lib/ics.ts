@@ -11,12 +11,12 @@ export function buildICS(sessions: Session[], calendarName: string): string {
   return buildICSCalendar(sessions, calendarName)
 }
 
-export function downloadICS(sessions: Session[], calendarName: string): void {
+export function downloadICS(sessions: Session[], calendarName: string, filename = 'my-timetable.ics'): void {
   const blob = new Blob([buildICS(sessions, calendarName)], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'my-timetable.ics'
+  a.download = filename
   document.body.appendChild(a)
   a.click()
   a.remove()

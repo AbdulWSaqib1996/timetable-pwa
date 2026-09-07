@@ -1,19 +1,16 @@
+import { COURSE_TIMEZONE } from '../../shared/calendar-time.js'
+import { availabilityPayload, computeFreeIntervals } from '../../shared/availability.js'
+import type { FreeSlot } from '../../shared/availability.js'
 import type { Session } from '../types'
 import { toMinutes } from './format'
 
+export type { FreeSlot }
+
 /**
  * Study groups: share a short code; each member publishes their free slots
- * (times only — no session details) to the push worker's KV, and everyone
- * sees the intersection.
+ * (times only — no session details, P6-05 privacy rule) plus generation time,
+ * timezone and horizon, and everyone sees the freshness-aware intersection.
  */
-
-export interface FreeSlot {
-  /** yyyy-mm-dd */
-  d: string
-  /** minutes from midnight */
-  from: number
-  to: number
-}
 
 export interface GroupMember {
   /** stable id (P3-07); may be absent from very old servers */
@@ -21,6 +18,21 @@ export interface GroupMember {
   name: string
   at: number
   slots: FreeSlot[]
+  /** timezone the slots' wall minutes are in (defaults to the course zone) */
+  tz?: string
+}
+
+/** A meeting proposal (P6-05): stable id, revision-checked edits. */
+export interface Proposal {
+  id: string
+  rev: number
+  /** proposer memberId */
+  by: string
+  slot: FreeSlot
+  status: 'open' | 'withdrawn'
+  participants: string[]
+  responses: Record<string, 'yes' | 'no'>
+  at: number
 }
 
 /** Device-held membership capability — proves this device owns its member record. */
@@ -29,59 +41,26 @@ export interface GroupCredentials {
   token?: string
 }
 
-const DAY_START = 9 * 60
-const DAY_END = 17 * 60
-const MIN_GAP = 45
-
-function addDaysISO(dateISO: string, days: number): string {
-  const [y, m, d] = dateISO.split('-').map(Number)
-  const date = new Date(y, m - 1, d + days)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+export interface SlotOptions {
+  workStart?: number
+  workEnd?: number
+  minMinutes?: number
 }
 
-/** Free slots (09:00–17:00, weekdays, ≥45 min) for the next `days` days. */
-export function computeFreeSlots(sessions: Session[], todayISO: string, days = 7): FreeSlot[] {
-  const out: FreeSlot[] = []
-  for (let i = 0; i < days; i++) {
-    const dateISO = addDaysISO(todayISO, i)
-    const [y, m, d] = dateISO.split('-').map(Number)
-    const dow = new Date(y, m - 1, d).getDay()
-    if (dow === 0 || dow === 6) continue
-    const busy = sessions
-      .filter((s) => s.dateISO === dateISO && !s.isKeyDate && !s.isSelfStudy && !s.isFreeTime && toMinutes(s.start) !== null)
-      .map((s) => {
-        const from = toMinutes(s.start)!
-        return { from, to: toMinutes(s.end) ?? from + 60 }
-      })
-      .sort((a, b) => a.from - b.from)
-    let cursor = DAY_START
-    for (const b of busy) {
-      if (b.from - cursor >= MIN_GAP) out.push({ d: dateISO, from: cursor, to: Math.min(b.from, DAY_END) })
-      cursor = Math.max(cursor, b.to)
-      if (cursor >= DAY_END) break
-    }
-    if (DAY_END - cursor >= MIN_GAP) out.push({ d: dateISO, from: cursor, to: DAY_END })
-  }
-  return out.slice(0, 100)
-}
-
-/** Slots where every member is free for at least 30 minutes. */
-export function intersectSlots(memberSlots: FreeSlot[][]): FreeSlot[] {
-  if (memberSlots.length === 0) return []
-  let common = memberSlots[0]
-  for (const next of memberSlots.slice(1)) {
-    const merged: FreeSlot[] = []
-    for (const a of common) {
-      for (const b of next) {
-        if (a.d !== b.d) continue
-        const from = Math.max(a.from, b.from)
-        const to = Math.min(a.to, b.to)
-        if (to - from >= 30) merged.push({ d: a.d, from, to })
-      }
-    }
-    common = merged
-  }
-  return common.sort((a, b) => (a.d + String(a.from).padStart(4, '0')).localeCompare(b.d + String(b.from).padStart(4, '0')))
+/**
+ * My free slots for the next `days` days: course sessions AND opted-in
+ * personal busy commitments (they arrive here as sessions with busy time)
+ * become plain intervals; the shared model does the rest. Nothing but
+ * times ever leaves this function.
+ */
+export function computeFreeSlots(sessions: Session[], todayISO: string, days = 7, opts: SlotOptions = {}): FreeSlot[] {
+  const busy = sessions
+    .filter((s) => !s.isKeyDate && !s.isSelfStudy && !s.isFreeTime && toMinutes(s.start) !== null)
+    .map((s) => {
+      const from = toMinutes(s.start)!
+      return { d: s.dateISO, from, to: toMinutes(s.end) ?? from + 60 }
+    })
+  return computeFreeIntervals(busy, { todayISO, days, ...opts })
 }
 
 export const fmtSlotTime = (mins: number) =>
@@ -97,7 +76,7 @@ export async function createGroup(
   const res = await fetch(`${trim(base)}/group`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name, slots, wantCredentials: true }),
+    body: JSON.stringify(availabilityPayload({ code: '', name, slots, tz: COURSE_TIMEZONE })),
   })
   if (!res.ok) throw new Error('Could not create the group.')
   const json = (await res.json()) as { code?: string; memberId?: string; token?: string }
@@ -115,7 +94,7 @@ export async function joinGroup(
   const res = await fetch(`${trim(base)}/group/join`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ code, name, slots, wantCredentials: true, ...creds }),
+    body: JSON.stringify(availabilityPayload({ code, name, slots, tz: COURSE_TIMEZONE, creds })),
   })
   if (res.status === 404) throw new Error('No group with that code.')
   if (res.status === 403) {
@@ -127,12 +106,69 @@ export async function joinGroup(
   return { memberId: json.memberId ?? creds?.memberId, token: json.token ?? creds?.token }
 }
 
-export async function fetchGroup(base: string, code: string): Promise<GroupMember[]> {
+export interface GroupState {
+  members: GroupMember[]
+  proposals: Proposal[]
+}
+
+export async function fetchGroup(base: string, code: string): Promise<GroupState> {
   const res = await fetch(`${trim(base)}/group?code=${encodeURIComponent(code)}`)
   if (res.status === 404) throw new Error('This group no longer exists.')
   if (!res.ok) throw new Error('Could not load the group.')
-  const json = (await res.json()) as { members?: GroupMember[] }
-  return json.members ?? []
+  const json = (await res.json()) as { members?: GroupMember[]; proposals?: Proposal[] }
+  return { members: json.members ?? [], proposals: json.proposals ?? [] }
+}
+
+/** Explicit send action (P6-05): nothing is proposed until the user asks. */
+export async function proposeSlot(
+  base: string,
+  code: string,
+  creds: GroupCredentials,
+  slot: FreeSlot
+): Promise<Proposal> {
+  const res = await fetch(`${trim(base)}/group/propose`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code, memberId: creds.memberId, token: creds.token, slot }),
+  })
+  if (res.status === 403) throw new Error('Your membership on this device is out of date — rejoin with the code.')
+  if (!res.ok) throw new Error('Could not send the proposal.')
+  const json = (await res.json()) as { proposal?: Proposal }
+  if (!json.proposal) throw new Error('Could not send the proposal.')
+  return json.proposal
+}
+
+/** Thrown when a proposal changed under a response; carries the fresh copy. */
+export class ProposalConflict extends Error {
+  proposal?: Proposal
+  constructor(proposal?: Proposal) {
+    super('This proposal just changed — showing the latest version.')
+    this.proposal = proposal
+  }
+}
+
+export async function respondProposal(
+  base: string,
+  code: string,
+  creds: GroupCredentials,
+  proposalId: string,
+  rev: number,
+  action: 'yes' | 'no' | 'withdraw'
+): Promise<Proposal> {
+  const res = await fetch(`${trim(base)}/group/proposal/respond`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code, memberId: creds.memberId, token: creds.token, proposalId, rev, action }),
+  })
+  if (res.status === 409) {
+    const json = (await res.json().catch(() => ({}))) as { proposal?: Proposal }
+    throw new ProposalConflict(json.proposal)
+  }
+  if (res.status === 403) throw new Error('Your membership on this device is out of date — rejoin with the code.')
+  if (!res.ok) throw new Error('Could not update the proposal.')
+  const json = (await res.json()) as { proposal?: Proposal }
+  if (!json.proposal) throw new Error('Could not update the proposal.')
+  return json.proposal
 }
 
 export async function leaveGroup(
@@ -146,4 +182,34 @@ export async function leaveGroup(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ code, name, ...creds }),
   }).catch(() => {})
+}
+
+/* ---- publish policy (P6-05): republish only when the slots changed or the
+ * freshness window requires it — not on every open. ---- */
+
+const PUB_KEY = (code: string) => `timetable.group.pub.v1.${code}`
+/** Republish at half the freshness window even when nothing changed. */
+const REPUBLISH_MS = 12 * 3_600_000
+
+export function slotsFingerprint(slots: FreeSlot[]): string {
+  return slots.map((s) => `${s.d}:${s.from}-${s.to}`).join('|')
+}
+
+export function shouldPublish(code: string, slots: FreeSlot[], now = Date.now()): boolean {
+  try {
+    const raw = localStorage.getItem(PUB_KEY(code))
+    if (!raw) return true
+    const last = JSON.parse(raw) as { hash?: string; at?: number }
+    return last.hash !== slotsFingerprint(slots) || now - (last.at ?? 0) > REPUBLISH_MS
+  } catch {
+    return true
+  }
+}
+
+export function markPublished(code: string, slots: FreeSlot[], now = Date.now()): void {
+  try {
+    localStorage.setItem(PUB_KEY(code), JSON.stringify({ hash: slotsFingerprint(slots), at: now }))
+  } catch {
+    /* storage unavailable — we'll just republish next time */
+  }
 }

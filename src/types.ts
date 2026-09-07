@@ -130,6 +130,10 @@ export interface Settings {
   groupMemberId?: string
   /** device-held membership capability — never synced to other devices */
   groupToken?: string
+  /** study-group working hours (minutes from midnight) and minimum meeting length */
+  groupWorkStart?: number
+  groupWorkEnd?: number
+  groupMinMeeting?: number
   /** setup checklist card permanently dismissed */
   checklistDismissed?: boolean
   /** anonymous daily usage ping to the push worker (default on; off switch in Settings) */

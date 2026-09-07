@@ -1024,6 +1024,8 @@ const RATE_CAPS = {
   '/group': 10,
   '/group/join': 10,
   '/group/leave': 10,
+  '/group/propose': 10,
+  '/group/proposal/respond': 10,
   '/stats': 20,
   '/history': 10,
 }
@@ -1211,7 +1213,10 @@ export default {
       }
       return json({ error: 'could not create the group — try again' }, 503)
     }
-    if (request.method === 'POST' && (url.pathname === '/group/join' || url.pathname === '/group/leave')) {
+    if (
+      request.method === 'POST' &&
+      ['/group/join', '/group/leave', '/group/propose', '/group/proposal/respond'].includes(url.pathname)
+    ) {
       const body = await boundedJSON(request, 32768)
       const code = String(body?.code ?? '').toUpperCase().trim()
       if (!/^[A-Z2-9]{4,8}$/.test(code)) return json({ error: 'invalid request' }, 400)

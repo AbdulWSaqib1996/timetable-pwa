@@ -139,3 +139,74 @@ test('KV listings paginate through every cursor page', async () => {
   assert.deepEqual(keys.map((k) => k.name), ['sub:1', 'sub:2', 'sub:3', 'sub:4'])
   assert.deepEqual(calls, [undefined, 'c1', 'c2'])
 })
+
+/* ---- P6-05: meeting proposals (capability-gated, revision-checked) ---- */
+
+const FUTURE = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10)
+const futureSlot = { d: FUTURE, from: 600, to: 660 }
+
+async function groupOfTwo() {
+  const { store } = makeStore()
+  const alex = await (await store.fetch(req('/group', 'POST', { name: 'Alex', slots, wantCredentials: true, tz: 'Europe/London' }))).json()
+  const sam = await (await store.fetch(req('/group/join', 'POST', { name: 'Sam', slots, wantCredentials: true, tz: 'Europe/Paris' }))).json()
+  return { store, alex, sam }
+}
+
+test('propose requires a valid capability; the proposal lists with stable id, rev and proposer-yes', async () => {
+  const { store, alex } = await groupOfTwo()
+  const noAuth = await store.fetch(req('/group/propose', 'POST', { slot: futureSlot, memberId: alex.memberId, token: 'f'.repeat(32) }))
+  assert.equal(noAuth.status, 403)
+  const sent = await (await store.fetch(req('/group/propose', 'POST', { slot: futureSlot, memberId: alex.memberId, token: alex.token }))).json()
+  assert.ok(sent.proposal.id && sent.proposal.rev === 1)
+  assert.equal(sent.proposal.responses[alex.memberId], 'yes')
+  const list = await (await store.fetch(req('/group', 'GET'))).json()
+  assert.equal(list.proposals.length, 1)
+  assert.equal(list.proposals[0].status, 'open')
+  // Member timezones are echoed for cross-zone intersection; tokens never are.
+  assert.deepEqual(list.members.map((m) => m.tz).sort(), ['Europe/London', 'Europe/Paris'])
+  assert.ok(!JSON.stringify(list).includes(alex.token))
+})
+
+test('simultaneous proposal edits: the second writer with a stale rev gets 409 plus the fresh copy', async () => {
+  const { store, alex, sam } = await groupOfTwo()
+  const { proposal } = await (await store.fetch(req('/group/propose', 'POST', { slot: futureSlot, memberId: alex.memberId, token: alex.token }))).json()
+  const first = await store.fetch(
+    req('/group/proposal/respond', 'POST', { memberId: sam.memberId, token: sam.token, proposalId: proposal.id, rev: 1, action: 'yes' })
+  )
+  assert.equal(first.status, 200)
+  // Someone else edits against the SAME rev they loaded — refused, current state returned.
+  const stale = await store.fetch(
+    req('/group/proposal/respond', 'POST', { memberId: alex.memberId, token: alex.token, proposalId: proposal.id, rev: 1, action: 'no' })
+  )
+  assert.equal(stale.status, 409)
+  const body = await stale.json()
+  assert.equal(body.proposal.rev, 2)
+  assert.equal(body.proposal.responses[sam.memberId], 'yes')
+})
+
+test('withdraw is proposer-only; a member who leaves takes their votes and open proposals with them', async () => {
+  const { store, alex, sam } = await groupOfTwo()
+  const { proposal } = await (await store.fetch(req('/group/propose', 'POST', { slot: futureSlot, memberId: sam.memberId, token: sam.token }))).json()
+  const notMine = await store.fetch(
+    req('/group/proposal/respond', 'POST', { memberId: alex.memberId, token: alex.token, proposalId: proposal.id, rev: 1, action: 'withdraw' })
+  )
+  assert.equal(notMine.status, 403)
+  await store.fetch(req('/group/leave', 'POST', { memberId: sam.memberId, token: sam.token }))
+  const after = await (await store.fetch(req('/group', 'GET'))).json()
+  assert.equal(after.proposals[0].status, 'withdrawn')
+  assert.ok(!(sam.memberId in after.proposals[0].responses))
+  // The departed member's capability is dead: no ghost responses.
+  const ghost = await store.fetch(
+    req('/group/proposal/respond', 'POST', { memberId: sam.memberId, token: sam.token, proposalId: proposal.id, rev: after.proposals[0].rev, action: 'yes' })
+  )
+  assert.equal(ghost.status, 403)
+})
+
+test('past-dated proposals are pruned on read; invalid slots are refused', async () => {
+  const { store, alex } = await groupOfTwo()
+  const bad = await store.fetch(req('/group/propose', 'POST', { slot: { d: 'nope', from: 1, to: 2 }, memberId: alex.memberId, token: alex.token }))
+  assert.equal(bad.status, 400)
+  await store.fetch(req('/group/propose', 'POST', { slot: { d: '2020-01-01', from: 600, to: 660 }, memberId: alex.memberId, token: alex.token }))
+  const list = await (await store.fetch(req('/group', 'GET'))).json()
+  assert.equal(list.proposals.length, 0)
+})
