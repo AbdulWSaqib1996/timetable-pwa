@@ -657,3 +657,16 @@ Release-gate check (§7): actual future-date itinerary intent proven by captured
 Known limitations / intentionally deferred: no full-route map geometry (P7-03); driving has no planning provider (labelled estimate only, by design); proposal exports carry a fixed neutral title ("Study group meet-up") since free text is deliberately refused server-side; departure boards cover the first three transit legs.
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+Phase 6 release verification (7 September 2026): workers deployed FIRST per the runbook (shared/ and workers/push changed) — push worker `659f0710-d51e-41f1-ac1c-668d262e0726`, feed worker `c101c5d3-3eb3-4897-a426-9c43b2676f2e`; the new /group/propose and /group/proposal/respond routes and member tz fields are additive, so the deployed worker stayed compatible with the still-running app release. Released commit `70adc54` (merge `050e369` phase-6 + `1957c18` icon families + PLAN records); GitHub Actions run 34153715801 for that exact commit concluded **success** (full browser gate incl. the 5 phase-six specs + Pages deploy). Both validates were re-run on the combined icons+Phase-6 state before the push (86 unit + 38 browser, both hosting layouts). Live checks: new favicon.svg serves 200 on Vercel AND Pages, admin/favicon.svg 200, and the deployed Vercel bundle contains the Phase 6 journey surfaces. `./scripts/deploy.sh verify`, verbatim:
+
+```text
+== verify live endpoints ==
+PASS: vercel app 200
+PASS: pages app 200
+PASS: push worker /vapid
+PASS: /stats locked (401)
+PASS: feed worker + cache header
+PASS: analytics dashboard 200
+done.
+```
