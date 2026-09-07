@@ -1,9 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { shiftMonthISO } from '../../shared/calendar-time.js'
 import type { Session } from '../types'
 
 interface Props {
   sessions: Session[]
   todayISO: string
+  /** the single selected date shared with Day/Week (defaults to today) */
+  anchorISO: string
+  /** month navigation moves the shared selected date (day number preserved, clamped) */
+  onNavigate: (dateISO: string) => void
   /** days (yyyy-mm-dd) that carry a key date, marked distinctly */
   keyDateDays?: Set<string>
   /** days that are entirely school-experience (tinted green) */
@@ -17,10 +22,10 @@ function iso(y: number, monthIndex: number, d: number): string {
   return `${y}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
 
-export function MonthView({ sessions, todayISO, keyDateDays, placementDays, breakStarts, onPickDay }: Props) {
+export function MonthView({ sessions, todayISO, anchorISO, onNavigate, keyDateDays, placementDays, breakStarts, onPickDay }: Props) {
   const [ty, tm] = todayISO.split('-').map(Number)
-  const [year, setYear] = useState(ty)
-  const [month, setMonth] = useState(tm - 1) // 0-based
+  const [year, monthOneBased] = anchorISO.split('-').map(Number)
+  const month = monthOneBased - 1 // 0-based
 
   const counts = useMemo(() => {
     const map = new Map<string, number>()
@@ -28,11 +33,7 @@ export function MonthView({ sessions, todayISO, keyDateDays, placementDays, brea
     return map
   }, [sessions])
 
-  function shiftMonth(delta: number) {
-    const d = new Date(year, month + delta, 1)
-    setYear(d.getFullYear())
-    setMonth(d.getMonth())
-  }
+  const shiftMonth = (delta: number) => onNavigate(shiftMonthISO(anchorISO, delta))
 
   const firstDow = (new Date(year, month, 1).getDay() + 6) % 7 // Monday-first
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -54,10 +55,7 @@ export function MonthView({ sessions, todayISO, keyDateDays, placementDays, brea
         <button
           type="button"
           className={`week-label${isCurrentMonth ? '' : ' clickable'}`}
-          onClick={() => {
-            setYear(ty)
-            setMonth(tm - 1)
-          }}
+          onClick={() => onNavigate(todayISO)}
           title={isCurrentMonth ? undefined : 'Back to this month'}
         >
           {monthLabel}
@@ -79,7 +77,7 @@ export function MonthView({ sessions, todayISO, keyDateDays, placementDays, brea
             <button
               key={dateISO}
               type="button"
-              className={`month-cell${dateISO === todayISO ? ' today' : ''}${(counts.get(dateISO) ?? 0) > 0 ? ' has-sessions' : ''}${placementDays?.has(dateISO) ? ' placement' : ''}`}
+              className={`month-cell${dateISO === todayISO ? ' today' : ''}${dateISO === anchorISO && anchorISO !== todayISO ? ' selected' : ''}${(counts.get(dateISO) ?? 0) > 0 ? ' has-sessions' : ''}${placementDays?.has(dateISO) ? ' placement' : ''}`}
               onClick={() => onPickDay(dateISO)}
             >
               <span className="month-daynum">{Number(dateISO.slice(-2))}</span>

@@ -121,7 +121,8 @@ export default function App() {
   const [openSheet, setOpenSheet] = useState<SheetName>('none')
   const [rechoosing, setRechoosing] = useState(false)
   const [selected, setSelected] = useState<Session | null>(null)
-  const [jumpDate, setJumpDate] = useState<string | null>(null)
+  // One date-selection model shared by Day/Week/Month (null = follow today).
+  const [selectedDateISO, setSelectedDateISO] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [showBackupNudge, setShowBackupNudge] = useState(false)
@@ -135,7 +136,16 @@ export default function App() {
   const settings = active?.settings ?? null
   const settingsRef = useRef(settings)
   settingsRef.current = settings
-  const todayISO = localTodayISO()
+  // Course-timezone today, refreshed each minute so midnight rollover moves the
+  // Today marker without touching the user's date selection.
+  const [todayISO, setTodayISO] = useState(() => localTodayISO())
+  useEffect(() => {
+    const t = setInterval(() => {
+      const next = localTodayISO()
+      setTodayISO((prev) => (prev === next ? prev : next))
+    }, 60_000)
+    return () => clearInterval(t)
+  }, [])
 
   const {
     sessions,
@@ -152,10 +162,10 @@ export default function App() {
     identityReview,
   } = useTimetableData(active)
 
-  // Close any open detail/jump target when the active profile switches.
+  // Close any open detail/date selection when the active profile switches.
   useEffect(() => {
     setSelected(null)
-    setJumpDate(null)
+    setSelectedDateISO(null)
     setAdminFile(active ? loadAdminFile(active.id) : EMPTY_ADMIN)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
@@ -762,7 +772,7 @@ export default function App() {
           historyOn={showHistory}
           onToggleHistory={() => setShowHistory((v) => !v)}
           onView={(v) => {
-            setJumpDate(null)
+            // View switches preserve the selected date (one shared model).
             updateSettings({ activeView: v })
           }}
           onTogglePlacements={() => updateFilters({ placementsOnly: !filters.placementsOnly })}
@@ -967,6 +977,8 @@ export default function App() {
         <WeekView
           sessions={filteredSessions}
           todayISO={todayISO}
+          anchorISO={selectedDateISO ?? todayISO}
+          onNavigate={(iso) => setSelectedDateISO(iso === todayISO ? null : iso)}
           onSelect={setSelected}
           termStartISO={settings.termStartISO}
           coords={coords}
@@ -977,18 +989,27 @@ export default function App() {
         <MonthView
           sessions={filteredSessions}
           todayISO={todayISO}
+          anchorISO={selectedDateISO ?? todayISO}
+          onNavigate={(iso) => setSelectedDateISO(iso === todayISO ? null : iso)}
           keyDateDays={getFilters(settings).showKeyDates ? keyDateDays : undefined}
           placementDays={monthExtras.placementDays}
           breakStarts={monthExtras.breakStarts}
           onPickDay={(dateISO) => {
-            setJumpDate(dateISO)
+            setSelectedDateISO(dateISO === todayISO ? null : dateISO)
+            // A "Today only"/"This week" display range must never hide a date
+            // the user just chose — widen it rather than show an empty day.
+            if (dateISO !== todayISO && getFilters(settings).dateRange !== 'all') {
+              updateFilters({ dateRange: 'all' })
+            }
             updateSettings({ activeView: 'day' })
           }}
         />
       ) : (
         <AgendaView
           sessions={dayViewSessions}
-          scrollTo={jumpDate}
+          scrollTo={selectedDateISO}
+          todayISO={todayISO}
+          onToday={() => setSelectedDateISO(null)}
           onSelect={setSelected}
           metaMap={metaMap}
           termStartISO={settings.termStartISO}

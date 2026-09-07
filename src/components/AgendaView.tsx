@@ -10,6 +10,10 @@ interface Props {
   sessions: Session[]
   emptyMessage?: string
   onSelect: (session: Session) => void
+  /** course-timezone today (falls back to the device date if absent) */
+  todayISO?: string
+  /** Today button: reset the shared date selection back to today */
+  onToday?: () => void
   /** Scroll target (yyyy-mm-dd); defaults to today / next day with sessions. */
   scrollTo?: string | null
   metaMap?: MetaMap
@@ -59,6 +63,8 @@ export function AgendaView({
   sessions,
   emptyMessage,
   onSelect,
+  todayISO: todayProp,
+  onToday,
   scrollTo,
   metaMap,
   termStartISO,
@@ -69,7 +75,7 @@ export function AgendaView({
   placements,
   placementProgress,
 }: Props) {
-  const todayISO = localTodayISO()
+  const todayISO = todayProp ?? localTodayISO()
   const anchorRef = useRef<HTMLElement | null>(null)
   // History lives behind the header 🕰 toggle — the agenda opens at today,
   // so the next session is always what you land on.
@@ -165,7 +171,10 @@ export function AgendaView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAllPast])
 
-  const scrollToToday = () => scrollToAnchor('smooth')
+  const scrollToToday = () => {
+    onToday?.() // clears the shared date selection; the anchor effect follows
+    scrollToAnchor('smooth')
+  }
 
   if (days.length === 0) {
     return <div className="empty-state">{emptyMessage ?? 'No sessions found in this sheet.'}</div>

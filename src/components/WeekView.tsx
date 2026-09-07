@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { addDaysISO, mondayOfISO } from '../../shared/calendar-time.js'
 import type { Coords, TravelMode } from '../lib/campus'
 import { isPlacementSession, placementTag, subjectColor, toMinutes as toMins, weekNumber } from '../lib/format'
 import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
@@ -9,6 +10,10 @@ import { SessionCard } from './SessionCard'
 interface Props {
   sessions: Session[]
   todayISO: string
+  /** the single selected date shared with Day/Month (defaults to today) */
+  anchorISO: string
+  /** week navigation moves the shared selected date */
+  onNavigate: (dateISO: string) => void
   onSelect: (session: Session) => void
   termStartISO?: string
   coords?: Coords | null
@@ -77,8 +82,8 @@ function useIsNarrow(): boolean {
 
 const HOUR_PX = 56
 
-export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, travelMode, placements }: Props) {
-  const [weekStart, setWeekStart] = useState(() => mondayOf(todayISO))
+export function WeekView({ sessions, todayISO, anchorISO, onNavigate, onSelect, termStartISO, coords, travelMode, placements }: Props) {
+  const weekStart = mondayOfISO(anchorISO)
   const isNarrow = useIsNarrow()
   const wkNum = termStartISO ? weekNumber(weekStart, termStartISO) : null
 
@@ -128,20 +133,20 @@ export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, t
 
   const nav = (
     <div className="week-nav">
-      <button type="button" className="btn-icon" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week">
+      <button type="button" className="btn-icon" onClick={() => onNavigate(addDaysISO(anchorISO, -7))} aria-label="Previous week">
         ‹
       </button>
       <button
         type="button"
         className={`week-label${isCurrentWeek ? '' : ' clickable'}`}
-        onClick={() => setWeekStart(mondayOf(todayISO))}
+        onClick={() => onNavigate(todayISO)}
         title={isCurrentWeek ? undefined : 'Back to this week'}
       >
         {weekLabel}
         {wkNum !== null && <span className="week-current"> · Wk {wkNum}</span>}
         {isCurrentWeek && <span className="week-current"> · this week</span>}
       </button>
-      <button type="button" className="btn-icon" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">
+      <button type="button" className="btn-icon" onClick={() => onNavigate(addDaysISO(anchorISO, 7))} aria-label="Next week">
         ›
       </button>
       <button
@@ -171,7 +176,7 @@ export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, t
         {weekDays.map((dateISO) => {
           const list = byDay.get(dateISO) ?? []
           return (
-            <section key={dateISO} className={dateISO < todayISO ? 'agenda-day past' : 'agenda-day'}>
+            <section key={dateISO} className={`agenda-day${dateISO < todayISO ? ' past' : ''}${dateISO === anchorISO && anchorISO !== todayISO ? ' selected-day' : ''}`}>
               <h2 className="day-header day-header-flat">
                 <span>{fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
                 {dateISO === todayISO && <span className="badge badge-today">Today</span>}
@@ -208,7 +213,7 @@ export function WeekView({ sessions, todayISO, onSelect, termStartISO, coords, t
       <div className="week-grid" style={{ gridTemplateColumns: `48px repeat(${weekDays.length}, 1fr)` }}>
         <div />
         {weekDays.map((dateISO) => (
-          <div key={dateISO} className={`week-col-head${dateISO === todayISO ? ' today' : ''}`}>
+          <div key={dateISO} className={`week-col-head${dateISO === todayISO ? ' today' : ''}${dateISO === anchorISO && anchorISO !== todayISO ? ' selected' : ''}`}>
             {fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
           </div>
         ))}
