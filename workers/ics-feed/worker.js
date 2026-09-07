@@ -13,6 +13,7 @@
  * Deploy (free Cloudflare account):  npx wrangler deploy
  */
 
+import { buildICSCalendar } from '../../shared/calendar-time.js'
 import { parseTimetable } from '../../shared/timetable.js'
 import { reconcileEvents, eventKey } from '../../shared/identity.js'
 const parseSessions = table => parseTimetable(table).sessions
@@ -98,44 +99,9 @@ function expandPlacements(sessions, plcMap) {
 // in-memory per-IP request counter (per isolate; abuse guard, not billing)
 const RL = new Map()
 
-const esc = (v) => v.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
-
-function fold(line) {
-  if (line.length <= 74) return line
-  const parts = []
-  let rest = line
-  while (rest.length > 74) { parts.push(rest.slice(0, 74)); rest = ' ' + rest.slice(74) }
-  parts.push(rest)
-  return parts.join('\r\n')
-}
-
-function buildICS(sessions, calName = 'My Timetable') {
-  const now = new Date()
-  const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`
-  const dt = (dateISO, time) => `${dateISO.replace(/-/g, '')}T${time.replace(':', '')}00`
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//timetable-pwa ics-feed//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', fold(`X-WR-CALNAME:${esc(calName)}`)]
-  for (const s of sessions) {
-    lines.push('BEGIN:VEVENT', fold(`UID:${esc(s.calendarUid || s.id)}@timetable-pwa`), `DTSTAMP:${stamp}`)
-    if (s.isKeyDate || !s.start) {
-      lines.push(`DTSTART;VALUE=DATE:${s.dateISO.replace(/-/g, '')}`)
-    } else {
-      lines.push(`DTSTART:${dt(s.dateISO, s.start)}`, `DTEND:${s.end ? dt(s.dateISO, s.end) : dt(s.dateISO, s.start)}`)
-    }
-    lines.push(fold(`SUMMARY:${esc(s.isKeyDate ? `📌 ${s.title}` : s.title)}`))
-    if (s.room && !s.isSelfStudy) lines.push(fold(`LOCATION:${esc(s.room)}`))
-    const desc = [
-      s.tutor && s.tutor !== 'Self Study' ? `Tutor: ${s.tutor}` : '',
-      s.subject && s.subject !== s.title ? `Subject: ${s.subject}` : '',
-      s.groups ? `Groups: ${s.groups}` : '',
-      s.link ? `Moodle: ${s.link}` : '',
-    ].filter(Boolean)
-    if (desc.length) lines.push(fold(`DESCRIPTION:${esc(desc.join('\n'))}`))
-    if (s.link) lines.push(fold(`URL:${s.link}`))
-    lines.push('END:VEVENT')
-  }
-  lines.push('END:VCALENDAR')
-  return lines.join('\r\n') + '\r\n'
-}
+// ICS generation is shared with the app download (shared/calendar-time.js):
+// UTC instants converted from Europe/London wall time and octet-based folding.
+const buildICS = (sessions, calName = 'My Timetable') => buildICSCalendar(sessions, calName)
 
 async function retainFeedIdentity(sessions, id, gid, env, ctx, keyDates = false) {
   if (env?.RATE) {

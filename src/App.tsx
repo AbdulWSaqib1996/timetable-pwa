@@ -976,6 +976,7 @@ export default function App() {
       ) : view === 'week' ? (
         <WeekView
           sessions={filteredSessions}
+          keyDates={getFilters(settings).showKeyDates ? allKeyDates : []}
           todayISO={todayISO}
           anchorISO={selectedDateISO ?? todayISO}
           onNavigate={(iso) => setSelectedDateISO(iso === todayISO ? null : iso)}

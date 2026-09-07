@@ -1283,6 +1283,22 @@ body {
   color: var(--accent);
 }
 
+.week-keydate {
+  display: block;
+  margin: 2px auto 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
 /* One shared date selection across Day/Week/Month */
 .week-col-head.selected {
   color: var(--accent);

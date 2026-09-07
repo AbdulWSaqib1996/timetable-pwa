@@ -1,3 +1,4 @@
+import { wallToUTC } from '../../shared/calendar-time.js'
 import { isPlacementTitle, placementTagOf } from '../../shared/eligibility.js'
 import type { Session } from '../types'
 
@@ -34,10 +35,15 @@ export function formatRemaining(mins: number): string {
   return rest > 0 ? `${h}h ${rest}m` : `${h}h`
 }
 
-/** Google Calendar "add event" template link (times are floating local, as in the ICS export). */
+/** Google Calendar "add event" template link (UTC instants converted from
+ *  course wall time, matching the ICS export). */
 export function googleCalendarUrl(s: Session): string | null {
   if (!s.start) return null
-  const dt = (t: string) => `${s.dateISO.replace(/-/g, '')}T${t.replace(':', '')}00`
+  const dt = (t: string) => {
+    const d = new Date(wallToUTC(s.dateISO, t).utcMs)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`
+  }
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: s.title,

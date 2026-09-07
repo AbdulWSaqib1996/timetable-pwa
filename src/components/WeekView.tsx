@@ -9,6 +9,8 @@ import { SessionCard } from './SessionCard'
 
 interface Props {
   sessions: Session[]
+  /** merged key dates (sheet + personal) shown as 📌 pins on their day */
+  keyDates?: Session[]
   todayISO: string
   /** the single selected date shared with Day/Month (defaults to today) */
   anchorISO: string
@@ -82,7 +84,7 @@ function useIsNarrow(): boolean {
 
 const HOUR_PX = 56
 
-export function WeekView({ sessions, todayISO, anchorISO, onNavigate, onSelect, termStartISO, coords, travelMode, placements }: Props) {
+export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavigate, onSelect, termStartISO, coords, travelMode, placements }: Props) {
   const weekStart = mondayOfISO(anchorISO)
   const isNarrow = useIsNarrow()
   const wkNum = termStartISO ? weekNumber(weekStart, termStartISO) : null
@@ -113,6 +115,14 @@ export function WeekView({ sessions, todayISO, anchorISO, onNavigate, onSelect, 
     }
     return map
   }, [sessions, weekDays])
+
+  const keyDatesByDay = useMemo(() => {
+    const map = new Map<string, Session[]>()
+    for (const kd of keyDates) {
+      if (weekDays.includes(kd.dateISO)) map.set(kd.dateISO, [...(map.get(kd.dateISO) ?? []), kd])
+    }
+    return map
+  }, [keyDates, weekDays])
 
   const { minHour, maxHour } = useMemo(() => {
     let min = 9
@@ -181,6 +191,9 @@ export function WeekView({ sessions, todayISO, anchorISO, onNavigate, onSelect, 
                 <span>{fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
                 {dateISO === todayISO && <span className="badge badge-today">Today</span>}
               </h2>
+              {(keyDatesByDay.get(dateISO) ?? []).map((kd) => (
+                <SessionCard key={kd.id} session={kd} onSelect={onSelect} />
+              ))}
               {list.length === 0 ? (
                 <p className="week-free">No sessions</p>
               ) : (
@@ -215,6 +228,17 @@ export function WeekView({ sessions, todayISO, anchorISO, onNavigate, onSelect, 
         {weekDays.map((dateISO) => (
           <div key={dateISO} className={`week-col-head${dateISO === todayISO ? ' today' : ''}${dateISO === anchorISO && anchorISO !== todayISO ? ' selected' : ''}`}>
             {fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
+            {(keyDatesByDay.get(dateISO) ?? []).slice(0, 2).map((kd) => (
+              <button
+                key={kd.id}
+                type="button"
+                className="week-keydate"
+                title={kd.title}
+                onClick={() => onSelect(kd)}
+              >
+                📌 {kd.title.length > 18 ? kd.title.slice(0, 18) + '…' : kd.title}
+              </button>
+            ))}
           </div>
         ))}
         <div className="week-hours" style={{ height: gridHeight }}>
