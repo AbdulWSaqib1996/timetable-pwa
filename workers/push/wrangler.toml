@@ -8,3 +8,11 @@ crons = ["*/10 * * * *"]
 [[kv_namespaces]]
 binding = "PUSH"
 id = "f4bb2f63ca3a4a76975036c421791731"
+
+[[durable_objects.bindings]]
+name = "SYNC"
+class_name = "SyncStore"
+
+[[migrations]]
+tag = "sync-v2"
+new_sqlite_classes = ["SyncStore"]

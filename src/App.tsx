@@ -1,3 +1,9 @@
+import { SyncNotice } from './components/SyncNotice'
+import { DATA_CHANGED_EVENT } from './lib/persistence'
+import { SYNC_APPLIED_EVENT, setSyncStatus } from './lib/sync'
+import { reportPersistenceFailure } from './lib/persistence'
+import { markBackedUp } from './lib/storage'
+import { PersistenceNotice } from './components/PersistenceNotice'
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AgendaView } from './components/AgendaView'
 import { FilterBar } from './components/FilterBar'
@@ -47,16 +53,16 @@ import { EMPTY_ADMIN, loadAdminFile, saveAdminFile } from './lib/admin'
 import type { AdminFile } from './lib/admin'
 import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
 import type { Notice } from './lib/notices'
-import { loadSyncState, pushSync, saveSyncState, syncPullApply } from './lib/sync'
+import { loadSyncState, pushSync, syncPullApply } from './lib/sync'
 import { downloadFile } from './lib/files'
 import { useNotifications } from './hooks/useNotifications'
 import { useTimetableData } from './hooks/useTimetableData'
 import { useTravel } from './hooks/useTravel'
 import {
   clearProfileData,
-  clearStore,
   exportBackup,
   loadStore,
+  loadMeta,
   newProfileId,
   saveCache,
   saveChanges,
@@ -276,26 +282,33 @@ export default function App() {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
-  const syncSkippedFirst = useRef(false)
   useEffect(() => {
-    if (!store) return
-    if (!syncSkippedFirst.current) {
-      syncSkippedFirst.current = true
-      return
+    let timer: ReturnType<typeof setTimeout>
+    const changed = () => {
+      if (!loadSyncState()) return
+      setSyncStatus('Changes saved on this device. Sync queued…')
+      clearTimeout(timer)
+      timer = setTimeout(() => { void syncPullApply(settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE).catch(() => {}) }, 2000)
     }
-    const t = setTimeout(() => {
-      const state = loadSyncState()
-      if (!state) return
-      const base = settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE
-      // pushSync skips the request when nothing actually changed.
-      void pushSync(base, state.code)
-        .then((at) => {
-          if (at) saveSyncState({ ...state, lastAt: at })
-        })
-        .catch(() => {})
-    }, 20_000)
-    return () => clearTimeout(t)
-  }, [store, metaMap])
+    window.addEventListener(DATA_CHANGED_EVENT, changed)
+    return () => { clearTimeout(timer); window.removeEventListener(DATA_CHANGED_EVENT, changed) }
+  }, [])
+  const externalRefreshPending = useRef(false)
+  useEffect(() => {
+    const applied = () => {
+      if (document.querySelector('[role="dialog"]')) { externalRefreshPending.current = true; setSyncStatus('Changes arrived from another tab. Close the open panel to load them.'); return }
+      externalRefreshPending.current = false
+      const next = loadStore()
+      setStore(next)
+      if (next) { setMetaMap(loadMeta(next.activeId)); setAdminFile(loadAdminFile(next.activeId)) }
+    }
+    window.addEventListener(SYNC_APPLIED_EVENT, applied)
+    return () => window.removeEventListener(SYNC_APPLIED_EVENT, applied)
+  }, [setMetaMap])
+  useEffect(() => {
+    if (openSheet === 'none' && !selected && externalRefreshPending.current) window.dispatchEvent(new Event(SYNC_APPLIED_EVENT))
+    if (openSheet === 'none' && !selected) void syncPullApply(settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE).catch(() => {})
+  }, [openSheet, selected])
 
   // Keep the push worker's copy of placement details and admin-summary counts
   // fresh (they feed background briefings/leave alerts and the Friday digest).
@@ -375,23 +388,14 @@ export default function App() {
     setAddingProfile(false)
   }
 
-  function handleDeleteProfile(id: string) {
-    clearProfileData(id)
-    setStore((prev) => {
-      if (!prev) return prev
-      const remaining = prev.profiles.filter((p) => p.id !== id)
-      if (remaining.length === 0) {
-        clearStore()
-        return null
-      }
-      const next: ProfileStore = {
-        activeId: prev.activeId === id ? remaining[0].id : prev.activeId,
-        profiles: remaining,
-      }
-      saveStore(next)
-      return next
-    })
-    setOpenSheet('none')
+  async function handleDeleteProfile(id: string) {
+    try {
+      await clearProfileData(id)
+      setStore(loadStore())
+      setOpenSheet('none')
+      const state = loadSyncState()
+      if (state) await pushSync(settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE, state.code)
+    } catch (error) { reportPersistenceFailure('Profile deletion failed: ' + String(error)) }
   }
 
   function handleSwitchProfile(id: string) {
@@ -407,7 +411,7 @@ export default function App() {
     if (!active) return
     setMetaMap((prev) => {
       const key = sessionKey(session)
-      const entry = { ...prev[key], ...patch, at: Date.now() }
+      const entry = { ...prev[key], deleted: undefined, ...patch, at: Math.max(Date.now(), (prev[key]?.at ?? 0) + 1) }
       const next = { ...prev, [key]: entry }
       if (
         !entry.attended &&
@@ -660,6 +664,8 @@ export default function App() {
 
   return (
     <div className="app">
+      <PersistenceNotice />
+      <SyncNotice />
       <header className="header-stack">
         <div className="topbar">
           <div className="topbar-title">
@@ -859,7 +865,7 @@ export default function App() {
               type="button"
               className="btn-secondary"
               onClick={() => {
-                void exportBackup().then((json) => downloadFile('my-timetable-backup.json', json, 'application/json'))
+                void exportBackup().then((json) => { downloadFile('my-timetable-backup.json', json, 'application/json'); markBackedUp() }).catch(error => reportPersistenceFailure('Backup export failed: ' + String(error)))
                 setShowBackupNudge(false)
               }}
             >

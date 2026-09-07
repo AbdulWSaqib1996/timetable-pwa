@@ -1,3 +1,6 @@
+import { validateBackup, backupPreview } from '../lib/backup'
+import { reportPersistenceFailure } from '../lib/persistence'
+import { markBackedUp } from '../lib/storage'
 import { useRef, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
 import { sessionKey } from '../lib/diff'
@@ -174,7 +177,7 @@ export function SettingsSheet({
         setSyncMsg('No synced data found for that code — check it and try again.')
         return
       }
-      applySyncPayload(remote.payload)
+      await applySyncPayload(remote.payload)
       // Park the merged result so the other device gets this one's notes too.
       const at = await pushSync(syncBase, code, { force: true }).catch(() => null)
       saveSyncState({ code, lastAt: at ?? remote.at })
@@ -279,13 +282,14 @@ export function SettingsSheet({
   }
 
   function handleImportFile(file: File) {
-    void file.text().then(async (text) => {
-      if (await importBackup(text)) {
-        window.location.reload()
-      } else {
-        window.alert('That file doesn’t look like a My Timetable backup.')
-      }
-    })
+    void (async () => {
+      if (file.size > 50 * 1024 * 1024) throw new Error('Backup exceeds the 50 MB limit.')
+      const text = await file.text()
+      const data = validateBackup(text)
+      if (!window.confirm(backupPreview(data))) return
+      await importBackup(text)
+      window.location.reload()
+    })().catch(error => window.alert('Restore did not finish: ' + String(error)))
   }
 
   // Attendance insights over past sessions (self-study excluded).
@@ -1133,7 +1137,7 @@ export function SettingsSheet({
               type="button"
               className="btn-secondary"
               onClick={() =>
-                void exportBackup().then((json) => downloadFile('my-timetable-backup.json', json, 'application/json'))
+                void exportBackup().then((json) => { downloadFile('my-timetable-backup.json', json, 'application/json'); markBackedUp() }).catch(error => reportPersistenceFailure('Backup export failed: ' + String(error)))
               }
             >
               Export backup

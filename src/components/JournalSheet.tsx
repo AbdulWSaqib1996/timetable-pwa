@@ -58,7 +58,7 @@ function buildMarkdown(entries: Entry[]): string {
         .join(' ')
       lines.push(`- ${bits}`)
       if (e.note) lines.push(`  ${e.note.replace(/\n/g, '\n  ')}`)
-      if (e.photos > 0) lines.push(`  _${e.photos} photo${e.photos === 1 ? '' : 's'} attached in the app_`)
+      if (e.photos > 0) lines.push(`  _${e.photos} photo${e.photos === 1 ? '' : 's'} recorded; check availability on this device_`)
     }
   }
   return lines.join('\n') + '\n'
@@ -88,6 +88,12 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         photos: m.photos ?? 0,
         standards: m.standards ?? [],
       })
+    }
+    // Older notes remain discoverable even if their source event vanished before identity migration.
+    for (const [key,m] of Object.entries(metaMap)) {
+      if (seen.has(key) || m.deleted || (!m.note && !m.photos)) continue
+      const [dateISO,,title] = key.split('|')
+      out.push({id:key,key,dateISO:/^\d{4}-\d{2}-\d{2}$/.test(dateISO) ? dateISO : '1970-01-01',title:'Saved record · ' + (title || key),note:m.note,photos:m.photos ?? 0,standards:m.standards ?? []})
     }
     for (const r of admin?.reflections ?? []) {
       out.push({

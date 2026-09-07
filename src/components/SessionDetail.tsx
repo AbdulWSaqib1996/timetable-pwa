@@ -1,3 +1,5 @@
+import { IdentityReview } from './IdentityReview'
+import { reportPersistenceFailure } from '../lib/persistence'
 import { useEffect, useRef, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
 import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords } from '../lib/campus'
@@ -105,7 +107,7 @@ export function SessionDetail({
       photoUrls.current.forEach((u) => URL.revokeObjectURL(u))
       photoUrls.current = list.map((p) => URL.createObjectURL(p.blob))
       setPhotos(list)
-    })
+    }).catch(error => reportPersistenceFailure('Photos could not be read: ' + String(error)))
   useEffect(() => {
     reloadPhotos()
     return () => {
@@ -200,6 +202,7 @@ export function SessionDetail({
       >
         <div className="sheet-header">
           <h2 className="detail-title">{session.title}</h2>
+          <IdentityReview session={session} profileId={profileId} />
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
             ✕
           </button>
@@ -399,6 +402,7 @@ export function SessionDetail({
             Tag notes/photos against the Teachers' Standards — they build your evidence journal
             (Settings → Evidence journal).
           </p>
+          <p className="filter-hint">{photos.length} photos available on this device.{(meta?.photos ?? 0) > photos.length ? ` ${(meta?.photos ?? 0) - photos.length} more recorded elsewhere; import a backup from that device to view them.` : ''}</p>
           <div className="photo-grid">
             {photos.map((p, i) => (
               <span className="photo-thumb" key={p.id}>
@@ -409,7 +413,7 @@ export function SessionDetail({
                   type="button"
                   className="photo-delete"
                   aria-label="Delete photo"
-                  onClick={() => void handleDeletePhoto(p.id)}
+                  onClick={() => void handleDeletePhoto(p.id).catch(error => reportPersistenceFailure('Photo deletion failed: ' + String(error)))}
                 >
                   ✕
                 </button>
@@ -423,7 +427,7 @@ export function SessionDetail({
                 hidden
                 onChange={(e) => {
                   const file = e.target.files?.[0]
-                  if (file) void handleAddPhoto(file)
+                  if (file) void handleAddPhoto(file).catch(error => reportPersistenceFailure('Photo save failed: ' + String(error)))
                   e.target.value = ''
                 }}
               />

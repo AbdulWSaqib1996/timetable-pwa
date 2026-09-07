@@ -1,9 +1,10 @@
+import { eventKey } from '../../shared/identity.js'
 import { describeRoomChange } from './location'
 import type { Session, SessionChange } from '../types'
 
 /** Stable identity for a session across refreshes (row indexes shift when rows are added). */
 export function sessionKey(s: Session): string {
-  return `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`
+  return eventKey(s)
 }
 
 /** Compare old vs new sessions (future only) and describe what changed. */
@@ -28,6 +29,8 @@ export function diffSessions(oldSessions: Session[], newSessions: Session[], tod
     const newS = newMap.get(key)
     if (!newS) return
     const details: string[] = []
+    if (oldS.dateISO !== newS.dateISO || oldS.start !== newS.start) details.push(`Rescheduled: ${oldS.dateISO} ${oldS.start} → ${newS.dateISO} ${newS.start}`)
+    if (oldS.title !== newS.title) details.push(`Title: ${oldS.title} → ${newS.title}`)
     if (oldS.room !== newS.room) details.push(describeRoomChange(oldS.room, newS.room))
     if (oldS.tutor !== newS.tutor) details.push(`Tutor changed: ${oldS.tutor || '—'} → ${newS.tutor || '—'}`)
     if (oldS.end !== newS.end) details.push(`End time changed: ${oldS.end || '—'} → ${newS.end || '—'}`)

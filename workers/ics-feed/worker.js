@@ -13,138 +13,11 @@
  * Deploy (free Cloudflare account):  npx wrangler deploy
  */
 
-const HEADER_MAP = {
-  title: 'title', day: 'day', date: 'date', start: 'start', 'start time': 'start',
-  end: 'end', 'end time': 'end', room: 'room', location: 'room', groups: 'groups',
-  group: 'groups', tutor: 'tutor', tutors: 'tutor', subject: 'subject',
-  link: 'link', url: 'link', moodle: 'link',
-}
-const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
-const SPECIALISM_RE = /^specialism\s*\d*\s*[-\u2013\u2014:]\s*(.+)$/i
-
-const cellText = (cell) => {
-  if (!cell) return ''
-  if (cell.f != null && cell.f !== '') return String(cell.f).trim()
-  if (cell.v == null) return ''
-  return String(cell.v).trim()
-}
-
-const gvizDate = (s) => {
-  const m = typeof s === 'string' && s.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+))?/)
-  if (!m) return null
-  return { y: +m[1], mo: +m[2], d: +m[3], h: m[4] !== undefined ? +m[4] : undefined, min: m[5] !== undefined ? +m[5] : undefined }
-}
-
-const pad = (n) => String(n).padStart(2, '0')
-
-function parseDateCell(cell) {
-  if (!cell) return null
-  const g = gvizDate(cell.v)
-  if (g) return `${g.y}-${pad(g.mo + 1)}-${pad(g.d)}`
-  const text = cellText(cell)
-  if (!text) return null
-  let m = text.match(/^(\d{1,2})[-/ ]([A-Za-z]{3,})[-/ ](\d{4})$/)
-  if (m) {
-    const month = MONTHS[m[2].slice(0, 3).toLowerCase()]
-    if (month !== undefined) return `${m[3]}-${pad(month + 1)}-${pad(+m[1])}`
-  }
-  m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (m) return `${m[3]}-${pad(+m[2])}-${pad(+m[1])}`
-  const parsed = new Date(text)
-  if (!isNaN(parsed.getTime())) return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`
-  return null
-}
-
-function parseTimeCell(cell) {
-  if (!cell) return ''
-  if (Array.isArray(cell.v) && cell.v.length >= 2) return `${pad(cell.v[0])}:${pad(cell.v[1])}`
-  const g = gvizDate(cell.v)
-  if (g && g.h !== undefined) return `${pad(g.h)}:${pad(g.min ?? 0)}`
-  const m = cellText(cell).match(/^(\d{1,2})[:.](\d{2})/)
-  return m ? `${pad(+m[1])}:${m[2]}` : ''
-}
-
-function parseSessions(table) {
-  let headerIndex = -1
-  let colMap = {}
-  const limit = Math.min(table.rows.length, 10)
-  for (let r = 0; r < limit; r++) {
-    const map = {}
-    let matches = 0
-    table.rows[r].c.forEach((cell, i) => {
-      const field = HEADER_MAP[cellText(cell).toLowerCase()]
-      if (field && map[field] === undefined) { map[field] = i; matches++ }
-    })
-    if (matches >= 3) { headerIndex = r; colMap = map; break }
-  }
-  if (headerIndex === -1 || colMap.title === undefined) {
-    throw new Error('Could not find a usable header row (needs Title and Date columns).')
-  }
-  // Some sheets leave Date/Start/End header cells blank — infer them from declared column types,
-  // then by sniffing cell values.
-  const width = Math.max(table.cols.length, ...table.rows.map((r) => r.c.length), 0)
-  const taken = new Set(Object.values(colMap))
-  const sniff = (i, test) => {
-    let hits = 0, nonEmpty = 0
-    for (let r = headerIndex + 1; r < Math.min(table.rows.length, headerIndex + 40); r++) {
-      const cell = table.rows[r].c[i]
-      if (!cell || cell.v == null) continue
-      nonEmpty++
-      if (test(cell)) hits++
-    }
-    return nonEmpty > 0 && hits / nonEmpty > 0.5
-  }
-  const findColumn = (declaredTypes, test) => {
-    for (let i = 0; i < width; i++) {
-      if (!taken.has(i) && declaredTypes.includes(table.cols[i]?.type ?? '')) return i
-    }
-    for (let i = 0; i < width; i++) {
-      if (!taken.has(i) && sniff(i, test)) return i
-    }
-    return undefined
-  }
-  for (const [field, types, test] of [
-    ['date', ['date'], (c) => parseDateCell(c) !== null],
-    ['start', ['datetime', 'timeofday'], (c) => parseTimeCell(c) !== ''],
-    ['end', ['datetime', 'timeofday'], (c) => parseTimeCell(c) !== ''],
-  ]) {
-    if (colMap[field] === undefined) {
-      const i = findColumn(types, test)
-      if (i !== undefined) { colMap[field] = i; taken.add(i) }
-    }
-  }
-  if (colMap.date === undefined) {
-    throw new Error('Could not find a date column in the sheet.')
-  }
-  const sessions = []
-  let lastDate = null
-  for (let r = headerIndex + 1; r < table.rows.length; r++) {
-    const cells = table.rows[r].c
-    const get = (f) => (colMap[f] !== undefined ? cellText(cells[colMap[f]]) : '')
-    const title = get('title')
-    let dateISO = parseDateCell(cells[colMap.date])
-    if (dateISO) lastDate = dateISO
-    else dateISO = lastDate
-    if (!title || !dateISO) continue
-    const linkText = get('link')
-    const specMatch = title.match(SPECIALISM_RE)
-    sessions.push({
-      id: `${dateISO}-${r}`,
-      title,
-      dateISO,
-      start: colMap.start !== undefined ? parseTimeCell(cells[colMap.start]) : '',
-      end: colMap.end !== undefined ? parseTimeCell(cells[colMap.end]) : '',
-      room: get('room'),
-      groups: get('groups'),
-      tutor: get('tutor'),
-      subject: get('subject'),
-      link: /^https?:\/\//i.test(linkText) ? linkText : undefined,
-      specialismName: specMatch ? specMatch[1].trim() : undefined,
-      isSelfStudy: /^self[- ]?study$/i.test(title),
-    })
-  }
-  return sessions
-}
+import { parseTimetable } from '../../shared/timetable.js'
+import { reconcileEvents, eventKey } from '../../shared/identity.js'
+const parseSessions = table => parseTimetable(table).sessions
+const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 }
+const pad = n => String(n).padStart(2,'0')
 
 /* ---------- placement (school experience) expansion, matching the app ---------- */
 const isPlacementTitle = (t) => /school experience|placement|\bSE ?\d[a-z]?\b/i.test(t || '')
@@ -242,7 +115,7 @@ function buildICS(sessions, calName = 'My Timetable') {
   const dt = (dateISO, time) => `${dateISO.replace(/-/g, '')}T${time.replace(':', '')}00`
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//timetable-pwa ics-feed//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', fold(`X-WR-CALNAME:${esc(calName)}`)]
   for (const s of sessions) {
-    lines.push('BEGIN:VEVENT', fold(`UID:${s.id}@timetable-pwa`), `DTSTAMP:${stamp}`)
+    lines.push('BEGIN:VEVENT', fold(`UID:${esc(s.calendarUid || s.id)}@timetable-pwa`), `DTSTAMP:${stamp}`)
     if (s.isKeyDate || !s.start) {
       lines.push(`DTSTART;VALUE=DATE:${s.dateISO.replace(/-/g, '')}`)
     } else {
@@ -264,8 +137,36 @@ function buildICS(sessions, calName = 'My Timetable') {
   return lines.join('\r\n') + '\r\n'
 }
 
+async function retainFeedIdentity(sessions, id, gid, env, ctx, keyDates = false) {
+  if (env?.RATE) {
+      try {
+        const histKey = `hist:${id}|${gid ?? ''}${keyDates ? '|keydates' : ''}`
+        const keyOf = eventKey
+        const todayISO = new Date().toISOString().slice(0, 10)
+        const seen = await env.RATE.get(histKey, 'json')
+        sessions = reconcileEvents(sessions.map(s => ({...s, sourceKey:`${id}|${gid ?? ''}`})), seen ?? [])
+        const freshKeys = new Set(sessions.map(keyOf))
+        if (seen) {
+          const freshDates = new Set(sessions.map((s) => s.dateISO))
+          sessions = sessions.concat(seen.filter((s) => s.dateISO < todayISO && !freshKeys.has(keyOf(s)) && !freshDates.has(s.dateISO)))
+        }
+        const byKey = new Map((seen ?? []).filter((s) => s.dateISO < todayISO && !freshKeys.has(keyOf(s))).map((s) => [keyOf(s), s]))
+        for (const s of sessions) if (s.dateISO < todayISO) byKey.set(keyOf(s), s)
+        const stored = [...byKey.values(), ...sessions.filter((s) => s.dateISO >= todayISO)]
+        if (!seen || JSON.stringify(stored) !== JSON.stringify(seen)) {
+          ctx.waitUntil(env.RATE.put(histKey, JSON.stringify(stored)))
+        }
+      } catch {
+        /* history is best-effort; the live feed still works */
+      }
+    }
+
+  return sessions
+}
+
 export default {
   async fetch(request, env, ctx) {
+    if (request.url.length > 16000) return new Response('Calendar URL is too large.', {status:414})
     const url = new URL(request.url)
     const id = url.searchParams.get('id')
     if (!id || !/^[a-zA-Z0-9_-]{20,}$/.test(id)) {
@@ -314,32 +215,7 @@ export default {
     let sessions
     try { sessions = parseSessions(json.table) } catch (e) { return new Response(e.message, { status: 422 }) }
 
-    // The sheet drops past rows daily (rolling TODAY() filter). The feed keeps
-    // history in KV so subscribed calendars keep past events. The stored copy is
-    // past-from-history + future-from-fresh-ONLY, so a session cancelled on the
-    // sheet is dropped from storage immediately and can never resurrect when its
-    // day later falls off the sheet.
-    if (env?.RATE) {
-      try {
-        const histKey = `hist:${id}|${gid ?? ''}`
-        const keyOf = (s) => `${s.dateISO}|${s.start}|${(s.title || '').trim().toLowerCase()}`
-        const todayISO = new Date().toISOString().slice(0, 10)
-        const seen = await env.RATE.get(histKey, 'json')
-        if (seen) {
-          const freshDates = new Set(sessions.map((s) => s.dateISO))
-          sessions = sessions.concat(seen.filter((s) => s.dateISO < todayISO && !freshDates.has(s.dateISO)))
-        }
-        const byKey = new Map((seen ?? []).filter((s) => s.dateISO < todayISO).map((s) => [keyOf(s), s]))
-        for (const s of sessions) if (s.dateISO < todayISO) byKey.set(keyOf(s), s)
-        const stored = [...byKey.values(), ...sessions.filter((s) => s.dateISO >= todayISO)]
-        const seenKeys = new Set((seen ?? []).map(keyOf))
-        if (!seen || stored.length !== seen.length || stored.some((s) => !seenKeys.has(keyOf(s)))) {
-          ctx.waitUntil(env.RATE.put(histKey, JSON.stringify(stored)))
-        }
-      } catch {
-        /* history is best-effort; the live feed still works */
-      }
-    }
+    sessions = await retainFeedIdentity(sessions, id, gid, env, ctx)
 
     if (spec.length > 0) {
       sessions = sessions.filter((s) => !s.specialismName || spec.includes(s.specialismName))
@@ -379,7 +255,7 @@ export default {
           const kdJson = JSON.parse(kdText.slice(a, b + 1))
           if (kdJson.table) {
             sessions = sessions.concat(
-              parseSessions(kdJson.table).map((s) => ({ ...s, id: `kd-${s.id}`, isKeyDate: true }))
+              await retainFeedIdentity(parseSessions(kdJson.table).map((s) => ({ ...s, id: `kd-${s.id}`, isKeyDate: true })), kdid, kdgid, env, ctx, true)
             )
           }
         }

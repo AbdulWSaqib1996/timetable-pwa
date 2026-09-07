@@ -1,45 +1,7 @@
-/**
- * Photo notes: images attached to sessions (whiteboard snaps, handouts), stored
- * locally in IndexedDB, downscaled on save, and included in backups.
- */
-
-export interface StoredPhoto {
-  id: number
-  /** `${profileId}|${sessionKey}` */
-  owner: string
-  blob: Blob
-  at: number
-}
-
-const DB_NAME = 'timetable-photos'
-const STORE = 'photos'
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1)
-    req.onupgradeneeded = () => {
-      const store = req.result.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true })
-      store.createIndex('owner', 'owner')
-    }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
-function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  return openDb().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const t = db.transaction(STORE, mode)
-        const req = run(t.objectStore(STORE))
-        req.onsuccess = () => resolve(req.result)
-        req.onerror = () => reject(req.error)
-        t.oncomplete = () => db.close()
-      })
-  )
-}
-
-const owner = (pid: string, sessionKey: string) => `${pid}|${sessionKey}`
+import { addAttachment, removeAttachment, readAttachments, attachmentUid, blobDataURL, withDataLock, replaceAttachments, decodeBase64 } from './attachments'
+import type { Attachment } from './attachments'
+export interface StoredPhoto extends Attachment {}
+export interface PhotoExport { uid?: string; owner: string; at: number; data: string }
 
 /** Downscale to ≤1600px JPEG so photos stay a few hundred KB each. */
 export async function compressImage(file: File | Blob, maxDim = 1600, quality = 0.8): Promise<Blob> {
@@ -59,70 +21,35 @@ export async function compressImage(file: File | Blob, maxDim = 1600, quality = 
 }
 
 export async function addPhoto(pid: string, sessionKey: string, blob: Blob): Promise<void> {
-  await tx('readwrite', (store) => store.add({ owner: owner(pid, sessionKey), blob, at: Date.now() }))
+  await addAttachment('photos', { owner: `${pid}|${sessionKey}`, blob, at: Date.now() })
 }
-
 export async function getPhotos(pid: string, sessionKey: string): Promise<StoredPhoto[]> {
-  try {
-    const db = await openDb()
-    return await new Promise((resolve) => {
-      const req = db.transaction(STORE).objectStore(STORE).index('owner').getAll(owner(pid, sessionKey))
-      req.onsuccess = () => {
-        db.close()
-        resolve((req.result as StoredPhoto[]) ?? [])
-      }
-      req.onerror = () => {
-        db.close()
-        resolve([])
-      }
-    })
-  } catch {
-    return []
-  }
+  return (await readAttachments('photos')).filter(p => p.owner === `${pid}|${sessionKey}`)
 }
-
-export async function deletePhoto(id: number): Promise<void> {
-  await tx('readwrite', (store) => store.delete(id))
+export const deletePhoto = (id: number) => removeAttachment('photos', id)
+export async function exportPhotos(): Promise<PhotoExport[]> {
+  return Promise.all((await readAttachments('photos')).map(async p => ({ uid: await attachmentUid(p), owner: p.owner, at: p.at, data: await blobDataURL(p.blob) })))
 }
-
-const blobToDataUrl = (blob: Blob): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(blob)
-  })
-
-/** All photos as data URLs, for the JSON backup. */
-export async function exportPhotos(): Promise<{ owner: string; at: number; data: string }[]> {
-  try {
-    const db = await openDb()
-    const all: StoredPhoto[] = await new Promise((resolve) => {
-      const req = db.transaction(STORE).objectStore(STORE).getAll()
-      req.onsuccess = () => {
-        db.close()
-        resolve((req.result as StoredPhoto[]) ?? [])
-      }
-      req.onerror = () => {
-        db.close()
-        resolve([])
-      }
-    })
-    const out = []
-    for (const p of all) out.push({ owner: p.owner, at: p.at, data: await blobToDataUrl(p.blob) })
-    return out
-  } catch {
-    return []
-  }
-}
-
-export async function importPhotos(items: { owner: string; at: number; data: string }[]): Promise<void> {
+export async function preparePhotos(existing: Attachment[], items: PhotoExport[]): Promise<Attachment[]> {
+  const out = [...existing]
+  const ids = new Map(await Promise.all(existing.map(async p => [await attachmentUid(p), p] as const)))
+  let next = Math.max(0, ...out.map(p => p.id)) + 1
   for (const item of items) {
-    try {
-      const blob = await (await fetch(item.data)).blob()
-      await tx('readwrite', (store) => store.add({ owner: item.owner, blob, at: item.at }))
-    } catch {
-      /* skip a bad entry */
+    const match = item.data.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/s)
+    if (!match) throw new Error('Backup contains an invalid photo.')
+    const blob = decodeBase64(match[2], match[1])
+    const candidate = { owner: item.owner, at: item.at, blob }
+    const uid = item.uid ?? await attachmentUid(candidate)
+    const prior = ids.get(uid)
+    if (prior) {
+      if (prior.owner !== item.owner || await attachmentUid({ ...prior, uid: undefined }) !== await attachmentUid(candidate)) throw new Error('Conflicting photo identity in backup.')
+      continue
     }
+    const added = { ...candidate, uid, id: next++ }
+    out.push(added); ids.set(uid, added)
   }
+  return out
+}
+export async function importPhotos(items: PhotoExport[]): Promise<void> {
+  await withDataLock(async () => replaceAttachments('photos', await preparePhotos(await readAttachments('photos'), items)))
 }

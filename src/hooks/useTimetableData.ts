@@ -1,3 +1,5 @@
+import { identityHistory } from '../lib/identity'
+import { reconcileEvents } from '../../shared/identity.js'
 import { useCallback, useEffect, useState } from 'react'
 import { DEFAULT_PUSH_BASE } from '../lib/config'
 import { buildDemoSessions } from '../lib/demo'
@@ -45,13 +47,17 @@ export function useTimetableData(active: ProfileEntry | null) {
       setRefreshing(true)
       try {
         const table = await fetchGvizTable(s.sheetId, s.gid)
-        let parsed = parseTimetable(table).sessions
+        const result = parseTimetable(table)
+        const warnings = [...result.warnings]
+        let parsed: Session[] = result.sessions.map(x => ({ ...x, sourceKey: `${s.sheetId}|${s.gid ?? ''}` }))
         // Merge any extra tabs into the same timetable, deduplicating identical rows.
         for (const [i, tab] of (s.extraTabs ?? []).entries()) {
           try {
             const extra = await fetchGvizTable(tab.sheetId, tab.gid)
+            const extraResult = parseTimetable(extra)
+            warnings.push(...extraResult.warnings.map(w => `Extra tab ${i+1}: ${w}`))
             parsed = parsed.concat(
-              parseTimetable(extra).sessions.map((x) => ({ ...x, id: `t${i}-${x.id}` }))
+              extraResult.sessions.map((x) => ({ ...x, id: `t${i}-${x.id}`, sourceKey: `${tab.sheetId}|${tab.gid ?? ''}` }))
             )
           } catch {
             /* a broken extra tab shouldn't take down the main timetable */
@@ -71,6 +77,7 @@ export function useTimetableData(active: ProfileEntry | null) {
         // The sheet drops past rows (rolling TODAY() filter) — keep the history
         // this app has already seen, and once per profile back-fill days lost
         // before retention existed from the push worker's snapshot.
+        parsed = reconcileEvents(parsed, (prev?.identityHistory ?? prev?.sessions ?? []).filter(x => !x.isKeyDate))
         parsed = retainHistory(parsed, prev?.sessions, todayISO)
         if (!historyRecovered(pid)) {
           const recovered = await recoverHistory(
@@ -105,7 +112,9 @@ export function useTimetableData(active: ProfileEntry | null) {
         if (s.keyDatesSheetId) {
           try {
             const kdTable = await fetchGvizTable(s.keyDatesSheetId, s.keyDatesGid ?? null)
-            kd = parseTimetable(kdTable).sessions.map((k) => ({ ...k, id: `kd-${k.id}`, isKeyDate: true }))
+            const kdResult = parseTimetable(kdTable)
+            warnings.push(...kdResult.warnings.map(w => 'Key dates: ' + w))
+            kd = reconcileEvents(kdResult.sessions.map((k) => ({ ...k, id: `kd-${k.id}`, isKeyDate: true, sourceKey: `${s.keyDatesSheetId}|${s.keyDatesGid ?? ''}` })), (prev?.identityHistory ?? prev?.keyDates ?? []).filter(x => x.isKeyDate))
             // Past deadlines survive too, if that tab also rolls forward.
             kd = retainHistory(kd, prev?.keyDates, todayISO)
           } catch {
@@ -116,8 +125,9 @@ export function useTimetableData(active: ProfileEntry | null) {
         setKeyDates(kd ?? [])
         const now = Date.now()
         setFetchedAt(now)
-        setError(null)
-        saveCache(pid, { fetchedAt: now, sessions: parsed, keyDates: kd })
+        const identityWarnings = [...parsed, ...(kd ?? [])].filter(x => x.identityCandidates?.length || x.identityWarning).length
+        setError([...warnings, ...(identityWarnings ? [`${identityWarnings} event identities need review. Open the session to resolve them.`] : [])].join(' ') || null)
+        saveCache(pid, { fetchedAt: now, sessions: parsed, keyDates: kd, identityHistory: identityHistory(prev?.identityHistory ?? [...(prev?.sessions ?? []), ...(prev?.keyDates ?? [])], [...parsed, ...(kd ?? [])]) })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to refresh.')
       } finally {
@@ -145,7 +155,7 @@ export function useTimetableData(active: ProfileEntry | null) {
       setMetaMap((prev) => {
         const next = { ...prev }
         for (const { action, key } of marks) {
-          next[key] = { ...next[key], attended: action === 'attended', absent: action === 'absent', at: Date.now() }
+          next[key] = { ...next[key], deleted: undefined, attended: action === 'attended', absent: action === 'absent', at: Date.now() }
         }
         saveMeta(pid, next)
         return next

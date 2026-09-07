@@ -1,3 +1,6 @@
+import { persistJSON, persistValue } from './persistence'
+import { collections } from '../../shared/contracts.js'
+import { canonical, mergeAdmin } from '../../shared/merge.js'
 /**
  * The PGCE admin file: everything the course makes a student log — weekly
  * reflections, mentor-set targets, meeting records with actions, observation
@@ -75,6 +78,7 @@ export interface AuditEntry {
 }
 
 export interface AdminFile {
+  deleted?: Record<string, number>
   reflections: Reflection[]
   targets: TargetItem[]
   meetings: Meeting[]
@@ -110,42 +114,22 @@ export function loadAdminFile(pid: string): AdminFile {
 }
 
 export function saveAdminFile(pid: string, file: AdminFile): void {
-  try {
-    localStorage.setItem(adminKey(pid), JSON.stringify(file))
-  } catch {
-    /* storage unavailable */
+  const previous = loadAdminFile(pid)
+  const next = { ...file, deleted: { ...previous.deleted, ...file.deleted } }
+  const now = Date.now()
+  for (const key of collections) {
+    for (const item of previous[key]) if (!file[key].some(x => x.id === item.id)) next.deleted[key + ':' + item.id] = now
+    // Stamp edits here too: a form cannot accidentally save an old revision.
+    next[key] = file[key].map(item => {
+      const old = previous[key].find(x => x.id === item.id)
+      return !old || canonical({...old,at:0}) !== canonical({...item,at:0}) ? { ...item, at: Math.max(now, (old?.at ?? 0) + 1) } : old
+    }) as never
   }
+  persistJSON(adminKey(pid), next)
 }
 
-export function clearAdminFile(pid: string): void {
-  try {
-    localStorage.removeItem(adminKey(pid))
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Merge two admin files per item id, newest `at` wins (no tombstones: a
- * deletion on one device can be resurrected by a merge — acceptable trade). */
-export function mergeAdminFiles(local: AdminFile, remote: AdminFile): AdminFile {
-  const mergeList = <T extends { id: string; at: number }>(a: T[], b: T[]): T[] => {
-    const byId = new Map<string, T>()
-    for (const item of a) byId.set(item.id, item)
-    for (const item of b) {
-      const mine = byId.get(item.id)
-      if (!mine || item.at >= mine.at) byId.set(item.id, item)
-    }
-    return [...byId.values()]
-  }
-  return {
-    reflections: mergeList(local.reflections, remote.reflections),
-    targets: mergeList(local.targets, remote.targets),
-    meetings: mergeList(local.meetings, remote.meetings),
-    observations: mergeList(local.observations, remote.observations),
-    lessons: mergeList(local.lessons, remote.lessons),
-    audits: mergeList(local.audits, remote.audits),
-  }
-}
+export function clearAdminFile(pid: string): void { persistValue(adminKey(pid), null) }
+export const mergeAdminFiles = mergeAdmin
 
 /** Monday of a date's week (yyyy-mm-dd). */
 export function mondayOfISO(dateISO: string): string {

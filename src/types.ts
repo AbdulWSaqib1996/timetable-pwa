@@ -1,4 +1,11 @@
 export interface Session {
+  identityAt?: number
+  eventKey?: string
+  calendarUid?: string
+  sourceKey?: string
+  sourceId?: string
+  identityCandidates?: string[]
+  identityWarning?: string
   id: string
   title: string
   day: string
@@ -124,18 +131,21 @@ export interface Settings {
 
 /** One saved timetable (sheet + all its choices). */
 export interface ProfileEntry {
+  at?: number
   id: string
   name: string
   settings: Settings
 }
 
 export interface ProfileStore {
+  deletedProfiles?: Record<string, number>
   activeId: string
   profiles: ProfileEntry[]
 }
 
 /** Per-session attendance/note, keyed by sessionKey(). */
 export interface SessionMeta {
+  deleted?: boolean
   attended?: boolean
   /** recorded absence (mutually exclusive with attended) */
   absent?: boolean
@@ -164,6 +174,7 @@ export interface SessionChange {
 }
 
 export interface CachedData {
+  identityHistory?: Session[]
   fetchedAt: number
   sessions: Session[]
   keyDates?: Session[]

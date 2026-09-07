@@ -304,6 +304,8 @@ Retain the existing React PWA. Deliver small, independently verifiable changes w
 
 **Release:** a contained corrective release. Do not wait for the redesign to deliver these fixes.
 
+**Implementation status (7 September 2026):** Phase 1 is released, including the subsequent Vercel build-image fix. Phase 2 is implemented on `codex/phase-2` and is passing the local release checks; hosted rollout and final endpoint verification are the remaining release steps. Implementation details, legacy-format compatibility and rollback are in `PLAN.md` and `DEPLOYMENT.md`. The review and before/after designs elsewhere in this document describe the original baseline and later planned UI phases.
+
 ### Phase 2 — make saved data trustworthy
 
 **Purpose:** protect existing profiles, notes, photos and records before moving their interfaces or expanding their use.

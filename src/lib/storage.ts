@@ -1,3 +1,6 @@
+import { withDataLock } from './attachments'
+import { canonical, syncSettings } from '../../shared/merge.js'
+import { requireSavedData, persistJSON, persistValue } from './persistence'
 import type { CachedData, MetaMap, ProfileStore, SessionChange, Settings } from '../types'
 
 const STORE_KEY = 'timetable.store.v2'
@@ -18,21 +21,8 @@ function readJSON<T>(key: string): T | null {
   }
 }
 
-function writeJSON(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    /* storage unavailable — app still works, just won't persist */
-  }
-}
-
-function removeKey(key: string): void {
-  try {
-    localStorage.removeItem(key)
-  } catch {
-    /* ignore */
-  }
-}
+function writeJSON(key: string, value: unknown): void { persistJSON(key, value) }
+function removeKey(key: string): void { persistValue(key, null) }
 
 export function newProfileId(): string {
   return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
@@ -63,28 +53,48 @@ export function loadStore(): ProfileStore | null {
     activeId: id,
     profiles: [{ id, name: 'My timetable', settings: legacy }],
   }
-  writeJSON(STORE_KEY, migrated)
   const oldCache = readJSON<CachedData>(LEGACY_CACHE_KEY)
-  if (oldCache) writeJSON(cacheKey(id), oldCache)
-  removeKey(LEGACY_SETTINGS_KEY)
-  removeKey(LEGACY_CACHE_KEY)
+  // Copy first; never remove the legacy recovery copy after a failed write.
+  const cacheSaved = !oldCache || persistJSON(cacheKey(id), oldCache)
+  const storeSaved = cacheSaved && persistJSON(STORE_KEY, migrated)
+  if (storeSaved) {
+    removeKey(LEGACY_SETTINGS_KEY)
+    removeKey(LEGACY_CACHE_KEY)
+  }
   return migrated
 }
 
 export function saveStore(store: ProfileStore): void {
-  writeJSON(STORE_KEY, store)
+  const previous = readJSON<ProfileStore>(STORE_KEY)
+  const profiles = store.profiles.map(p => {
+    const old = previous?.profiles.find(x => x.id === p.id)
+    return !old || canonical({name:p.name,settings:syncSettings(p.settings)}) !== canonical({name:old.name,settings:syncSettings(old.settings)})
+      ? { ...p, at: Math.max(Date.now(), (old?.at ?? 0) + 1) } : { ...p, at: old.at }
+  })
+  writeJSON(STORE_KEY, { ...store, profiles, deletedProfiles: { ...previous?.deletedProfiles, ...store.deletedProfiles } })
 }
 
 export function clearStore(): void {
   removeKey(STORE_KEY)
 }
 
-/** Remove a profile's cached data (call when deleting a profile). */
-export function clearProfileData(pid: string): void {
-  removeKey(cacheKey(pid))
-  removeKey(metaKey(pid))
-  removeKey(changesKey(pid))
-  removeKey(`timetable.admin.v1.${pid}`)
+/** Delete all local owners atomically; keep a sync tombstone. */
+export async function clearProfileData(pid: string): Promise<void> {
+  const { restoreWithRecovery } = await import('./recovery')
+  const { readAttachments } = await import('./attachments')
+  await restoreWithRecovery(async () => {
+    const store = readJSON<ProfileStore>(STORE_KEY)
+    const metadata: Record<string,string|null> = {}
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)!
+      if (key.startsWith('timetable.') && key.endsWith('.' + pid)) metadata[key] = null
+    }
+    if (store) {
+      const profiles = store.profiles.filter(p => p.id !== pid)
+      metadata[STORE_KEY] = JSON.stringify({ ...store, profiles, activeId: store.activeId === pid ? profiles[0]?.id ?? '' : store.activeId, deletedProfiles: { ...store.deletedProfiles, [pid]: Date.now() } })
+    }
+    return { metadata, photos: (await readAttachments('photos')).filter(x => x.owner.split('|')[0] !== pid), wallet: (await readAttachments('wallet')).filter(x => x.owner.split('|')[0] !== pid) }
+  })
 }
 
 export function loadCache(pid: string): CachedData | null {
@@ -100,7 +110,10 @@ export function loadMeta(pid: string): MetaMap {
 }
 
 export function saveMeta(pid: string, meta: MetaMap): void {
-  writeJSON(metaKey(pid), meta)
+  const previous = loadMeta(pid)
+  const next = { ...meta }
+  for (const key of Object.keys(previous)) if (!(key in next)) next[key] = { deleted: true, at: Math.max(Date.now(), (previous[key].at ?? 0) + 1) }
+  writeJSON(metaKey(pid), next)
 }
 
 export function loadChanges(pid: string): SessionChange[] {
@@ -113,11 +126,19 @@ export function saveChanges(pid: string, changes: SessionChange[]): void {
 
 /** Everything worth keeping (profiles, notes, attendance, photos, PGCE admin file, wallet). */
 export async function exportBackup(): Promise<string> {
+  requireSavedData()
+  return withDataLock(async () => {
   const store = readJSON<ProfileStore>(STORE_KEY)
+  if (!store) throw new Error('No timetable to back up.')
+  const cache: Record<string, CachedData> = {}
+  const changes: Record<string, SessionChange[]> = {}
   const meta: Record<string, MetaMap> = {}
   const admin: Record<string, unknown> = {}
   for (const p of store?.profiles ?? []) {
     meta[p.id] = loadMeta(p.id)
+    const snapshot = loadCache(p.id)
+    if (snapshot) cache[p.id] = snapshot
+    changes[p.id] = loadChanges(p.id)
     const rawAdmin = readJSON<unknown>(`timetable.admin.v1.${p.id}`)
     if (rawAdmin) admin[p.id] = rawAdmin
   }
@@ -125,40 +146,22 @@ export async function exportBackup(): Promise<string> {
   const photos = await exportPhotos()
   const { exportWallet } = await import('./wallet')
   const wallet = await exportWallet()
-  markBackedUp()
-  return JSON.stringify(
-    { version: 3, exportedAt: new Date().toISOString(), store, meta, admin, photos, wallet },
+  const json = JSON.stringify(
+    { version: 4, cache, changes, exportedAt: new Date().toISOString(), store, meta, admin, photos, wallet },
     null,
     2
   )
+  const { validateBackup } = await import('./backup')
+  validateBackup(json)
+  return json
+  })
 }
 
-/** Restore a backup produced by exportBackup. Returns false if the file isn't one. */
+/** Validate and restore with a durable undo journal. Errors are shown by the caller. */
 export async function importBackup(text: string): Promise<boolean> {
-  try {
-    const data = JSON.parse(text) as {
-      store?: ProfileStore
-      meta?: Record<string, MetaMap>
-      admin?: Record<string, unknown>
-      photos?: { owner: string; at: number; data: string }[]
-      wallet?: { owner: string; name: string; type: string; at: number; data: string }[]
-    }
-    if (!data.store || !Array.isArray(data.store.profiles) || data.store.profiles.length === 0) return false
-    writeJSON(STORE_KEY, data.store)
-    for (const [pid, m] of Object.entries(data.meta ?? {})) writeJSON(metaKey(pid), m)
-    for (const [pid, a] of Object.entries(data.admin ?? {})) writeJSON(`timetable.admin.v1.${pid}`, a)
-    if (Array.isArray(data.photos) && data.photos.length > 0) {
-      const { importPhotos } = await import('./photos')
-      await importPhotos(data.photos)
-    }
-    if (Array.isArray(data.wallet) && data.wallet.length > 0) {
-      const { importWallet } = await import('./wallet')
-      await importWallet(data.wallet)
-    }
-    return true
-  } catch {
-    return false
-  }
+  const { validateBackup, restoreBackup } = await import('./backup')
+  await restoreBackup(validateBackup(text))
+  return true
 }
 
 /* ---------- backup nudge bookkeeping ---------- */

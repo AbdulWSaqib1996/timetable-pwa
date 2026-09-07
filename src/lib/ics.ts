@@ -34,7 +34,7 @@ export function buildICS(sessions: Session[], calendarName: string): string {
   ]
   for (const s of sessions) {
     lines.push('BEGIN:VEVENT')
-    lines.push(fold(`UID:${s.id}@timetable-pwa`))
+    lines.push(fold(`UID:${escapeText(s.calendarUid || s.id)}@timetable-pwa`))
     lines.push(`DTSTAMP:${stamp}`)
     if (s.isKeyDate) {
       // Deadlines export as all-day events so they stand out in calendar apps.

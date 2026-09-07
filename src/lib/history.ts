@@ -1,3 +1,4 @@
+import { eventKey } from '../../shared/identity.js'
 import type { Session } from '../types'
 
 /**
@@ -16,9 +17,10 @@ export function retainHistory(
   todayISO: string
 ): Session[] {
   if (!cached || cached.length === 0) return fresh
+  const freshKeys = new Set(fresh.map(eventKey))
   const freshDates = new Set(fresh.map((s) => s.dateISO))
   const retained = cached.filter(
-    (s) => s.dateISO < todayISO && !freshDates.has(s.dateISO) && !s.id.startsWith('plc-')
+    (s) => s.dateISO < todayISO && !freshKeys.has(eventKey(s)) && !freshDates.has(s.dateISO) && !s.id.startsWith('plc-')
   )
   return retained.length === 0 ? fresh : [...fresh, ...retained]
 }

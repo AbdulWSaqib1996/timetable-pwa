@@ -1,3 +1,4 @@
+import { validateSettings, validateTree } from '../../shared/contracts.js'
 import type { Filters, Settings } from '../types'
 
 interface SharePayload {
@@ -45,12 +46,14 @@ export function buildShareUrl(settings: Settings): string {
 
 /** Parse a #setup=… hash into ready-to-use settings, or null if absent/invalid. */
 export function parseShareHash(hash: string): Settings | null {
+  if (hash.length > 16000) return null
   const m = hash.match(/#setup=([A-Za-z0-9_-]+)/)
   if (!m) return null
   try {
     const p = JSON.parse(b64urlDecode(m[1])) as SharePayload
+    validateTree(p)
     if (!p.i || !/^[a-zA-Z0-9_-]{20,}$/.test(p.i)) return null
-    return {
+    const settings: Settings = {
       sheetUrl: p.u ?? '',
       sheetId: p.i,
       gid: p.g ?? null,
@@ -65,6 +68,8 @@ export function parseShareHash(hash: string): Settings | null {
       keyDatesGid: typeof p.kg === 'string' ? p.kg : undefined,
       keyDatesUrl: typeof p.ku === 'string' ? p.ku : undefined,
     }
+    validateSettings(settings)
+    return settings
   } catch {
     return null
   }

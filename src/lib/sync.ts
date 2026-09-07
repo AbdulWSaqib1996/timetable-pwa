@@ -1,14 +1,21 @@
+import { eventKey } from '../../shared/identity.js'
+import type { Session } from '../types'
+import { loadCache } from './storage'
+import { validatePayload, safeURL, MAX_SYNC_BYTES } from '../../shared/contracts.js'
+import { canonical, mergeRecords, mergeStores, deviceSettings, syncSettings } from '../../shared/merge.js'
+import { persistValue, requireSavedData } from './persistence'
+import { restoreWithRecovery } from './recovery'
 import type { MetaMap, ProfileStore } from '../types'
-import { loadAdminFile, mergeAdminFiles, saveAdminFile } from './admin'
+import { loadAdminFile, mergeAdminFiles } from './admin'
 import type { AdminFile } from './admin'
 import { loadMeta, loadStore } from './storage'
 
 /**
  * Cross-device sync via a shared code: the whole profile store + per-profile
  * notes/attendance are encrypted on this device (AES-GCM, key derived from the
- * code) and parked as an opaque blob in the push worker's KV. The worker only
+ * code) and stored as an opaque blob in a revision-protected sync object. The worker only
  * ever sees ciphertext keyed by a hash of the code; photos stay local (size).
- * Last write wins — the freshest `at` is applied on app start.
+ * Deletion-aware records merge before writes; stale revisions are retried.
  */
 
 const SYNC_STATE_KEY = 'timetable.sync.v1'
@@ -20,6 +27,7 @@ export interface SyncState {
 }
 
 export interface SyncPayload {
+  identities?: Record<string, Session[]>
   store: ProfileStore
   meta: Record<string, MetaMap>
   /** PGCE admin file per profile (absent in pre-round-9 blobs) */
@@ -35,21 +43,13 @@ export function loadSyncState(): SyncState | null {
   }
 }
 
-export function saveSyncState(state: SyncState): void {
-  try {
-    localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(state))
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-export function clearSyncState(): void {
-  try {
-    localStorage.removeItem(SYNC_STATE_KEY)
-  } catch {
-    /* ignore */
-  }
-}
+export function saveSyncState(state: SyncState): void { persistValue(SYNC_STATE_KEY, JSON.stringify(state)) }
+export function clearSyncState(): void { persistValue(SYNC_STATE_KEY, null) }
+export const SYNC_STATUS_EVENT = 'timetable-sync-status'
+export const SYNC_APPLIED_EVENT = 'timetable-sync-applied'
+let syncStatus = ''
+export function getSyncStatus() { return syncStatus }
+export function setSyncStatus(message: string) { syncStatus = message; window.dispatchEvent(new Event(SYNC_STATUS_EVENT)) }
 
 /** 8 chars from an unambiguous alphabet (no 0/O/1/I/L). */
 export function newSyncCode(): string {
@@ -61,7 +61,7 @@ export function newSyncCode(): string {
 
 const utf8 = (s: string) => new TextEncoder().encode(s)
 const b64 = (buf: ArrayBuffer | Uint8Array) =>
-  btoa(String.fromCharCode(...new Uint8Array(buf as ArrayBuffer)))
+  btoa(Array.from(new Uint8Array(buf as ArrayBuffer), c => String.fromCharCode(c)).join(''))
 const b64decode = (s: string) => Uint8Array.from([...atob(s)].map((c) => c.charCodeAt(0)))
 
 /** Server-side lookup id: SHA-256 of the code with a purpose prefix (never the code itself). */
@@ -87,7 +87,11 @@ async function pipeThrough(
   stream: { readable: ReadableStream; writable: WritableStream }
 ): Promise<Uint8Array<ArrayBuffer>> {
   const compressed = new Blob([bytes as BlobPart]).stream().pipeThrough(stream as ReadableWritablePair)
-  return new Uint8Array(await new Response(compressed).arrayBuffer())
+  const reader = compressed.getReader()
+  const chunks: Uint8Array[] = []; let length = 0
+  for (;;) { const {done,value} = await reader.read(); if (done) break; length += value.length; if (length > MAX_SYNC_BYTES) { await reader.cancel(); throw new Error('Sync data exceeds the size limit.') } chunks.push(value) }
+  const out = new Uint8Array(length); let offset=0; for (const chunk of chunks) { out.set(chunk,offset); offset+=chunk.length }
+  return out
 }
 
 async function encrypt(code: string, payload: SyncPayload): Promise<string> {
@@ -121,7 +125,8 @@ async function decrypt(code: string, blob: string): Promise<SyncPayload | null> 
     if (plain[0] === 0x1f && plain[1] === 0x8b && typeof DecompressionStream !== 'undefined') {
       plain = await pipeThrough(plain, new DecompressionStream('gzip'))
     }
-    return JSON.parse(new TextDecoder().decode(plain)) as SyncPayload
+    if (plain.byteLength > MAX_SYNC_BYTES) throw new Error('Sync data exceeds the size limit.')
+    return validatePayload(JSON.parse(new TextDecoder().decode(plain))) as SyncPayload
   } catch {
     return null
   }
@@ -129,117 +134,133 @@ async function decrypt(code: string, blob: string): Promise<SyncPayload | null> 
 
 /** Everything synced: profile store, notes/attendance and PGCE admin file per profile. */
 export function collectSyncPayload(): SyncPayload | null {
-  const store = loadStore()
+  const store = loadStore() ?? JSON.parse(localStorage.getItem('timetable.store.v2') ?? 'null') as ProfileStore | null
   if (!store) return null
+  const identities: Record<string, Session[]> = {}
   const meta: Record<string, MetaMap> = {}
   const admin: Record<string, AdminFile> = {}
   for (const p of store.profiles) {
+    const cache = loadCache(p.id)
+    identities[p.id] = cache?.identityHistory ?? [...(cache?.sessions ?? []), ...(cache?.keyDates ?? [])]
     meta[p.id] = loadMeta(p.id)
     admin[p.id] = loadAdminFile(p.id)
   }
-  return { store, meta, admin }
+  return { identities, store: { ...store, activeId:[...store.profiles].sort((a,b) => a.id.localeCompare(b.id))[0]?.id ?? '', profiles: store.profiles.map(p => ({ ...p, settings: syncSettings(p.settings) })) }, meta, admin }
 }
 
-const trim = (base: string) => base.replace(/\/+$/, '')
-
-const SYNC_SENT_HASH_KEY = 'timetable.synchash.v1'
-
-function payloadHash(payload: SyncPayload): string {
-  const s = JSON.stringify(payload)
-  let hash = 5381
-  for (let i = 0; i < s.length; i++) hash = ((hash * 33) ^ s.charCodeAt(i)) >>> 0
-  return `${s.length}:${hash.toString(36)}`
+const trim = (base: string) => {
+  if (!safeURL(base)) throw new Error('Invalid sync server URL.')
+  return base.replace(/\/+$/, '')
 }
-
-/** Encrypt the current local state and park it on the worker. Returns the write
- *  timestamp, or null when nothing changed since the last successful push
- *  (skipped entirely — no request). `force` bypasses the skip. */
-export async function pushSync(base: string, code: string, opts?: { force?: boolean }): Promise<number | null> {
-  const payload = collectSyncPayload()
-  if (!payload) return null
-  const hash = `${code}|${payloadHash(payload)}`
-  if (!opts?.force) {
-    try {
-      if (localStorage.getItem(SYNC_SENT_HASH_KEY) === hash) return null
-    } catch {
-      /* storage unavailable — just send */
-    }
+interface Remote { payload?: SyncPayload; at: number; revision: number; deleted?: boolean }
+async function readRemote(base: string, code: string): Promise<Remote> {
+  const res = await fetch(`${trim(base)}/sync-v2?id=${await syncId(code)}`)
+  if (!res.ok) throw new Error('Sync could not be read. Check your connection and app/server version.')
+  const rec = await res.json() as { blob?: string; at?: number; revision: number; deleted?: boolean }
+  if (!Number.isSafeInteger(rec.revision) || (rec.blob?.length ?? 0) > 400000) throw new Error('Invalid sync response.')
+  const payload = rec.blob ? await decrypt(code, rec.blob) : undefined
+  if (rec.blob && !payload) throw new Error('The sync data could not be decrypted or validated. Local data is unchanged.')
+  return { payload: payload ?? undefined, revision:rec.revision, at:rec.at ?? 0, deleted:rec.deleted }
+}
+export function mergePayload(local: SyncPayload, remote: SyncPayload): SyncPayload {
+  const store = mergeStores(local.store, remote.store)
+  store.activeId = store.profiles[0]?.id ?? ''
+  const identities: Record<string, Session[]> = {}
+  const meta: Record<string, MetaMap> = {}, admin: Record<string, AdminFile> = {}
+  for (const p of store.profiles) {
+    const identityMap = new Map<string,Session>()
+    for (const item of [...(remote.identities?.[p.id] ?? []), ...(local.identities?.[p.id] ?? [])]) { const old = identityMap.get(eventKey(item)); if (!old || (item.identityAt ?? 0) > (old.identityAt ?? 0) || ((item.identityAt ?? 0) === (old.identityAt ?? 0) && canonical(item) > canonical(old))) identityMap.set(eventKey(item),item) }
+    identities[p.id] = [...identityMap.values()].sort((a,b) => eventKey(a).localeCompare(eventKey(b)))
+    meta[p.id] = mergeRecords(local.meta[p.id] ?? {}, remote.meta[p.id] ?? {})
+    admin[p.id] = mergeAdminFiles(local.admin?.[p.id] ?? loadAdminFile(''), remote.admin?.[p.id] ?? loadAdminFile(''))
   }
-  const at = Date.now()
-  const res = await fetch(`${trim(base)}/sync`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ id: await syncId(code), blob: await encrypt(code, payload), at }),
+  return { store, meta, admin, identities }
+}
+/** Merge before every write; retry revision conflicts. No stale payload is blindly posted. */
+async function exchange(base: string, code: string): Promise<number | null> {
+  requireSavedData()
+  setSyncStatus('Syncing…')
+  try {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const remote = await readRemote(base, code)
+      if (remote.deleted) throw new Error('This sync code was disconnected. Create or join a new code.')
+      const local = collectSyncPayload()
+      if (!local) return null
+      const merged = remote.payload ? mergePayload(local, remote.payload) : local
+      let at = remote.at
+      if (!remote.payload || canonical(merged) !== canonical(remote.payload)) {
+        if (new Blob([JSON.stringify(merged)]).size > MAX_SYNC_BYTES) throw new Error('Sync is too large. Export a backup to transfer your data.')
+        const blob = await encrypt(code, merged)
+        if (blob.length > 400000) throw new Error('Encrypted sync exceeds the server limit. Export a backup instead.')
+        const res = await fetch(`${trim(base)}/sync-v2`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({id:await syncId(code), blob, revision:remote.revision}) })
+        if (res.status === 409) continue
+        if (!res.ok) throw new Error('The sync server rejected the update.')
+        at = (await res.json()).at
+      }
+      // An edit during encryption/network I/O must take part in the next exchange.
+      const current = collectSyncPayload()
+      if (canonical(current) !== canonical(local)) continue
+      if (canonical(merged) !== canonical(local)) {
+        if (document.querySelector('[role="dialog"]')) {
+          setSyncStatus('Saved to sync. Close the open panel to load changes from other devices.')
+          return at
+        }
+        await applySyncPayload(merged)
+      }
+      setSyncStatus('Synced. Photos and wallet files stay on this device; use Backup to transfer them.')
+      return at
+    }
+    throw new Error('Sync is busy with newer edits. Your changes remain local; retry shortly.')
+  } catch (error) {
+    setSyncStatus('Sync failed: ' + (error instanceof Error ? error.message : String(error)))
+    throw error
+  }
+}
+let syncQueue: Promise<unknown> = Promise.resolve()
+export function pushSync(base: string, code: string, _opts?: {force?: boolean}): Promise<number | null> {
+  const work = async () => navigator.locks ? await navigator.locks.request('timetable-sync', () => exchange(base,code)) : exchange(base,code)
+  const next = syncQueue.then(work,work)
+  syncQueue = next.catch(() => {})
+  return next
+}
+export async function pullSync(base: string, code: string): Promise<{payload:SyncPayload;at:number}|null> {
+  const remote = await readRemote(base,code)
+  return remote.payload ? {payload:remote.payload,at:remote.at} : null
+}
+export async function applySyncPayload(payload: SyncPayload): Promise<void> {
+  validatePayload(payload)
+  await restoreWithRecovery(async () => {
+    const local = collectSyncPayload()
+    const merged = local ? mergePayload(local,payload) : payload
+    const localStore = loadStore()
+    const store = { ...merged.store, activeId: merged.store.profiles.some(p => p.id === localStore?.activeId) ? localStore!.activeId : merged.store.activeId,
+      profiles: merged.store.profiles.map(p => {
+        const mine = localStore?.profiles.find(x => x.id === p.id)
+        const settings = {...p.settings}
+        for (const key of deviceSettings) { delete (settings as any)[key]; if (mine && key in mine.settings) (settings as any)[key] = (mine.settings as any)[key] }
+        return {...p,settings}
+      }) }
+    const metadata: Record<string,string|null> = {'timetable.store.v2':JSON.stringify(store)}
+    for (const [pid,m] of Object.entries(merged.meta)) metadata[`timetable.meta.v2.${pid}`] = JSON.stringify(m)
+    for (const [pid,a] of Object.entries(merged.admin ?? {})) metadata[`timetable.admin.v1.${pid}`] = JSON.stringify(a)
+    for (const [pid,history] of Object.entries(merged.identities ?? {})) metadata[`timetable.cache.v2.${pid}`] = JSON.stringify({...loadCache(pid),fetchedAt:loadCache(pid)?.fetchedAt ?? 0,sessions:loadCache(pid)?.sessions ?? [],identityHistory:history})
+    // A remotely deleted profile loses all of its local owners as well.
+    const removed = new Set((localStore?.profiles ?? []).filter(p => !store.profiles.some(x => x.id === p.id)).map(p => p.id))
+    for (let i=0;i<localStorage.length;i++) { const key = localStorage.key(i)!; if ([...removed].some(pid => key.startsWith('timetable.') && key.endsWith('.'+pid))) metadata[key] = null }
+    const { readAttachments } = await import('./attachments')
+    return {metadata, ...(removed.size ? {photos:(await readAttachments('photos')).filter(x => !removed.has(x.owner.split('|')[0])),wallet:(await readAttachments('wallet')).filter(x => !removed.has(x.owner.split('|')[0]))} : {})}
   })
-  if (!res.ok) throw new Error('The sync server rejected the update.')
-  try {
-    localStorage.setItem(SYNC_SENT_HASH_KEY, hash)
-  } catch {
-    /* ignore */
-  }
-  return at
+  window.dispatchEvent(new Event(SYNC_APPLIED_EVENT))
 }
-
-/** Fetch and decrypt the parked state for a code; null when none exists. */
-export async function pullSync(base: string, code: string): Promise<{ payload: SyncPayload; at: number } | null> {
-  const res = await fetch(`${trim(base)}/sync?id=${await syncId(code)}`)
-  if (!res.ok) return null
-  const rec = (await res.json()) as { blob?: string; at?: number }
-  if (!rec.blob || typeof rec.at !== 'number') return null
-  const payload = await decrypt(code, rec.blob)
-  return payload ? { payload, at: rec.at } : null
-}
-
-/** Union of two meta maps; where both edited the same session, the newer `at` wins. */
-function mergeMeta(local: MetaMap, remote: MetaMap): MetaMap {
-  const merged: MetaMap = { ...local }
-  for (const [key, entry] of Object.entries(remote)) {
-    const mine = merged[key]
-    if (!mine || (entry.at ?? 0) >= (mine.at ?? 0)) merged[key] = entry
-  }
-  return merged
-}
-
-/**
- * Write a pulled payload into localStorage. The profile store takes the remote
- * copy (it carried the newer timestamp); notes/attendance merge per session so
- * neither device's edits are dropped. Caller reloads the app afterwards.
- */
-export function applySyncPayload(payload: SyncPayload): void {
-  try {
-    localStorage.setItem('timetable.store.v2', JSON.stringify(payload.store))
-    for (const [pid, m] of Object.entries(payload.meta)) {
-      localStorage.setItem(`timetable.meta.v2.${pid}`, JSON.stringify(mergeMeta(loadMeta(pid), m)))
-    }
-    for (const [pid, a] of Object.entries(payload.admin ?? {})) {
-      saveAdminFile(pid, mergeAdminFiles(loadAdminFile(pid), a))
-    }
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-/**
- * The full pull cycle: fetch the parked state, and when it's newer than what this
- * device last saw, merge it in, park the merged result back (so the other device
- * gets the union too) and return true — the caller should reload the UI.
- */
 export async function syncPullApply(base: string): Promise<boolean> {
   const state = loadSyncState()
   if (!state) return false
-  const remote = await pullSync(base, state.code)
-  if (!remote || remote.at <= state.lastAt) return false
-  applySyncPayload(remote.payload)
-  const at = await pushSync(base, state.code, { force: true }).catch(() => null)
-  saveSyncState({ ...state, lastAt: at ?? remote.at })
-  return true
+  const at = await pushSync(base,state.code)
+  if (at) saveSyncState({...state,lastAt:at})
+  return false // UI receives a data event, never a destructive page reload.
 }
-
-/** Remove the parked blob for a code (used when rotating or turning sync off). */
 export async function deleteSync(base: string, code: string): Promise<void> {
-  await fetch(`${trim(base)}/sync/delete`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ id: await syncId(code) }),
-  }).catch(() => {})
+  const remote = await readRemote(base,code)
+  const res = await fetch(`${trim(base)}/sync-v2/delete`, {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:await syncId(code),revision:remote.revision})})
+  if (!res.ok) throw new Error('Sync changed while disconnecting. Retry before rotating your code.')
 }

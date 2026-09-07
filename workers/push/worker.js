@@ -1,3 +1,7 @@
+import { validWorkerConfig } from '../../shared/contracts.js'
+import { parseTimetable, parseDateCell } from '../../shared/timetable.js'
+import { reconcileEvents, eventKey } from '../../shared/identity.js'
+export { SyncStore } from './sync-store.js'
 /**
  * timetable-push worker — background Web Push for My Timetable.
  *
@@ -117,39 +121,9 @@ async function sendPush(env, subscription, payload) {
 }
 
 /* ---------- sheet parsing (compact copy of the app's parser) ---------- */
-const HEADER_MAP = {
-  title: 'title', day: 'day', date: 'date', start: 'start', 'start time': 'start', end: 'end',
-  'end time': 'end', room: 'room', location: 'room', groups: 'groups', group: 'groups',
-  tutor: 'tutor', tutors: 'tutor', subject: 'subject', link: 'link', url: 'link', moodle: 'link',
-}
-const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
-const pad = (n) => String(n).padStart(2, '0')
-const cellText = (c) => (!c ? '' : c.f != null && c.f !== '' ? String(c.f).trim() : c.v == null ? '' : String(c.v).trim())
-const gvizDate = (s) => {
-  const m = typeof s === 'string' && s.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+))?/)
-  return m ? { y: +m[1], mo: +m[2], d: +m[3], h: m[4] !== undefined ? +m[4] : undefined, min: m[5] !== undefined ? +m[5] : undefined } : null
-}
-function parseDateCell(cell) {
-  if (!cell) return null
-  const g = gvizDate(cell.v)
-  if (g) return `${g.y}-${pad(g.mo + 1)}-${pad(g.d)}`
-  const t = cellText(cell)
-  let m = t.match(/^(\d{1,2})[-/ ]([A-Za-z]{3,})[-/ ](\d{4})$/)
-  if (m) {
-    const mo = MONTHS[m[2].slice(0, 3).toLowerCase()]
-    if (mo !== undefined) return `${m[3]}-${pad(mo + 1)}-${pad(+m[1])}`
-  }
-  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  return m ? `${m[3]}-${pad(+m[2])}-${pad(+m[1])}` : null
-}
-function parseTimeCell(cell) {
-  if (!cell) return ''
-  if (Array.isArray(cell.v) && cell.v.length >= 2) return `${pad(cell.v[0])}:${pad(cell.v[1])}`
-  const g = gvizDate(cell.v)
-  if (g && g.h !== undefined) return `${pad(g.h)}:${pad(g.min ?? 0)}`
-  const m = cellText(cell).match(/^(\d{1,2})[:.](\d{2})/)
-  return m ? `${pad(+m[1])}:${m[2]}` : ''
-}
+const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 }
+const pad = n => String(n).padStart(2,'0')
+const cellText = c => !c ? '' : String(c.f || c.v || '').trim()
 async function fetchSessions(sheetId, gid) {
   const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0${gid ? `&gid=${encodeURIComponent(gid)}` : ''}`
   const res = await fetch(url)
@@ -164,81 +138,7 @@ async function fetchSessions(sheetId, gid) {
     return []
   }
   if (!table) return []
-  let headerIndex = -1
-  const colMap = {}
-  for (let r = 0; r < Math.min(table.rows.length, 10); r++) {
-    const map = {}
-    let matches = 0
-    table.rows[r].c.forEach((cell, i) => {
-      const f = HEADER_MAP[cellText(cell).toLowerCase()]
-      if (f && map[f] === undefined) {
-        map[f] = i
-        matches++
-      }
-    })
-    if (matches >= 3) {
-      headerIndex = r
-      Object.assign(colMap, map)
-      break
-    }
-  }
-  if (headerIndex === -1 || colMap.title === undefined) return []
-  const width = Math.max(table.cols.length, ...table.rows.map((r) => r.c.length), 0)
-  const taken = new Set(Object.values(colMap))
-  const sniff = (i, test) => {
-    let hits = 0
-    let nonEmpty = 0
-    for (let r = headerIndex + 1; r < Math.min(table.rows.length, headerIndex + 40); r++) {
-      const cell = table.rows[r].c[i]
-      if (!cell || cell.v == null) continue
-      nonEmpty++
-      if (test(cell)) hits++
-    }
-    return nonEmpty > 0 && hits / nonEmpty > 0.5
-  }
-  const findCol = (types, test) => {
-    for (let i = 0; i < width; i++) if (!taken.has(i) && types.includes(table.cols[i]?.type ?? '')) return i
-    for (let i = 0; i < width; i++) if (!taken.has(i) && sniff(i, test)) return i
-    return undefined
-  }
-  for (const [f, types, test] of [
-    ['date', ['date'], (c) => parseDateCell(c) !== null],
-    ['start', ['datetime', 'timeofday'], (c) => parseTimeCell(c) !== ''],
-    ['end', ['datetime', 'timeofday'], (c) => parseTimeCell(c) !== ''],
-  ]) {
-    if (colMap[f] === undefined) {
-      const i = findCol(types, test)
-      if (i !== undefined) {
-        colMap[f] = i
-        taken.add(i)
-      }
-    }
-  }
-  if (colMap.date === undefined) return []
-  const sessions = []
-  let lastDate = null
-  for (let r = headerIndex + 1; r < table.rows.length; r++) {
-    const cells = table.rows[r].c
-    const get = (f) => (colMap[f] !== undefined ? cellText(cells[colMap[f]]) : '')
-    const title = get('title')
-    let dateISO = parseDateCell(cells[colMap.date])
-    if (dateISO) lastDate = dateISO
-    else dateISO = lastDate
-    if (!title || !dateISO) continue
-    const specMatch = title.match(/^specialism\s*\d*\s*[-–—:]\s*(.+)$/i)
-    sessions.push({
-      title,
-      dateISO,
-      start: colMap.start !== undefined ? parseTimeCell(cells[colMap.start]) : '',
-      end: colMap.end !== undefined ? parseTimeCell(cells[colMap.end]) : '',
-      room: get('room'),
-      tutor: get('tutor'),
-      groups: get('groups'),
-      specialismName: specMatch ? specMatch[1].trim() : undefined,
-      isSelfStudy: /^self[- ]?study$/i.test(title),
-    })
-  }
-  return sessions
+  try { return parseTimetable(table).sessions.map(s => ({...s, sourceKey:`${sheetId}|${gid ?? ''}`})) } catch { return [] }
 }
 
 /* ---------- placement (school experience) parity with the app ---------- */
@@ -586,7 +486,7 @@ const snapKey = (id, gid) => `snap:${id}|${gid ?? ''}`
 
 function diffSheets(oldSessions, newSessions, todayISO) {
   const future = (list) => list.filter((s) => s.dateISO >= todayISO)
-  const keyOf = (s) => `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`
+  const keyOf = eventKey
   const oldMap = new Map(future(oldSessions).map((s) => [keyOf(s), s]))
   const newMap = new Map(future(newSessions).map((s) => [keyOf(s), s]))
   const out = []
@@ -653,17 +553,21 @@ async function runScheduled(env) {
       let sessions = await fetchSessions(id, gid)
       let changes = []
       let hadSnapshot = false
+      let identityChanged = false
       let failCount = 0
       if (sessions.length > 0) {
         await env.PUSH.delete(`fail:${key}`)
         const old = await env.PUSH.get(snapKey(id, gid), 'json')
+        sessions = reconcileEvents(sessions, old ?? [])
+        identityChanged = !!old && old.some(s => !s.eventKey || !s.calendarUid)
         if (old) {
           hadSnapshot = true
           // The sheet drops past rows daily (rolling TODAY() filter); keep the
           // history the snapshot has seen so placement-span markers and past
           // days survive — and snapshots accumulate it through rewrites.
           const freshDates = new Set(sessions.map((s) => s.dateISO))
-          const retained = old.filter((s) => s.dateISO < now.dateISO && !freshDates.has(s.dateISO))
+          const keys = new Set(sessions.map(eventKey))
+          const retained = old.filter((s) => s.dateISO < now.dateISO && !keys.has(eventKey(s)) && !freshDates.has(s.dateISO))
           if (retained.length > 0) sessions = sessions.concat(retained)
           changes = diffSheets(old, sessions, now.dateISO)
         }
@@ -674,7 +578,7 @@ async function runScheduled(env) {
       }
       // Snapshots/diffs use the raw sheet; everything user-facing (briefing,
       // reminders, leave alerts) uses the placement-expanded view.
-      sheetCache.set(key, { id, gid, sessions, expanded: expandPlacements(sessions), changes, hadSnapshot, failCount })
+      sheetCache.set(key, { id, gid, sessions, expanded: expandPlacements(sessions), changes, hadSnapshot, identityChanged, failCount })
     }
     return sheetCache.get(key)
   }
@@ -895,7 +799,7 @@ async function runScheduled(env) {
             const ageH = Math.round((Date.now() - loc.at) / 3600000)
             due.push({
               dedupe: `leave|${s.dateISO}|${s.start}|${s.title}|${offset}`,
-              key: `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`,
+              key: eventKey(s),
               title:
                 untilLeave <= 2 ? `Time to leave — ${s.title}` : `Leave in ~${untilLeave}m — ${s.title}`,
               body:
@@ -917,7 +821,7 @@ async function runScheduled(env) {
         if (end === null) continue
         const since = now.minutes - end
         if (since >= 0 && since < CRON_MINUTES) {
-          const sKey = `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`
+          const sKey = eventKey(s)
           due.push({
             dedupe: `att|${s.dateISO}|${s.end}|${s.title}`,
             key: sKey,
@@ -1012,7 +916,7 @@ async function runScheduled(env) {
             const school = placementSchool(s, config)
             due.push({
               dedupe: `${s.dateISO}|${s.start}|${s.title}|${offset}`,
-              key: `${s.dateISO}|${s.start}|${s.title.trim().toLowerCase()}`,
+              key: eventKey(s),
               title: s.title,
               body: `Starts ${s.start}${school ? ` · ${school}` : s.room ? ` · ${s.room}` : ''}`,
             })
@@ -1029,7 +933,7 @@ async function runScheduled(env) {
           if (days === d) {
             due.push({
               dedupe: `kd|${kd.dateISO}|${kd.title}|${d}`,
-              key: `${kd.dateISO}|${kd.start}|${kd.title.trim().toLowerCase()}`,
+              key: eventKey(kd),
               title: `📌 ${kd.title}`,
               body: days === 0 ? 'Due today' : `Due in ${days} day${days === 1 ? '' : 's'}`,
             })
@@ -1069,7 +973,7 @@ async function runScheduled(env) {
   // Persist snapshots (first seeding, or after real changes) so the next run diffs
   // against today's state.
   for (const info of sheetCache.values()) {
-    if (info.sessions.length > 0 && (!info.hadSnapshot || info.changes.length > 0)) {
+    if (info.sessions.length > 0 && (!info.hadSnapshot || info.identityChanged || info.changes.length > 0)) {
       await env.PUSH.put(snapKey(info.id, info.gid), JSON.stringify(info.sessions))
     }
   }
@@ -1105,6 +1009,8 @@ const RATE_CAPS = {
   '/location': 10,
   '/ping': 6,
   '/sync': 10,
+  '/sync-v2': 20,
+  '/sync-v2/delete': 6,
   '/sync/delete': 6,
   '/group': 10,
   '/group/join': 10,
@@ -1196,8 +1102,7 @@ export default {
     }
     if (request.method === 'POST' && url.pathname === '/subscribe') {
       const body = await boundedJSON(request, 32768)
-      if (!(await validSubscription(body?.subscription)) || typeof body?.config?.sheetId !== 'string'
-        || !/^[a-zA-Z0-9_-]{20,200}$/.test(body.config.sheetId)) {
+      if (!(await validSubscription(body?.subscription)) || !validWorkerConfig(body?.config)) {
         return json({ error: 'invalid subscription' }, 400)
       }
       const subKey = await endpointKey(body.subscription.endpoint)
@@ -1433,35 +1338,21 @@ export default {
       })
     }
     /* ---------- cross-device sync: opaque encrypted blobs keyed by a hash of the code ---------- */
-    if (request.method === 'POST' && url.pathname === '/sync') {
-      const body = await request.json().catch(() => null)
-      const id = String(body?.id ?? '')
-      if (
-        !/^[0-9a-f]{64}$/.test(id) ||
-        typeof body?.blob !== 'string' ||
-        body.blob.length > 400000 ||
-        typeof body?.at !== 'number'
-      ) {
-        return json({ error: 'invalid sync payload' }, 400)
+    if (url.pathname === '/sync-v2' || url.pathname === '/sync-v2/delete') {
+      if (!['GET','POST'].includes(request.method)) return json({ error: 'method not allowed' }, 405)
+      let body
+      if (request.method === 'POST') {
+        try { body = await boundedJSON(request, 420000) } catch { return json({error:'invalid or oversized sync request'},400) }
       }
-      await env.PUSH.put(`sync:${id}`, JSON.stringify({ blob: body.blob, at: body.at }), {
-        expirationTtl: 90 * 86400,
-      })
-      return json({ ok: true })
+      if (request.method === 'POST' && !body) return json({error:'invalid sync payload'},400)
+      const id = String(body?.id ?? url.searchParams.get('id') ?? '')
+      if (!/^[0-9a-f]{64}$/.test(id)) return json({error:'invalid id'},400)
+      const target = new URL(url); target.searchParams.set('id',id)
+      const response = await env.SYNC.get(env.SYNC.idFromName(id)).fetch(new Request(target, {method:request.method, ...(body ? {body:JSON.stringify(body),headers:{'content-type':'application/json'}} : {})}))
+      return json(await response.json(), response.status)
     }
-    if (request.method === 'GET' && url.pathname === '/sync') {
-      const id = String(url.searchParams.get('id') ?? '')
-      const rec = /^[0-9a-f]{64}$/.test(id) ? await env.PUSH.get(`sync:${id}`, 'json') : null
-      if (!rec) return json({ error: 'not found' }, 404)
-      return json(rec)
-    }
-    if (request.method === 'POST' && url.pathname === '/sync/delete') {
-      const body = await request.json().catch(() => null)
-      const id = String(body?.id ?? '')
-      if (!/^[0-9a-f]{64}$/.test(id)) return json({ error: 'invalid id' }, 400)
-      await env.PUSH.delete(`sync:${id}`)
-      return json({ ok: true })
-    }
+    // Old clients must upgrade instead of bypassing revision protection.
+    if (url.pathname === '/sync' || url.pathname === '/sync/delete') return json({error:'Update My Timetable to continue syncing safely.'}, 426)
     if (request.method === 'POST' && url.pathname === '/location') {
       const body = await request.json().catch(() => null)
       const lat = Number(body?.lat)

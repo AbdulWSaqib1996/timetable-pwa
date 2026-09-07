@@ -442,7 +442,7 @@ function AuditsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO: 
 function WalletTab({ profileId }: { profileId: string }) {
   const [files, setFiles] = useState<WalletFile[]>([])
   const [error, setError] = useState<string | null>(null)
-  const reload = () => void getWalletFiles(profileId).then(setFiles)
+  const reload = () => void getWalletFiles(profileId).then(setFiles).catch(error => setError('Could not read files: ' + String(error)))
   useEffect(reload, [profileId])
   const sizeLabel = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.round(n / 1024)}KB`)
   return (
