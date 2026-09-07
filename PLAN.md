@@ -560,3 +560,18 @@ Real-device/usability checks actually performed: none this phase — automated +
 Known limitations / intentionally deferred: no future-date arrival-by promises anywhere (Phase 6); desktop detail between 1024–1279px uses the dialog sheet rather than a drawer; the 200% check is a zoom proxy, not OS text scaling; unfinished-setup drafts are not persisted (Back within the wizard preserves state; a reload restarts it).
 
 Worker versions + hosted commit statuses: no worker deployment required (frontend-only); hosted statuses for the released commit recorded below after push.
+
+Phase 4 release verification (7 September 2026): GitHub Actions run for `df2cbf3` concluded **success** (full browser gate incl. the phase-four visual matrix + Pages deploy); Vercel production Ready and serving the new bundle (verified by fetching the deployed JS — new onboarding marker present — and confirming "Step 1 of 3 · Connect" renders live after the service worker's auto-update cycle; the one-open-stale window is the PWA's designed autoUpdate behaviour). Live verification output, verbatim:
+
+```text
+== verify live endpoints ==
+PASS: vercel app 200
+PASS: pages app 200
+PASS: push worker /vapid
+PASS: /stats locked (401)
+PASS: feed worker + cache header
+PASS: analytics dashboard 200
+done.
+```
+
+No worker deployment was needed or performed (frontend-only phase; push `d34465a8` / feed `7b8cfc54` remain current).
