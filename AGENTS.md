@@ -65,3 +65,7 @@ a new commit. `all` runs everything in order.
 
 Expected: all PASS — Vercel 200, Pages 200, `/vapid` returns a key, `/stats`
 401 without a key, feed serves `cache-control: public, max-age=900`, dashboard 200.
+
+## Remaining phases and UI design references
+
+For Phases 3–7, read [TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md](TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md). The accompanying [handoff-assets](handoff-assets/) directory contains the before/after screenshots and HTML concepts. These references now live in this repository; follow the handoff’s phase boundaries, styling specifications and acceptance tests when implementing the relevant phase.

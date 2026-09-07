@@ -556,3 +556,7 @@ Section 7 is the sole implementation sequence. These designs are delivered throu
 Additional checks performed for this follow-up: captured the unchanged current UI with synthetic journey responses and public map tiles; reproduced the home popover's clipped edge; inspected the proposed layouts in light/dark appearance at 736, 360 and 320 pixels; exercised route expansion, the home entry/back flow, day selection, Week/Month switching and the Monday PS1 travel example. The final captures block service workers to keep API fixtures deterministic. These are preview checks, not production route accuracy or accessibility certification.
 
 The original source repository remains unchanged. All new files are review artifacts or tests in the isolated copy. The existing enhancement priorities still apply: these designs should follow the data-integrity and notification fixes identified earlier.
+
+## Repository-local development handoff
+
+The detailed implementation specification for Phases 3–7 is [TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md](TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md). Its before/after screenshots and HTML concept sources are in [handoff-assets](handoff-assets/), with portable relative links. The handoff records the verified Phase 2 release baseline and expands the remaining fixes, UI styling, implementation steps and acceptance tests.

@@ -442,3 +442,39 @@ Context: niche audience (one PGCE cohort today — likely low hundreds of users)
 Phase 2 release gate: Pages-layout build, 12 unit tests and 9 isolated browser tests passed; the full Vercel-layout gate also passed before the final persistence-notice refinements. The worker-first deployment gate reran the Pages build and all 21 tests successfully. Authentication preflight passed. Deployed push worker `500e90a0-2157-4441-9f85-acfd6d1b26d4` (including `SYNC` binding) and feed worker `ff3de1ee-7ea2-4217-a826-23dba37de119`. No production notification, subscription or analytics test writes were used.
 
 Final worker revisions after calendar-ID escaping: push `917e1cd1-56f2-4f35-b192-345468cbfb18`, feed `43900bd2-e329-42b1-bdc1-08f9934c97c4`. The worker gate again passed all 12 unit and 9 browser tests. Equal-timestamp deletion markers take precedence over stale live records. Legacy single-profile migration now retains its original copy when persistence fails.
+
+### Repository-local AI development handoff — 7 September 2026
+
+Copied the detailed Phases 3–7 implementation handoff and its complete design-asset directory into the shared source repository. Added links from AGENTS.md and the enhancement report so Codex and Claude can discover the same specifications. Verified byte-for-byte copies and every relative design link. Documentation/assets only; application code is unchanged.
+
+### Pass 39 — Phases 3–7 implementation plan — 7 September 2026
+
+Read the full handoff (TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md, 921 lines) against the current baseline and produced the execution plan below. Baseline note: main is at `f783992`, two commits past the handoff's recorded Phase 2 release commit `439371d` — both are compatible bug fixes (shared parser zero-duration markers; identity-review duplicate-row deadlock) already deployed and verified live. No contract drift; the handoff's Phase 3 starting point holds.
+
+**Sequence (binding, from the handoff):** Phase 3 (reliability/data correctness) → Phase 4 (design system + navigation redesign) → Phase 5 (editable workflows) → Phase 6 (real travel planning + collaboration) → Phase 7 (optional expansion, only on explicit instruction). No phase starts until the previous phase's release gate passes and its completion record (handoff §9.4) is written here.
+
+**Branching:** per handoff §1.1, each phase runs on its own branch (`phase-3`, `phase-4`, …) with one commit per work item; merge to `main` (fast-forward) once that item's tests and the repository gate pass, so main stays releasable and worker-first ordering is preserved per item. Both gates for base-path-affecting work: `npm run validate` and `VERCEL=1 npm run validate`.
+
+**Phase 3 execution order** (dependencies first, worker-touching items clustered to minimise worker deploy cycles):
+
+1. **Fixtures first** — build `course-basic`, `membership-ranges`, `calendar-timezones` and `profile-race` synthetic fixtures (§9.1) before touching behaviour; extend `tests/fixtures.ts` keeping its external-request blocking.
+2. **P3-02** race-safe per-source refresh (AbortController + generation counters in `useTimetableData`) — foundational; several later items depend on "late results are ignored".
+3. **P3-03** single date-selection model shared by Day/Week/Month/Agenda.
+4. **P3-01** membership vs display filters with group-range parsing (`1-10`, lists, all-groups) — pure logic in `src/lib/groups.ts`/`filters.ts` + settings UI.
+5. **P3-06** attendance statistics with Attended/Absent/Unrecorded denominators (client-only).
+6. **P3-08** travel freshness envelope (loading/live/cached/estimate/unavailable) in `src/lib/tfl.ts`/`campus.ts` consumers — presentation contract Phase 6 later builds on.
+7. **P3-04** calendar/timezone/ICS parity (Europe/London course timezone, octet-based folding) — shared code + feed worker; worker-first deploy.
+8. **P3-05** profile-scoped notification payloads with owner — push worker + client; worker-first deploy.
+9. **P3-07** worker KV list pagination + stable study-group member IDs with Durable Object transactions — push worker; worker-first deploy. Items 7–9 land as one worker deployment window where practical.
+
+Phase 3 exit: handoff §4 release gate + completion record here, then live verify via `./scripts/deploy.sh verify`.
+
+**Phase 4:** P4-01 first (tokens + primitives + feature inventory — the inventory is the preservation checklist for every later screen), then Today → mobile Schedule → desktop Schedule → session detail (Overview + Travel & map with visible map) → Journey home full screen → Tasks/PGCE file → Settings → onboarding → accessibility + screenshot matrix (320/360/390/768/1024/1440, light/dark). Four-destination nav: Today · Schedule · Tasks · PGCE file. No future-date arrival-by claims (that is Phase 6); design assets in `handoff-assets/` are the reference.
+
+**Phase 5:** storage contracts first (tombstone/revision pattern + DraftEnvelope), then P5-01 Tasks CRUD → P5-02 PGCE record editing/drafts → P5-03 placement hours & exceptions → P5-04 evidence search + binder preview → P5-05 assignment work plans → P5-06 personal commitments (no recurrence in v1). Every new collection joins backup/sync/delete before its UI ships.
+
+**Phase 6:** P6-01 JourneyIntent/JourneyRequest model with arrival-by routing (verify TfL Journey Planner date/time/arrival parameters against current docs at implementation time) → P6-02 explicit origins + strict cache invalidation → P6-03 forecasts/disruptions/departure boards → P6-04 journey-home itinerary parity → P6-05 group availability/proposals.
+
+**Phase 7:** explicitly deferred pending user instruction — P7-02 in particular may require paid object storage, which the handoff does not pre-authorise.
+
+Standing constraints carried into every item: never delete/overwrite production KV outside records created by the task; reserved `ffffffff…` analytics test ids only; `/test` broadcast stays 410; deploy compatible workers before app; Vercel keeps `--skip-e2e`; browser gate stays in GitHub Actions; document migrations + rollback per stored-schema change.
