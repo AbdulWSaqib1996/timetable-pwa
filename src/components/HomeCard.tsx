@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import type { Coords, TravelMode } from '../lib/campus'
 import { TRAVEL_MODE_PHRASE, estimateTravelToCoords, haversineMeters } from '../lib/campus'
 import { formatRemaining } from '../lib/format'
-import { cachedRouteMinutes } from '../lib/tfl'
+import { freshnessLabel } from '../../shared/travel-state.js'
+import { cachedRouteInfo } from '../lib/tfl'
 import { cachedWeatherForHour, weatherEmoji, weatherForHour } from '../lib/weather'
 import { useLiveJourney } from '../hooks/useLiveJourney'
 import { RouteSteps } from './RouteSteps'
@@ -36,7 +37,7 @@ export function HomePill({ home, coords, locationEnabled, travelMode }: Props) {
 
   const visible = coords !== null && haversineMeters(coords, home) > 400
 
-  const { route, legDeps, routeDisruptions } = useLiveJourney(
+  const { route, routeFetchedAt, legDeps, routeDisruptions } = useLiveJourney(
     coords,
     home,
     open && visible && travelMode === 'transit'
@@ -87,12 +88,19 @@ export function HomePill({ home, coords, locationEnabled, travelMode }: Props) {
 
   const est = estimateTravelToCoords(home, coords, travelMode, 'Home')
   let minutes = est.minutes
-  let live = false
+  // Honest freshness (P3-08): live route → 'live TfL'; an older cached route
+  // says its age; the distance heuristic is always an estimate.
+  let basisLabel = ' (estimate)'
   if (travelMode === 'transit') {
-    const cached = route?.minutes ?? cachedRouteMinutes(coords, home)
-    if (cached !== null && cached !== undefined) {
-      minutes = cached
-      live = true
+    if (route) {
+      minutes = route.minutes
+      basisLabel = ` (${freshnessLabel({ basis: 'provider', fetchedAt: routeFetchedAt })})`
+    } else {
+      const info = cachedRouteInfo(coords, home)
+      if (info) {
+        minutes = info.route.minutes
+        basisLabel = ` (${freshnessLabel({ basis: 'provider', fetchedAt: info.fetchedAt })})`
+      }
     }
   }
   if (minutes === null) return null
@@ -123,7 +131,7 @@ export function HomePill({ home, coords, locationEnabled, travelMode }: Props) {
             <span className="home-card-title">🏠 Head home</span>
             <span className="home-card-info">
               ≈ {formatRemaining(minutes)} {TRAVEL_MODE_PHRASE[travelMode]}
-              {live ? ' (live TfL)' : ''} · arrive ~{arriveLabel}
+              {basisLabel} · arrive ~{arriveLabel}
             </span>
           </div>
           {route && <RouteSteps route={route} legDeps={legDeps} routeDisruptions={routeDisruptions} />}

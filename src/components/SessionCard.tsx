@@ -26,11 +26,16 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
   const travel =
     coords && session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
   // Keep card and detail-sheet times consistent: in transit mode, use the same
-  // cached live TfL journey the detail sheet shows (warmed by the app).
+  // cached live TfL journey the detail sheet shows (warmed by the app). Only a
+  // genuinely fresh provider value drops the estimate marker (P3-08).
   let travelMins = travel?.minutes ?? null
+  let liveBasis = false
   if (travelMins !== null && travelMode === 'transit' && travel?.location && coords) {
     const live = cachedRouteMinutes(coords, travel.location)
-    if (live !== null) travelMins = live
+    if (live !== null) {
+      travelMins = live
+      liveBasis = true
+    }
   }
   return (
     <button
@@ -67,8 +72,11 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
             })()}
           {session.tutor && session.tutor !== 'Self Study' && <span>{session.tutor}</span>}
           {travelMins != null && (
-            <span className="travel-chip" title={travel?.building ?? undefined}>
-              {TRAVEL_MODE_ICON[travelMode]} {formatRemaining(travelMins)}
+            <span
+              className="travel-chip"
+              title={`${liveBasis ? 'Live TfL journey time' : 'Estimate from distance'}${travel?.building ? ` · ${travel.building}` : ''}`}
+            >
+              {TRAVEL_MODE_ICON[travelMode]} {liveBasis ? '' : '≈'}{formatRemaining(travelMins)}
             </span>
           )}
           {weather && !session.isKeyDate && (

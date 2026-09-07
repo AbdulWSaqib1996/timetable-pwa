@@ -1,3 +1,4 @@
+import { LIVE_TTL_MS, travelStatus } from '../../shared/travel-state.js'
 import type { Coords } from './campus'
 
 /**
@@ -76,10 +77,28 @@ const routeCache = new Map<string, { at: number; route: TflRoute | null }>()
 const routeKey = (from: Coords, to: Coords) =>
   `${from.lat.toFixed(3)},${from.lng.toFixed(3)}|${to.lat.toFixed(4)},${to.lng.toFixed(4)}`
 
-/** Synchronous cache lookup of a live journey time (for the leave-alert loop). */
-export function cachedRouteMinutes(from: Coords, to: Coords): number | null {
+export interface CachedRouteInfo {
+  route: TflRoute
+  fetchedAt: number
+  status: 'live' | 'cached'
+}
+
+/** Synchronous cache lookup with honest freshness: 'live' within 5 minutes,
+ *  'cached' within 30, and nothing at all once expired. */
+export function cachedRouteInfo(from: Coords, to: Coords): CachedRouteInfo | null {
   const hit = routeCache.get(routeKey(from, to))
-  return hit && Date.now() - hit.at < 10 * 60_000 ? hit.route?.minutes ?? null : null
+  if (!hit?.route) return null
+  const status = travelStatus(hit.at)
+  if (status !== 'live' && status !== 'cached') return null
+  return { route: hit.route, fetchedAt: hit.at, status }
+}
+
+/** Synchronous cache lookup of a LIVE journey time (for the leave-alert loop).
+ *  Only provider data fresh within the live TTL qualifies — an old cached
+ *  duration must not masquerade as live. */
+export function cachedRouteMinutes(from: Coords, to: Coords): number | null {
+  const info = cachedRouteInfo(from, to)
+  return info && info.status === 'live' ? info.route.minutes : null
 }
 
 function cleanStop(name?: string): string {
@@ -94,7 +113,7 @@ function cleanStop(name?: string): string {
 export async function tflRoute(from: Coords, to: Coords): Promise<TflRoute | null> {
   const key = routeKey(from, to)
   const hit = routeCache.get(key)
-  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.route
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS) return hit.route
   let route: TflRoute | null = null
   try {
     const res = await fetch(

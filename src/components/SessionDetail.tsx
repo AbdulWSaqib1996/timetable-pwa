@@ -12,6 +12,7 @@ import { sessionKey } from '../lib/diff'
 import { trackUse } from '../lib/usage'
 import { addPhoto, compressImage, deletePhoto, getPhotos } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
+import { freshnessLabel } from '../../shared/travel-state.js'
 import { useLiveJourney } from '../hooks/useLiveJourney'
 import { RouteSteps } from './RouteSteps'
 import { weatherEmoji, weatherForHour } from '../lib/weather'
@@ -133,7 +134,7 @@ export function SessionDetail({
 
   // Live TfL journey (time + recommended route + per-leg departure boards +
   // disruptions on the route's lines) — shared with the head-home dropdown.
-  const { route, legDeps, routeDisruptions } = useLiveJourney(
+  const { route, routeFetchedAt, legDeps, routeDisruptions } = useLiveJourney(
     coords,
     travel?.location ?? null,
     travelMode === 'transit' && !!coords && !!travel?.location
@@ -163,7 +164,14 @@ export function SessionDetail({
   }, [session.dateISO, startMins, travelMins])
 
   const shownMinutes = travelMode === 'transit' && route ? route.minutes : travel?.minutes ?? null
-  const liveLabel = travelMode === 'transit' && route ? ' (live TfL)' : ''
+  // Honest freshness (P3-08): provider data says live/cached with its age;
+  // the distance heuristic is always labelled an estimate.
+  const liveLabel =
+    travelMode === 'transit' && route
+      ? ` (${freshnessLabel({ basis: 'provider', fetchedAt: routeFetchedAt })})`
+      : shownMinutes !== null
+        ? ' (estimate)'
+        : ''
   // The sheet's Location column glues building and room together — split them
   // into their own rows (with special cases for TBC and leaked booking refs).
   const loc = parseLocation(session.isSelfStudy ? '' : session.room)
