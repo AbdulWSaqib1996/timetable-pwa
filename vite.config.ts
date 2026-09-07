@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -9,6 +10,17 @@ const base = process.env.VERCEL ? '/' : '/timetable-pwa/'
 
 export default defineConfig({
   base,
+  build: {
+    rollupOptions: {
+      // Multi-page build (A3): the admin analytics dashboard is a real Vite
+      // entry, emitted as analytics.html at the dist root on BOTH hosting
+      // bases — the same URL the old static page had.
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        analytics: fileURLToPath(new URL('./analytics.html', import.meta.url)),
+      },
+    },
+  },
   // Build stamp shown in Settings so "am I on the latest version?" is answerable.
   define: {
     __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
@@ -78,6 +90,11 @@ export default defineConfig({
         // still succeeds offline, and periodic background sync (sw-periodic.js) keeps it warm.
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
         navigateFallback: `${base}index.html`,
+        // The learner SPA fallback must NEVER swallow the admin dashboard:
+        // an installed app's service worker controls the whole origin, and
+        // without this denylist a navigation to analytics.html would render
+        // learner Today instead (ADM-19). Registration strategy unchanged.
+        navigateFallbackDenylist: [/analytics/],
         importScripts: ['sw-periodic.js', 'sw-push.js'],
         runtimeCaching: [
           {
