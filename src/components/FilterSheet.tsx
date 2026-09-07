@@ -1,4 +1,5 @@
 import { useModalA11y } from '../lib/a11y'
+import { activeCourse } from '../lib/course'
 import type { FilterOptions } from '../lib/filters'
 import type { Filters, Settings } from '../types'
 
@@ -70,7 +71,7 @@ export function FilterSheet({
 
         {options.specialisms.length > 0 && (
           <section className="filter-section">
-            <h3>My specialisms (membership)</h3>
+            <h3>My {activeCourse().terminology.specialism.toLowerCase()}s (membership)</h3>
             <ChipList
               values={options.specialisms}
               selected={mySpecialisms}
@@ -82,17 +83,17 @@ export function FilterSheet({
                 checked={settings.hideOtherSpecialisms !== false}
                 onChange={(e) => onUpdateSettings({ hideOtherSpecialisms: e.target.checked })}
               />
-              Hide other specialisms automatically
+              Hide other {activeCourse().terminology.specialism.toLowerCase()}s automatically
             </label>
             {mySpecialisms.length === 0 && (
-              <p className="filter-hint">No specialism selected — all are shown.</p>
+              <p className="filter-hint">No {activeCourse().terminology.specialism.toLowerCase()} selected — all are shown.</p>
             )}
           </section>
         )}
 
         {options.groups.length > 1 && (
           <section className="filter-section">
-            <h3>My group (membership)</h3>
+            <h3>My {activeCourse().terminology.group.toLowerCase()} (membership)</h3>
             <ChipList
               values={options.groups}
               selected={settings.myGroups ?? []}

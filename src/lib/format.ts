@@ -1,6 +1,7 @@
 import { wallToUTC } from '../../shared/calendar-time.js'
 import { isPlacementTitle, placementTagOf } from '../../shared/eligibility.js'
 import type { Session } from '../types'
+import { courseZone } from './course'
 
 /** "IOE - Bedford Way (20) - 631" → "Bedford Way 631" (cards only; detail shows the full name). */
 export function shortenRoom(room: string): string {
@@ -40,7 +41,7 @@ export function formatRemaining(mins: number): string {
 export function googleCalendarUrl(s: Session): string | null {
   if (!s.start) return null
   const dt = (t: string) => {
-    const d = new Date(wallToUTC(s.dateISO, t).utcMs)
+    const d = new Date(wallToUTC(s.dateISO, t, courseZone()).utcMs)
     const pad = (n: number) => String(n).padStart(2, '0')
     return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`
   }

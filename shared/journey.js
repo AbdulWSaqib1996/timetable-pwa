@@ -1,4 +1,5 @@
 import { COURSE_TIMEZONE, wallToUTC } from './calendar-time.js'
+import { parseLineString } from './route-geometry.js'
 
 /**
  * Journey request/result model (P6-01/P6-02). A request carries its full
@@ -61,6 +62,9 @@ export function validateItinerary(raw, zone = COURSE_TIMEZONE) {
       minutes: Number(leg.duration) || 0,
       fromLat: leg.departurePoint?.lat,
       fromLng: leg.departurePoint?.lon,
+      // Provider route geometry (P7-03) — [] when TfL sends none; a missing
+      // line is simply not drawn, never faked from stop coordinates.
+      geometry: parseLineString(leg.path?.lineString),
       summary: leg.instruction?.summary ?? '',
       disruptions: (Array.isArray(leg.disruptions) ? leg.disruptions : [])
         .map((d) => String(d?.description ?? '').slice(0, 200))

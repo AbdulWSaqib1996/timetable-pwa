@@ -48,7 +48,9 @@ export async function planJourney(req: JourneyRequestLike, signal?: AbortSignal)
   else params.set('mode', TFL_MODES)
   let intentHonoured: PlanResult['intentHonoured'] = 'leave-now'
   if (req.intent.kind === 'arrive-by') {
-    const wall = utcToZonedParts(req.intent.arriveByMs)
+    // TfL expects LONDON wall time whatever the course timezone is — the
+    // provider's clock is not configurable.
+    const wall = utcToZonedParts(req.intent.arriveByMs, 'Europe/London')
     params.set('date', wall.dateISO.replace(/-/g, ''))
     params.set('time', wall.hhmm.replace(':', ''))
     params.set('timeIs', 'Arriving')

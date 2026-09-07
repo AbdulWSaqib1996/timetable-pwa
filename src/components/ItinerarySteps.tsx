@@ -12,6 +12,9 @@ interface Props {
   disruptions: TflDisruption[]
   /** show provider leg times (arrive-by plans) */
   showTimes?: boolean
+  /** P7-03: highlighted leg on the route map; rows toggle it when provided */
+  selectedLeg?: number | null
+  onSelectLeg?: (i: number | null) => void
 }
 
 const t = (ms: number | null) => (ms !== null ? utcToZonedParts(ms).hhmm : null)
@@ -21,7 +24,7 @@ const t = (ms: number | null) => (ms !== null ? utcToZonedParts(ms).hhmm : null)
  * where planned, a live departure board (stop, direction and the relevant
  * service only), and disruption warnings adjacent to the leg they affect.
  */
-export function ItinerarySteps({ itinerary, legDeps, disruptions, showTimes = false }: Props) {
+export function ItinerarySteps({ itinerary, legDeps, disruptions, showTimes = false, selectedLeg = null, onSelectLeg }: Props) {
   const legLineDisruptions = (line: string) =>
     line ? disruptions.filter((d) => line.toLowerCase().includes(d.line.toLowerCase())) : []
   return (
@@ -34,8 +37,28 @@ export function ItinerarySteps({ itinerary, legDeps, disruptions, showTimes = fa
         const color = tflLineColor(leg.line, leg.mode)
         const times = showTimes && leg.departMs !== null ? `${t(leg.departMs)}–${t(leg.arriveMs) ?? ''}` : null
         const lineWarnings = leg.mode === 'walking' ? [] : legLineDisruptions(leg.line)
+        const selectable = !!onSelectLeg && leg.geometry.length >= 2
         return (
-          <div className="route-step" key={i} style={{ borderLeftColor: color }}>
+          <div
+            className={`route-step${selectable ? ' route-step-selectable' : ''}${selectedLeg === i ? ' route-step-selected' : ''}`}
+            key={i}
+            style={{ borderLeftColor: color }}
+            {...(selectable
+              ? {
+                  role: 'button' as const,
+                  tabIndex: 0,
+                  'aria-pressed': selectedLeg === i,
+                  'aria-label': `Highlight this step on the map`,
+                  onClick: () => onSelectLeg(selectedLeg === i ? null : i),
+                  onKeyDown: (e: React.KeyboardEvent) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onSelectLeg(selectedLeg === i ? null : i)
+                    }
+                  },
+                }
+              : {})}
+          >
             <span className="route-step-icon">{tflModeIcon(leg.mode)}</span>
             <span className="route-step-body">
               {leg.mode === 'walking' ? (

@@ -100,8 +100,19 @@ function expandPlacements(sessions, plcMap) {
 const RL = new Map()
 
 // ICS generation is shared with the app download (shared/calendar-time.js):
-// UTC instants converted from Europe/London wall time and octet-based folding.
-const buildICS = (sessions, calName = 'My Timetable') => buildICSCalendar(sessions, calName)
+// UTC instants converted from course wall time (Europe/London unless a
+// configured course passes a validated tz — P7-01) and octet-based folding.
+const validTz = (tz) => {
+  if (typeof tz !== 'string' || !/^[A-Za-z][A-Za-z0-9_+\-/]{1,59}$/.test(tz)) return false
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: tz })
+    return true
+  } catch {
+    return false
+  }
+}
+const buildICS = (sessions, calName = 'My Timetable', tz = null) =>
+  buildICSCalendar(sessions, calName, validTz(tz) ? { zone: tz } : {})
 
 async function retainFeedIdentity(sessions, id, gid, env, ctx, keyDates = false) {
   if (env?.RATE) {
@@ -230,7 +241,7 @@ export default {
       }
     }
 
-    const response = new Response(buildICS(sessions, calName), {
+    const response = new Response(buildICS(sessions, calName, url.searchParams.get('tz')), {
       headers: {
         'content-type': 'text/calendar; charset=utf-8',
         'cache-control': 'public, max-age=900',

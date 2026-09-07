@@ -130,6 +130,8 @@ export interface Settings {
   groupMemberId?: string
   /** device-held membership capability — never synced to other devices */
   groupToken?: string
+  /** versioned course configuration (P7-01); absent = UCL Primary PGCE built-in */
+  courseConfig?: import('../shared/course.js').CourseConfig
   /** study-group working hours (minutes from midnight) and minimum meeting length */
   groupWorkStart?: number
   groupWorkEnd?: number

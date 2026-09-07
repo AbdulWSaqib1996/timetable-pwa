@@ -6,6 +6,7 @@ import { parseTimetable } from '../lib/parseTimetable'
 import { parseSheetUrl } from '../lib/sheetUrl'
 import { sessionInMembership } from '../../shared/membership.js'
 import type { Session } from '../types'
+import { activeCourse } from '../lib/course'
 
 export interface SetupResult {
   url: string
@@ -118,6 +119,10 @@ export function SetupScreen({ defaultName, onComplete, onDemo, onCancel }: Props
           <div className="setup-card">
             <p className="setup-step">Step 2 of 3 · Personalise</p>
             <h1>Make it yours</h1>
+            <p className="filter-hint">
+              Course: {activeCourse().name} — switch course or import a shared template any time
+              in Settings → My timetable → Course setup.
+            </p>
             <label className="ui-field">
               <span className="ui-field-label">Timetable name</span>
               <input type="text" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />

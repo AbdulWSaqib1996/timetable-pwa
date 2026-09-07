@@ -13,6 +13,7 @@ import { trackUse } from '../lib/usage'
 import { PHOTO_CAPTION_MAX, addPhoto, compressImage, deletePhoto, getPhotos, setPhotoCaption } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
 import { wallToUTC, utcToZonedParts } from '../../shared/calendar-time.js'
+import { courseZone } from '../lib/course'
 import { requiredArrivalMs } from '../../shared/journey.js'
 import { useJourney } from '../hooks/useJourney'
 import { ItinerarySteps } from './ItinerarySteps'
@@ -22,6 +23,7 @@ import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
 import { SegmentedControl } from './ui'
+import { RouteMap } from './RouteMap'
 import { StaticMap } from './StaticMap'
 
 interface Props {
@@ -169,7 +171,7 @@ export function SessionDetail({
   // arrive-by plan for its actual date/time with the chosen buffer; a
   // session happening about now gets a leave-now route. Driving stays a
   // labelled distance estimate — nothing future is fabricated for it.
-  const startMs = !isTask && session.start ? wallToUTC(session.dateISO, session.start).utcMs : null
+  const startMs = !isTask && session.start ? wallToUTC(session.dateISO, session.start, courseZone()).utcMs : null
   const planable = !isTask && !!travel?.location && travelMode !== 'driving'
   const futurePlan = planable && startMs !== null && startMs > Date.now() + 5 * 60_000
   const [originId, setOriginId] = useState<string | null>(
@@ -191,12 +193,16 @@ export function SessionDetail({
     mode: travelMode,
     intent:
       futurePlan && startMs !== null
-        ? { kind: 'arrive-by', arriveByMs: requiredArrivalMs(startMs, arrivalBufferMins), eventKey: sessionKey(session) }
+        ? { kind: 'arrive-by', arriveByMs: requiredArrivalMs(startMs, arrivalBufferMins), timeZone: courseZone(), eventKey: sessionKey(session) }
         : { kind: 'leave-now' },
     eventKey: sessionKey(session),
     enabled: tab === 'travel' && planable,
   })
   const shownItinerary = journey.departure === 'passed' ? journey.fallback : journey.itinerary
+  // Leg highlight for the route map (P7-03) — cleared whenever the itinerary
+  // itself changes so a stale selection can't point at the wrong route.
+  const [selectedLeg, setSelectedLeg] = useState<number | null>(null)
+  useEffect(() => setSelectedLeg(null), [shownItinerary])
 
   // Weather at the DESTINATION around the planned departure (provider horizon
   // honoured — outside it there is simply no forecast shown).
@@ -217,7 +223,7 @@ export function SessionDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [journey.leaveByMs, shownItinerary, travel?.location?.lat])
 
-  const hhmm = (ms: number) => utcToZonedParts(ms).hhmm
+  const hhmm = (ms: number) => utcToZonedParts(ms, courseZone()).hhmm
 
   // The sheet's Location column glues building and room together — split them.
   const loc = parseLocation(session.isSelfStudy || isTask ? '' : session.room)
@@ -604,7 +610,17 @@ export function SessionDetail({
           Copy address
         </button>
       </div>
-      {travel.location ? (
+      {travel.location && shownItinerary && shownItinerary.legs.some((l) => l.geometry.length >= 2) ? (
+        // Full-route map (P7-03): drawn ONLY from provider geometry; a failed
+        // or geometry-less plan falls back to the destination-only map below.
+        <RouteMap
+          itinerary={shownItinerary}
+          origin={origin?.coords ?? null}
+          destination={travel.location}
+          selectedLeg={selectedLeg}
+          label={travel.building ?? undefined}
+        />
+      ) : travel.location ? (
         <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} />
       ) : (
         <div className="ui-card map-fallback">
@@ -612,6 +628,12 @@ export function SessionDetail({
             No map match for this location — the address and external directions below still work.
           </p>
         </div>
+      )}
+      {travel.location && (
+        <p className="filter-hint entrance-note">
+          The pin marks the approximate building centre — entrances and step-free access aren't
+          verified here; check the venue's own access information.
+        </p>
       )}
       {shownItinerary && shownItinerary.legs.length > 0 ? (
         <details className="journey-steps">
@@ -627,6 +649,8 @@ export function SessionDetail({
             legDeps={journey.legDeps}
             disruptions={journey.disruptions}
             showTimes={futurePlan && journey.departure !== 'passed'}
+            selectedLeg={selectedLeg}
+            onSelectLeg={setSelectedLeg}
           />
         </details>
       ) : shownItinerary && shownItinerary.legs.length === 0 && travelMode === 'transit' ? (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ItinerarySteps } from '../../components/ItinerarySteps'
 import { OriginSelector } from '../../components/OriginSelector'
+import { RouteMap } from '../../components/RouteMap'
 import { StaticMap } from '../../components/StaticMap'
 import { EmptyState, PageHeader } from '../../components/ui'
 import { useJourney } from '../../hooks/useJourney'
@@ -60,6 +61,9 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
 
   // A minute tick keeps the arrival estimate current.
   const [, setTick] = useState(0)
+  // Route-map leg highlight (P7-03), cleared when the itinerary changes.
+  const [selectedLeg, setSelectedLeg] = useState<number | null>(null)
+  useEffect(() => setSelectedLeg(null), [journey.itinerary])
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 60_000)
     return () => clearInterval(t)
@@ -173,7 +177,17 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
         )}
       </div>
 
-      <StaticMap lat={home.lat} lng={home.lng} label="Home" />
+      {journey.itinerary && journey.itinerary.legs.some((l) => l.geometry.length >= 2) ? (
+        <RouteMap
+          itinerary={journey.itinerary}
+          origin={origin?.coords ?? null}
+          destination={home}
+          selectedLeg={selectedLeg}
+          label="Home"
+        />
+      ) : (
+        <StaticMap lat={home.lat} lng={home.lng} label="Home" />
+      )}
 
       {journey.itinerary && journey.itinerary.legs.length > 0 ? (
         <details className="journey-steps" open>
@@ -184,7 +198,13 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
               {[...new Set(journey.itinerary.legs.map((l) => (l.mode === 'walking' ? 'walk' : l.line || l.mode)))].join(' · ')}
             </span>
           </summary>
-          <ItinerarySteps itinerary={journey.itinerary} legDeps={journey.legDeps} disruptions={journey.disruptions} />
+          <ItinerarySteps
+            itinerary={journey.itinerary}
+            legDeps={journey.legDeps}
+            disruptions={journey.disruptions}
+            selectedLeg={selectedLeg}
+            onSelectLeg={setSelectedLeg}
+          />
         </details>
       ) : journey.itinerary && journey.itinerary.legs.length === 0 && travelMode === 'transit' ? (
         <p className="route-info">Best option now: walk (no transit leg needed).</p>

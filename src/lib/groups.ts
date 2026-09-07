@@ -1,8 +1,8 @@
-import { COURSE_TIMEZONE } from '../../shared/calendar-time.js'
 import { availabilityPayload, computeFreeIntervals } from '../../shared/availability.js'
 import type { FreeSlot } from '../../shared/availability.js'
 import type { Session } from '../types'
 import { toMinutes } from './format'
+import { courseZone } from './course'
 
 export type { FreeSlot }
 
@@ -76,7 +76,7 @@ export async function createGroup(
   const res = await fetch(`${trim(base)}/group`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(availabilityPayload({ code: '', name, slots, tz: COURSE_TIMEZONE })),
+    body: JSON.stringify(availabilityPayload({ code: '', name, slots, tz: courseZone() })),
   })
   if (!res.ok) throw new Error('Could not create the group.')
   const json = (await res.json()) as { code?: string; memberId?: string; token?: string }
@@ -94,7 +94,7 @@ export async function joinGroup(
   const res = await fetch(`${trim(base)}/group/join`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(availabilityPayload({ code, name, slots, tz: COURSE_TIMEZONE, creds })),
+    body: JSON.stringify(availabilityPayload({ code, name, slots, tz: courseZone(), creds })),
   })
   if (res.status === 404) throw new Error('No group with that code.')
   if (res.status === 403) {

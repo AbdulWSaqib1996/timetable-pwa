@@ -2,6 +2,7 @@ import { zonedTodayISO } from '../../shared/calendar-time.js'
 import { expandGroupOptions, sessionInMembership } from '../../shared/membership.js'
 import type { Filters, Session, Settings } from '../types'
 import { isPlacementSession } from './format'
+import { courseZone } from './course'
 
 export const DEFAULT_FILTERS: Filters = {
   dateRange: 'all',
@@ -46,10 +47,10 @@ export function deriveOptions(sessions: Session[]): FilterOptions {
   }
 }
 
-/** Today in the course timezone (Europe/London) — "today" must not shift when
- *  the device travels; the course calendar stays on London wall time. */
+/** Today in the ACTIVE course's timezone (P7-01) — "today" must not shift
+ *  when the device travels; the course calendar stays on course wall time. */
 export function localTodayISO(): string {
-  return zonedTodayISO()
+  return zonedTodayISO(courseZone())
 }
 
 /** Monday–Sunday bounds (inclusive, ISO dates) of the week containing `todayISO`. */
