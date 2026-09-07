@@ -55,6 +55,8 @@ import { subscribePush } from './lib/push'
 import { EMPTY_ADMIN, loadAdminFile, saveAdminFile } from './lib/admin'
 import type { AdminFile, TaskRecord } from './lib/admin'
 import { duplicateTask, migrateCustomKeyDates, overlayTaskMeta, taskEventKey, taskToSession } from './lib/tasks'
+import { applyPlacementExceptions } from './lib/placement'
+import { PlacementPage } from './features/pgce/PlacementPage'
 import { TaskEditSheet } from './components/TaskEditSheet'
 import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
 import type { Notice } from './lib/notices'
@@ -525,24 +527,37 @@ export default function App() {
   const filteredSessions = useMemo(
     () =>
       sessions && settings
-        ? applyFilters(sessions, settings, todayISO, { ignoreDateRange: true })
+        ? applyPlacementExceptions(
+            applyFilters(sessions, settings, todayISO, { ignoreDateRange: true }),
+            adminFile.exceptions,
+            settings
+          )
         : [],
-    [sessions, settings, todayISO]
+    [sessions, settings, todayISO, adminFile.exceptions]
   )
 
-  // Course membership only (specialisms + groups), all dates: the base set for
-  // exports, search, stats, journal, Now/Next and group availability. Temporary
-  // display filters (rooms, subjects…) never narrow this.
-  const courseSessions = useMemo(
+  // Course membership only (specialisms + groups), all dates, BEFORE placement
+  // exceptions — the Placement page needs the raw plan to show excluded days.
+  const rawCourseSessions = useMemo(
     () => (sessions && settings ? selectCourseSessions(sessions, settings) : []),
     [sessions, settings]
+  )
+
+  // The agreed view everywhere else (schedule, stats, calendar, reminders):
+  // placement exceptions applied after span expansion (P5-03).
+  const courseSessions = useMemo(
+    () => (settings ? applyPlacementExceptions(rawCourseSessions, adminFile.exceptions, settings) : rawCourseSessions),
+    [rawCourseSessions, adminFile.exceptions, settings]
   )
 
   // What notifications may fire for: membership plus the explicit optional/
   // self-study reminder preferences — independent of any display filter.
   const reminderSessions = useMemo(
-    () => (sessions && settings ? selectReminderSessions(sessions, settings) : []),
-    [sessions, settings]
+    () =>
+      sessions && settings
+        ? applyPlacementExceptions(selectReminderSessions(sessions, settings), adminFile.exceptions, settings)
+        : [],
+    [sessions, settings, adminFile.exceptions]
   )
 
   // Sheet key dates + the user's personal tasks (task records), merged into
@@ -965,6 +980,7 @@ export default function App() {
             section={route.section as SettingsSection | undefined}
             onOpenSection={(sec) => navigate({ name: 'settings', section: sec })}
             sources={sources}
+            exceptions={adminFile.exceptions}
             settings={settings}
             store={store}
             courseSessions={courseSessions}
@@ -992,6 +1008,26 @@ export default function App() {
             }}
           />
         </Suspense>
+      ) : route.name === 'placement' ? (
+        <PlacementPage
+          profileName={active.name}
+          settings={settings}
+          sessions={rawCourseSessions}
+          exceptions={adminFile.exceptions}
+          metaMap={metaMap}
+          todayISO={todayISO}
+          onSaveException={(rec) =>
+            updateAdmin((prev) => ({
+              ...prev,
+              exceptions: [...prev.exceptions.filter((e) => e.id !== rec.id), rec],
+            }))
+          }
+          onDeleteException={(id) =>
+            updateAdmin((prev) => ({ ...prev, exceptions: prev.exceptions.filter((e) => e.id !== id) }))
+          }
+          onUpdateSettings={updateSettings}
+          onBack={() => goBackOr({ name: 'pgce' })}
+        />
       ) : route.name === 'tasks' ? (
         <TasksPage
           profileName={active.name}
@@ -1040,10 +1076,7 @@ export default function App() {
           }}
           onOpenJournal={() => setOpenSheet('journal')}
           onOpenStats={() => setOpenSheet('stats')}
-          onOpenPlacements={() => {
-            updateFilters({ placementsOnly: true })
-            navigate({ name: 'schedule' })
-          }}
+          onOpenPlacements={() => navigate({ name: 'placement' })}
         />
       ) : route.name === 'schedule' ? (
         <SchedulePage

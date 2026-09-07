@@ -13,6 +13,7 @@ export type Route =
   | { name: 'settings'; section?: string }
   | { name: 'session'; key: string }
   | { name: 'homeJourney' }
+  | { name: 'placement' }
 
 export const TOP_LEVEL: Route['name'][] = ['today', 'schedule', 'tasks', 'pgce']
 
@@ -32,6 +33,8 @@ export function routeHash(route: Route): string {
       return `#/session/${encodeURIComponent(route.key)}`
     case 'homeJourney':
       return '#/home'
+    case 'placement':
+      return '#/placement'
   }
 }
 
@@ -50,6 +53,8 @@ export function parseRoute(hash: string): Route {
       return parts[1] ? { name: 'session', key: decodeURIComponent(parts[1]) } : { name: 'today' }
     case 'home':
       return { name: 'homeJourney' }
+    case 'placement':
+      return { name: 'placement' }
     default:
       return { name: 'today' }
   }

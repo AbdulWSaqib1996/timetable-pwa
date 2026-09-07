@@ -137,6 +137,10 @@ export interface Settings {
   >
   /** required assessed school days for the course (drives the placement progress line) */
   placementTargetDays?: number
+  /** default placement working hours (P5-03) */
+  placementHours?: { start: string; end: string; breakMins?: number }
+  /** whether inset/training days count toward planned school days (default true) */
+  placementInsetCounts?: boolean
 }
 
 /** One saved timetable (sheet + all its choices). */

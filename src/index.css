@@ -3407,3 +3407,48 @@ body {
   background: var(--surface);
   color: var(--text);
 }
+
+/* ---------- Placement page (P5-03) ---------- */
+
+.placement-day-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.placement-day-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  align-items: baseline;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 2px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.placement-day-date {
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 92px;
+}
+
+.placement-day-date.excluded {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.placement-day-status {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.placement-block {
+  margin-bottom: 12px;
+}

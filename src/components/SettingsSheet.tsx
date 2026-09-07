@@ -28,6 +28,8 @@ import {
 import type { SyncState } from '../lib/sync'
 import { exportBackup, importBackup } from '../lib/storage'
 import type { SourceStatus } from '../../shared/refresh.js'
+import type { PlacementExceptionRec } from '../lib/admin'
+import { placementBlocks as computePlacementBlocks } from '../lib/placement'
 import { WHATSNEW } from '../lib/changelog'
 import { IconBack, PageHeader } from './ui'
 import { useEffect } from 'react'
@@ -48,6 +50,8 @@ interface Props {
   onOpenSection: (section: SettingsSection) => void
   /** per-source refresh outcomes for the data-health list */
   sources: SourceStatus[]
+  /** placement exceptions, for provenance in the day-log export */
+  exceptions: PlacementExceptionRec[]
   settings: Settings
   store: ProfileStore
   /** sessions with the user's filters applied (specialisms etc.), all dates */
@@ -110,6 +114,7 @@ export function SettingsSheet({
   section,
   onOpenSection,
   sources,
+  exceptions,
   settings,
   store,
   courseSessions,
@@ -364,30 +369,38 @@ export function SettingsSheet({
     downloadFile('attendance.csv', rows.join('\r\n'), 'text/csv;charset=utf-8')
   }
 
-  // Placement day log: one row per school day per block, for mentor/tutor sign-off.
+  // Placement day log: one row per school day per block with provenance
+  // (P5-03) — planned vs logged, exception kind, inferred/corrected flags.
   function downloadPlacementLog() {
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
-    const rows = ['Date,Block,School,Attended,Absent,Reason,Note']
-    const seen = new Set<string>()
-    for (const s of courseSessions) {
-      if (s.isKeyDate || !isPlacementSession(s)) continue
-      const tag = placementTag(s.title)
-      const dayKey = `${tag}|${s.dateISO}`
-      if (seen.has(dayKey)) continue
-      seen.add(dayKey)
-      const m = metaMap[sessionKey(s)]
-      const school = (settings.placements ?? {})[tag]?.school ?? ''
-      rows.push(
-        [
-          s.dateISO,
-          tag,
-          esc(school),
-          m?.attended ? 'yes' : 'no',
-          m?.absent ? 'yes' : 'no',
-          esc(m?.absentReason ?? ''),
-          esc(m?.note ?? ''),
-        ].join(',')
-      )
+    const rows = [
+      'Date,Block,School,Planned mins,Logged mins,Provenance,Exception,Inferred,Attended,Absent,Reason,Note',
+    ]
+    const blocks = computePlacementBlocks(courseSessions, exceptions, settings, (s) => metaMap[sessionKey(s)])
+    for (const b of blocks) {
+      const school = (settings.placements ?? {})[b.tag]?.school ?? ''
+      for (const d of b.days) {
+        const meta = courseSessions
+          .filter((s) => !s.isKeyDate && isPlacementSession(s) && placementTag(s.title) === b.tag && s.dateISO === d.dateISO)
+          .map((s) => metaMap[sessionKey(s)])
+          .find(Boolean)
+        rows.push(
+          [
+            d.dateISO,
+            b.tag,
+            esc(school),
+            String(d.plannedMins),
+            d.loggedMins === null ? '' : String(d.loggedMins),
+            d.loggedFrom === 'correction' ? 'corrected entry' : d.loggedFrom === 'day-tick' ? 'whole-day tick' : 'unrecorded',
+            d.exception ? d.exception.kind : '',
+            d.inferred ? 'inferred from timetable' : 'from sheet row',
+            d.attended ? 'yes' : 'no',
+            d.absent ? 'yes' : 'no',
+            esc(meta?.absentReason ?? ''),
+            esc(d.exception?.note ?? meta?.note ?? ''),
+          ].join(',')
+        )
+      }
     }
     downloadFile('placement-day-log.csv', rows.join('\r\n'), 'text/csv;charset=utf-8')
   }
