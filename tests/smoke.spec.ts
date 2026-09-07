@@ -17,6 +17,8 @@ test('demo timetable renders and a session detail opens', async ({ page }) => {
     await picker.getByRole('button').last().click()
   }
 
+  // Phase 4 shell: session cards live in the Schedule destination.
+  await page.getByRole('button', { name: 'Schedule' }).click()
   const firstCard = page.locator('.session-card').first()
   await expect(firstCard).toBeVisible()
   await firstCard.click()

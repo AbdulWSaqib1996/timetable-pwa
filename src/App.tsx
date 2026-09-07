@@ -5,14 +5,14 @@ import { reportPersistenceFailure } from './lib/persistence'
 import { markBackedUp } from './lib/storage'
 import { PersistenceNotice } from './components/PersistenceNotice'
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import { AgendaView } from './components/AgendaView'
-import { FilterBar } from './components/FilterBar'
-import { HomePill } from './components/HomeCard'
-import { MonthView } from './components/MonthView'
-import { NowNextCard } from './components/NowNextCard'
+import { AppShell } from './components/AppShell'
 import { SessionDetail } from './components/SessionDetail'
 import { SetupScreen } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
+import { SchedulePage } from './features/schedule/SchedulePage'
+import { TodayPage } from './features/today/TodayPage'
+import { useRoute } from './lib/router'
+import type { Route } from './lib/router'
 
 // The bottom sheets are modal and rarely part of first paint — split them out
 // of the initial bundle (they load on first open).
@@ -30,7 +30,6 @@ import { maybePing } from './lib/analytics'
 import { loadSyncState as loadSyncStateForPing } from './lib/sync'
 import { trackOpen, trackUse } from './lib/usage'
 import { UpdateToast } from './components/UpdateToast'
-import { WeekView } from './components/WeekView'
 import { legacyKey } from '../shared/identity.js'
 import { sessionKey } from './lib/diff'
 import {
@@ -83,20 +82,6 @@ import type {
   ViewMode,
 } from './types'
 
-function formatAge(fetchedAt: number): string {
-  const mins = Math.round((Date.now() - fetchedAt) / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.round(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.round(hours / 24)}d ago`
-}
-
-function matchesQuery(s: Session, q: string): boolean {
-  const needle = q.toLowerCase()
-  return [s.title, s.subject, s.tutor, s.room].some((f) => f && f.toLowerCase().includes(needle))
-}
-
 type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats' | 'group' | 'adddl' | 'journal' | 'admin'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
@@ -124,8 +109,6 @@ export default function App() {
   const [selected, setSelected] = useState<Session | null>(null)
   // One date-selection model shared by Day/Week/Month (null = follow today).
   const [selectedDateISO, setSelectedDateISO] = useState<string | null>(null)
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [query, setQuery] = useState('')
   const [showBackupNudge, setShowBackupNudge] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowWhatsNew())
@@ -151,6 +134,33 @@ export default function App() {
     }, 60_000)
     return () => clearInterval(t)
   }, [])
+
+  // Phase 4 shell: hash routing across Today · Schedule · Tasks · PGCE file.
+  const [route, navigate] = useRoute()
+  const goBackOr = (fallback: Route) => {
+    if (window.history.length > 1) window.history.back()
+    else navigate(fallback, { replace: true })
+  }
+  function handleNavigate(r: Route) {
+    // Settings stays a focused surface reachable from everywhere (P4-08 turns
+    // it into routed pages); Tasks/PGCE are routed destinations.
+    if (r.name === 'settings') {
+      setOpenSheet('settings')
+      return
+    }
+    navigate(r)
+  }
+  // Route → surface sync for the interim sheet-based Tasks/PGCE/Settings.
+  useEffect(() => {
+    if (route.name === 'tasks') setOpenSheet('keydates')
+    else if (route.name === 'pgce') setOpenSheet('admin')
+    else if (route.name === 'settings') setOpenSheet('settings')
+    else setOpenSheet((cur) => (cur === 'keydates' || cur === 'admin' ? 'none' : cur))
+  }, [route.name])
+  function routeAwareClose() {
+    if (route.name === 'tasks' || route.name === 'pgce' || route.name === 'settings') goBackOr({ name: 'today' })
+    else setOpenSheet('none')
+  }
 
   const {
     sessions,
@@ -262,9 +272,6 @@ export default function App() {
   useEffect(() => {
     if (viewForTrack !== 'day') trackUse(viewForTrack)
   }, [viewForTrack])
-  useEffect(() => {
-    if (searchOpen) trackUse('search')
-  }, [searchOpen])
   useEffect(() => {
     if (showHistory) trackUse('historyview')
   }, [showHistory])
@@ -543,11 +550,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingOpen, active?.id, sessions, allKeyDates])
 
-  const searchResults = useMemo(() => {
-    const q = query.trim()
-    return q ? [...courseSessions, ...allKeyDates].filter((s) => matchesQuery(s, q)) : null
-  }, [courseSessions, allKeyDates, query])
-
   // Day view weaves key dates in as highlighted blocks (toggle in Filters); they follow
   // the same date-range choice as the rest of the day view.
   const dayViewSessions = useMemo(() => {
@@ -745,101 +747,9 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <AppShell route={route} onNavigate={handleNavigate} profileName={active.name}>
       <PersistenceNotice />
       <SyncNotice />
-      <header className="header-stack">
-        <div className="topbar">
-          <div className="topbar-title">
-            <h1>My Timetable</h1>
-            {fetchedAt && (
-              <span className="updated">
-                {settings.demo ? 'demo data' : `updated ${formatAge(fetchedAt)}`}
-              </span>
-            )}
-          </div>
-          <div className="topbar-actions">
-            {settings.homeLat != null && settings.homeLng != null && (
-              <HomePill
-                home={{ lat: settings.homeLat, lng: settings.homeLng }}
-                coords={coords}
-                locationEnabled={locationEnabled}
-                travelMode={travelMode}
-              />
-            )}
-            <button
-              type="button"
-              className="btn-icon"
-              onClick={() => setOpenSheet('admin')}
-              aria-label="My PGCE file"
-              title="My PGCE file"
-            >
-              🎓
-            </button>
-            <button
-              type="button"
-              className="btn-icon"
-              onClick={() => {
-                setSearchOpen((v) => !v)
-                setQuery('')
-              }}
-              aria-label="Search"
-              title="Search"
-            >
-              🔍
-            </button>
-            <button type="button" className="btn-icon btn-bell" onClick={openChanges} aria-label="Changes" title="Changes">
-              🔔
-              {unseenChanges > 0 && <span className="bell-badge">{unseenChanges}</span>}
-            </button>
-            <button
-              type="button"
-              className="btn-icon"
-              onClick={() => refresh(settings, active.id)}
-              disabled={refreshing}
-              aria-label="Refresh"
-              title="Refresh"
-            >
-              {refreshing ? '…' : '↻'}
-            </button>
-            <button
-              type="button"
-              className="btn-icon"
-              onClick={() => setOpenSheet('settings')}
-              aria-label="Settings"
-              title="Settings"
-            >
-              ⚙
-            </button>
-          </div>
-        </div>
-        {searchOpen && (
-          <div className="searchbar">
-            <input
-              type="search"
-              placeholder="Search title, tutor or room…"
-              aria-label="Search sessions"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoFocus
-            />
-            {searchResults && <span className="search-count">{searchResults.length}</span>}
-          </div>
-        )}
-        <FilterBar
-          view={view}
-          activeCount={activeFilterCount(settings)}
-          placementsOnly={filters.placementsOnly === true}
-          historyOn={showHistory}
-          onToggleHistory={() => setShowHistory((v) => !v)}
-          onView={(v) => {
-            // View switches preserve the selected date (one shared model).
-            updateSettings({ activeView: v })
-          }}
-          onTogglePlacements={() => updateFilters({ placementsOnly: !filters.placementsOnly })}
-          onOpenFilters={() => setOpenSheet('filters')}
-        />
-      </header>
 
       {identityReview.length > 0 && (
         <button
@@ -992,7 +902,7 @@ export default function App() {
         </div>
       )}
 
-      {sessions !== null && view === 'day' && !searchResults && travelMode === 'transit' && tubeStatus.length > 0 && (
+      {route.name === 'today' && sessions !== null && travelMode === 'transit' && tubeStatus.length > 0 && (
         <details className="tfl-banner">
           <summary>
             ⚠ TfL disruptions: {tubeStatus.slice(0, 3).map((d) => d.line).join(', ')}
@@ -1007,86 +917,35 @@ export default function App() {
         </details>
       )}
 
-      {sessions !== null && view === 'day' && !searchResults && (
-        <NowNextCard sessions={courseSessions} onSelect={setSelected} />
-      )}
-
-      {sessions !== null &&
-        view === 'day' &&
-        !searchResults &&
-        (() => {
-          const next = allKeyDates
-            .filter((k) => metaMap[sessionKey(k)]?.status !== 'done')
-            .sort((a, b) => a.dateISO.localeCompare(b.dateISO))[0]
-          if (!next) return null
-          const days = daysUntil(next.dateISO, todayISO)
-          return (
-            <button type="button" className="keydate-strip" onClick={() => setOpenSheet('keydates')}>
-              <span className="keydate-title">📌 {next.title}</span>
-              <span className={`kd-chip${days <= 7 ? ' urgent' : ''}`}>
-                {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `in ${days}d`}
-              </span>
-            </button>
-          )
-        })()}
-
-      {sessions === null ? (
-        <div className="empty-state">Loading timetable…</div>
-      ) : searchResults ? (
-        <AgendaView
-          sessions={searchResults}
-          onSelect={setSelected}
+      {route.name === 'schedule' ? (
+        <SchedulePage
+          settings={settings}
+          profileName={active.name}
+          todayISO={todayISO}
+          view={view}
+          selectedDateISO={selectedDateISO}
+          onSelectDate={setSelectedDateISO}
+          filteredSessions={filteredSessions}
+          dayViewSessions={dayViewSessions}
+          courseSessions={courseSessions}
+          allKeyDates={allKeyDates}
+          keyDateDays={keyDateDays}
+          monthExtras={monthExtras}
           metaMap={metaMap}
-          termStartISO={settings.termStartISO}
           coords={coords}
           travelMode={travelMode}
-          placements={settings.placements}
-          emptyMessage={`No sessions match “${query.trim()}”.`}
-        />
-      ) : view === 'week' ? (
-        <WeekView
-          sessions={filteredSessions}
-          keyDates={getFilters(settings).showKeyDates ? allKeyDates : []}
-          todayISO={todayISO}
-          anchorISO={selectedDateISO ?? todayISO}
-          onNavigate={(iso) => setSelectedDateISO(iso === todayISO ? null : iso)}
-          onSelect={setSelected}
-          termStartISO={settings.termStartISO}
-          coords={coords}
-          travelMode={travelMode}
-          placements={settings.placements}
-        />
-      ) : view === 'month' ? (
-        <MonthView
-          sessions={filteredSessions}
-          todayISO={todayISO}
-          anchorISO={selectedDateISO ?? todayISO}
-          onNavigate={(iso) => setSelectedDateISO(iso === todayISO ? null : iso)}
-          keyDateDays={getFilters(settings).showKeyDates ? keyDateDays : undefined}
-          placementDays={monthExtras.placementDays}
-          breakStarts={monthExtras.breakStarts}
-          onPickDay={(dateISO) => {
-            setSelectedDateISO(dateISO === todayISO ? null : dateISO)
-            // A "Today only"/"This week" display range must never hide a date
-            // the user just chose — widen it rather than show an empty day.
-            if (dateISO !== todayISO && getFilters(settings).dateRange !== 'all') {
-              updateFilters({ dateRange: 'all' })
-            }
-            updateSettings({ activeView: 'day' })
-          }}
-        />
-      ) : (
-        <AgendaView
-          sessions={dayViewSessions}
-          scrollTo={selectedDateISO}
-          todayISO={todayISO}
-          onToday={() => setSelectedDateISO(null)}
-          onSelect={setSelected}
-          metaMap={metaMap}
-          termStartISO={settings.termStartISO}
-          coords={coords}
-          travelMode={travelMode}
-          placements={settings.placements}
+          showHistory={showHistory}
+          onToggleHistory={() => setShowHistory((v) => !v)}
+          activeCount={activeFilterCount(settings)}
+          filters={filters}
+          sessionsLoaded={sessions !== null}
+          emptyMessage={
+            sessions !== null && sessions.length === 0
+              ? 'No sessions found in this sheet.'
+              : filters.dateRange === 'today'
+                ? 'Nothing on today. 🎉'
+                : 'No sessions match your filters.'
+          }
           placementProgress={
             placementStats.totalDays > 0
               ? {
@@ -1096,15 +955,36 @@ export default function App() {
                 }
               : undefined
           }
-          windowed
-          showAllPast={showHistory}
-          emptyMessage={
-            sessions.length === 0
-              ? 'No sessions found in this sheet.'
-              : filters.dateRange === 'today'
-                ? 'Nothing on today. 🎉'
-                : 'No sessions match your filters.'
-          }
+          onView={(v) => updateSettings({ activeView: v })}
+          onTogglePlacements={() => updateFilters({ placementsOnly: !filters.placementsOnly })}
+          onOpenFilters={() => setOpenSheet('filters')}
+          onSelect={setSelected}
+          onUpdateFilters={updateFilters}
+        />
+      ) : sessions === null && !settings.demo ? (
+        <div className="empty-state">Loading timetable…</div>
+      ) : (
+        <TodayPage
+          profileName={active.name}
+          todayISO={todayISO}
+          fetchedAt={fetchedAt}
+          refreshing={refreshing}
+          demo={settings.demo === true}
+          onRefresh={() => refresh(settings, active.id)}
+          courseSessions={courseSessions}
+          allKeyDates={allKeyDates}
+          metaMap={metaMap}
+          unseenChanges={unseenChanges}
+          latestChange={changes.find((c) => !c.seen) ?? null}
+          settings={settings}
+          coords={coords}
+          travelMode={travelMode}
+          locationEnabled={locationEnabled}
+          onSelect={setSelected}
+          onOpenChanges={openChanges}
+          onOpenSettings={() => setOpenSheet('settings')}
+          onOpenTasks={() => navigate({ name: 'tasks' })}
+          onOpenSchedule={() => navigate({ name: 'schedule' })}
         />
       )}
 
@@ -1179,7 +1059,7 @@ export default function App() {
         />
       )}
 
-      {openSheet === 'admin' && (
+      {(openSheet === 'admin' || route.name === 'pgce') && (
         <AdminSheet
           profileId={active.id}
           profileName={active.name}
@@ -1190,7 +1070,7 @@ export default function App() {
           keyDates={allKeyDates}
           placementTargetDays={settings.placementTargetDays}
           todayISO={todayISO}
-          onClose={() => setOpenSheet('none')}
+          onClose={routeAwareClose}
         />
       )}
 
@@ -1205,7 +1085,7 @@ export default function App() {
         />
       )}
 
-      {openSheet === 'keydates' && (
+      {(openSheet === 'keydates' || route.name === 'tasks') && (
         <KeyDatesSheet
           keyDates={allKeyDates}
           todayISO={todayISO}
@@ -1218,7 +1098,7 @@ export default function App() {
               customKeyDates: (settings.customKeyDates ?? []).filter((c) => `custom-${c.id}` !== id),
             })
           }
-          onClose={() => setOpenSheet('none')}
+          onClose={routeAwareClose}
         />
       )}
 
@@ -1284,12 +1164,12 @@ export default function App() {
             setAddingProfile(true)
           }}
           onDeleteProfile={handleDeleteProfile}
-          onClose={() => setOpenSheet('none')}
+          onClose={routeAwareClose}
         />
       )}
       </Suspense>
 
-      {view === 'day' && !searchResults && (
+      {route.name === 'today' && (
         <button
           type="button"
           className="fab-add"
@@ -1302,6 +1182,6 @@ export default function App() {
       )}
 
       <UpdateToast />
-    </div>
+    </AppShell>
   )
 }

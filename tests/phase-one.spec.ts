@@ -18,6 +18,7 @@ test('overdue personal deadlines remain visible and completed tasks do not notif
   await page.goto('./')
   await expect(page.locator('.keydate-strip')).toContainText('Overdue essay')
   await expect(page.locator('.keydate-strip')).toContainText('1d overdue')
+  await page.getByRole('button',{name:'Schedule'}).click()
   await page.getByRole('button',{name:'Filters',exact:true}).click()
   await page.getByRole('button',{name:/View all key dates/}).click()
   await expect(page.getByRole('dialog',{name:'Key dates'})).toBeVisible()

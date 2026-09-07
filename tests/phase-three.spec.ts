@@ -13,6 +13,7 @@ async function openDemo(page: import('@playwright/test').Page) {
   if (await picker.isVisible({ timeout: 3000 }).catch(() => false)) {
     await picker.getByRole('button').last().click()
   }
+  await page.getByRole('button', { name: 'Schedule' }).click()
   await expect(page.locator('.session-card').first()).toBeVisible()
 }
 
