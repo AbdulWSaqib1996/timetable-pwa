@@ -1019,7 +1019,7 @@ export default function App() {
           onSelect={openSession}
           onMeta={handleMeta}
         />
-      ) : sessions === null && !settings.demo ? (
+      ) : sessions === null && !settings.demo && !error ? (
         <div className="empty-state">Loading timetable…</div>
       ) : (
         <TodayPage

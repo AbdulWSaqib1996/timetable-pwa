@@ -64,7 +64,27 @@ export function MonthView({ sessions, todayISO, anchorISO, onNavigate, keyDateDa
           ›
         </button>
       </div>
-      <div className="month-grid">
+      <div
+        className="month-grid"
+        role="grid"
+        aria-label={monthLabel}
+        onKeyDown={(e) => {
+          // Arrow keys move focus through the calendar grid; selection stays a
+          // separate, deliberate Enter/Space/click (P4-10).
+          const deltas: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
+          const delta = deltas[e.key]
+          if (!delta) return
+          const target = e.target as HTMLElement
+          const cells = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('.month-cell:not(.blank)'))
+          const idx = cells.indexOf(target as HTMLButtonElement)
+          if (idx === -1) return
+          const next = cells[idx + delta]
+          if (next) {
+            e.preventDefault()
+            next.focus()
+          }
+        }}
+      >
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
           <div key={d} className="month-dow">
             {d}

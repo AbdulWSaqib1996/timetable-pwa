@@ -3323,3 +3323,38 @@ body {
   font-weight: 600;
   color: var(--danger);
 }
+
+/* Reduced motion: no scroll animation or transitions when the OS asks (P4-10) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Settings rows must wrap, never widen the page (P4-10) */
+.notif-overview li {
+  flex-wrap: wrap;
+}
+
+.notif-overview .notif-state {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: right;
+}
+
+.settings-body,
+.page-settings .filter-hint,
+.page-settings .settings-url {
+  overflow-wrap: anywhere;
+}
+
+.feed-row input {
+  min-width: 0;
+  width: 100%;
+}
