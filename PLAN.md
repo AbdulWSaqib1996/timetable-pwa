@@ -513,4 +513,4 @@ Real-device/usability checks actually performed: none this phase — automated s
 
 Known limitations / intentionally deferred: in-app reminder scheduling still compares London dates with the device clock's minutes (exact only in the UK; full course-timezone scheduling arrives with the Phase 6 travel/time work); the feed emits no SEQUENCE/METHOD:CANCEL records (unchanged from Phase 2); durable (cross-isolate) abuse counters not added — in-memory per-IP caps retained; per-source status UI is minimal (statuses feed the existing error banner; richer surfacing is Phase 4).
 
-Worker versions + hosted commit statuses: recorded after deployment below.
+Worker versions + hosted commit statuses: push worker `d34465a8-af85-4442-855e-87235680f684` (GROUPS Durable Object migration groups-v1 applied), feed worker `7b8cfc54-6629-49af-b7a4-e99bcdff79f0`, deployed worker-first before the app push. Live spot-check after worker deploy: /vapid 200, /stats 401 locked, DO group create→legacy join→stale-token 403→leave→404 all correct with a synthetic self-deleted test group. Hosted statuses and `deploy.sh verify` output recorded after the app rollout.
