@@ -8,6 +8,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
 import { SessionDetail } from './components/SessionDetail'
 import { SetupScreen } from './components/SetupScreen'
+import type { SetupResult } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
 import { PGCEPage } from './features/pgce/PGCEPage'
 import type { AdminTab } from './features/pgce/PGCEPage'
@@ -48,10 +49,7 @@ import {
   selectReminderSessions,
 } from './lib/filters'
 import { daysUntil, isPlacementSession, placementTag } from './lib/format'
-import { fetchGvizTable } from './lib/gviz'
-import { parseTimetable } from './lib/parseTimetable'
 import { expandPlacementSpans } from './lib/placementSpans'
-import { parseSheetUrl } from './lib/sheetUrl'
 import { parseShareHash } from './lib/share'
 import { DEFAULT_PUSH_BASE } from './lib/config'
 import { subscribePush } from './lib/push'
@@ -413,18 +411,20 @@ export default function App() {
     return id
   }
 
-  async function handleSetup(url: string) {
-    const parsed = parseSheetUrl(url)
-    if (!parsed) {
-      throw new Error('That doesn’t look like a Google Sheets link. It should contain /spreadsheets/d/…')
+  // Onboarding commits ONLY after the validated preview (P4-09): membership
+  // choices ride along, so the separate specialism picker never re-asks.
+  function handleSetupComplete(result: SetupResult) {
+    const s: Settings = {
+      sheetUrl: result.url,
+      sheetId: result.sheetId,
+      gid: result.gid,
+      mySpecialisms: result.mySpecialisms,
+      hideOtherSpecialisms: true,
+      myGroups: result.myGroups,
+      specialismsChosen: true,
     }
-    // Validate by fetching before saving anything.
-    const table = await fetchGvizTable(parsed.sheetId, parsed.gid)
-    const parsedSessions = expandPlacementSpans(parseTimetable(table).sessions)
-    const s: Settings = { sheetUrl: url, sheetId: parsed.sheetId, gid: parsed.gid }
-    const name = `Timetable ${(store?.profiles.length ?? 0) + 1}`
-    const id = addProfileToStore(s, name)
-    saveCache(id, { fetchedAt: Date.now(), sessions: parsedSessions })
+    const id = addProfileToStore(s, result.name)
+    saveCache(id, { fetchedAt: Date.now(), sessions: expandPlacementSpans(result.sessions) })
     setAddingProfile(false)
   }
 
@@ -736,7 +736,8 @@ export default function App() {
   if (!active || !settings || addingProfile) {
     return (
       <SetupScreen
-        onSubmit={handleSetup}
+        defaultName={`Timetable ${(store?.profiles.length ?? 0) + 1}`}
+        onComplete={handleSetupComplete}
         onDemo={handleDemo}
         onCancel={addingProfile && active ? () => setAddingProfile(false) : undefined}
       />

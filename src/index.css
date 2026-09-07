@@ -3276,3 +3276,50 @@ body {
 [data-density='compact'] .filter-section {
   padding: 8px 0;
 }
+
+/* ---------- Onboarding (P4-09) ---------- */
+
+.setup-step {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 4px;
+}
+
+.setup-preview-list {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setup-preview-list li {
+  display: flex;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.setup-preview-when {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.setup-warnings {
+  margin: 10px 0;
+}
+
+.setup-warnings summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--danger);
+}
