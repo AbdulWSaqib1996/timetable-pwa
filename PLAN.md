@@ -708,3 +708,23 @@ PASS: feed worker + cache header
 PASS: analytics dashboard 200
 done.
 ```
+
+### Pass 45 — Admin analytics A1: secure access and honest output — 7 September 2026
+
+Work items: phase A1 of `admin-analytics-handoff/ADMIN_ANALYTICS_ENHANCEMENTS.md` (§9), per `admin-analytics-handoff/DEVELOPMENT_PLAN.md`. Findings addressed: ADM-01, ADM-02, ADM-03, ADM-04, ADM-09, ADM-10, ADM-11, ADM-12 (both halves), ADM-14, ADM-16 (bounds portion), ADM-20 (disclosure portion). Remaining findings are A2+ scope by design.
+
+Commit and branch: one commit on `admin-a1`, merged to `main`.
+
+Behaviour changes:
+- `/stats` fails closed: absent/empty server key → 503 "configuration unavailable" and wrong/absent credential → 401, both BEFORE any analytics scan; `Authorization: Bearer` supported (constant-time compare) with the legacy `?key=` accepted only until 21 Sep 2026 (removed in the A2 worker deploy); `Cache-Control: no-store` on every stats response including errors; CORS preflight allows Authorization. Named 7/30-day figures use their own fixed windows regardless of `?days`; only valid-read rows count as activity; capped scans surface `scanComplete:false` (shared `listAllKeys` semantics untouched — analytics uses a new checked variant); positive-only adoption; per-flag known-value setup denominators. `/ping` body bounded to 8 KiB, stores positive counters and reported booleans only.
+- Dashboard: in-memory credential + snapshot only, legacy `tt.statskey`/`tt.statscache` purged on load; visible Lock (clears + aborts + generation-guards; late responses cannot repopulate); honest 401/503/429/network states with retry; fixed chart geometry with axis/date labels/focusable value text; truthful metric copy (tokens not people, standalone reports not installs, observed-days not "tried it once", attempt-labelled legacy counters, aggregation-time disclaimer, both retention facts disclosed); loud incomplete-scan warnings; unreported setup flags show "—", never 0%.
+
+Data/contract changes: `/stats` response ADDS `timezone`, `includesPartialToday`, `completeness{scanComplete,missingRows,invalidRows}`, `daily[].listed` and `setup.known` — all additive; existing fields keep their names so a stale installed dashboard still renders (its cached-key path now simply gets 401/503 states). No stored-data migrations; no analytics rows written or deleted beyond normal ping ingestion.
+
+Automated checks + results: `npm run validate` AND `VERCEL=1 npm run validate` green — 104 unit (7 new: fail-closed matrix with no-scan-before-auth spies on a fake KV, both auth forms, days=1 window independence, null-row completeness, 60-page capped-scan flag, zero/negative adopter minting, ping bounds/boolean-only setup) and 44 browser tests (4 new admin-a1: legacy purge + no-fetch-before-unlock + header-only credential, full lock lifecycle including a late in-flight response being discarded, honest 401/503 copy, nonzero bar geometry + honest labels + completeness warnings). Screenshots from synthetic fixtures at 390px and 1440px: `admin-analytics-handoff/evidence/a1-390.png`, `a1-1440.png` (page is dark-only until A3 ships themes).
+
+A1 acceptance (spec §9): unauthorized/misconfigured stats never scan or render ✓ (unit spies + 503/401 before list); no secret in URLs or new persistent storage ✓; forced 401 after a loaded snapshot removes it ✓; a response arriving after Lock cannot repopulate ✓ (browser-tested); nonzero bars visibly render ✓ (offsetHeight-asserted); short-range requests do not truncate named fixed windows ✓; missing rows/capped scans flagged ✓; zero denominator shows unavailable ✓. Worker deploys before the page per the runbook.
+
+Rollback: auth fail-closed + no-store are retained under any rollback; rendering changes are independently revertible. The legacy query credential path is documented for removal in A2 and must not outlive it.
+
+Worker versions + hosted commit statuses: recorded after deployment below.
