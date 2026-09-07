@@ -1,0 +1,401 @@
+{
+  "generatedAt": "2026-09-07T10:42:00Z",
+  "windowDays": 31,
+  "totalDevicesEver": 286,
+  "activeLast7Days": 124,
+  "activeLast30Days": 208,
+  "todayVersions": {
+    "11": 8,
+    "12": 30
+  },
+  "retention": {
+    "oneDay": 58,
+    "twoToFourDays": 88,
+    "fivePlusDays": 62
+  },
+  "features": {
+    "detail": {
+      "devices": 92,
+      "uses": 384
+    },
+    "week": {
+      "devices": 74,
+      "uses": 212
+    },
+    "search": {
+      "devices": 48,
+      "uses": 106
+    },
+    "photo": {
+      "devices": 18,
+      "uses": 31
+    },
+    "binder": {
+      "devices": 11,
+      "uses": 14
+    }
+  },
+  "opensLast7Days": 416,
+  "dayparts": [
+    3,
+    62,
+    148,
+    102,
+    84,
+    17
+  ],
+  "setup": {
+    "devices": 36,
+    "counts": {
+      "push": 24,
+      "location": 22,
+      "home": 28,
+      "keyDates": 18,
+      "sync": 17,
+      "placements": 16
+    }
+  },
+  "daily": [
+    {
+      "date": "2026-09-07",
+      "active": 38,
+      "installed": 24,
+      "newDevices": 6,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-09-06",
+      "active": 39,
+      "installed": 21,
+      "newDevices": 4,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-09-05",
+      "active": 46,
+      "installed": 24,
+      "newDevices": 5,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-09-04",
+      "active": 53,
+      "installed": 27,
+      "newDevices": 6,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-09-03",
+      "active": 60,
+      "installed": 30,
+      "newDevices": 7,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-09-02",
+      "active": 67,
+      "installed": 20,
+      "newDevices": 8,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-09-01",
+      "active": 38,
+      "installed": 23,
+      "newDevices": 9,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-31",
+      "active": 45,
+      "installed": 26,
+      "newDevices": 3,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-30",
+      "active": 52,
+      "installed": 29,
+      "newDevices": 4,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-29",
+      "active": 59,
+      "installed": 19,
+      "newDevices": 5,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-28",
+      "active": 66,
+      "installed": 22,
+      "newDevices": 6,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-27",
+      "active": 37,
+      "installed": 25,
+      "newDevices": 7,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-26",
+      "active": 44,
+      "installed": 28,
+      "newDevices": 8,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-25",
+      "active": 51,
+      "installed": 18,
+      "newDevices": 9,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-24",
+      "active": 58,
+      "installed": 21,
+      "newDevices": 3,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-23",
+      "active": 65,
+      "installed": 24,
+      "newDevices": 4,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-22",
+      "active": 36,
+      "installed": 27,
+      "newDevices": 5,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-21",
+      "active": 43,
+      "installed": 30,
+      "newDevices": 6,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-20",
+      "active": 50,
+      "installed": 20,
+      "newDevices": 7,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-19",
+      "active": 57,
+      "installed": 23,
+      "newDevices": 8,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-18",
+      "active": 64,
+      "installed": 26,
+      "newDevices": 9,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-17",
+      "active": 35,
+      "installed": 29,
+      "newDevices": 3,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-16",
+      "active": 42,
+      "installed": 19,
+      "newDevices": 4,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-15",
+      "active": 49,
+      "installed": 22,
+      "newDevices": 5,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-14",
+      "active": 56,
+      "installed": 25,
+      "newDevices": 6,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-13",
+      "active": 63,
+      "installed": 28,
+      "newDevices": 7,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "active": 34,
+      "installed": 18,
+      "newDevices": 8,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-11",
+      "active": 41,
+      "installed": 21,
+      "newDevices": 9,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-10",
+      "active": 48,
+      "installed": 24,
+      "newDevices": 3,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-09",
+      "active": 55,
+      "installed": 27,
+      "newDevices": 4,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    },
+    {
+      "date": "2026-08-08",
+      "active": 62,
+      "installed": 30,
+      "newDevices": 5,
+      "platforms": {
+        "ios": 21,
+        "android": 9,
+        "desktop": 8
+      }
+    }
+  ]
+}

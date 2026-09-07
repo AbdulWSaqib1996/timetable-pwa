@@ -1,0 +1,177 @@
+{
+  "auditedAt": "2026-09-07T18:16:16.528Z",
+  "head": "4b22653af51f367d89806e6de06e7c92c48e1b8d",
+  "files": [
+    {
+      "path": "public/analytics.html",
+      "sha256": "eb8972e07d082e22623dc435a72a9a0aa8ce4252b8f30869a1dfd5bb3294a523"
+    },
+    {
+      "path": "public/analytics.webmanifest",
+      "sha256": "9ce0654b91dc481af08439e7a0a52b8d320c94d7c0fafccb171a7d133fa43507"
+    },
+    {
+      "path": "src/lib/analytics.ts",
+      "sha256": "47c7fc7e3f6d40a6cfaf1965b1472f9e5f8579c91f9578567b35e6da697a22c8"
+    },
+    {
+      "path": "src/lib/usage.ts",
+      "sha256": "83fd8bda4aa9c3cca63c5d11437f3266543259a3309c1bf0b4165ee90f39dca6"
+    },
+    {
+      "path": "src/App.tsx",
+      "sha256": "7b4ae0f4f0378d867571f6c03feb46b66fe6d7307dcc1d671fdb1f0cd909a3f7"
+    },
+    {
+      "path": "src/index.css",
+      "sha256": "bc9df3fb2b326724e69efcb003283087e123a37edace7c980423715f9a04719e"
+    },
+    {
+      "path": "workers/push/worker.js",
+      "sha256": "73d1aab907ef1fd2a84a10b59501037e427f7ee700ca5f7a1f3837020526af0a"
+    },
+    {
+      "path": "vite.config.ts",
+      "sha256": "4d5284786e54ef8a1e88db89ddd3aaa1a0749c4b1a7dea9532b4ce578786c6c5"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Missing statskey fails open",
+      "actual": {
+        "status": 200,
+        "cacheControl": null
+      }
+    },
+    {
+      "name": "days=1 truncates 7/30 day KPIs",
+      "actual": {
+        "short7": 0,
+        "full7": 1,
+        "short30": 0,
+        "full30": 1
+      }
+    },
+    {
+      "name": "Repeated device/day ping replaces counts",
+      "actual": {
+        "i": false,
+        "p": "other",
+        "v": 0,
+        "o": 1,
+        "u": {
+          "photo": 1
+        },
+        "s": {}
+      }
+    },
+    {
+      "name": "Negative feature becomes zero but counts as adopter",
+      "actual": {
+        "photo": {
+          "uses": 0,
+          "devices": 1
+        },
+        "setup": {
+          "devices": 1,
+          "counts": {}
+        }
+      }
+    },
+    {
+      "name": "Listed row disappearing before get counts as active",
+      "actual": {
+        "date": "2026-09-07",
+        "active": 1,
+        "installed": 0,
+        "newDevices": 0,
+        "platforms": {
+          "other": 1
+        }
+      }
+    },
+    {
+      "name": "Daily chart geometry",
+      "actual": {
+        "chartHeight": 120,
+        "bars": [
+          {
+            "bar": 1,
+            "segments": [
+              0,
+              0
+            ]
+          },
+          {
+            "bar": 1,
+            "segments": [
+              0,
+              0
+            ]
+          },
+          {
+            "bar": 1,
+            "segments": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Mobile baseline width",
+      "actual": {
+        "viewport": 390,
+        "scrollWidth": 390
+      }
+    },
+    {
+      "name": "Cache renders without stored credential or auth request",
+      "actual": {
+        "requests": 0,
+        "tiles": 19
+      }
+    },
+    {
+      "name": "Events recorded during send are deleted",
+      "actual": {
+        "during": {
+          "o": 1,
+          "h": [
+            0,
+            0,
+            1,
+            0,
+            0,
+            0
+          ],
+          "u": {
+            "detail": 1,
+            "photo": 1
+          }
+        },
+        "after": {
+          "o": 0,
+          "h": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "u": {}
+        }
+      }
+    },
+    {
+      "name": "Pagination cap returns incomplete rows without completeness flag",
+      "actual": {
+        "calls": 50,
+        "returned": 50,
+        "threw": false
+      }
+    }
+  ]
+}

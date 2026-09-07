@@ -1,0 +1,153 @@
+[
+  {
+    "view": "overview",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "overflows": false
+  },
+  {
+    "view": "overview",
+    "width": 768,
+    "scrollWidth": 768,
+    "overflows": false
+  },
+  {
+    "view": "overview",
+    "width": 390,
+    "scrollWidth": 390,
+    "overflows": false
+  },
+  {
+    "view": "overview",
+    "width": 320,
+    "scrollWidth": 320,
+    "overflows": false
+  },
+  {
+    "view": "adoption",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "overflows": false
+  },
+  {
+    "view": "adoption",
+    "width": 768,
+    "scrollWidth": 768,
+    "overflows": false
+  },
+  {
+    "view": "adoption",
+    "width": 390,
+    "scrollWidth": 390,
+    "overflows": false
+  },
+  {
+    "view": "adoption",
+    "width": 320,
+    "scrollWidth": 320,
+    "overflows": false
+  },
+  {
+    "view": "returning",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "overflows": false
+  },
+  {
+    "view": "returning",
+    "width": 768,
+    "scrollWidth": 768,
+    "overflows": false
+  },
+  {
+    "view": "returning",
+    "width": 390,
+    "scrollWidth": 390,
+    "overflows": false
+  },
+  {
+    "view": "returning",
+    "width": 320,
+    "scrollWidth": 320,
+    "overflows": false
+  },
+  {
+    "view": "reliability",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "overflows": false
+  },
+  {
+    "view": "reliability",
+    "width": 768,
+    "scrollWidth": 768,
+    "overflows": false
+  },
+  {
+    "view": "reliability",
+    "width": 390,
+    "scrollWidth": 390,
+    "overflows": false
+  },
+  {
+    "view": "reliability",
+    "width": 320,
+    "scrollWidth": 320,
+    "overflows": false
+  },
+  {
+    "view": "releases",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "overflows": false
+  },
+  {
+    "view": "releases",
+    "width": 768,
+    "scrollWidth": 768,
+    "overflows": false
+  },
+  {
+    "view": "releases",
+    "width": 390,
+    "scrollWidth": 390,
+    "overflows": false
+  },
+  {
+    "view": "releases",
+    "width": 320,
+    "scrollWidth": 320,
+    "overflows": false
+  },
+  {
+    "view": "access",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "overflows": false
+  },
+  {
+    "view": "access",
+    "width": 768,
+    "scrollWidth": 768,
+    "overflows": false
+  },
+  {
+    "view": "access",
+    "width": 390,
+    "scrollWidth": 390,
+    "overflows": false
+  },
+  {
+    "view": "access",
+    "width": 320,
+    "scrollWidth": 320,
+    "overflows": false
+  },
+  {
+    "interaction": "lock/unlock",
+    "pass": true
+  },
+  {
+    "pageErrors": []
+  }
+]
