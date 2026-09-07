@@ -14,13 +14,16 @@ export interface GvizTable {
  * `headers=0` forces every row to come back as data so we can detect the
  * header row ourselves (timetable sheets often have a title row above it).
  */
-export async function fetchGvizTable(sheetId: string, gid: string | null): Promise<GvizTable> {
+export async function fetchGvizTable(sheetId: string, gid: string | null, signal?: AbortSignal): Promise<GvizTable> {
   const gidParam = gid ? `&gid=${gid}` : ''
   const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0${gidParam}`
   let res: Response
   try {
-    res = await fetch(url)
-  } catch {
+    res = await fetch(url, { signal })
+  } catch (err) {
+    // A superseded refresh aborts its fetches — let the caller's generation
+    // gate swallow that silently rather than reporting a connection problem.
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
     throw new Error('Could not reach Google Sheets. Check your connection.')
   }
   if (!res.ok) {

@@ -1,6 +1,8 @@
 import { identityHistory } from '../lib/identity'
 import { reconcileEvents } from '../../shared/identity.js'
-import { useCallback, useEffect, useState } from 'react'
+import { createGenerationGate, planSources, resolveSourceResults, sourceKeyOf } from '../../shared/refresh.js'
+import type { SourceStatus } from '../../shared/refresh.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_PUSH_BASE } from '../lib/config'
 import { buildDemoSessions } from '../lib/demo'
 import { diffSessions } from '../lib/diff'
@@ -14,16 +16,28 @@ import {
   loadCache,
   loadChanges,
   loadMeta,
+  loadStore,
   saveCache,
   saveChanges,
   saveMeta,
 } from '../lib/storage'
 import type { MetaMap, ProfileEntry, Session, SessionChange, Settings } from '../types'
 
+/** Short stable hash of a source key, used to scope extra-tab row ids to the
+ *  source's identity rather than its position in the extraTabs array. */
+function srcHash(key: string): string {
+  let h = 5381
+  for (const c of key) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0
+  return h.toString(36)
+}
+
 /**
  * Everything about loading and caching the active profile's data: sessions,
  * key dates, change history and per-session meta. Owns the refresh cycle;
- * the App renders what comes out.
+ * the App renders what comes out. Refreshes are source-scoped and race-safe:
+ * each configured source settles independently (a failed source keeps its
+ * last good rows with a stale label), and a refresh generation gate stops an
+ * older in-flight request from publishing over a newer profile or config.
  */
 export function useTimetableData(active: ProfileEntry | null) {
   const [sessions, setSessions] = useState<Session[] | null>(null)
@@ -37,7 +51,16 @@ export function useTimetableData(active: ProfileEntry | null) {
   // Sessions whose identity is ambiguous after a sheet edit — surfaced as their
   // own actionable notice, never mixed into fetch errors.
   const [identityReview, setIdentityReview] = useState<Session[]>([])
+  // Per-source outcome of the latest refresh (ok / stale / error + times).
+  const [sources, setSources] = useState<SourceStatus[]>([])
   const todayISO = localTodayISO()
+
+  const gateRef = useRef(createGenerationGate())
+  const abortRef = useRef<AbortController | null>(null)
+  const lastAttemptRef = useRef(0)
+  const lastStatusesRef = useRef<SourceStatus[]>([])
+  const activeRef = useRef(active)
+  activeRef.current = active
 
   const refresh = useCallback(
     async (s: Settings, pid: string) => {
@@ -47,24 +70,62 @@ export function useTimetableData(active: ProfileEntry | null) {
         setError(null)
         return
       }
+      // Newer request wins: abort the previous one and take a fresh generation.
+      const ticket = gateRef.current.begin()
+      abortRef.current?.abort()
+      const ctrl = new AbortController()
+      abortRef.current = ctrl
+      lastAttemptRef.current = Date.now()
       setRefreshing(true)
       try {
-        const table = await fetchGvizTable(s.sheetId, s.gid)
-        const result = parseTimetable(table)
-        const warnings = [...result.warnings]
-        let parsed: Session[] = result.sessions.map(x => ({ ...x, sourceKey: `${s.sheetId}|${s.gid ?? ''}` }))
-        // Merge any extra tabs into the same timetable, deduplicating identical rows.
-        for (const [i, tab] of (s.extraTabs ?? []).entries()) {
-          try {
-            const extra = await fetchGvizTable(tab.sheetId, tab.gid)
-            const extraResult = parseTimetable(extra)
-            warnings.push(...extraResult.warnings.map(w => `Extra tab ${i+1}: ${w}`))
-            parsed = parsed.concat(
-              extraResult.sessions.map((x) => ({ ...x, id: `t${i}-${x.id}`, sourceKey: `${tab.sheetId}|${tab.gid ?? ''}` }))
-            )
-          } catch {
-            /* a broken extra tab shouldn't take down the main timetable */
+        const plan = planSources(s)
+        if (plan.length === 0) return
+        const prev = loadCache(pid)
+        const settled = await Promise.all(
+          plan.map(async (src) => {
+            try {
+              const table = await fetchGvizTable(src.sheetId, src.gid, ctrl.signal)
+              const result = parseTimetable(table)
+              return [src.id, { ok: true, rows: result.sessions as Session[], warnings: result.warnings }] as const
+            } catch (err) {
+              return [src.id, { ok: false, error: err instanceof Error ? err.message : 'Failed to refresh.' }] as const
+            }
+          })
+        )
+        // A stale request publishes nothing — not state, not cache.
+        if (!ticket.isCurrent()) return
+        const prevRows = [...(prev?.sessions ?? []), ...(prev?.keyDates ?? [])]
+        const { bySource, statuses } = resolveSourceResults(plan, Object.fromEntries(settled), prevRows)
+        // Carry each source's last success time forward across failed attempts.
+        for (const st of statuses) {
+          if (st.lastSuccessAt === null) {
+            st.lastSuccessAt = lastStatusesRef.current.find((p) => p.id === st.id)?.lastSuccessAt ?? null
           }
+        }
+        lastStatusesRef.current = statuses
+        setSources(statuses)
+        const messages: string[] = []
+        for (const st of statuses) {
+          for (const w of st.warnings) messages.push(st.kind === 'timetable' ? w : `${st.label}: ${w}`)
+          if (st.status === 'stale') messages.push(`${st.label} didn’t load — showing its last saved rows.`)
+          if (st.status === 'error') messages.push(`${st.label} didn’t load: ${st.error ?? 'unknown error.'}`)
+        }
+        const main = statuses[0]
+        if (main.status === 'error') {
+          // Nothing usable for the main timetable and nothing cached for it:
+          // report, but never blank a previously rendered timetable.
+          setError(messages.join(' '))
+          return
+        }
+
+        // Assemble the timetable rows (main + extra tabs), ids scoped by source identity.
+        let parsed: Session[] = []
+        for (const src of plan) {
+          if (src.kind === 'keydates') continue
+          const rows = bySource.get(src.id) ?? []
+          parsed = parsed.concat(
+            src.kind === 'extra' ? rows.map((x) => ({ ...x, id: x.id.startsWith('t') ? x.id : `t${srcHash(sourceKeyOf(src))}-${x.id}` })) : rows
+          )
         }
         if ((s.extraTabs ?? []).length > 0) {
           const seen = new Set<string>()
@@ -76,11 +137,10 @@ export function useTimetableData(active: ProfileEntry | null) {
           })
           parsed.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
         }
-        const prev = loadCache(pid)
         // The sheet drops past rows (rolling TODAY() filter) — keep the history
         // this app has already seen, and once per profile back-fill days lost
         // before retention existed from the push worker's snapshot.
-        parsed = reconcileEvents(parsed, (prev?.identityHistory ?? prev?.sessions ?? []).filter(x => !x.isKeyDate))
+        parsed = reconcileEvents(parsed, (prev?.identityHistory ?? prev?.sessions ?? []).filter((x) => !x.isKeyDate))
         parsed = retainHistory(parsed, prev?.sessions, todayISO)
         if (!historyRecovered(pid)) {
           const recovered = await recoverHistory(
@@ -90,6 +150,7 @@ export function useTimetableData(active: ProfileEntry | null) {
             parsed,
             todayISO
           )
+          if (!ticket.isCurrent()) return
           if (recovered.length > 0) parsed = [...parsed, ...recovered]
           markHistoryRecovered(pid)
         }
@@ -112,31 +173,48 @@ export function useTimetableData(active: ProfileEntry | null) {
             setChanges(merged.slice(0, 100))
           }
         }
-        // Key dates live in a second tab; failures there never break the main timetable.
+        // Key dates resolve like any other source: stale rows survive a failed tab.
         let kd: Session[] | undefined
         if (s.keyDatesSheetId) {
-          try {
-            const kdTable = await fetchGvizTable(s.keyDatesSheetId, s.keyDatesGid ?? null)
-            const kdResult = parseTimetable(kdTable)
-            warnings.push(...kdResult.warnings.map(w => 'Key dates: ' + w))
-            kd = reconcileEvents(kdResult.sessions.map((k) => ({ ...k, id: `kd-${k.id}`, isKeyDate: true, sourceKey: `${s.keyDatesSheetId}|${s.keyDatesGid ?? ''}` })), (prev?.identityHistory ?? prev?.keyDates ?? []).filter(x => x.isKeyDate))
+          const kdStatus = statuses.find((st) => st.kind === 'keydates')
+          if (kdStatus?.status === 'ok') {
+            const rows = (bySource.get('keydates') ?? []).map((k) => ({
+              ...k,
+              id: k.id.startsWith('kd-') ? k.id : `kd-${k.id}`,
+              isKeyDate: true as const,
+            }))
+            kd = reconcileEvents(rows, (prev?.identityHistory ?? prev?.keyDates ?? []).filter((x) => x.isKeyDate))
             // Past deadlines survive too, if that tab also rolls forward.
             kd = retainHistory(kd, prev?.keyDates, todayISO)
-          } catch {
+          } else {
             kd = prev?.keyDates
           }
         }
+        // Final gate before commit: still the latest request, and the profile
+        // must still exist (a refresh must never resurrect a deleted profile's
+        // cache keys).
+        if (!ticket.isCurrent()) return
+        if (!loadStore()?.profiles.some((p) => p.id === pid)) return
         setSessions(parsed)
         setKeyDates(kd ?? [])
         const now = Date.now()
         setFetchedAt(now)
         setIdentityReview([...parsed, ...(kd ?? [])].filter((x) => x.identityCandidates?.length || x.identityWarning))
-        setError(warnings.join(' ') || null)
-        saveCache(pid, { fetchedAt: now, sessions: parsed, keyDates: kd, identityHistory: identityHistory(prev?.identityHistory ?? [...(prev?.sessions ?? []), ...(prev?.keyDates ?? [])], [...parsed, ...(kd ?? [])]) })
+        setError(messages.join(' ') || null)
+        saveCache(pid, {
+          fetchedAt: now,
+          sessions: parsed,
+          keyDates: kd,
+          identityHistory: identityHistory(
+            prev?.identityHistory ?? [...(prev?.sessions ?? []), ...(prev?.keyDates ?? [])],
+            [...parsed, ...(kd ?? [])]
+          ),
+        })
       } catch (err) {
+        if (!ticket.isCurrent()) return
         setError(err instanceof Error ? err.message : 'Failed to refresh.')
       } finally {
-        setRefreshing(false)
+        if (ticket.isCurrent()) setRefreshing(false)
       }
     },
     [todayISO]
@@ -157,6 +235,8 @@ export function useTimetableData(active: ProfileEntry | null) {
         (x) => x.identityCandidates?.length || x.identityWarning
       )
     )
+    setSources([])
+    lastStatusesRef.current = []
     // Apply "✓ Attended"/"✗ Absent" taps made on notifications while the app was closed.
     const pid = active.id
     void drainPendingActions().then((actions) => {
@@ -185,6 +265,21 @@ export function useTimetableData(active: ProfileEntry | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.settings.keyDatesSheetId, active?.settings.keyDatesGid, extraTabsKey])
 
+  // Revalidate on resume: installed PWAs mostly resume rather than relaunch, so
+  // refresh when the tab becomes visible again — throttled to every 10 minutes,
+  // and only while a profile is active. (No timers run while hidden.)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - lastAttemptRef.current < 10 * 60_000) return
+      const a = activeRef.current
+      if (a && !a.settings.demo) void refresh(a.settings, a.id)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return {
     identityReview,
     sessions,
@@ -192,6 +287,7 @@ export function useTimetableData(active: ProfileEntry | null) {
     fetchedAt,
     refreshing,
     error,
+    sources,
     metaMap,
     metaReady: active !== null && metaProfileId === active.id,
     setMetaMap,
