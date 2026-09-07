@@ -111,3 +111,13 @@ test('aggregate prunes only expired analytics rows; fresh rows and unexpired ded
   assert.equal(records.has(`day:${dayISO(0)}:aaaa1111aaaa1111`), true)
   assert.equal(records.has('dp:aaaa1111aaaa1111:b111111111111111'), true)
 })
+
+test('reserved ffffffff test tokens are accepted (smoke tests) but never aggregated', async () => {
+  const { store } = makeStore()
+  const res = await (await post(store, '/v2/batch', batch({ token: 'ffffffffffffffff', batchId: 'b555555555555555' }))).json()
+  assert.equal(res.acked, 'b555555555555555')
+  const snap = await (await post(store, '/v2/aggregate', {})).json()
+  assert.equal(snap.metrics.activeToday.value, 0)
+  assert.equal(snap.metrics.activeTokens7.value, 0)
+  assert.equal(snap.features.find((f) => f.id === 'detail').uses.value, 0)
+})

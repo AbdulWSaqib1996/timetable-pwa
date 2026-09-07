@@ -22,6 +22,9 @@ const RAW_RETENTION_DAYS = 90
 const AGGREGATE_WINDOW_DAYS = 31
 
 const json = (obj, status = 200) => Response.json(obj, { status })
+/** Reserved test-token prefix (repo rule): accepted for live smoke tests but
+ *  NEVER aggregated — synthetic traffic must not inflate real metrics. */
+const isTestToken = (token) => /^f{8}/.test(token)
 const dayISO = (ms) => new Date(ms).toISOString().slice(0, 10)
 const hex = (bytes) =>
   [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, '0')).join('')
@@ -61,10 +64,10 @@ export class AnalyticsStore {
         if (!(await tx.get(`seen:${batch.token}`))) {
           await tx.put(`seen:${batch.token}`, batch.days.map((d) => d.date).sort()[0])
         }
-        // v2 measurement start: the first accepted batch's earliest day, kept
+        // v2 measurement start: the first REAL batch's earliest day, kept
         // forever so adoption figures can say when collection began (§7.3 —
-        // never silently backdated).
-        if (!(await tx.get('meta:start'))) {
+        // never silently backdated). Reserved test tokens don't set it.
+        if (!isTestToken(batch.token) && !(await tx.get('meta:start'))) {
           await tx.put('meta:start', batch.days.map((d) => d.date).sort()[0])
         }
         await tx.put(dedupeKey, Date.now() + DEDUPE_HORIZON_DAYS * 86400000)
@@ -89,7 +92,9 @@ export class AnalyticsStore {
     const collectionStart = (await this.state.storage.get('meta:start')) ?? null
     const seenEntries = await this.state.storage.list({ prefix: 'seen:' })
     const firstSeen = new Map()
-    for (const [k, v] of seenEntries) firstSeen.set(k.slice(5), v)
+    for (const [k, v] of seenEntries) {
+      if (!isTestToken(k.slice(5))) firstSeen.set(k.slice(5), v)
+    }
 
     const daily = []
     const active7 = new Set()
@@ -110,6 +115,7 @@ export class AnalyticsStore {
       let returning = 0
       for (const [key, row] of rows) {
         const token = key.slice(`day:${date}:`.length)
+        if (isTestToken(token)) continue
         active++
         if (firstSeen.get(token) === date) newTokens++
         else if (firstSeen.has(token)) returning++
