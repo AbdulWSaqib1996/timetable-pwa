@@ -28,8 +28,9 @@ interface Options {
   /** Do not notify before this profile's saved completion state has loaded. */
   metaReady: boolean
   settings: Settings | null
-  /** sessions with the user's filters applied, all dates */
-  exportSessions: Session[]
+  /** reminder-eligible sessions: course membership + the explicit optional/
+   *  self-study reminder preferences — display filters play no part */
+  reminderSessions: Session[]
   allKeyDates: Session[]
   /** per-session meta, to skip attendance prompts for already-ticked sessions */
   metaMap: MetaMap
@@ -49,7 +50,7 @@ interface Options {
 export function useNotifications({
   metaReady,
   settings,
-  exportSessions,
+  reminderSessions,
   allKeyDates,
   metaMap,
   coords,
@@ -58,8 +59,8 @@ export function useNotifications({
   tubeStatus,
   onMark,
 }: Options) {
-  const exportRef = useRef(exportSessions)
-  exportRef.current = exportSessions
+  const exportRef = useRef(reminderSessions)
+  exportRef.current = reminderSessions
   const metaRef = useRef(metaMap)
   metaRef.current = metaMap
   const keyDatesRef = useRef(allKeyDates)

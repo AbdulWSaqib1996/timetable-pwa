@@ -28,13 +28,24 @@ export function newProfileId(): string {
   return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 }
 
-/** Migrate the legacy single reminderMinutes field into the reminderOffsets list. */
+/** Migrate the legacy single reminderMinutes field into the reminderOffsets list,
+ *  and seed the separated reminder-eligibility choices from the old behaviour
+ *  (reminders used to follow the optional/self-study display filters — keep
+ *  whatever each profile effectively had, never silently enable more). */
 function normalizeStore(store: ProfileStore): ProfileStore {
   let changed = false
   for (const p of store.profiles) {
     if (p.settings.reminderMinutes && !p.settings.reminderOffsets) {
       p.settings.reminderOffsets = [p.settings.reminderMinutes]
       delete p.settings.reminderMinutes
+      changed = true
+    }
+    if (p.settings.remindOptional === undefined && p.settings.filters?.showOptional === false) {
+      p.settings.remindOptional = false
+      changed = true
+    }
+    if (p.settings.remindSelfStudy === undefined && p.settings.filters?.showSelfStudy === false) {
+      p.settings.remindSelfStudy = false
       changed = true
     }
   }

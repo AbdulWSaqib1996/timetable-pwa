@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { DEFAULT_PUSH_BASE } from '../lib/config'
 import { buildDemoSessions } from '../lib/demo'
 import { diffSessions } from '../lib/diff'
-import { applyFilters, localTodayISO } from '../lib/filters'
+import { localTodayISO, selectCourseSessions } from '../lib/filters'
 import { fetchGvizTable } from '../lib/gviz'
 import { historyRecovered, markHistoryRecovered, recoverHistory, retainHistory } from '../lib/history'
 import { parseTimetable } from '../lib/parseTimetable'
@@ -96,12 +96,14 @@ export function useTimetableData(active: ProfileEntry | null) {
         parsed.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
         parsed = expandPlacementSpans(parsed)
         if (prev) {
-          // Diff the user's own view of old vs new (their specialism/group filters applied);
-          // synthetic placement days are excluded so span expansion never floods the bell.
+          // Diff the user's course membership view of old vs new (groups +
+          // specialisms only — temporary display filters must not decide what
+          // change alerts the user gets); synthetic placement days are excluded
+          // so span expansion never floods the bell.
           const notSynthetic = (x: Session) => !x.id.startsWith('plc-')
           const newChanges = diffSessions(
-            applyFilters(prev.sessions.filter(notSynthetic), s, todayISO, { ignoreDateRange: true }),
-            applyFilters(parsed.filter(notSynthetic), s, todayISO, { ignoreDateRange: true }),
+            selectCourseSessions(prev.sessions.filter(notSynthetic), s),
+            selectCourseSessions(parsed.filter(notSynthetic), s),
             todayISO
           )
           if (newChanges.length > 0) {

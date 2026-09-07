@@ -33,7 +33,7 @@ interface Props {
   settings: Settings
   store: ProfileStore
   /** sessions with the user's filters applied (specialisms etc.), all dates */
-  exportSessions: Session[]
+  courseSessions: Session[]
   keyDates: Session[]
   metaMap: MetaMap
   todayISO: string
@@ -92,7 +92,7 @@ const REMINDER_OPTIONS = [
 export function SettingsSheet({
   settings,
   store,
-  exportSessions,
+  courseSessions,
   keyDates,
   metaMap,
   todayISO,
@@ -293,7 +293,7 @@ export function SettingsSheet({
   }
 
   // Attendance insights over past sessions (self-study excluded).
-  const pastSessions = exportSessions.filter((s) => s.dateISO <= todayISO && !s.isSelfStudy)
+  const pastSessions = courseSessions.filter((s) => s.dateISO <= todayISO && !s.isSelfStudy)
   const attendedCount = pastSessions.filter((s) => metaMap[sessionKey(s)]?.attended).length
   const absentCount = pastSessions.filter((s) => metaMap[sessionKey(s)]?.absent).length
   const bySubject = new Map<string, { attended: number; total: number }>()
@@ -333,7 +333,7 @@ export function SettingsSheet({
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
     const rows = ['Date,Block,School,Attended,Absent,Reason,Note']
     const seen = new Set<string>()
-    for (const s of exportSessions) {
+    for (const s of courseSessions) {
       if (s.isKeyDate || !isPlacementSession(s)) continue
       const tag = placementTag(s.title)
       const dayKey = `${tag}|${s.dateISO}`
@@ -1112,15 +1112,16 @@ export function SettingsSheet({
         <section className="filter-section">
           <h3>Calendar export</h3>
           <p className="filter-hint">
-            Downloads your filtered timetable ({exportSessions.length} sessions
+            Downloads your timetable — your groups and specialisms, all dates, regardless of
+            display filters ({courseSessions.length} sessions
             {keyDates.length > 0 ? ` + ${keyDates.length} key dates` : ''}) as an .ics file you can
             import into Google, Apple or Outlook calendars. Key dates export as all-day 📌 events.
           </p>
           <button
             type="button"
             className="btn-secondary"
-            disabled={exportSessions.length === 0 && keyDates.length === 0}
-            onClick={() => downloadICS([...exportSessions, ...keyDates], 'My Timetable')}
+            disabled={courseSessions.length === 0 && keyDates.length === 0}
+            onClick={() => downloadICS([...courseSessions, ...keyDates], 'My Timetable')}
           >
             Download .ics file
           </button>

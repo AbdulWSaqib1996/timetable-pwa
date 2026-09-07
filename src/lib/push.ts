@@ -49,6 +49,8 @@ export async function subscribePush(
     spec: settings.hideOtherSpecialisms !== false ? settings.mySpecialisms ?? [] : [],
     groups: settings.myGroups ?? [],
     reminderOffsets: settings.reminderOffsets ?? [],
+    // Explicit reminder participation (P3-01): independent of display filters.
+    remindOptional: settings.remindOptional !== false,
     attendancePrompts: settings.attendancePrompts === true,
     keyDateReminderDays: settings.keyDateReminderDays ?? [],
     travelMode: settings.travelMode ?? 'walking',

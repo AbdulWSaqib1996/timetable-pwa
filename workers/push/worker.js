@@ -1,4 +1,5 @@
 import { validWorkerConfig } from '../../shared/contracts.js'
+import { filterSessionsForMembership } from '../../shared/membership.js'
 import { parseTimetable, parseDateCell } from '../../shared/timetable.js'
 import { reconcileEvents, eventKey } from '../../shared/identity.js'
 export { SyncStore } from './sync-store.js'
@@ -508,16 +509,9 @@ function diffSheets(oldSessions, newSessions, todayISO) {
   return out
 }
 
-function filterForConfig(sessions, config) {
-  return sessions.filter((s) => {
-    if (config.spec?.length > 0 && s.specialismName && !config.spec.includes(s.specialismName)) return false
-    if (config.groups?.length > 0) {
-      const tokens = (s.groups || '').split(',').map((t) => t.trim()).filter(Boolean)
-      if (tokens.length > 0 && !tokens.some((t) => config.groups.includes(t))) return false
-    }
-    return true
-  })
-}
+// Membership filtering is the shared module, so the worker and the browser
+// agree byte-for-byte on group ranges ("1-10"), lists and all-group forms.
+const filterForConfig = (sessions, config) => filterSessionsForMembership(sessions, config)
 
 const CRON_MINUTES = 10
 
@@ -772,6 +766,7 @@ async function runScheduled(env) {
       const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
       for (const s of sessions) {
         if (s.dateISO !== now.dateISO || s.isSelfStudy) continue
+        if (s.isOptional && config.remindOptional === false) continue
         const start = toMinutes(s.start)
         if (start === null || start <= now.minutes) continue
         let building = matchBuilding(s.room)
@@ -817,6 +812,7 @@ async function runScheduled(env) {
       const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
       for (const s of sessions) {
         if (s.dateISO !== now.dateISO || s.isSelfStudy) continue
+        if (s.isOptional && config.remindOptional === false) continue
         const end = toMinutes(s.end)
         if (end === null) continue
         const since = now.minutes - end
@@ -908,6 +904,7 @@ async function runScheduled(env) {
       const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
       for (const s of sessions) {
         if (s.dateISO !== now.dateISO || s.isSelfStudy) continue
+        if (s.isOptional && config.remindOptional === false) continue
         const start = toMinutes(s.start)
         if (start === null) continue
         const delta = start - now.minutes

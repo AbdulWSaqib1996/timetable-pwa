@@ -39,6 +39,8 @@ import {
   deriveOptions,
   getFilters,
   localTodayISO,
+  selectCourseSessions,
+  selectReminderSessions,
   weekBounds,
 } from './lib/filters'
 import { daysUntil, isPlacementSession, placementTag } from './lib/format'
@@ -441,11 +443,19 @@ export default function App() {
     [sessions, settings, todayISO, view]
   )
 
-  // For export, search, reminders and the Now/Next card: user's filters, all dates.
-  const exportSessions = useMemo(
-    () =>
-      sessions && settings ? applyFilters(sessions, settings, todayISO, { ignoreDateRange: true }) : [],
-    [sessions, settings, todayISO]
+  // Course membership only (specialisms + groups), all dates: the base set for
+  // exports, search, stats, journal, Now/Next and group availability. Temporary
+  // display filters (rooms, subjects…) never narrow this.
+  const courseSessions = useMemo(
+    () => (sessions && settings ? selectCourseSessions(sessions, settings) : []),
+    [sessions, settings]
+  )
+
+  // What notifications may fire for: membership plus the explicit optional/
+  // self-study reminder preferences — independent of any display filter.
+  const reminderSessions = useMemo(
+    () => (sessions && settings ? selectReminderSessions(sessions, settings) : []),
+    [sessions, settings]
   )
 
   // Sheet key dates + the user's personal deadlines, merged.
@@ -473,8 +483,8 @@ export default function App() {
 
   const searchResults = useMemo(() => {
     const q = query.trim()
-    return q ? [...exportSessions, ...allKeyDates].filter((s) => matchesQuery(s, q)) : null
-  }, [exportSessions, allKeyDates, query])
+    return q ? [...courseSessions, ...allKeyDates].filter((s) => matchesQuery(s, q)) : null
+  }, [courseSessions, allKeyDates, query])
 
   // Day view weaves key dates in as highlighted blocks (toggle in Filters); they follow
   // the same date-range choice as the rest of the day view.
@@ -499,7 +509,7 @@ export default function App() {
   // Placement progress: unique school days per block, attended via the ✓ tick.
   const placementStats = useMemo(() => {
     const byTag = new Map<string, { total: Set<string>; attended: Set<string> }>()
-    for (const s of exportSessions) {
+    for (const s of courseSessions) {
       if (s.isKeyDate || !isPlacementSession(s)) continue
       const tag = placementTag(s.title)
       const e = byTag.get(tag) ?? { total: new Set<string>(), attended: new Set<string>() }
@@ -515,7 +525,7 @@ export default function App() {
       attended: blocks.reduce((n, b) => n + b.attended, 0),
       totalDays: blocks.reduce((n, b) => n + b.total, 0),
     }
-  }, [exportSessions, metaMap])
+  }, [courseSessions, metaMap])
 
   // Month-grid extras: fully-placement days (tinted) and the first day of each break (🏖).
   const monthExtras = useMemo(() => {
@@ -584,7 +594,7 @@ export default function App() {
     }
   }, [])
   useEffect(() => {
-    if (!pendingShare || !active || exportSessions.length === 0) return
+    if (!pendingShare || !active || courseSessions.length === 0) return
     setPendingShare(false)
     void (async () => {
       const { getAndClearSharedPhotos } = await import('./lib/shareTarget')
@@ -593,7 +603,7 @@ export default function App() {
       const now = new Date()
       const nowMins = now.getHours() * 60 + now.getMinutes()
       // Today's latest already-started session; else the most recent past session.
-      const started = exportSessions.filter((s) => {
+      const started = courseSessions.filter((s) => {
         if (s.isKeyDate || s.isSelfStudy) return false
         if (s.dateISO < todayISO) return true
         if (s.dateISO !== todayISO || !s.start) return false
@@ -611,14 +621,14 @@ export default function App() {
       setSelected(target)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingShare, active?.id, exportSessions.length])
+  }, [pendingShare, active?.id, courseSessions.length])
 
-  const { coords, tubeStatus, locationEnabled, travelMode } = useTravel(settings, exportSessions, todayISO)
+  const { coords, tubeStatus, locationEnabled, travelMode } = useTravel(settings, courseSessions, todayISO)
 
   useNotifications({
     metaReady,
     settings,
-    exportSessions,
+    reminderSessions,
     allKeyDates,
     metaMap,
     coords,
@@ -918,7 +928,7 @@ export default function App() {
       )}
 
       {sessions !== null && view === 'day' && !searchResults && (
-        <NowNextCard sessions={exportSessions} onSelect={setSelected} />
+        <NowNextCard sessions={courseSessions} onSelect={setSelected} />
       )}
 
       {sessions !== null &&
@@ -1057,12 +1067,9 @@ export default function App() {
           onUpdateFilters={updateFilters}
           onOpenKeyDates={() => setOpenSheet('keydates')}
           onClear={() =>
-            updateSettings({
-              filters: { ...DEFAULT_FILTERS },
-              mySpecialisms: [],
-              hideOtherSpecialisms: true,
-              myGroups: [],
-            })
+            // Clear only temporary display narrowing — group and specialism
+            // membership is enrolment and stays as chosen.
+            updateSettings({ filters: { ...DEFAULT_FILTERS } })
           }
           onClose={() => setOpenSheet('none')}
         />
@@ -1070,7 +1077,7 @@ export default function App() {
 
       {openSheet === 'stats' && (
         <StatsSheet
-          sessions={exportSessions}
+          sessions={courseSessions}
           metaMap={metaMap}
           todayISO={todayISO}
           keyDates={allKeyDates}
@@ -1086,7 +1093,7 @@ export default function App() {
           profileName={active.name}
           admin={adminFile}
           onUpdateAdmin={updateAdmin}
-          sessions={exportSessions}
+          sessions={courseSessions}
           metaMap={metaMap}
           keyDates={allKeyDates}
           placementTargetDays={settings.placementTargetDays}
@@ -1097,7 +1104,7 @@ export default function App() {
 
       {openSheet === 'journal' && (
         <JournalSheet
-          sessions={[...exportSessions, ...allKeyDates]}
+          sessions={[...courseSessions, ...allKeyDates]}
           metaMap={metaMap}
           profileId={active.id}
           admin={adminFile}
@@ -1140,7 +1147,7 @@ export default function App() {
       {openSheet === 'group' && (
         <StudyGroupSheet
           settings={settings}
-          sessions={exportSessions}
+          sessions={courseSessions}
           todayISO={todayISO}
           onUpdateSettings={updateSettings}
           onClose={() => setOpenSheet('none')}
@@ -1162,7 +1169,7 @@ export default function App() {
         <SettingsSheet
           settings={settings}
           store={store}
-          exportSessions={exportSessions}
+          courseSessions={courseSessions}
           keyDates={allKeyDates}
           onOpenGroup={() => setOpenSheet('group')}
           metaMap={metaMap}

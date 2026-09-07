@@ -76,7 +76,7 @@ export function FilterSheet({
 
         {options.specialisms.length > 0 && (
           <section className="filter-section">
-            <h3>My specialisms</h3>
+            <h3>My specialisms (membership)</h3>
             <ChipList
               values={options.specialisms}
               selected={mySpecialisms}
@@ -98,14 +98,16 @@ export function FilterSheet({
 
         {options.groups.length > 1 && (
           <section className="filter-section">
-            <h3>My group</h3>
+            <h3>My group (membership)</h3>
             <ChipList
               values={options.groups}
               selected={settings.myGroups ?? []}
               onToggle={(v) => onUpdateSettings({ myGroups: toggleValue(settings.myGroups ?? [], v) })}
             />
             <p className="filter-hint">
-              Hides sessions not listed for your group. Sessions with no group set are always shown.
+              Hides sessions not listed for your group — group lists and ranges like “1-10” are
+              understood. Sessions with no group set are always shown. Membership also decides
+              reminders and exports, and is kept when you clear filters.
             </p>
           </section>
         )}
@@ -144,6 +146,26 @@ export function FilterSheet({
             />
             Show optional sessions
           </label>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={settings.remindOptional !== false}
+              onChange={(e) => onUpdateSettings({ remindOptional: e.target.checked })}
+            />
+            Remind me about optional sessions
+          </label>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={settings.remindSelfStudy !== false}
+              onChange={(e) => onUpdateSettings({ remindSelfStudy: e.target.checked })}
+            />
+            Remind me about self-study blocks
+          </label>
+          <p className="filter-hint">
+            Hiding sessions here only changes the display — the two reminder choices above decide
+            what notifications cover.
+          </p>
           {hasKeyDates && (
             <>
               <label className="toggle-row">
@@ -205,7 +227,7 @@ export function FilterSheet({
             Done
           </button>
           <button type="button" className="btn-ghost" onClick={onClear}>
-            Clear all filters
+            Clear display filters
           </button>
         </div>
       </div>

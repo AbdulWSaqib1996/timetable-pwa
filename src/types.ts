@@ -72,6 +72,10 @@ export interface Settings {
   reminderOffsets?: number[]
   /** "did you attend?" notification at each session's end time (default off) */
   attendancePrompts?: boolean
+  /** include "(optional)" sessions in reminders/leave alerts (default on; independent of display filters) */
+  remindOptional?: boolean
+  /** include self-study blocks in reminders (default on; independent of display filters) */
+  remindSelfStudy?: boolean
   /** quiet hours: no notifications between these hours (24h, wraps midnight); both unset = off */
   quietFrom?: number
   quietTo?: number

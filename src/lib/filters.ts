@@ -1,3 +1,4 @@
+import { expandGroupOptions, sessionInMembership } from '../../shared/membership.js'
 import type { Filters, Session, Settings } from '../types'
 import { isPlacementSession } from './format'
 
@@ -24,20 +25,14 @@ export interface FilterOptions {
   groups: string[]
 }
 
-export function groupTokens(groups: string): string[] {
-  return groups
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean)
-}
-
 function distinctSorted(values: (string | undefined)[]): string[] {
   return [...new Set(values.filter((v): v is string => !!v && v.trim() !== ''))].sort((a, b) =>
     a.localeCompare(b)
   )
 }
 
-/** Distinct values the filter UI offers, derived from the loaded sheet. */
+/** Distinct values the filter UI offers, derived from the loaded sheet.
+ *  Group ranges like "1-10" expand so a Group 2 member can pick "2". */
 export function deriveOptions(sessions: Session[]): FilterOptions {
   return {
     specialisms: distinctSorted(sessions.map((s) => s.specialismName)),
@@ -46,9 +41,7 @@ export function deriveOptions(sessions: Session[]): FilterOptions {
     ),
     tutors: distinctSorted(sessions.filter((s) => !s.isSelfStudy).map((s) => s.tutor)),
     rooms: distinctSorted(sessions.filter((s) => !s.isSelfStudy).map((s) => s.room)),
-    groups: [...new Set(sessions.flatMap((s) => groupTokens(s.groups)))].sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true })
-    ),
+    groups: expandGroupOptions(sessions.map((s) => s.groups)),
   }
 }
 
@@ -69,28 +62,48 @@ export function weekBounds(todayISO: string): { from: string; to: string } {
   return { from: iso(monday), to: iso(sunday) }
 }
 
-export function applyFilters(
-  sessions: Session[],
+/** The user's saved enrolment (specialisms + groups) as a membership record. */
+export function membershipOf(settings: Settings): { specialisms: string[]; groups: string[] } {
+  const mySpecialisms = settings.mySpecialisms ?? []
+  const hideOthers = settings.hideOtherSpecialisms !== false && mySpecialisms.length > 0
+  return { specialisms: hideOthers ? mySpecialisms : [], groups: settings.myGroups ?? [] }
+}
+
+/**
+ * Course membership only: the sessions this user is enrolled in. This is the
+ * base set for reminders, statistics, exports, journals and group availability —
+ * temporary display filters (rooms, subjects, search…) never narrow it.
+ */
+export function selectCourseSessions(sessions: Session[], settings: Settings): Session[] {
+  const membership = membershipOf(settings)
+  return sessions.filter((s) => sessionInMembership(s, membership))
+}
+
+/** Should this course session produce reminders/leave alerts? Optional and
+ *  self-study participation are explicit preferences, not display filters. */
+export function reminderEligible(s: Session, settings: Settings): boolean {
+  if (s.isOptional && settings.remindOptional === false) return false
+  if (s.isSelfStudy && settings.remindSelfStudy === false) return false
+  return true
+}
+
+/** Sessions notifications may fire for: membership plus reminder eligibility. */
+export function selectReminderSessions(sessions: Session[], settings: Settings): Session[] {
+  return selectCourseSessions(sessions, settings).filter((s) => reminderEligible(s, settings))
+}
+
+/** Temporary display narrowing applied on top of course membership. */
+export function selectVisibleSessions(
+  courseSessions: Session[],
   settings: Settings,
   todayISO: string,
   opts: { ignoreDateRange?: boolean } = {}
 ): Session[] {
   const filters = getFilters(settings)
-  const mySpecialisms = settings.mySpecialisms ?? []
-  const hideOthers = settings.hideOtherSpecialisms !== false && mySpecialisms.length > 0
   const dateRange = opts.ignoreDateRange ? 'all' : filters.dateRange
   const week = dateRange === 'week' ? weekBounds(todayISO) : null
-
-  const myGroups = settings.myGroups ?? []
-  return sessions.filter((s) => {
+  return courseSessions.filter((s) => {
     if (filters.placementsOnly && !isPlacementSession(s)) return false
-    if (hideOthers && s.isSpecialism && s.specialismName && !mySpecialisms.includes(s.specialismName)) {
-      return false
-    }
-    if (myGroups.length > 0) {
-      const tokens = groupTokens(s.groups)
-      if (tokens.length > 0 && !tokens.some((t) => myGroups.includes(t))) return false
-    }
     if (!filters.showSelfStudy && s.isSelfStudy) return false
     if (!filters.showOptional && s.isOptional) return false
     if (filters.subjects.length > 0 && !s.isSpecialism && !s.isSelfStudy) {
@@ -104,7 +117,18 @@ export function applyFilters(
   })
 }
 
-/** How many non-default narrowing filters are active (shown as a badge on the Filters button). */
+/** Membership + display filters together (what the timetable screens show). */
+export function applyFilters(
+  sessions: Session[],
+  settings: Settings,
+  todayISO: string,
+  opts: { ignoreDateRange?: boolean } = {}
+): Session[] {
+  return selectVisibleSessions(selectCourseSessions(sessions, settings), settings, todayISO, opts)
+}
+
+/** How many temporary display filters are active (badge on the Filters button).
+ *  Group/specialism membership is enrolment, not a display filter — not counted. */
 export function activeFilterCount(settings: Settings): number {
   const filters = getFilters(settings)
   let count = filters.subjects.length + filters.tutors.length + filters.rooms.length
@@ -112,7 +136,5 @@ export function activeFilterCount(settings: Settings): number {
   if (!filters.showOptional) count++
   if (!filters.showKeyDates) count++
   if (filters.placementsOnly) count++
-  if ((settings.mySpecialisms ?? []).length > 0 && settings.hideOtherSpecialisms !== false) count++
-  if ((settings.myGroups ?? []).length > 0) count++
   return count
 }
