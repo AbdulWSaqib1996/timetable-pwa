@@ -8,7 +8,7 @@ import { isPlacementSession, placementTag } from '../lib/format'
 import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
 import { parseSheetUrl } from '../lib/sheetUrl'
-import { lastPingDate } from '../lib/analytics'
+import { telemetryPending } from '../lib/telemetry'
 import { WHATSNEW_VERSION } from '../lib/changelog'
 import { geocodeAddress } from '../lib/geocode'
 import { needsIosInstall } from '../lib/platform'
@@ -141,6 +141,17 @@ export function SettingsSheet({
   onClose,
 }: Props) {
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE)
+  // Local telemetry queue status (coarse counts only; nothing is sent here).
+  const [telemetry, setTelemetry] = useState<{ openSegments: number; claimedSegments: number; dropped: number } | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void telemetryPending().then((t) => {
+      if (!cancelled) setTelemetry(t)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [settings.usagePing])
   const [keyDatesUrl, setKeyDatesUrl] = useState(settings.keyDatesUrl ?? '')
   const [keyDatesError, setKeyDatesError] = useState(false)
   const [noticesUrl, setNoticesUrl] = useState(settings.noticesUrl ?? '')
@@ -1535,20 +1546,20 @@ export function SettingsSheet({
               checked={settings.usagePing !== false}
               onChange={(e) => onUpdateSettings({ usagePing: e.target.checked })}
             />
-            Send a daily device usage ping
+            Share anonymous usage counts
           </label>
           <p className="filter-hint">
-            Once a day the app tells its own server "a device used me today": a random token
-            (a pseudonymous identifier created on this device), whether the app is installed, the platform
-            type, the app version, how many times the app was opened (by rough time of day), which
-            features were used (names and counts only — never their content) and which settings are
-            switched on (yes/no only). No location, name, timetable content or notes are included in the ping. It
-            helps the developer see whether the app — and which parts of it — are being used.
-            {settings.usagePing !== false &&
+            The app keeps coarse local counters — opens and feature names with counts, by UTC day —
+            and sends them to its own server as small batches: a random token (a pseudonymous
+            identifier created on this device), whether the app runs installed, the platform type,
+            the build id and which settings are switched on (yes/no only). No location, name,
+            timetable content or notes are ever included. Switching this off clears anything not yet
+            sent and stops collection; batches already delivered cannot be unsent.
+            {settings.usagePing !== false && telemetry &&
               ` Status: ${
-                lastPingDate() === new Date().toISOString().slice(0, 10)
-                  ? 'ping sent today ✓'
-                  : 'not sent yet today — it retries each time the app opens.'
+                telemetry.openSegments + telemetry.claimedSegments === 0
+                  ? 'nothing waiting to send ✓'
+                  : `${telemetry.openSegments + telemetry.claimedSegments} day batch(es) queued — they send on the next open or within 15 minutes.`
               }`}
           </p>
           <p className="filter-hint">
