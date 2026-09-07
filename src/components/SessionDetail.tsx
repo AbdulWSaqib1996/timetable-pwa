@@ -279,6 +279,10 @@ export function SessionDetail({
             value={meta?.note ?? ''}
             onChange={(e) => onMeta({ note: e.target.value })}
           />
+          <p className="filter-hint">
+            From your key-dates sheet — the title and due date are corrected in the sheet itself;
+            your status and notes live here and are never overwritten by it.
+          </p>
         </section>
       ) : (
         <>

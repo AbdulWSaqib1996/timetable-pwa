@@ -1,4 +1,5 @@
 import { groupPendingActions } from '../../shared/actions.js'
+import { loadAdminFile, saveAdminFile } from './admin'
 import { loadMeta, loadStore, saveMeta } from './storage'
 
 /**
@@ -98,9 +99,30 @@ export async function applyPendingNotificationActions(): Promise<AppliedActions>
     entries.find((e) => e.item === item || (item.id && e.item?.id === item.id))?.dbKey
   for (const [pid, actions] of apply) {
     try {
+      // Personal-task actions update the task RECORD, not session metadata.
+      const taskActions = actions.filter((a) => a.key.startsWith('task:'))
+      if (taskActions.length > 0) {
+        const admin = loadAdminFile(pid)
+        let tasks = admin.tasks
+        for (const a of taskActions) {
+          const id = a.key.slice('task:'.length)
+          tasks = tasks.map((t) =>
+            t.id === id && a.action === 'done' && t.status !== 'done'
+              ? { ...t, status: 'done' as const, completedISO: new Date().toISOString().slice(0, 10), at: Date.now() }
+              : t
+          )
+        }
+        if (tasks !== admin.tasks) saveAdminFile(pid, { ...admin, tasks })
+        result.changedProfiles.add(pid)
+        for (const a of taskActions) {
+          const k = keyFor(a)
+          if (k !== undefined) done.push(k)
+        }
+      }
+      const metaActions = actions.filter((a) => !a.key.startsWith('task:'))
       const meta = loadMeta(pid)
       const next = { ...meta }
-      for (const a of actions) {
+      for (const a of metaActions) {
         const at = Math.max(Date.now(), (next[a.key]?.at ?? 0) + 1)
         if (a.action === 'done') next[a.key] = { ...next[a.key], deleted: undefined, status: 'done', at }
         else
@@ -112,9 +134,11 @@ export async function applyPendingNotificationActions(): Promise<AppliedActions>
             at,
           }
       }
-      saveMeta(pid, next)
-      result.changedProfiles.add(pid)
-      for (const a of actions) {
+      if (metaActions.length > 0) {
+        saveMeta(pid, next)
+        result.changedProfiles.add(pid)
+      }
+      for (const a of metaActions) {
         const k = keyFor(a)
         if (k !== undefined) done.push(k)
       }

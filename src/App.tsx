@@ -22,7 +22,6 @@ import type { Route } from './lib/router'
 // The bottom sheets are modal and rarely part of first paint — split them out
 // of the initial bundle (they load on first open).
 const AdminSheet = lazy(() => import('./components/AdminSheet').then((m) => ({ default: m.AdminSheet })))
-const AddDeadlineSheet = lazy(() => import('./components/AddDeadlineSheet').then((m) => ({ default: m.AddDeadlineSheet })))
 const ChangesSheet = lazy(() => import('./components/ChangesSheet').then((m) => ({ default: m.ChangesSheet })))
 const FilterSheet = lazy(() => import('./components/FilterSheet').then((m) => ({ default: m.FilterSheet })))
 const JournalSheet = lazy(() => import('./components/JournalSheet').then((m) => ({ default: m.JournalSheet })))
@@ -54,7 +53,9 @@ import { parseShareHash } from './lib/share'
 import { DEFAULT_PUSH_BASE } from './lib/config'
 import { subscribePush } from './lib/push'
 import { EMPTY_ADMIN, loadAdminFile, saveAdminFile } from './lib/admin'
-import type { AdminFile } from './lib/admin'
+import type { AdminFile, TaskRecord } from './lib/admin'
+import { duplicateTask, migrateCustomKeyDates, overlayTaskMeta, taskEventKey, taskToSession } from './lib/tasks'
+import { TaskEditSheet } from './components/TaskEditSheet'
 import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
 import type { Notice } from './lib/notices'
 import { loadSyncState, pushSync, syncPullApply } from './lib/sync'
@@ -84,7 +85,7 @@ import type {
   ViewMode,
 } from './types'
 
-type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'adddl' | 'journal' | 'admin'
+type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -119,6 +120,9 @@ export default function App() {
   const [dismissedNotices, setDismissedNotices] = useState<Set<string>>(() => loadDismissedNotices())
   const [adminFile, setAdminFile] = useState<AdminFile>(EMPTY_ADMIN)
   const [adminTab, setAdminTab] = useState<AdminTab>('overview')
+  // Task editor: null = closed, { task: null } = create (P5-01).
+  const [taskEdit, setTaskEdit] = useState<{ task: TaskRecord | null } | null>(null)
+  const [taskUndo, setTaskUndo] = useState<TaskRecord | null>(null)
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
   const settings = active?.settings ?? null
@@ -170,11 +174,27 @@ export default function App() {
     sources,
   } = useTimetableData(active)
 
-  // Close any open detail/date selection when the active profile switches.
+  // Close any open detail/date selection when the active profile switches,
+  // and run the one-time customKeyDates → task-records migration (P5-01):
+  // old ids and calendar identity are preserved; saved status/notes adopt.
   useEffect(() => {
     if (parseRoute(window.location.hash).name === 'session') navigate({ name: 'today' }, { replace: true })
     setSelectedDateISO(null)
-    setAdminFile(active ? loadAdminFile(active.id) : EMPTY_ADMIN)
+    setTaskEdit(null)
+    setTaskUndo(null)
+    if (!active) {
+      setAdminFile(EMPTY_ADMIN)
+      return
+    }
+    const loaded = loadAdminFile(active.id)
+    const { admin: migratedAdmin, migrated } = migrateCustomKeyDates(active.settings, loadMeta(active.id), loaded)
+    if (migrated) {
+      saveAdminFile(active.id, migratedAdmin)
+      setAdminFile(loadAdminFile(active.id))
+      updateSettings({ customKeyDates: undefined })
+    } else {
+      setAdminFile(loaded)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
 
@@ -184,6 +204,29 @@ export default function App() {
       const next = updater(prev)
       saveAdminFile(active.id, next)
       return next
+    })
+  }
+
+  function saveTask(record: TaskRecord): boolean {
+    if (!active) return false
+    updateAdmin((prev) => ({ ...prev, tasks: [...prev.tasks.filter((t) => t.id !== record.id), record] }))
+    return true
+  }
+
+  function deleteTask(task: TaskRecord) {
+    // Removal writes a tombstone via saveAdminFile; Undo saves a NEWER
+    // revision, deliberately beating the tombstone (never just hiding it).
+    updateAdmin((prev) => ({ ...prev, tasks: prev.tasks.filter((t) => t.id !== task.id) }))
+    setTaskUndo(task)
+  }
+
+  function cycleTaskStatus(task: TaskRecord) {
+    const next = task.status === 'todo' ? 'doing' : task.status === 'doing' ? 'done' : 'todo'
+    saveTask({
+      ...task,
+      status: next,
+      completedISO: next === 'done' ? new Date().toISOString().slice(0, 10) : task.completedISO,
+      at: Date.now(),
     })
   }
 
@@ -502,28 +545,16 @@ export default function App() {
     [sessions, settings]
   )
 
-  // Sheet key dates + the user's personal deadlines, merged.
+  // Sheet key dates + the user's personal tasks (task records), merged into
+  // the shared key-date pipeline (calendar, reminders, Today strip).
   const allKeyDates = useMemo(() => {
-    const custom = (settings?.customKeyDates ?? []).map(
-      (c): Session => ({
-        id: `custom-${c.id}`,
-        title: c.title,
-        day: '',
-        dateISO: c.dateISO,
-        start: c.start ?? '',
-        end: '',
-        room: '',
-        groups: '',
-        tutor: '',
-        subject: c.title,
-        isSpecialism: false,
-        isSelfStudy: false,
-        isOptional: false,
-        isKeyDate: true,
-      })
-    )
+    const custom = adminFile.tasks.map(taskToSession)
     return [...keyDates, ...custom].sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
-  }, [keyDates, settings?.customKeyDates])
+  }, [keyDates, adminFile.tasks])
+
+  // Task status/notes overlaid on session metadata for display consumers —
+  // writes always go through the task records, never these entries.
+  const effectiveMeta = useMemo(() => overlayTaskMeta(metaMap, adminFile.tasks), [metaMap, adminFile.tasks])
 
   // The open session detail is a ROUTE (#/session/<key>): Back returns to the
   // caller, notification opens deep-link, and profile switches clear it.
@@ -706,12 +737,20 @@ export default function App() {
     settings,
     reminderSessions,
     allKeyDates,
-    metaMap,
+    metaMap: effectiveMeta,
     coords,
     travelMode,
     locationEnabled,
     tubeStatus,
     onMark: (key, kind, ownerPid) => {
+      // A personal task's notification action updates the task RECORD.
+      if (kind === 'done' && key.startsWith('task:')) {
+        const record = adminFile.tasks.find((t) => taskEventKey(t) === key)
+        if (record && record.status !== 'done') {
+          saveTask({ ...record, status: 'done', completedISO: new Date().toISOString().slice(0, 10), at: Date.now() })
+        }
+        return
+      }
       const target = ownerPid ?? active?.id
       if (!target) return
       const patch = (entry: SessionMeta | undefined): SessionMeta =>
@@ -957,17 +996,31 @@ export default function App() {
         <TasksPage
           profileName={active.name}
           keyDates={allKeyDates}
+          tasks={adminFile.tasks}
+          meetings={adminFile.meetings}
           todayISO={todayISO}
           configured={!!settings.keyDatesSheetId}
-          metaMap={metaMap}
+          metaMap={effectiveMeta}
+          undoTask={taskUndo}
+          onUndoDelete={(t) => {
+            saveTask({ ...t, at: Date.now() })
+            setTaskUndo(null)
+          }}
           onSelect={openSession}
           onSetStatus={(kd, status) => handleMeta(kd, { status })}
-          onDeleteCustom={(id) =>
-            updateSettings({
-              customKeyDates: (settings.customKeyDates ?? []).filter((c) => `custom-${c.id}` !== id),
-            })
+          onEditTask={(t) => setTaskEdit({ task: t })}
+          onCycleTask={cycleTaskStatus}
+          onToggleAction={(meetingId, actionId) =>
+            updateAdmin((prev) => ({
+              ...prev,
+              meetings: prev.meetings.map((m) =>
+                m.id === meetingId
+                  ? { ...m, actions: m.actions.map((a) => (a.id === actionId ? { ...a, done: !a.done } : a)) }
+                  : m
+              ),
+            }))
           }
-          onAddTask={() => setOpenSheet('adddl')}
+          onAddTask={() => setTaskEdit({ task: null })}
         />
       ) : route.name === 'pgce' ? (
         <PGCEPage
@@ -1031,7 +1084,7 @@ export default function App() {
           onRefresh={() => refresh(settings, active.id)}
           courseSessions={courseSessions}
           allKeyDates={allKeyDates}
-          metaMap={metaMap}
+          metaMap={effectiveMeta}
           unseenChanges={unseenChanges}
           latestChange={changes.find((c) => !c.seen) ?? null}
           settings={settings}
@@ -1047,7 +1100,31 @@ export default function App() {
         />
       )}
 
-      {selected && (
+      {taskEdit && active && (
+        <TaskEditSheet
+          profileId={active.id}
+          task={taskEdit.task}
+          latest={taskEdit.task ? adminFile.tasks.find((t) => t.id === taskEdit.task!.id) ?? null : null}
+          onSave={saveTask}
+          onDuplicate={(t) => saveTask(duplicateTask(t))}
+          onDelete={deleteTask}
+          onClose={() => setTaskEdit(null)}
+        />
+      )}
+
+      {selected && selected.id.startsWith('custom-') ? (
+        // A personal task opens its dedicated editable detail (P5-01), not the
+        // session sheet.
+        <TaskEditSheet
+          profileId={active.id}
+          task={adminFile.tasks.find((t) => t.id === selected.id.slice('custom-'.length)) ?? null}
+          latest={adminFile.tasks.find((t) => t.id === selected.id.slice('custom-'.length)) ?? null}
+          onSave={saveTask}
+          onDuplicate={(t) => saveTask(duplicateTask(t))}
+          onDelete={deleteTask}
+          onClose={() => goBackOr({ name: 'today' })}
+        />
+      ) : selected && (
         <SessionDetail
           session={selected}
           presentation={detailAsSheet ? 'sheet' : 'page'}
@@ -1150,20 +1227,6 @@ export default function App() {
         />
       )}
 
-      {openSheet === 'adddl' && (
-        <AddDeadlineSheet
-          onAdd={(title, dateISO, start) =>
-            updateSettings({
-              customKeyDates: [
-                ...(settings.customKeyDates ?? []),
-                { id: Date.now().toString(36), title, dateISO, start },
-              ],
-            })
-          }
-          onClose={() => setOpenSheet('none')}
-        />
-      )}
-
       {openSheet === 'group' && (
         <StudyGroupSheet
           settings={settings}
@@ -1193,7 +1256,7 @@ export default function App() {
           className="fab-add"
           aria-label="Add a personal deadline"
           title="Add a personal deadline"
-          onClick={() => setOpenSheet('adddl')}
+          onClick={() => setTaskEdit({ task: null })}
         >
           ＋
         </button>

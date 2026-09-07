@@ -3358,3 +3358,31 @@ body {
   min-width: 0;
   width: 100%;
 }
+
+/* ---------- Tasks editing (P5-01) ---------- */
+
+.task-edit-row {
+  display: flex;
+  gap: 12px;
+}
+
+.task-edit-row .ui-field {
+  flex: 1;
+}
+
+.mentor-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+
+.mentor-action-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
