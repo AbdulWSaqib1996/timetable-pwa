@@ -2998,3 +2998,62 @@ body {
   align-items: flex-start;
   padding: 8px 0 16px;
 }
+
+/* ---------- Desktop Schedule (P4-04) ---------- */
+
+.schedule-desktop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 1280px) {
+  .schedule-desktop.with-panel {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+.session-panel {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+
+.session-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-panel-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.session-panel-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.session-panel-when {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+@media (min-width: 1024px) {
+  .page--wide .week-grid {
+    min-width: 0;
+  }
+}

@@ -24,6 +24,11 @@ test('demo timetable renders and a session detail opens', async ({ page }) => {
   await expect(firstEvent).toBeVisible()
   await firstEvent.click()
 
+  // ≥1280px: selection fills the side panel; Full details opens the sheet.
+  const panel = page.locator('.session-panel')
+  await expect(panel).toBeVisible()
+  await panel.getByRole('button', { name: /Full details/ }).click()
+
   const detail = page.locator('.modal-card.sheet')
   await expect(detail).toBeVisible()
   await expect(detail.locator('.detail-list')).toBeVisible()

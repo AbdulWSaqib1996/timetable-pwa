@@ -932,6 +932,7 @@ export default function App() {
           onOpenFilters={() => setOpenSheet('filters')}
           onClearFilters={() => updateSettings({ filters: { ...DEFAULT_FILTERS } })}
           onSelect={setSelected}
+          onMeta={handleMeta}
         />
       ) : sessions === null && !settings.demo ? (
         <div className="empty-state">Loading timetable…</div>

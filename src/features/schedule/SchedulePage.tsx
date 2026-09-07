@@ -5,10 +5,12 @@ import { MonthView } from '../../components/MonthView'
 import { WeekView } from '../../components/WeekView'
 import { IconSearch, PageHeader, SegmentedControl } from '../../components/ui'
 import type { Coords, TravelMode } from '../../lib/campus'
+import { sessionKey as panelKey } from '../../lib/diff'
 import { getFilters } from '../../lib/filters'
 import { trackUse } from '../../lib/usage'
-import type { Filters, MetaMap, Session, Settings, ViewMode } from '../../types'
+import type { Filters, MetaMap, Session, SessionMeta, Settings, ViewMode } from '../../types'
 import { DayList } from './DayList'
+import { SessionPanel } from './SessionPanel'
 import { WeekStrip } from './WeekStrip'
 
 interface Props {
@@ -37,6 +39,7 @@ interface Props {
   onOpenFilters: () => void
   onClearFilters: () => void
   onSelect: (s: Session) => void
+  onMeta: (session: Session, patch: Partial<SessionMeta>) => void
 }
 
 function matchesQuery(s: Session, q: string): boolean {
@@ -49,15 +52,15 @@ const longDay = (iso: string) => {
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })
 }
 
-function useWide(): boolean {
-  const [wide, setWide] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
+function useMinWidth(px: number): boolean {
+  const [match, setMatch] = useState(() => window.matchMedia(`(min-width: ${px}px)`).matches)
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)')
-    const onChange = (e: MediaQueryListEvent) => setWide(e.matches)
+    const mq = window.matchMedia(`(min-width: ${px}px)`)
+    const onChange = (e: MediaQueryListEvent) => setMatch(e.matches)
     mq.addEventListener('change', onChange)
     return () => mq.removeEventListener('change', onChange)
-  }, [])
-  return wide
+  }, [px])
+  return match
 }
 
 /**
@@ -89,12 +92,21 @@ export function SchedulePage({
   onOpenFilters,
   onClearFilters,
   onSelect,
+  onMeta,
 }: Props) {
-  const wide = useWide()
+  const wide = useMinWidth(1024)
+  // ≥1280px: selection fills the side panel instead of opening the full
+  // detail, so the calendar never jumps (P4-04).
+  const hasPanel = useMinWidth(1280)
+  const [panel, setPanel] = useState<Session | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const mode: 'week' | 'month' = view === 'month' ? 'month' : 'week'
   const anchorISO = selectedDateISO ?? todayISO
+  const handleSelect = (s: Session) => {
+    if (wide && hasPanel && mode === 'week') setPanel(s)
+    else onSelect(s)
+  }
 
   const searchResults = useMemo(() => {
     const q = query.trim()
@@ -213,18 +225,32 @@ export function SchedulePage({
           emptyMessage={`No sessions match “${query.trim()}”.`}
         />
       ) : wide && mode === 'week' ? (
-        <WeekView
-          sessions={filteredSessions}
-          keyDates={getFilters(settings).showKeyDates ? allKeyDates : []}
-          todayISO={todayISO}
-          anchorISO={anchorISO}
-          onNavigate={(iso) => onSelectDate(iso === todayISO ? null : iso)}
-          onSelect={onSelect}
-          termStartISO={settings.termStartISO}
-          coords={coords}
-          travelMode={travelMode}
-          placements={settings.placements}
-        />
+        <div className={`schedule-desktop${panel && hasPanel ? ' with-panel' : ''}`}>
+          <div className="schedule-desktop-grid">
+            <WeekView
+              sessions={filteredSessions}
+              keyDates={getFilters(settings).showKeyDates ? allKeyDates : []}
+              todayISO={todayISO}
+              anchorISO={anchorISO}
+              onNavigate={(iso) => onSelectDate(iso === todayISO ? null : iso)}
+              onSelect={handleSelect}
+              termStartISO={settings.termStartISO}
+              coords={coords}
+              travelMode={travelMode}
+              placements={settings.placements}
+            />
+          </div>
+          {panel && hasPanel && (
+            <SessionPanel
+              session={panel}
+              meta={metaMap[panelKey(panel)]}
+              travelMode={travelMode}
+              onMeta={onMeta}
+              onOpenFull={(s) => onSelect(s)}
+              onClose={() => setPanel(null)}
+            />
+          )}
+        </div>
       ) : mode === 'month' ? (
         <>
           <MonthView
