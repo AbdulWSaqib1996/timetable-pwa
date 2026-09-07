@@ -10,6 +10,7 @@ import { SessionDetail } from './components/SessionDetail'
 import { SetupScreen } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
 import { SchedulePage } from './features/schedule/SchedulePage'
+import { JourneyHomePage } from './features/today/JourneyHomePage'
 import { TodayPage } from './features/today/TodayPage'
 import { parseRoute, useRoute } from './lib/router'
 import type { Route } from './lib/router'
@@ -767,7 +768,7 @@ export default function App() {
       route={route}
       onNavigate={handleNavigate}
       profileName={active.name}
-      hideNav={route.name === 'session' && !detailAsSheet}
+      hideNav={(route.name === 'session' || route.name === 'homeJourney') && !detailAsSheet}
     >
       <PersistenceNotice />
       <SyncNotice />
@@ -938,7 +939,16 @@ export default function App() {
         </details>
       )}
 
-      {selected && !detailAsSheet ? null : route.name === 'schedule' ? (
+      {selected && !detailAsSheet ? null : route.name === 'homeJourney' ? (
+        <JourneyHomePage
+          settings={settings}
+          coords={coords}
+          locationEnabled={locationEnabled}
+          travelMode={travelMode}
+          onBack={() => goBackOr({ name: 'today' })}
+          onOpenSettings={() => setOpenSheet('settings')}
+        />
+      ) : route.name === 'schedule' ? (
         <SchedulePage
           settings={settings}
           profileName={active.name}
@@ -989,6 +999,7 @@ export default function App() {
           onOpenSettings={() => setOpenSheet('settings')}
           onOpenTasks={() => navigate({ name: 'tasks' })}
           onOpenSchedule={() => navigate({ name: 'schedule' })}
+          onOpenHomeJourney={() => navigate({ name: 'homeJourney' })}
         />
       )}
 

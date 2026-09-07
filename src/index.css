@@ -3164,3 +3164,14 @@ body {
 .map-fallback {
   margin: 10px 0;
 }
+
+.home-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.journey-origin {
+  margin: 8px 0;
+}

@@ -4,7 +4,9 @@ import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey } from '../../lib/diff'
 import { daysUntil, formatRemaining, isPlacementSession, placementTag, toMinutes } from '../../lib/format'
 import { parseLocation, shortBuildingName } from '../../lib/location'
-import { HomePill } from '../../components/HomeCard'
+import { freshnessLabel } from '../../../shared/travel-state.js'
+import { cachedRouteInfo } from '../../lib/tfl'
+import { TRAVEL_MODE_PHRASE } from '../../lib/campus'
 import { Card, EmptyState, IconBell, IconRefresh, IconSettings, PageHeader } from '../../components/ui'
 import type { MetaMap, Session, SessionChange, Settings } from '../../types'
 
@@ -30,6 +32,7 @@ interface Props {
   onOpenSettings: () => void
   onOpenTasks: () => void
   onOpenSchedule: () => void
+  onOpenHomeJourney: () => void
 }
 
 function formatAge(fetchedAt: number): string {
@@ -81,6 +84,7 @@ export function TodayPage({
   onOpenSettings,
   onOpenTasks,
   onOpenSchedule,
+  onOpenHomeJourney,
 }: Props) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -162,6 +166,39 @@ export function TodayPage({
   const heroRoom = hero ? roomLines(hero) : { room: null, building: null }
 
   const homeSet = settings.homeLat != null && settings.homeLng != null
+  // "Ready to head home?" can be dismissed for the day; the manual action stays.
+  const [homeDismissedDay, setHomeDismissedDay] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('timetable.homedismiss.v1')
+    } catch {
+      return null
+    }
+  })
+  const homePromoted = homeSet && dayFinished && homeDismissedDay !== todayISO
+  const dismissHome = () => {
+    try {
+      localStorage.setItem('timetable.homedismiss.v1', todayISO)
+    } catch {
+      /* per-device convenience only */
+    }
+    setHomeDismissedDay(todayISO)
+  }
+  // Freshness-qualified duration for the entry row (P3-08 rules).
+  let homeSummary: string | null = null
+  if (homeSet && coords) {
+    const home = { lat: settings.homeLat!, lng: settings.homeLng! }
+    const est = estimateTravelToCoords(home, coords, travelMode, 'Home')
+    let minutes = est.minutes
+    let basis = 'estimate from distance'
+    if (travelMode === 'transit') {
+      const info = cachedRouteInfo(coords, home)
+      if (info) {
+        minutes = info.route.minutes
+        basis = freshnessLabel({ basis: 'provider', fetchedAt: info.fetchedAt })
+      }
+    }
+    if (minutes !== null) homeSummary = `≈ ${formatRemaining(minutes)} ${TRAVEL_MODE_PHRASE[travelMode]} (${basis})`
+  }
 
   return (
     <div className="page page-today">
@@ -252,10 +289,9 @@ export function TodayPage({
         />
       )}
 
-      {dayFinished && (
+      {dayFinished && !homePromoted && (
         <Card tone="accent" className="today-finished">
           <p className="today-finished-title">That's the day done 🎉</p>
-          {homeSet ? <p className="filter-hint">Ready to head home? Use Journey home below.</p> : null}
         </Card>
       )}
 
@@ -304,17 +340,23 @@ export function TodayPage({
       )}
 
       {homeSet && (
-        <Card className={`home-row${dayFinished ? ' home-row--promoted' : ''}`}>
+        <Card tone={homePromoted ? 'accent' : 'default'} className="home-row">
           <div className="home-row-text">
-            <span className="home-row-title">Journey home</span>
-            <span className="filter-hint">Live route, departures and map</span>
+            <span className="home-row-title">{homePromoted ? 'Ready to head home?' : 'Journey home'}</span>
+            <span className="filter-hint">
+              {homeSummary ?? (locationEnabled ? 'Live route, departures and map' : 'Route, map and directions home')}
+            </span>
           </div>
-          <HomePill
-            home={{ lat: settings.homeLat!, lng: settings.homeLng! }}
-            coords={coords}
-            locationEnabled={locationEnabled}
-            travelMode={travelMode}
-          />
+          <div className="home-row-actions">
+            <button type="button" className="btn-secondary" onClick={onOpenHomeJourney}>
+              View journey
+            </button>
+            {homePromoted && (
+              <button type="button" className="btn-icon" aria-label="Dismiss for today" onClick={dismissHome}>
+                ✕
+              </button>
+            )}
+          </div>
         </Card>
       )}
 
