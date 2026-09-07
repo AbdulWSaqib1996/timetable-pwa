@@ -3,7 +3,6 @@ import { reportPersistenceFailure } from '../lib/persistence'
 import { markBackedUp } from '../lib/storage'
 import { useRef, useState } from 'react'
 import { attendanceSummary, isCompleted, isEligibleSession } from '../../shared/eligibility.js'
-import { useModalA11y } from '../lib/a11y'
 import { sessionKey } from '../lib/diff'
 import { isPlacementSession, placementTag } from '../lib/format'
 import { downloadICS } from '../lib/ics'
@@ -28,9 +27,27 @@ import {
 } from '../lib/sync'
 import type { SyncState } from '../lib/sync'
 import { exportBackup, importBackup } from '../lib/storage'
+import type { SourceStatus } from '../../shared/refresh.js'
+import { WHATSNEW } from '../lib/changelog'
+import { IconBack, PageHeader } from './ui'
+import { useEffect } from 'react'
 import type { MetaMap, ProfileStore, Session, Settings } from '../types'
 
+export type SettingsSection =
+  | 'timetable'
+  | 'reminders'
+  | 'travel'
+  | 'calendars'
+  | 'data'
+  | 'appearance'
+  | 'help'
+
 interface Props {
+  /** focused page to show; undefined = the category index */
+  section?: SettingsSection
+  onOpenSection: (section: SettingsSection) => void
+  /** per-source refresh outcomes for the data-health list */
+  sources: SourceStatus[]
   settings: Settings
   store: ProfileStore
   /** sessions with the user's filters applied (specialisms etc.), all dates */
@@ -45,7 +62,6 @@ interface Props {
   onUpdateSettings: (patch: Partial<Settings>) => void
   onOpenStats: () => void
   onOpenGroup: () => void
-  onOpenJournal: () => void
   onRechooseSpecialisms: () => void
   onSwitchProfile: (id: string) => void
   onAddProfile: () => void
@@ -91,6 +107,9 @@ const REMINDER_OPTIONS = [
 ]
 
 export function SettingsSheet({
+  section,
+  onOpenSection,
+  sources,
   settings,
   store,
   courseSessions,
@@ -102,14 +121,12 @@ export function SettingsSheet({
   onUpdateSettings,
   onOpenStats,
   onOpenGroup,
-  onOpenJournal,
   onRechooseSpecialisms,
   onSwitchProfile,
   onAddProfile,
   onDeleteProfile,
   onClose,
 }: Props) {
-  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE)
   const [keyDatesUrl, setKeyDatesUrl] = useState(settings.keyDatesUrl ?? '')
   const [keyDatesError, setKeyDatesError] = useState(false)
@@ -129,6 +146,21 @@ export function SettingsSheet({
   const syncBase = settings.pushServerBase ?? DEFAULT_PUSH_BASE
   const [homeAddr, setHomeAddr] = useState(settings.homeAddress ?? '')
   const [homeGeoStatus, setHomeGeoStatus] = useState<'working' | 'ok' | 'fail' | null>(null)
+  const [storageEstimate, setStorageEstimate] = useState<string | null>(null)
+  useEffect(() => {
+    if (section !== 'data') return
+    if (!navigator.storage?.estimate) {
+      setStorageEstimate('not reported by this browser')
+      return
+    }
+    void navigator.storage
+      .estimate()
+      .then((e) => {
+        const mb = (n?: number) => (n != null ? `${Math.round(n / 1048576)} MB` : '?')
+        setStorageEstimate(`${mb(e.usage)} used of ~${mb(e.quota)} available (browser estimate, not a guarantee)`)
+      })
+      .catch(() => setStorageEstimate('not reported by this browser'))
+  }, [section])
 
   function saveHomeAddress() {
     const address = homeAddr.trim()
@@ -451,22 +483,52 @@ export function SettingsSheet({
     ? buildFeedUrl(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE, settings, activeProfile?.name)
     : null
 
+  const CATEGORIES: { id: SettingsSection; title: string; hint: string }[] = [
+    { id: 'timetable', title: 'My timetable', hint: 'Profiles, sources, notices, specialisms, study group' },
+    { id: 'reminders', title: 'Reminders', hint: 'Notification offsets, quiet hours, background push' },
+    { id: 'travel', title: 'Travel & home', hint: 'Location, mode, home address, placements' },
+    { id: 'calendars', title: 'Connected calendars', hint: 'Subscribed feed, .ics export, what they contain' },
+    { id: 'data', title: 'Data & devices', hint: 'Save state, sync, backup, exports, storage' },
+    { id: 'appearance', title: 'Appearance', hint: 'Theme and density' },
+    { id: 'help', title: 'Help & privacy', hint: 'What’s new, install, usage ping, support' },
+  ]
+
+  if (!section) {
+    return (
+      <div className="page page-settings">
+        <PageHeader
+          title="Settings"
+          subtitle={activeProfile?.name}
+          actions={
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Done
+            </button>
+          }
+        />
+        <ul className="settings-index">
+          {CATEGORIES.map((c) => (
+            <li key={c.id}>
+              <button type="button" className="settings-index-row" onClick={() => onOpenSection(c.id)}>
+                <span className="settings-index-title">{c.title}</span>
+                <span className="filter-hint">{c.hint}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  const title = CATEGORIES.find((c) => c.id === section)?.title ?? 'Settings'
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        ref={dialogRef}
-        className="modal-card sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Settings"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sheet-header">
-          <h2>Settings</h2>
-          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
+    <div className="page page-settings">
+      <button type="button" className="page-back" onClick={onClose}>
+        <IconBack size={18} /> Settings
+      </button>
+      <PageHeader title={title} />
+      <div className="settings-body">
+      {section === 'timetable' && (
+        <>
 
         <section className="filter-section">
           <h3>Timetables</h3>
@@ -530,6 +592,7 @@ export function SettingsSheet({
           )}
         </section>
 
+
         {!settings.demo && (
           <section className="filter-section">
             <h3>Share this setup</h3>
@@ -542,6 +605,7 @@ export function SettingsSheet({
             </button>
           </section>
         )}
+
 
         {!settings.demo && (
           <section className="filter-section">
@@ -594,6 +658,7 @@ export function SettingsSheet({
           </section>
         )}
 
+
         {!settings.demo && (
           <section className="filter-section">
             <h3>Notices (cohort broadcasts)</h3>
@@ -617,6 +682,7 @@ export function SettingsSheet({
           </section>
         )}
 
+
         <section className="filter-section">
           <h3>Specialisms</h3>
           <p className="filter-hint">
@@ -629,28 +695,6 @@ export function SettingsSheet({
           </button>
         </section>
 
-        <section className="filter-section">
-          <h3>Theme</h3>
-          <div className="chip-grid">
-            {(
-              [
-                { value: 'system', label: 'System' },
-                { value: 'light', label: '☀️ Light' },
-                { value: 'dark', label: '🌙 Dark' },
-              ] as const
-            ).map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                className={`chip${(settings.theme ?? 'system') === value ? ' chip-on' : ''}`}
-                aria-pressed={(settings.theme ?? 'system') === value}
-                onClick={() => onUpdateSettings({ theme: value })}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </section>
 
         <section className="filter-section">
           <h3>Term start (week numbers)</h3>
@@ -662,6 +706,24 @@ export function SettingsSheet({
             onChange={(e) => onUpdateSettings({ termStartISO: e.target.value || undefined })}
           />
         </section>
+
+
+        <section className="filter-section">
+          <h3>Study group</h3>
+          <p className="filter-hint">
+            {settings.groupCode
+              ? `In group ${settings.groupCode} as ${settings.groupName}.`
+              : 'Find common free slots with coursemates by sharing a code.'}
+          </p>
+          <button type="button" className="btn-secondary" onClick={onOpenGroup}>
+            👥 {settings.groupCode ? 'Open study group' : 'Set up a study group'}
+          </button>
+        </section>
+
+        </>
+      )}
+      {section === 'reminders' && (
+        <>
 
         <section className="filter-section">
           <h3>Notifications at a glance</h3>
@@ -718,6 +780,7 @@ export function SettingsSheet({
           </div>
         </section>
 
+
         <section className="filter-section">
           <h3>Session reminders</h3>
           <p className="filter-hint">
@@ -770,68 +833,6 @@ export function SettingsSheet({
           </p>
         </section>
 
-        <section className="filter-section">
-          <h3>Travel times</h3>
-          <label className="toggle-row">
-            <input
-              type="checkbox"
-              checked={settings.locationEnabled ?? false}
-              onChange={(e) => toggleLocation(e.target.checked)}
-            />
-            Use my location for travel times
-          </label>
-          <div className="chip-grid">
-            {(
-              [
-                { value: 'walking', label: '🚶 Walking' },
-                { value: 'transit', label: '🚌 Public transport' },
-                { value: 'driving', label: '🚗 Driving' },
-              ] as const
-            ).map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                className={`chip${(settings.travelMode ?? 'walking') === value ? ' chip-on' : ''}`}
-                aria-pressed={(settings.travelMode ?? 'walking') === value}
-                onClick={() => onUpdateSettings({ travelMode: value })}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <p className="filter-hint">
-            Shows an estimated journey from where you are to each session's UCL building, on the
-            timetable cards and in session details (rooms are matched against the Bloomsbury
-            campus). Estimates are approximate — the Directions link gives the exact route. Your
-            location and destination are sent to TfL for transit routes; map areas are requested from
-            OpenStreetMap. Background leave alerts additionally store your last app-open location
-            in the push worker.
-          </p>
-          <h3 className="subheading">Home</h3>
-          <div className="feed-row">
-            <input
-              type="text"
-              placeholder="Home address / postcode"
-              aria-label="Home address"
-              value={homeAddr}
-              onChange={(e) => setHomeAddr(e.target.value)}
-              onBlur={saveHomeAddress}
-            />
-          </div>
-          {homeGeoStatus === 'working' && <p className="filter-hint">📍 Locating home…</p>}
-          {homeGeoStatus === 'fail' && (
-            <p className="filter-hint">Couldn't locate that address — try adding the postcode.</p>
-          )}
-          {(homeGeoStatus === 'ok' || (homeGeoStatus === null && settings.homeLat != null)) && (
-            <p className="filter-hint">📍 Home set — a "🏠 Head home" card shows whenever you're away from home.</p>
-          )}
-          <p className="filter-hint">
-            The card shows the live journey home — time, TfL route and arrival estimate — any time
-            you're out (it hides itself when you're home). Address lookup sends the postcode to
-            postcodes.io or the address to OpenStreetMap Nominatim. Home coordinates are used in
-            TfL and map requests. Saved home settings are included in encrypted sync and backups.
-          </p>
-        </section>
 
         <section className="filter-section">
           <h3>Leave alerts</h3>
@@ -868,6 +869,7 @@ export function SettingsSheet({
             <p className="filter-hint">Leave alerts are off.</p>
           )}
         </section>
+
 
         {!settings.demo && (
           <section className="filter-section">
@@ -1033,6 +1035,75 @@ export function SettingsSheet({
           </section>
         )}
 
+        </>
+      )}
+      {section === 'travel' && (
+        <>
+
+        <section className="filter-section">
+          <h3>Travel times</h3>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={settings.locationEnabled ?? false}
+              onChange={(e) => toggleLocation(e.target.checked)}
+            />
+            Use my location for travel times
+          </label>
+          <div className="chip-grid">
+            {(
+              [
+                { value: 'walking', label: '🚶 Walking' },
+                { value: 'transit', label: '🚌 Public transport' },
+                { value: 'driving', label: '🚗 Driving' },
+              ] as const
+            ).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                className={`chip${(settings.travelMode ?? 'walking') === value ? ' chip-on' : ''}`}
+                aria-pressed={(settings.travelMode ?? 'walking') === value}
+                onClick={() => onUpdateSettings({ travelMode: value })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="filter-hint">
+            Shows an estimated journey from where you are to each session's UCL building, on the
+            timetable cards and in session details (rooms are matched against the Bloomsbury
+            campus). Estimates are approximate — the Directions link gives the exact route. Your
+            location and destination are sent to TfL for transit routes; map areas are requested from
+            OpenStreetMap. Background leave alerts additionally store your last app-open location
+            in the push worker.
+          </p>
+          <h3 className="subheading">Home</h3>
+          <div className="feed-row">
+            <input
+              type="text"
+              placeholder="Home address / postcode"
+              aria-label="Home address"
+              value={homeAddr}
+              onChange={(e) => setHomeAddr(e.target.value)}
+              onBlur={saveHomeAddress}
+            />
+          </div>
+          {homeGeoStatus === 'working' && <p className="filter-hint">📍 Locating home…</p>}
+          {homeGeoStatus === 'fail' && (
+            <p className="filter-hint">Couldn't locate that address — try adding the postcode.</p>
+          )}
+          {(homeGeoStatus === 'ok' || (homeGeoStatus === null && settings.homeLat != null)) && (
+            <p className="filter-hint">📍 Home set — a "🏠 Head home" card shows whenever you're away from home.</p>
+          )}
+          <p className="filter-hint">
+            The card shows the live journey home — time, TfL route and arrival estimate — any time
+            you're out (it hides itself when you're home). Address lookup sends the postcode to
+            postcodes.io or the address to OpenStreetMap Nominatim. Home coordinates are used in
+            TfL and map requests. Saved home settings are included in encrypted sync and backups.
+          </p>
+        </section>
+
+
         {(placementBlocks.length > 0 || Object.keys(settings.placements ?? {}).length > 0) && (
           <section className="filter-section">
             <h3>Placements</h3>
@@ -1071,15 +1142,112 @@ export function SettingsSheet({
           </section>
         )}
 
+        </>
+      )}
+      {section === 'calendars' && (
+        <>
+
         <section className="filter-section">
-          <h3>Evidence journal</h3>
+          <h3>Calendar feed (stays in sync)</h3>
+          {settings.demo ? (
+            <p className="filter-hint">Load a real sheet to use the calendar feed.</p>
+          ) : (
+            <>
+              <p className="filter-hint">
+                Add the feed URL below to your calendar app ("subscribe by URL" / "from internet")
+                and it stays in sync with the sheet — sessions, your specialism choices, and key
+                dates included.
+              </p>
+              <div className="feed-row">
+                <input
+                  type="url"
+                  placeholder="https://timetable-ics.<you>.workers.dev"
+                  value={feedBase}
+                  onChange={(e) => setFeedBase(e.target.value)}
+                  onBlur={() => onUpdateSettings({ icsFeedBase: feedBase.trim() || undefined })}
+                />
+              </div>
+              {feedUrl && (
+                <>
+                  <p className="settings-url">{feedUrl}</p>
+                  {feedCopiedUrl && feedCopiedUrl !== feedUrl && (
+                    <p className="filter-hint feed-stale">
+                      ⚠ Your feed URL has changed since you last copied it (filters or placement
+                      details changed) — re-copy it and update the subscription in your calendar app.
+                    </p>
+                  )}
+                  <button type="button" className="btn-secondary" onClick={() => copy(feedUrl, 'feed')}>
+                    {copied === 'feed' ? 'Copied!' : 'Copy feed URL'}
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </section>
+
+
+        <section className="filter-section">
+          <h3>Calendar export</h3>
           <p className="filter-hint">
-            Session notes and photos, tagged against the Teachers' Standards (TS1–TS8) in each
-            session's details — exportable when you compile your evidence bundle.
+            Downloads your timetable — your groups and specialisms, all dates, regardless of
+            display filters ({courseSessions.length} sessions
+            {keyDates.length > 0 ? ` + ${keyDates.length} key dates` : ''}) as an .ics file you can
+            import into Google, Apple or Outlook calendars. Key dates export as all-day 📌 events.
           </p>
-          <button type="button" className="btn-secondary" onClick={onOpenJournal}>
-            📔 Open evidence journal
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={courseSessions.length === 0 && keyDates.length === 0}
+            onClick={() => downloadICS([...courseSessions, ...keyDates], 'My Timetable')}
+          >
+            Download .ics file
           </button>
+        </section>
+
+        </>
+      )}
+      {section === 'data' && (
+        <>
+        <section className="filter-section">
+          <h3>Data health</h3>
+          <ul className="notif-overview">
+            <li>
+              <span>Saved on this device</span>
+              <span className="notif-state">notes, attendance & settings persist locally</span>
+            </li>
+            <li>
+              <span>Sync</span>
+              <span className={`notif-state${syncState ? '' : ' off'}`}>
+                {syncState
+                  ? `on — last parked ${new Date(syncState.lastAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                  : 'off (this device only)'}
+              </span>
+            </li>
+            {sources.map((src) => (
+              <li key={src.id}>
+                <span>{src.label} source</span>
+                <span className={`notif-state${src.status !== 'ok' ? ' warn' : ''}`}>
+                  {src.status === 'ok'
+                    ? `updated ${src.lastSuccessAt ? new Date(src.lastSuccessAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'this session'}`
+                    : src.status === 'stale'
+                      ? 'showing last saved rows'
+                      : 'not loading'}
+                </span>
+              </li>
+            ))}
+            <li>
+              <span>Storage</span>
+              <span className="notif-state">{storageEstimate ?? '…'}</span>
+            </li>
+            <li>
+              <span>Photos & wallet files</span>
+              <span className="notif-state">on this device only — move them with a backup</span>
+            </li>
+          </ul>
+          <p className="filter-hint">
+            A downloaded backup is only safe once you can see the file where you saved it — the
+            download prompt alone is not proof it was kept.
+          </p>
         </section>
 
         {attendance.eligible > 0 && (
@@ -1111,23 +1279,6 @@ export function SettingsSheet({
           </section>
         )}
 
-        <section className="filter-section">
-          <h3>Calendar export</h3>
-          <p className="filter-hint">
-            Downloads your timetable — your groups and specialisms, all dates, regardless of
-            display filters ({courseSessions.length} sessions
-            {keyDates.length > 0 ? ` + ${keyDates.length} key dates` : ''}) as an .ics file you can
-            import into Google, Apple or Outlook calendars. Key dates export as all-day 📌 events.
-          </p>
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={courseSessions.length === 0 && keyDates.length === 0}
-            onClick={() => downloadICS([...courseSessions, ...keyDates], 'My Timetable')}
-          >
-            Download .ics file
-          </button>
-        </section>
 
         <section className="filter-section">
           <h3>Backup</h3>
@@ -1161,6 +1312,7 @@ export function SettingsSheet({
             />
           </div>
         </section>
+
 
         <section className="filter-section">
           <h3>Sync between devices</h3>
@@ -1232,54 +1384,67 @@ export function SettingsSheet({
           {syncMsg && <p className="filter-hint">{syncMsg}</p>}
         </section>
 
+        </>
+      )}
+      {section === 'appearance' && (
+        <>
+
         <section className="filter-section">
-          <h3>Calendar feed (stays in sync)</h3>
-          {settings.demo ? (
-            <p className="filter-hint">Load a real sheet to use the calendar feed.</p>
-          ) : (
-            <>
-              <p className="filter-hint">
-                Add the feed URL below to your calendar app ("subscribe by URL" / "from internet")
-                and it stays in sync with the sheet — sessions, your specialism choices, and key
-                dates included.
-              </p>
-              <div className="feed-row">
-                <input
-                  type="url"
-                  placeholder="https://timetable-ics.<you>.workers.dev"
-                  value={feedBase}
-                  onChange={(e) => setFeedBase(e.target.value)}
-                  onBlur={() => onUpdateSettings({ icsFeedBase: feedBase.trim() || undefined })}
-                />
-              </div>
-              {feedUrl && (
-                <>
-                  <p className="settings-url">{feedUrl}</p>
-                  {feedCopiedUrl && feedCopiedUrl !== feedUrl && (
-                    <p className="filter-hint feed-stale">
-                      ⚠ Your feed URL has changed since you last copied it (filters or placement
-                      details changed) — re-copy it and update the subscription in your calendar app.
-                    </p>
-                  )}
-                  <button type="button" className="btn-secondary" onClick={() => copy(feedUrl, 'feed')}>
-                    {copied === 'feed' ? 'Copied!' : 'Copy feed URL'}
-                  </button>
-                </>
-              )}
-            </>
-          )}
+          <h3>Theme</h3>
+          <div className="chip-grid">
+            {(
+              [
+                { value: 'system', label: 'System' },
+                { value: 'light', label: '☀️ Light' },
+                { value: 'dark', label: '🌙 Dark' },
+              ] as const
+            ).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                className={`chip${(settings.theme ?? 'system') === value ? ' chip-on' : ''}`}
+                aria-pressed={(settings.theme ?? 'system') === value}
+                onClick={() => onUpdateSettings({ theme: value })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </section>
 
         <section className="filter-section">
-          <h3>Study group</h3>
-          <p className="filter-hint">
-            {settings.groupCode
-              ? `In group ${settings.groupCode} as ${settings.groupName}.`
-              : 'Find common free slots with coursemates by sharing a code.'}
-          </p>
-          <button type="button" className="btn-secondary" onClick={onOpenGroup}>
-            👥 {settings.groupCode ? 'Open study group' : 'Set up a study group'}
-          </button>
+          <h3>Density</h3>
+          <div className="chip-grid">
+            {(
+              [
+                { value: undefined, label: 'Comfortable' },
+                { value: 'compact', label: 'Compact' },
+              ] as const
+            ).map(({ value, label }) => (
+              <button
+                key={label}
+                type="button"
+                className={`chip${(settings.density ?? undefined) === value ? ' chip-on' : ''}`}
+                aria-pressed={(settings.density ?? undefined) === value}
+                onClick={() => onUpdateSettings({ density: value })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="filter-hint">Compact tightens card spacing — controls and text stay full size.</p>
+        </section>
+        </>
+      )}
+      {section === 'help' && (
+        <>
+        <section className="filter-section">
+          <h3>What's new</h3>
+          <ul className="whatsnew-list">
+            {WHATSNEW.map((n, i) => (
+              <li key={i}>{n}</li>
+            ))}
+          </ul>
         </section>
 
         {onInstall && (
@@ -1294,6 +1459,7 @@ export function SettingsSheet({
             </button>
           </section>
         )}
+
 
         <section className="filter-section">
           <h3>Support this app</h3>
@@ -1337,11 +1503,8 @@ export function SettingsSheet({
           </p>
         </section>
 
-        <div className="modal-actions">
-          <button type="button" className="btn-primary" onClick={onClose}>
-            Done
-          </button>
-        </div>
+        </>
+      )}
       </div>
     </div>
   )

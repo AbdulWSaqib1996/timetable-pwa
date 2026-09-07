@@ -26,9 +26,11 @@ const ChangesSheet = lazy(() => import('./components/ChangesSheet').then((m) => 
 const FilterSheet = lazy(() => import('./components/FilterSheet').then((m) => ({ default: m.FilterSheet })))
 const JournalSheet = lazy(() => import('./components/JournalSheet').then((m) => ({ default: m.JournalSheet })))
 const SettingsSheet = lazy(() => import('./components/SettingsSheet').then((m) => ({ default: m.SettingsSheet })))
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+type SettingsSection = import('./components/SettingsSheet').SettingsSection
 const StatsSheet = lazy(() => import('./components/StatsSheet').then((m) => ({ default: m.StatsSheet })))
 const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((m) => ({ default: m.StudyGroupSheet })))
-import { WHATSNEW, WHATSNEW_VERSION, dismissWhatsNew, shouldShowWhatsNew } from './lib/changelog'
+import { WHATSNEW_VERSION } from './lib/changelog'
 import { maybePing } from './lib/analytics'
 import { loadSyncState as loadSyncStateForPing } from './lib/sync'
 import { trackOpen, trackUse } from './lib/usage'
@@ -84,7 +86,7 @@ import type {
   ViewMode,
 } from './types'
 
-type SheetName = 'none' | 'filters' | 'settings' | 'changes' | 'keydates' | 'stats' | 'group' | 'adddl' | 'journal' | 'admin'
+type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'adddl' | 'journal' | 'admin'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -111,7 +113,6 @@ export default function App() {
   // One date-selection model shared by Day/Week/Month (null = follow today).
   const [selectedDateISO, setSelectedDateISO] = useState<string | null>(null)
   const [showBackupNudge, setShowBackupNudge] = useState(false)
-  const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowWhatsNew())
   const [notices, setNotices] = useState<Notice[]>([])
   // A notification tap carrying an owner: switch to that profile, then open
   // the stable event (P3-05). Falls back to a safe notice when it's gone.
@@ -152,21 +153,7 @@ export default function App() {
     else navigate(fallback, { replace: true })
   }
   function handleNavigate(r: Route) {
-    // Settings stays a focused surface reachable from everywhere (P4-08 turns
-    // it into routed pages); Tasks/PGCE are routed destinations.
-    if (r.name === 'settings') {
-      setOpenSheet('settings')
-      return
-    }
     navigate(r)
-  }
-  // Settings stays a sheet until P4-08; a direct #/settings link opens it.
-  useEffect(() => {
-    if (route.name === 'settings') setOpenSheet('settings')
-  }, [route.name])
-  function routeAwareClose() {
-    if (route.name === 'settings') goBackOr({ name: 'today' })
-    else setOpenSheet('none')
   }
 
   const {
@@ -182,6 +169,7 @@ export default function App() {
     setChanges,
     refresh,
     identityReview,
+    sources,
   } = useTimetableData(active)
 
   // Close any open detail/date selection when the active profile switches.
@@ -228,6 +216,12 @@ export default function App() {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme')
     else document.documentElement.setAttribute('data-theme', theme)
   }, [settings?.theme])
+
+  // Compact density tightens spacing only — controls stay full size.
+  useEffect(() => {
+    if (settings?.density === 'compact') document.documentElement.setAttribute('data-density', 'compact')
+    else document.documentElement.removeAttribute('data-density')
+  }, [settings?.density])
 
   // App-icon badge with the unseen-changes count, where the Badging API exists.
   useEffect(() => {
@@ -283,7 +277,7 @@ export default function App() {
   // PWA shortcut deep-link (?view=keydates) — consume it once.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('view') === 'keydates') setOpenSheet('keydates')
+    if (params.get('view') === 'keydates') navigate({ name: 'tasks' }, { replace: true })
     if (params.has('view')) {
       history.replaceState(null, '', window.location.pathname)
     }
@@ -836,38 +830,15 @@ export default function App() {
           </div>
         ))}
 
-      {showWhatsNew && (
-        <div className="backup-banner whatsnew">
-          <div>
-            <strong>What's new</strong>
-            <ul className="whatsnew-list">
-              {WHATSNEW.map((n, i) => (
-                <li key={i}>{n}</li>
-              ))}
-            </ul>
-          </div>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => {
-              dismissWhatsNew()
-              setShowWhatsNew(false)
-            }}
-          >
-            Got it
-          </button>
-        </div>
-      )}
-
       {!settings.checklistDismissed &&
         sessions !== null &&
         (() => {
           const all = [
             ...(canInstall ? [{ done: false, label: 'Install the app on this device', act: handleInstall }] : []),
             { done: !!settings.specialismsChosen || options.specialisms.length === 0, label: 'Pick your specialism', act: () => setRechoosing(true) },
-            { done: !!settings.keyDatesSheetId, label: 'Connect key dates (Settings → Key dates)', act: () => setOpenSheet('settings') },
-            { done: !!settings.pushEnabled, label: 'Enable background push (Settings)', act: () => setOpenSheet('settings') },
-            { done: !!settings.locationEnabled, label: 'Turn on travel times (Settings)', act: () => setOpenSheet('settings') },
+            { done: !!settings.keyDatesSheetId, label: 'Connect key dates (Settings → Key dates)', act: () => navigate({ name: 'settings' }) },
+            { done: !!settings.pushEnabled, label: 'Enable background push (Settings)', act: () => navigate({ name: 'settings' }) },
+            { done: !!settings.locationEnabled, label: 'Turn on travel times (Settings)', act: () => navigate({ name: 'settings' }) },
           ]
           const items = all.filter((i) => !i.done)
           if (items.length === 0) return null
@@ -946,8 +917,41 @@ export default function App() {
           locationEnabled={locationEnabled}
           travelMode={travelMode}
           onBack={() => goBackOr({ name: 'today' })}
-          onOpenSettings={() => setOpenSheet('settings')}
+          onOpenSettings={() => navigate({ name: 'settings' })}
         />
+      ) : route.name === 'settings' && store ? (
+        <Suspense fallback={null}>
+          <SettingsSheet
+            section={route.section as SettingsSection | undefined}
+            onOpenSection={(sec) => navigate({ name: 'settings', section: sec })}
+            sources={sources}
+            settings={settings}
+            store={store}
+            courseSessions={courseSessions}
+            keyDates={allKeyDates}
+            onOpenGroup={() => setOpenSheet('group')}
+            metaMap={metaMap}
+            todayISO={todayISO}
+            placementBlocks={placementStats.blocks}
+            onInstall={canInstall ? handleInstall : undefined}
+            onUpdateSettings={updateSettings}
+            onOpenStats={() => setOpenSheet('stats')}
+            onRechooseSpecialisms={() => {
+              setRechoosing(true)
+            }}
+            onSwitchProfile={(id) => {
+              handleSwitchProfile(id)
+            }}
+            onAddProfile={() => {
+              setAddingProfile(true)
+            }}
+            onDeleteProfile={handleDeleteProfile}
+            onClose={() => {
+              if (route.section) navigate({ name: 'settings' })
+              else goBackOr({ name: 'today' })
+            }}
+          />
+        </Suspense>
       ) : route.name === 'tasks' ? (
         <TasksPage
           profileName={active.name}
@@ -1035,7 +1039,7 @@ export default function App() {
           locationEnabled={locationEnabled}
           onSelect={openSession}
           onOpenChanges={openChanges}
-          onOpenSettings={() => setOpenSheet('settings')}
+          onOpenSettings={() => navigate({ name: 'settings' })}
           onOpenTasks={() => navigate({ name: 'tasks' })}
           onOpenSchedule={() => navigate({ name: 'schedule' })}
           onOpenHomeJourney={() => navigate({ name: 'homeJourney' })}
@@ -1180,36 +1184,6 @@ export default function App() {
         />
       )}
 
-      {openSheet === 'settings' && store && (
-        <SettingsSheet
-          settings={settings}
-          store={store}
-          courseSessions={courseSessions}
-          keyDates={allKeyDates}
-          onOpenGroup={() => setOpenSheet('group')}
-          metaMap={metaMap}
-          todayISO={todayISO}
-          placementBlocks={placementStats.blocks}
-          onInstall={canInstall ? handleInstall : undefined}
-          onUpdateSettings={updateSettings}
-          onOpenStats={() => setOpenSheet('stats')}
-          onOpenJournal={() => setOpenSheet('journal')}
-          onRechooseSpecialisms={() => {
-            setOpenSheet('none')
-            setRechoosing(true)
-          }}
-          onSwitchProfile={(id) => {
-            handleSwitchProfile(id)
-            setOpenSheet('none')
-          }}
-          onAddProfile={() => {
-            setOpenSheet('none')
-            setAddingProfile(true)
-          }}
-          onDeleteProfile={handleDeleteProfile}
-          onClose={routeAwareClose}
-        />
-      )}
       </Suspense>
 
       {route.name === 'today' && (
