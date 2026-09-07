@@ -3386,3 +3386,24 @@ body {
   height: 18px;
   accent-color: var(--accent);
 }
+
+/* Record editor (P5-02) */
+.record-actions-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.record-action-row {
+  display: flex;
+  gap: 6px;
+}
+
+.record-action-row input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+}

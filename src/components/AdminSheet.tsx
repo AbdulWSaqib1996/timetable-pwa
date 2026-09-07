@@ -7,6 +7,9 @@ import { daysUntil, isPlacementSession, placementTag } from '../lib/format'
 import { printBinder } from '../lib/printBinder'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import { trackUse } from '../lib/usage'
+import { RecordEditSheet } from './RecordEditSheet'
+import type { RecordKind } from './RecordEditSheet'
+import { StatusMessage } from './ui'
 import { WALLET_FILE_CAP, addWalletFile, deleteWalletFile, getWalletFiles } from '../lib/wallet'
 import type { WalletFile } from '../lib/wallet'
 import type { MetaMap, Session } from '../types'
@@ -69,7 +72,7 @@ const toggleIn = (list: string[], id: string) =>
 
 /* ---------- tab components (each owns its add-form state) ---------- */
 
-function ReflectionsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin'] }) {
+function ReflectionsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
   const [week, setWeek] = useState(todayISO)
   const [wentWell, setWentWell] = useState('')
   const [challenges, setChallenges] = useState('')
@@ -124,6 +127,7 @@ function ReflectionsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; today
                 {r.standards.map((ts) => (
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
+                <button type="button" className="btn-icon" aria-label="Edit reflection" onClick={() => onEdit('reflection', r.id)}>✎</button>
                 <button type="button" className="btn-icon" aria-label="Delete reflection" onClick={() => onUpdate((prev) => ({ ...prev, reflections: prev.reflections.filter((x) => x.id !== r.id) }))}>✕</button>
               </span>
             </div>
@@ -137,7 +141,7 @@ function ReflectionsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; today
   )
 }
 
-function TargetsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin'] }) {
+function TargetsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
   const [text, setText] = useState('')
   const [standards, setStandards] = useState<string[]>([])
   const cycle = (t: TargetItem): TargetItem =>
@@ -181,6 +185,7 @@ function TargetsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO:
                 {t.standards.map((ts) => (
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
+                <button type="button" className="btn-icon" aria-label="Edit target" onClick={() => onEdit('target', t.id)}>✎</button>
                 <button type="button" className="btn-icon" aria-label="Delete target" onClick={() => onUpdate((prev) => ({ ...prev, targets: prev.targets.filter((x) => x.id !== t.id) }))}>✕</button>
               </span>
             </div>
@@ -193,7 +198,7 @@ function TargetsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO:
   )
 }
 
-function MeetingsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin'] }) {
+function MeetingsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
   const [date, setDate] = useState(todayISO)
   const [discussed, setDiscussed] = useState('')
   const [actionsText, setActionsText] = useState('')
@@ -236,7 +241,10 @@ function MeetingsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO
           <li key={m.id} className="admin-item">
             <div className="admin-item-head">
               <strong>{fmt(m.dateISO)}</strong>
-              <button type="button" className="btn-icon" aria-label="Delete meeting" onClick={() => onUpdate((prev) => ({ ...prev, meetings: prev.meetings.filter((x) => x.id !== m.id) }))}>✕</button>
+              <span className="journal-tags">
+                <button type="button" className="btn-icon" aria-label="Edit meeting" onClick={() => onEdit('meeting', m.id)}>✎</button>
+                <button type="button" className="btn-icon" aria-label="Delete meeting" onClick={() => onUpdate((prev) => ({ ...prev, meetings: prev.meetings.filter((x) => x.id !== m.id) }))}>✕</button>
+              </span>
             </div>
             {m.discussed && <p>{m.discussed}</p>}
             {m.actions.map((a) => (
@@ -265,7 +273,7 @@ function MeetingsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO
   )
 }
 
-function ObservationsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin'] }) {
+function ObservationsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
   const [date, setDate] = useState(todayISO)
   const [observer, setObserver] = useState('')
   const [subject, setSubject] = useState('')
@@ -319,7 +327,10 @@ function ObservationsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; toda
           <li key={o.id} className="admin-item">
             <div className="admin-item-head">
               <strong>{fmt(o.dateISO)} · {o.subject || 'Lesson'}</strong>
-              <button type="button" className="btn-icon" aria-label="Delete observation" onClick={() => onUpdate((prev) => ({ ...prev, observations: prev.observations.filter((x) => x.id !== o.id) }))}>✕</button>
+              <span className="journal-tags">
+                <button type="button" className="btn-icon" aria-label="Edit observation" onClick={() => onEdit('observation', o.id)}>✎</button>
+                <button type="button" className="btn-icon" aria-label="Delete observation" onClick={() => onUpdate((prev) => ({ ...prev, observations: prev.observations.filter((x) => x.id !== o.id) }))}>✕</button>
+              </span>
             </div>
             {o.observer && <p className="admin-dates">observed by {o.observer}{o.focus ? ` · focus: ${o.focus}` : ''}</p>}
             {o.strengths && <p>👍 {o.strengths}</p>}
@@ -331,7 +342,7 @@ function ObservationsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; toda
   )
 }
 
-function LessonsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin'] }) {
+function LessonsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
   const [date, setDate] = useState(todayISO)
   const [subject, setSubject] = useState('')
   const [classGroup, setClassGroup] = useState('')
@@ -375,6 +386,7 @@ function LessonsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO:
                 {l.standards.map((ts) => (
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
+                <button type="button" className="btn-icon" aria-label="Edit lesson" onClick={() => onEdit('lesson', l.id)}>✎</button>
                 <button type="button" className="btn-icon" aria-label="Delete lesson" onClick={() => onUpdate((prev) => ({ ...prev, lessons: prev.lessons.filter((x) => x.id !== l.id) }))}>✕</button>
               </span>
             </div>
@@ -386,7 +398,7 @@ function LessonsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO:
   )
 }
 
-function AuditsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin'] }) {
+function AuditsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
   const [subject, setSubject] = useState('')
   const [stage, setStage] = useState<AuditStage>('baseline')
   const [note, setNote] = useState('')
@@ -431,6 +443,7 @@ function AuditsTab({ admin, todayISO, onUpdate }: { admin: AdminFile; todayISO: 
             {[...entries].sort((a, b) => a.dateISO.localeCompare(b.dateISO)).map((e) => (
               <p key={e.id}>
                 {e.stage} ({fmt(e.dateISO)}){e.note ? `: ${e.note}` : ''}{' '}
+                <button type="button" className="btn-icon" aria-label="Edit audit entry" onClick={() => onEdit('audit', e.id)}>✎</button>
                 <button type="button" className="btn-icon" aria-label="Delete audit entry" onClick={() => onUpdate((prev) => ({ ...prev, audits: prev.audits.filter((x) => x.id !== e.id) }))}>✕</button>
               </p>
             ))}
@@ -576,10 +589,22 @@ function Overview({ admin, sessions, metaMap, keyDates, placementTargetDays, tod
   )
 }
 
+const KIND_COLLECTION: Record<RecordKind, 'reflections' | 'targets' | 'meetings' | 'observations' | 'lessons' | 'audits'> = {
+  reflection: 'reflections',
+  target: 'targets',
+  meeting: 'meetings',
+  observation: 'observations',
+  lesson: 'lessons',
+  audit: 'audits',
+}
+
 export function AdminSheet(props: Props) {
   const { profileId, profileName, admin, onUpdateAdmin, sessions, metaMap, keyDates, placementTargetDays, todayISO, onClose } = props
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const [tab, setTab] = useState<Tab>(props.initialTab ?? 'overview')
+  const [editing, setEditing] = useState<{ kind: RecordKind; id: string } | null>(null)
+  const [undoRec, setUndoRec] = useState<{ kind: RecordKind; record: { id: string; at: number } } | null>(null)
+  const onEdit = (kind: RecordKind, id: string) => setEditing({ kind, id })
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -612,13 +637,64 @@ export function AdminSheet(props: Props) {
         {tab === 'overview' && (
           <Overview admin={admin} sessions={sessions} metaMap={metaMap} keyDates={keyDates} placementTargetDays={placementTargetDays} todayISO={todayISO} />
         )}
-        {tab === 'reflect' && <ReflectionsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} />}
-        {tab === 'targets' && <TargetsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} />}
-        {tab === 'meetings' && <MeetingsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} />}
-        {tab === 'obs' && <ObservationsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} />}
-        {tab === 'lessons' && <LessonsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} />}
-        {tab === 'audits' && <AuditsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} />}
+        {tab === 'reflect' && <ReflectionsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
+        {tab === 'targets' && <TargetsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
+        {tab === 'meetings' && <MeetingsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
+        {tab === 'obs' && <ObservationsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
+        {tab === 'lessons' && <LessonsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
+        {tab === 'audits' && <AuditsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
         {tab === 'wallet' && <WalletTab profileId={profileId} />}
+        {undoRec && (
+          <StatusMessage tone="info">
+            <span>
+              Record deleted.{' '}
+              <button
+                type="button"
+                className="travel-link"
+                onClick={() => {
+                  const collection = KIND_COLLECTION[undoRec.kind]
+                  // Undo writes a revision NEWER than the tombstone.
+                  onUpdateAdmin((prev) => ({
+                    ...prev,
+                    [collection]: [...(prev[collection] as { id: string }[]), { ...undoRec.record, at: Date.now() }],
+                  }))
+                  setUndoRec(null)
+                }}
+              >
+                Undo
+              </button>
+            </span>
+          </StatusMessage>
+        )}
+        {editing &&
+          (() => {
+            const collection = KIND_COLLECTION[editing.kind]
+            const record = (admin[collection] as { id: string; at: number }[]).find((r) => r.id === editing.id)
+            if (!record) return null
+            return (
+              <RecordEditSheet
+                profileId={profileId}
+                kind={editing.kind}
+                record={record}
+                latest={record}
+                onSave={(next) => {
+                  onUpdateAdmin((prev) => ({
+                    ...prev,
+                    [collection]: (prev[collection] as { id: string }[]).map((r) => (r.id === next.id ? next : r)),
+                  }))
+                  return true
+                }}
+                onDelete={() => {
+                  setUndoRec({ kind: editing.kind, record })
+                  onUpdateAdmin((prev) => ({
+                    ...prev,
+                    [collection]: (prev[collection] as { id: string }[]).filter((r) => r.id !== record.id),
+                  }))
+                }}
+                onClose={() => setEditing(null)}
+              />
+            )
+          })()}
         <div className="modal-actions">
           <button
             type="button"

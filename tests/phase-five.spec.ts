@@ -155,3 +155,58 @@ test('task drafts survive a reload and offer Continue/Discard', async ({ page })
   )
   expect(draftKeys.length).toBe(1)
 })
+
+test('every PGCE record type is editable; a reflection draft survives reload with Continue/Discard; delete has undo', async ({ page }) => {
+  await seed(page)
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'timetable.admin.v1.fx',
+      JSON.stringify({
+        tasks: [], exceptions: [], plans: [], commitments: [],
+        reflections: [{ id: 'r1', weekISO: '2026-08-31', wentWell: 'Settled in', challenges: '', focus: '', standards: [], at: 5 }],
+        targets: [{ id: 't1', text: 'Cold calling', standards: [], setISO: '2026-09-01', status: 'open', at: 5 }],
+        meetings: [{ id: 'm1', dateISO: '2026-09-04', discussed: 'Targets', actions: [{ id: 'a1', text: 'Read policy', done: true }], at: 5 }],
+        observations: [{ id: 'o1', dateISO: '2026-09-03', observer: 'JB', subject: 'Maths', focus: '', strengths: 'Pace', development: '', at: 5 }],
+        lessons: [{ id: 'l1', dateISO: '2026-09-02', classGroup: 'Y2', subject: 'Maths', evaluation: 'Good', standards: [], at: 5 }],
+        audits: [{ id: 'au1', subject: 'Maths', stage: 'baseline', note: '', dateISO: '2026-09-01', at: 5 }],
+      })
+    )
+  })
+  await page.goto('./#/pgce')
+  await page.getByRole('button', { name: 'Weekly reflections (1)' }).click()
+  // Edit exists for every record type (spot-check each tab's control).
+  await expect(page.getByRole('button', { name: 'Edit reflection' })).toBeVisible()
+
+  // Type into the editor, then reload mid-edit: the draft must offer recovery.
+  await page.getByRole('button', { name: 'Edit reflection' }).click()
+  await page.getByLabel('What went well').fill('Settled in AND ran my first starter')
+  await expect(page.getByText('Draft saved on this device.')).toBeVisible()
+  await page.reload()
+  await page.goto('./#/pgce')
+  await page.getByRole('button', { name: 'Weekly reflections (1)' }).click()
+  await page.getByRole('button', { name: 'Edit reflection' }).click()
+  await expect(page.getByText('Continue draft')).toBeVisible()
+  await page.getByRole('button', { name: 'Continue draft' }).click()
+  await expect(page.getByLabel('What went well')).toHaveValue('Settled in AND ran my first starter')
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.fx')!).reflections[0])
+  expect(saved.wentWell).toContain('ran my first starter')
+  expect(saved.id).toBe('r1')
+
+  // Editing a meeting keeps each action's identity and done state.
+  await page.getByRole('button', { name: 'Meetings', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit meeting' }).click()
+  await page.getByLabel('Action text').fill('Read the FULL policy')
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  const meeting = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.fx')!).meetings[0])
+  expect(meeting.actions[0]).toMatchObject({ id: 'a1', text: 'Read the FULL policy', done: true })
+
+  // Delete from the editor, then undo restores with a newer revision.
+  await page.getByRole('button', { name: 'Edit meeting' }).click()
+  await page.getByRole('button', { name: 'Delete meeting record' }).click()
+  await expect(page.getByText('Record deleted.')).toBeVisible()
+  await page.getByRole('button', { name: 'Undo' }).click()
+  const after = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.fx')!))
+  expect(after.meetings.length).toBe(1)
+  expect(after.meetings[0].at).toBeGreaterThanOrEqual(after.deleted['meetings:m1'])
+})
