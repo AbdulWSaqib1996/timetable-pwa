@@ -3175,3 +3175,53 @@ body {
 .journey-origin {
   margin: 8px 0;
 }
+
+/* ---------- Tasks & PGCE pages (P4-07) ---------- */
+
+.page-tasks .keydates-list,
+.page-pgce .pgce-section {
+  margin-bottom: 12px;
+}
+
+.completed-tasks {
+  margin-top: 16px;
+}
+
+.completed-tasks > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 0;
+}
+
+.pgce-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pgce-section-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.pgce-dev-row {
+  flex-wrap: wrap;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.page-header .btn-primary {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--radius-control);
+  border: none;
+  cursor: pointer;
+}

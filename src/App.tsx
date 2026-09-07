@@ -9,7 +9,10 @@ import { AppShell } from './components/AppShell'
 import { SessionDetail } from './components/SessionDetail'
 import { SetupScreen } from './components/SetupScreen'
 import { SpecialismPicker } from './components/SpecialismPicker'
+import { PGCEPage } from './features/pgce/PGCEPage'
+import type { AdminTab } from './features/pgce/PGCEPage'
 import { SchedulePage } from './features/schedule/SchedulePage'
+import { TasksPage } from './features/tasks/TasksPage'
 import { JourneyHomePage } from './features/today/JourneyHomePage'
 import { TodayPage } from './features/today/TodayPage'
 import { parseRoute, useRoute } from './lib/router'
@@ -22,7 +25,6 @@ const AddDeadlineSheet = lazy(() => import('./components/AddDeadlineSheet').then
 const ChangesSheet = lazy(() => import('./components/ChangesSheet').then((m) => ({ default: m.ChangesSheet })))
 const FilterSheet = lazy(() => import('./components/FilterSheet').then((m) => ({ default: m.FilterSheet })))
 const JournalSheet = lazy(() => import('./components/JournalSheet').then((m) => ({ default: m.JournalSheet })))
-const KeyDatesSheet = lazy(() => import('./components/KeyDatesSheet').then((m) => ({ default: m.KeyDatesSheet })))
 const SettingsSheet = lazy(() => import('./components/SettingsSheet').then((m) => ({ default: m.SettingsSheet })))
 const StatsSheet = lazy(() => import('./components/StatsSheet').then((m) => ({ default: m.StatsSheet })))
 const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((m) => ({ default: m.StudyGroupSheet })))
@@ -117,6 +119,7 @@ export default function App() {
   const [openNotice, setOpenNotice] = useState<string | null>(null)
   const [dismissedNotices, setDismissedNotices] = useState<Set<string>>(() => loadDismissedNotices())
   const [adminFile, setAdminFile] = useState<AdminFile>(EMPTY_ADMIN)
+  const [adminTab, setAdminTab] = useState<AdminTab>('overview')
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
   const settings = active?.settings ?? null
@@ -157,15 +160,12 @@ export default function App() {
     }
     navigate(r)
   }
-  // Route → surface sync for the interim sheet-based Tasks/PGCE/Settings.
+  // Settings stays a sheet until P4-08; a direct #/settings link opens it.
   useEffect(() => {
-    if (route.name === 'tasks') setOpenSheet('keydates')
-    else if (route.name === 'pgce') setOpenSheet('admin')
-    else if (route.name === 'settings') setOpenSheet('settings')
-    else setOpenSheet((cur) => (cur === 'keydates' || cur === 'admin' ? 'none' : cur))
+    if (route.name === 'settings') setOpenSheet('settings')
   }, [route.name])
   function routeAwareClose() {
-    if (route.name === 'tasks' || route.name === 'pgce' || route.name === 'settings') goBackOr({ name: 'today' })
+    if (route.name === 'settings') goBackOr({ name: 'today' })
     else setOpenSheet('none')
   }
 
@@ -948,6 +948,45 @@ export default function App() {
           onBack={() => goBackOr({ name: 'today' })}
           onOpenSettings={() => setOpenSheet('settings')}
         />
+      ) : route.name === 'tasks' ? (
+        <TasksPage
+          profileName={active.name}
+          keyDates={allKeyDates}
+          todayISO={todayISO}
+          configured={!!settings.keyDatesSheetId}
+          metaMap={metaMap}
+          onSelect={openSession}
+          onSetStatus={(kd, status) => handleMeta(kd, { status })}
+          onDeleteCustom={(id) =>
+            updateSettings({
+              customKeyDates: (settings.customKeyDates ?? []).filter((c) => `custom-${c.id}` !== id),
+            })
+          }
+          onAddTask={() => setOpenSheet('adddl')}
+        />
+      ) : route.name === 'pgce' ? (
+        <PGCEPage
+          profileId={active.id}
+          profileName={active.name}
+          admin={adminFile}
+          metaMap={metaMap}
+          placement={{
+            attendedDays: placementStats.attended,
+            totalDays: placementStats.totalDays,
+            targetDays: settings.placementTargetDays,
+            blocks: placementStats.blocks.length,
+          }}
+          onOpenAdmin={(tab) => {
+            setAdminTab(tab)
+            setOpenSheet('admin')
+          }}
+          onOpenJournal={() => setOpenSheet('journal')}
+          onOpenStats={() => setOpenSheet('stats')}
+          onOpenPlacements={() => {
+            updateFilters({ placementsOnly: true })
+            navigate({ name: 'schedule' })
+          }}
+        />
       ) : route.name === 'schedule' ? (
         <SchedulePage
           settings={settings}
@@ -1054,7 +1093,10 @@ export default function App() {
           hasKeyDates={allKeyDates.length > 0}
           onUpdateSettings={updateSettings}
           onUpdateFilters={updateFilters}
-          onOpenKeyDates={() => setOpenSheet('keydates')}
+          onOpenKeyDates={() => {
+            setOpenSheet('none')
+            navigate({ name: 'tasks' })
+          }}
           onClear={() =>
             // Clear only temporary display narrowing — group and specialism
             // membership is enrolment and stays as chosen.
@@ -1076,8 +1118,9 @@ export default function App() {
         />
       )}
 
-      {(openSheet === 'admin' || route.name === 'pgce') && (
+      {openSheet === 'admin' && (
         <AdminSheet
+          initialTab={adminTab}
           profileId={active.id}
           profileName={active.name}
           admin={adminFile}
@@ -1087,7 +1130,7 @@ export default function App() {
           keyDates={allKeyDates}
           placementTargetDays={settings.placementTargetDays}
           todayISO={todayISO}
-          onClose={routeAwareClose}
+          onClose={() => setOpenSheet('none')}
         />
       )}
 
@@ -1099,23 +1142,6 @@ export default function App() {
           admin={adminFile}
           onSelect={openSession}
           onClose={() => setOpenSheet('none')}
-        />
-      )}
-
-      {(openSheet === 'keydates' || route.name === 'tasks') && (
-        <KeyDatesSheet
-          keyDates={allKeyDates}
-          todayISO={todayISO}
-          configured={!!settings.keyDatesSheetId}
-          metaMap={metaMap}
-          onSelect={openSession}
-          onSetStatus={(kd, status) => handleMeta(kd, { status })}
-          onDeleteCustom={(id) =>
-            updateSettings({
-              customKeyDates: (settings.customKeyDates ?? []).filter((c) => `custom-${c.id}` !== id),
-            })
-          }
-          onClose={routeAwareClose}
         />
       )}
 

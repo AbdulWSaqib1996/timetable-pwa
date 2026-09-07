@@ -12,6 +12,8 @@ import type { WalletFile } from '../lib/wallet'
 import type { MetaMap, Session } from '../types'
 
 interface Props {
+  /** open at a specific tab (PGCE page section links) */
+  initialTab?: Tab
   profileId: string
   profileName: string
   admin: AdminFile
@@ -577,7 +579,7 @@ function Overview({ admin, sessions, metaMap, keyDates, placementTargetDays, tod
 export function AdminSheet(props: Props) {
   const { profileId, profileName, admin, onUpdateAdmin, sessions, metaMap, keyDates, placementTargetDays, todayISO, onClose } = props
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<Tab>(props.initialTab ?? 'overview')
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
