@@ -575,3 +575,33 @@ done.
 ```
 
 No worker deployment was needed or performed (frontend-only phase; push `d34465a8` / feed `7b8cfc54` remain current).
+
+### Pass 42 — Phase 5 complete: editable planning and PGCE workflows — 7 September 2026
+
+Phase / work-item IDs completed: P5-01 … P5-06 (all six), per TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md §6.
+
+Commit and branch: eight commits on `phase-5` (`ce02d77` foundations, `2c5f574` P5-01+draft core, `8f827c6` P5-02, `55926d5` P5-03, `3de253a` P5-04, `0f17716` P5-05+06, `f70d10d` backup-validation fix), merged to `main`.
+
+User-visible behaviour:
+- Tasks are fully editable records: create/edit/duplicate/complete-reopen/delete with Undo; identity survives edits; imported sheet deadlines stay source-owned with an explanation of what the sheet controls; open mentor actions appear in Tasks and complete on the meeting record exactly once.
+- Every PGCE record type (reflections, targets, meetings incl. per-action identity, observations, lessons, audits) has a labelled Edit/Delete with local drafts: debounced honest "Draft saved", Continue/Discard on return or reload, Keep mine / Use latest when sync changed the record mid-edit.
+- Placement: planned vs logged days/hours with per-date exceptions (holiday/inset/part-day/cancelled/hours corrections), explicit working-hours + inset policy, inferred days labelled until confirmed, provenance in the CSV; excluded days leave schedule/stats/calendar/reminders together.
+- Evidence journal: search (query/date range/type/standards/Untagged) across notes, photo captions, reflections, evaluations, targets and observations; honest empty states; context survives Back. Photo captions ride backups and the printed binder; the binder now previews range/sections/counts and labels photos that live on another device.
+- Work plans under a deadline: subtasks/milestones/study blocks with progress, effort totals and clash flags; a moved due date names stranded blocks for review; completing with open subtasks asks an explicit policy.
+- Personal commitments/study blocks: individual events with busy/free participation and a reminder choice; they show as Personal on Schedule/Today, keep "day finished" honest, join clash detection and study-group busy time (intervals only — titles never leave the device), and appear in the .ics download only behind an explicit choice.
+
+Stored schema/contract changes:
+- shared/contracts.js: four new record collections — tasks, exceptions, plans, commitments — in the generic revision/tombstone/merge machinery; OPTIONAL on read so legacy sync payloads and v2/v3/v4 backups still validate; strict enum/date/time/bounds validation when present.
+- Settings: + placementHours, placementInsetCounts, includePersonalInExport. Session view gains a non-persisted isFreeTime marker; photos gain a caption (excluded from identity hashing — no photo forks).
+- Drafts: timetable.draft.v1.<kind>.<id>.<pid> local envelopes (never synced; swept by profile deletion).
+- Migration: Settings.customKeyDates → task records keeping the old ids and `custom-<id>` calendar UIDs (no duplicate calendar events) and adopting saved status/notes from the legacy owner key; the field clears only after the records persist.
+
+Migration and rollback: all migrations are forward-only but non-destructive — an old app version ignores the new collections (and drops them from ITS sync blob; a new device re-merges them from local state), reads the same backups, and sees personal deadlines only if it predates the migration (the records remain; the legacy field is empty). Reverting the app leaves records intact.
+
+Automated checks + results: `npm run validate` AND `VERCEL=1 npm run validate` green — 67 unit tests (new: record merge/undo-tombstone semantics, back-compat validation, placement rules incl. inset policy/half-days/provenance) and 32 browser tests (9 new phase-five: migration fidelity, CRUD/undo, mentor-action single ownership, draft recovery across reload for tasks AND PGCE records, evidence search + honest empty states, binder preview counts/availability, work-plan review prompts, commitment lifecycle/day-finished honesty). One regression caught and fixed at the gate (photo-caption validation had broken legacy-backup import).
+
+Release-gate check (§6): every supported record type editable with recovering drafts ✓; every new collection participates in backup/sync/delete via the shared record store ✓; placement/evidence totals consistent by construction (single shared helpers) ✓; work plans and personal commitments reference their canonical records (no duplicated status anywhere) ✓.
+
+Known limitations / intentionally deferred: three-way field-level merge falls back to whole-record Keep mine/Use latest (per-field merge deferred); commitment reminders reuse session-reminder offsets; imported-deadline work plans are supported in data (parentId = event key) but the plan UI attaches to personal tasks only; no recurrence for commitments (deliberate, per the handoff).
+
+Worker versions + hosted commit statuses: recorded after deployment below.
