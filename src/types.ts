@@ -120,6 +120,10 @@ export interface Settings {
   /** study group membership */
   groupCode?: string
   groupName?: string
+  /** stable member id in the group (P3-07) */
+  groupMemberId?: string
+  /** device-held membership capability — never synced to other devices */
+  groupToken?: string
   /** setup checklist card permanently dismissed */
   checklistDismissed?: boolean
   /** anonymous daily usage ping to the push worker (default on; off switch in Settings) */

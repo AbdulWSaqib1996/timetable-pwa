@@ -16,3 +16,11 @@ class_name = "SyncStore"
 [[migrations]]
 tag = "sync-v2"
 new_sqlite_classes = ["SyncStore"]
+
+[[durable_objects.bindings]]
+name = "GROUPS"
+class_name = "GroupStore"
+
+[[migrations]]
+tag = "groups-v1"
+new_sqlite_classes = ["GroupStore"]

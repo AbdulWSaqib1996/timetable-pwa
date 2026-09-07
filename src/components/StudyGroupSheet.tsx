@@ -37,10 +37,15 @@ export function StudyGroupSheet({ settings, sessions, todayISO, onUpdateSettings
   const [error, setError] = useState<string | null>(null)
 
   const mySlots = () => computeFreeSlots(sessions, todayISO)
+  const creds = () => ({ memberId: settings.groupMemberId, token: settings.groupToken })
 
   async function refresh(code: string, displayName: string) {
-    // republish my current slots, then read everyone's
-    await joinGroup(base, code, displayName, mySlots())
+    // republish my current slots (proving membership with this device's
+    // credentials), then read everyone's
+    const next = await joinGroup(base, code, displayName, mySlots(), creds())
+    if (next.memberId !== settings.groupMemberId || next.token !== settings.groupToken) {
+      onUpdateSettings({ groupMemberId: next.memberId, groupToken: next.token })
+    }
     setMembers(await fetchGroup(base, code))
   }
 
@@ -68,23 +73,40 @@ export function StudyGroupSheet({ settings, sessions, todayISO, onUpdateSettings
 
   const handleCreate = () =>
     run(async () => {
-      const code = await createGroup(base, name.trim(), mySlots())
-      onUpdateSettings({ groupCode: code, groupName: name.trim() })
-      setMembers(await fetchGroup(base, code))
+      const created = await createGroup(base, name.trim(), mySlots())
+      onUpdateSettings({
+        groupCode: created.code,
+        groupName: name.trim(),
+        groupMemberId: created.memberId,
+        groupToken: created.token,
+      })
+      setMembers(await fetchGroup(base, created.code))
     })
 
   const handleJoin = () =>
     run(async () => {
       const code = codeInput.trim().toUpperCase()
-      await joinGroup(base, code, name.trim(), mySlots())
-      onUpdateSettings({ groupCode: code, groupName: name.trim() })
+      const joined = await joinGroup(base, code, name.trim(), mySlots())
+      onUpdateSettings({
+        groupCode: code,
+        groupName: name.trim(),
+        groupMemberId: joined.memberId,
+        groupToken: joined.token,
+      })
       setMembers(await fetchGroup(base, code))
     })
 
   const handleLeave = () =>
     run(async () => {
-      if (settings.groupCode && settings.groupName) await leaveGroup(base, settings.groupCode, settings.groupName)
-      onUpdateSettings({ groupCode: undefined, groupName: undefined })
+      if (settings.groupCode && settings.groupName) {
+        await leaveGroup(base, settings.groupCode, settings.groupName, creds())
+      }
+      onUpdateSettings({
+        groupCode: undefined,
+        groupName: undefined,
+        groupMemberId: undefined,
+        groupToken: undefined,
+      })
       setMembers(null)
     })
 

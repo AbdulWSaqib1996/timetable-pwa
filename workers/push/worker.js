@@ -3,6 +3,7 @@ import { filterSessionsForMembership } from '../../shared/membership.js'
 import { parseTimetable, parseDateCell } from '../../shared/timetable.js'
 import { reconcileEvents, eventKey } from '../../shared/identity.js'
 export { SyncStore } from './sync-store.js'
+export { GroupStore } from './group-store.js'
 /**
  * timetable-push worker — background Web Push for My Timetable.
  *
@@ -519,8 +520,8 @@ async function runScheduled(env) {
   const now = londonNow()
 
   // Deliver due snoozes first.
-  const snoozes = await env.PUSH.list({ prefix: 'snooze:' })
-  for (const entry of snoozes.keys) {
+  const snoozeKeys = await listAllKeys(env.PUSH, { prefix: 'snooze:' })
+  for (const entry of snoozeKeys) {
     const item = await env.PUSH.get(entry.name, 'json')
     if (!item) continue
     if (item.fireAt <= Date.now()) {
@@ -537,7 +538,7 @@ async function runScheduled(env) {
     }
   }
 
-  const list = await env.PUSH.list({ prefix: 'sub:' })
+  const list = { keys: await listAllKeys(env.PUSH, { prefix: 'sub:' }) }
   const sheetCache = new Map()
   // Each sheet is fetched once per run; a KV snapshot of its previous state lets us
   // detect changes (rooms, times, tutors, added/cancelled sessions) and push them.
@@ -1086,6 +1087,21 @@ async function endpointKey(endpoint) {
   return `sub:${b64url(digest)}`
 }
 
+/** KV list with full cursor pagination (P3-07): a first-page-only list would
+ *  silently skip subscriptions/records past 1,000 keys. Bounded so a runaway
+ *  prefix cannot pin a request forever. */
+export async function listAllKeys(kv, options, maxPages = 50) {
+  const keys = []
+  let cursor
+  for (let page = 0; page < maxPages; page++) {
+    const res = await kv.list(cursor ? { ...options, cursor } : options)
+    keys.push(...res.keys)
+    if (res.list_complete) return keys
+    cursor = res.cursor
+  }
+  return keys
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
@@ -1163,69 +1179,50 @@ export default {
       if (result.status < 200 || result.status >= 300) return json({ error: 'push delivery failed; try enabling push again' }, 502)
       return json({ ok: true, sent: 1 })
     }
-    /* ---------- study groups: shared free-slot codes (times only, no session details) ---------- */
-    const cleanSlots = (slots) =>
-      Array.isArray(slots)
-        ? slots
-            .filter(
-              (s) =>
-                s &&
-                /^\d{4}-\d{2}-\d{2}$/.test(s.d) &&
-                Number.isInteger(s.from) &&
-                Number.isInteger(s.to) &&
-                s.from >= 0 &&
-                s.to > s.from &&
-                s.to <= 1440
-            )
-            .slice(0, 120)
-        : []
-    const cleanName = (n) => String(n ?? '').trim().slice(0, 24)
+    /* ---------- study groups (times only, no session details) ----------
+     * Served by the GroupStore Durable Object: stable member ids + capability
+     * tokens, transactional join/update/leave, legacy KV records imported on
+     * first access. Old name-keyed clients keep working. */
+    const groupFetch = async (code, path, method, body) => {
+      const target = new URL(url)
+      target.pathname = path
+      target.searchParams.set('code', code)
+      const stub = env.GROUPS.get(env.GROUPS.idFromName(code))
+      const response = await stub.fetch(
+        new Request(target, {
+          method,
+          ...(body ? { body: JSON.stringify(body), headers: { 'content-type': 'application/json' } } : {}),
+        })
+      )
+      return { status: response.status, body: await response.json() }
+    }
     if (request.method === 'POST' && url.pathname === '/group') {
-      const body = await request.json().catch(() => null)
-      const name = cleanName(body?.name)
+      const body = await boundedJSON(request, 32768)
+      const name = String(body?.name ?? '').trim()
       if (!name) return json({ error: 'missing name' }, 400)
       const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-      let code = ''
-      for (const b of crypto.getRandomValues(new Uint8Array(6))) code += chars[b % chars.length]
-      await env.PUSH.put(
-        `grp:${code}`,
-        JSON.stringify({ createdAt: Date.now(), members: { [name]: { slots: cleanSlots(body?.slots), at: Date.now() } } }),
-        { expirationTtl: 21 * 86400 }
-      )
-      return json({ code })
-    }
-    if (request.method === 'POST' && url.pathname === '/group/join') {
-      const body = await request.json().catch(() => null)
-      const name = cleanName(body?.name)
-      const code = String(body?.code ?? '').toUpperCase().trim()
-      if (!name || !/^[A-Z2-9]{4,8}$/.test(code)) return json({ error: 'invalid request' }, 400)
-      const group = await env.PUSH.get(`grp:${code}`, 'json')
-      if (!group) return json({ error: 'unknown group' }, 404)
-      if (!group.members[name] && Object.keys(group.members).length >= 12) {
-        return json({ error: 'group is full' }, 403)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        let code = ''
+        for (const b of crypto.getRandomValues(new Uint8Array(6))) code += chars[b % chars.length]
+        const res = await groupFetch(code, '/group', 'POST', body)
+        if (res.status !== 409) {
+          return json(res.status === 200 ? { code, ...res.body } : res.body, res.status)
+        }
       }
-      group.members[name] = { slots: cleanSlots(body?.slots), at: Date.now() }
-      await env.PUSH.put(`grp:${code}`, JSON.stringify(group), { expirationTtl: 21 * 86400 })
-      return json({ ok: true })
+      return json({ error: 'could not create the group — try again' }, 503)
+    }
+    if (request.method === 'POST' && (url.pathname === '/group/join' || url.pathname === '/group/leave')) {
+      const body = await boundedJSON(request, 32768)
+      const code = String(body?.code ?? '').toUpperCase().trim()
+      if (!/^[A-Z2-9]{4,8}$/.test(code)) return json({ error: 'invalid request' }, 400)
+      const res = await groupFetch(code, url.pathname, 'POST', body)
+      return json(res.body, res.status)
     }
     if (request.method === 'GET' && url.pathname === '/group') {
       const code = String(url.searchParams.get('code') ?? '').toUpperCase().trim()
-      const group = code ? await env.PUSH.get(`grp:${code}`, 'json') : null
-      if (!group) return json({ error: 'unknown group' }, 404)
-      const members = Object.entries(group.members).map(([name, m]) => ({ name, at: m.at, slots: m.slots }))
-      return json({ members })
-    }
-    if (request.method === 'POST' && url.pathname === '/group/leave') {
-      const body = await request.json().catch(() => null)
-      const code = String(body?.code ?? '').toUpperCase().trim()
-      const name = cleanName(body?.name)
-      const group = code ? await env.PUSH.get(`grp:${code}`, 'json') : null
-      if (group && name && group.members[name]) {
-        delete group.members[name]
-        if (Object.keys(group.members).length === 0) await env.PUSH.delete(`grp:${code}`)
-        else await env.PUSH.put(`grp:${code}`, JSON.stringify(group), { expirationTtl: 21 * 86400 })
-      }
-      return json({ ok: true })
+      if (!/^[A-Z2-9]{4,8}$/.test(code)) return json({ error: 'unknown group' }, 404)
+      const res = await groupFetch(code, '/group', 'GET')
+      return json(res.body, res.status)
     }
     /* ---------- anonymous usage analytics (self-hosted; a random token per device) ---------- */
     if (request.method === 'POST' && url.pathname === '/ping') {
@@ -1270,7 +1267,7 @@ export default {
       const days = Math.min(62, Math.max(1, parseInt(url.searchParams.get('days') ?? '31', 10) || 31))
       // First-seen dates per device → new-device counts and retention.
       const firstSeen = new Map()
-      const devList = await env.PUSH.list({ prefix: 'adev:' })
+      const devList = { keys: await listAllKeys(env.PUSH, { prefix: 'adev:' }) }
       for (const k of devList.keys) {
         firstSeen.set(k.name.slice(5), await env.PUSH.get(k.name))
       }
@@ -1288,7 +1285,7 @@ export default {
       let setupDevices = 0
       for (let i = 0; i < days; i++) {
         const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10)
-        const list = await env.PUSH.list({ prefix: `aping:${date}:` })
+        const list = { keys: await listAllKeys(env.PUSH, { prefix: `aping:${date}:` }) }
         let installed = 0
         let newDevices = 0
         const platforms = {}

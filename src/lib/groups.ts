@@ -16,9 +16,17 @@ export interface FreeSlot {
 }
 
 export interface GroupMember {
+  /** stable id (P3-07); may be absent from very old servers */
+  memberId?: string
   name: string
   at: number
   slots: FreeSlot[]
+}
+
+/** Device-held membership capability — proves this device owns its member record. */
+export interface GroupCredentials {
+  memberId?: string
+  token?: string
 }
 
 const DAY_START = 9 * 60
@@ -81,26 +89,42 @@ export const fmtSlotTime = (mins: number) =>
 
 const trim = (base: string) => base.replace(/\/+$/, '')
 
-export async function createGroup(base: string, name: string, slots: FreeSlot[]): Promise<string> {
+export async function createGroup(
+  base: string,
+  name: string,
+  slots: FreeSlot[]
+): Promise<{ code: string } & GroupCredentials> {
   const res = await fetch(`${trim(base)}/group`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name, slots }),
+    body: JSON.stringify({ name, slots, wantCredentials: true }),
   })
   if (!res.ok) throw new Error('Could not create the group.')
-  const { code } = (await res.json()) as { code?: string }
-  if (!code) throw new Error('The server returned no code.')
-  return code
+  const json = (await res.json()) as { code?: string; memberId?: string; token?: string }
+  if (!json.code) throw new Error('The server returned no code.')
+  return { code: json.code, memberId: json.memberId, token: json.token }
 }
 
-export async function joinGroup(base: string, code: string, name: string, slots: FreeSlot[]): Promise<void> {
+export async function joinGroup(
+  base: string,
+  code: string,
+  name: string,
+  slots: FreeSlot[],
+  creds?: GroupCredentials
+): Promise<GroupCredentials> {
   const res = await fetch(`${trim(base)}/group/join`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ code, name, slots }),
+    body: JSON.stringify({ code, name, slots, wantCredentials: true, ...creds }),
   })
   if (res.status === 404) throw new Error('No group with that code.')
+  if (res.status === 403) {
+    const { error } = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(error ?? 'Your membership on this device is out of date — rejoin with the code.')
+  }
   if (!res.ok) throw new Error('Could not join the group.')
+  const json = (await res.json()) as { memberId?: string; token?: string }
+  return { memberId: json.memberId ?? creds?.memberId, token: json.token ?? creds?.token }
 }
 
 export async function fetchGroup(base: string, code: string): Promise<GroupMember[]> {
@@ -111,10 +135,15 @@ export async function fetchGroup(base: string, code: string): Promise<GroupMembe
   return json.members ?? []
 }
 
-export async function leaveGroup(base: string, code: string, name: string): Promise<void> {
+export async function leaveGroup(
+  base: string,
+  code: string,
+  name: string,
+  creds?: GroupCredentials
+): Promise<void> {
   await fetch(`${trim(base)}/group/leave`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ code, name }),
+    body: JSON.stringify({ code, name, ...creds }),
   }).catch(() => {})
 }
