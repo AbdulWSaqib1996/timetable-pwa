@@ -618,3 +618,40 @@ PASS: feed worker + cache header
 PASS: analytics dashboard 200
 done.
 ```
+
+
+## Coordinated timetable/admin icons — 7 September 2026
+
+Generated native vector icon families matching the updated UI: an indigo session calendar for My Timetable and a navy calendar/analytics mark for the admin dashboard. Added SVG and multi-size ICO favicons, 16/32/48 PNG favicons, 180px Apple touch icons, 192/512 standard and maskable PWA icons, 1024px artwork, preview and a reproducible generator. Updated only HTML icon links and manifest icon entries; preserved launch URLs, scope, theme settings, registerType and concurrent Phase 6 work. Source and preview are in `branding/`; admin assets are isolated in `public/admin/`. Dimension and maskable safe-circle validation passed for both families. Build verification is recorded after the isolated asset check. Not deployed by this task.
+
+Icon verification: isolated snapshot `npm run build` (TypeScript + GitHub Pages Vite/PWA build) passed; `VERCEL=1 vite build --outDir dist-vercel` passed. Both generated manifests and both HTML pages resolve all icon assets under both host base paths. Both ICO containers validate as 16/32/48 PNG entries. All maskable glyph pixels fit inside the safe circle. Existing unrelated dynamic/static import warnings remain. No production request or deployment was made.
+
+### Pass 43 — Phase 6 complete: accurate travel planning and collaboration — 7 September 2026
+
+Phase / work-item IDs completed: P6-01 … P6-05 (all five), per TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md §7.
+
+Commit and branch: two commits on `phase-6` (`2245230` P6-01..P6-04 journeys, `807392f` P6-05 study groups), merged to `main`.
+
+User-visible behaviour:
+- A future session's Travel tab now asks TfL for a real arrive-by journey on the session's ACTUAL date (date/time/timeIs=Arriving), and answers "Leave by HH:MM" with the planned arrival, the journey + arrival-buffer breakdown, when the plan was fetched, and which origin it is from. The arrival buffer is user-settable (0/5/10/15/20 min) per profile.
+- Origins are explicit: current location (with fix age; a missing/denied fix is stated, never silently substituted), home, campus and geocoded placement schools. The plan clears the instant origin, destination, mode, buffer or intent changes — a stale itinerary cannot survive any of them by construction (request-identity keying).
+- Itineraries are honest end-to-end: per-leg planned times, line badges, live departure boards (stop + direction, near-term journeys only, 30s poll while visible), and disruption warnings adjacent to the affected leg. A passed planned departure says so and switches to a truthful leave-now route — never a negative countdown. Driving keeps a labelled estimate; no fabricated plans.
+- Provider failure keeps the destination usable: address, map area, Copy address and Open in Google Maps all remain.
+- Leave-alert notifications consume the SAME published plan the travel tab displays (one leave-plan store keyed by event), so the reminder and the screen always agree; a plan that errors clears its published plan rather than letting reminders fire on stale data.
+- Journey home is leave-now with an explicit origin selector and live boards; the crude distance estimate stays clearly labelled when no plan exists.
+- Study group: every member row shows Last updated; members whose availability is stale (>24h) or missing are EXCLUDED from the common slots and named as such — nobody is shown confidently free on old data. Working hours and minimum meeting length are explicit controls. Meeting proposals are a two-step explicit send with stable id and revision; accept/decline/withdraw are capability-gated and conflict-checked (simultaneous edits get the fresh copy, never a silent merge). An accepted slot exports to the user's OWN calendar with a stable UID — the UI states it does not appear in anyone else's calendar.
+
+Stored schema/contract changes:
+- Settings: + arrivalBufferMins, groupWorkStart, groupWorkEnd, groupMinMeeting (device preferences; group credentials remain never-synced).
+- GroupStore DO record: members gain a validated IANA timezone; new `proposals` map {id, rev, by, slot, status, participants, responses, at} — intervals only, no free text accepted or stored; past-dated proposals pruned on read; a leaving member's votes are removed and their open proposals withdrawn. New worker routes /group/propose and /group/proposal/respond (rate-capped, capability-gated). Availability publishes carry tz + horizonDays; old clients that omit them keep working (fields optional).
+- New shared modules: shared/journey.js (request identity, itinerary validation from provider wall times, feasibility pick, departure state) and shared/availability.js (freshness policy, free-interval computation, cross-timezone slot conversion, payload builder, proposal calendar identity). Client-side: 10-min journey plan cache per request identity, 20-min leave-plan store, publish guard (republish only when slots changed or 12h elapsed).
+
+Migration and rollback: no stored-record migrations. Old clients ignore proposals and tz (additive DO fields); reverting the app loses only journey planning, not data. Worker is backwards-compatible with the released app (new endpoints are additive; existing /group contracts unchanged — the member listing only gains optional fields).
+
+Automated checks + results: `npm run validate` AND `VERCEL=1 npm run validate` green — 86 unit tests (13 new: journey identity/buffer/DST parsing/feasibility/departure states; availability freshness/busy blocks/working hours/timezone conversion incl. cross-midnight splits/same-name distinctness/payload privacy/export identity; DO proposals: capability, 409-on-stale-rev, proposer-only withdraw, leave cleanup, past pruning) and 38 browser tests (5 new phase-six, network-blocked with synthetic TfL/group fixtures).
+
+Release-gate check (§7): actual future-date itinerary intent proven by captured request fixtures (date=20260908 & time=0850 & timeIs=Arriving; buffer change → time=0840) ✓; buffer and reminders agree (single published leave plan consumed by both) ✓; stale results cannot survive origin/destination/mode/intent changes (request-identity keying + abort, browser-tested) ✓; external navigation works through provider failures ✓; group availability is current (freshness policy), private (intervals-only payloads inspected in unit AND browser tests) and concurrency-safe (DO transactions + revision checks) ✓.
+
+Known limitations / intentionally deferred: no full-route map geometry (P7-03); driving has no planning provider (labelled estimate only, by design); proposal exports carry a fixed neutral title ("Study group meet-up") since free text is deliberately refused server-side; departure boards cover the first three transit legs.
+
+Worker versions + hosted commit statuses: recorded after deployment below.
