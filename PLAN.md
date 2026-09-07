@@ -478,3 +478,39 @@ Phase 3 exit: handoff §4 release gate + completion record here, then live verif
 **Phase 7:** explicitly deferred pending user instruction — P7-02 in particular may require paid object storage, which the handoff does not pre-authorise.
 
 Standing constraints carried into every item: never delete/overwrite production KV outside records created by the task; reserved `ffffffff…` analytics test ids only; `/test` broadcast stays 410; deploy compatible workers before app; Vercel keeps `--skip-e2e`; browser gate stays in GitHub Actions; document migrations + rollback per stored-schema change.
+
+### Pass 40 — Phase 3 complete: consistent schedule, integrations and statistics — 7 September 2026
+
+Phase / work-item IDs completed: P3-01 … P3-08 (all eight), per TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md §4.
+
+Commit and branch: implemented as eight reviewable commits on `phase-3` (`56622bb` P3-01, `d30ad24` P3-02, `04a84f0` P3-03, `2c3ea0b` P3-04, `e7acac6` P3-05, `00b7fe7` P3-06, `e5b71aa` P3-07, `5d59e55` P3-08), merged to `main`.
+
+User-visible behaviour:
+- Group ranges ("1-10", lists, all-groups) now match membership everywhere — app and push worker agree via one shared parser. Clear filters keeps group/specialism membership; reminder participation for optional/self-study sessions is an explicit choice, no longer a side effect of display filters; a room/subject filter can no longer remove reminders.
+- A slow refresh from a previous profile/config can never overwrite a newer one; a failed source keeps its last good rows labelled stale; extra tabs are owned by source identity, not array position; the app revalidates on resume (10-minute throttle).
+- One selected date across Day/Week/Month: month/week navigation moves it, view switches preserve it, Today resets it, a Today-only display range widens instead of hiding a picked date; today follows Europe/London and rolls at midnight without jumping the selection.
+- Calendar downloads, Google Calendar links and the subscribed feed all emit UTC instants converted from London wall time (DST-correct on any device); deadlines appear in Week view; ICS lines fold by UTF-8 octets.
+- Notification taps/actions route to the OWNING profile; deadlines get Open/Mark done/Snooze (never "Attended"); missing events show a safe notice + Changes.
+- Stats/Settings/CSV/binder share one attendance definition with Attended/Absent/Unrecorded separated and inferred placement days labelled.
+- Study groups: stable member ids + device capability tokens, same-name members distinct, transactional joins; travel durations are honestly labelled live / cached-with-age / estimate, and departure boards pause when hidden and expire.
+
+Stored schema/contract changes:
+- Settings: + remindOptional, remindSelfStudy (migrated conservatively from old display-filter behaviour), + groupMemberId, + groupToken (token excluded from cross-device sync via shared/merge.js deviceSettings).
+- Notification payloads/queued actions: versioned v2 {profileId, key, kind}; legacy unscoped actions apply only in single-profile stores, are never re-attached.
+- Push subscribe config: + profileId, + remindOptional (validated in shared/contracts.js).
+- Worker: new GroupStore SQLite Durable Object (binding GROUPS, migration tag groups-v1); legacy KV `grp:` records imported on first access and left in place; old /group request/response shapes still accepted.
+- No changes to sync-v2, backup v4, KV namespace ids, or calendar UIDs.
+
+Migration and rollback: settings migrations run in normalizeStore on load (idempotent). Worker rollback: redeploy the previous worker revision but KEEP the GroupStore class export and GROUPS binding/migration in wrangler.toml (Cloudflare migrations are append-only; removing the class requires a deleted_classes migration and would drop group data). Reverting the app alone leaves the worker fully compatible with old clients. ICS consumers see identical instants (UTC vs floating-local for London users); no UID changed, so no duplicate events.
+
+Automated checks + results: `npm run validate` and `VERCEL=1 npm run validate` both pass — 57 unit tests (membership, refresh/generation gate, calendar-time incl. 2027 spring gap + 2026 autumn ambiguity, ICS octet folding, eligibility, actions routing, GroupStore, KV pagination, travel freshness, plus all prior phase-1/2 suites) and 11 isolated browser tests (existing 9 + phase-three.spec.ts: shared date selection across views; Clear filters preserves membership).
+
+Coverage contract (P3-04, binding): Today/Schedule = course membership; Notifications = explicit reminder eligibility independent of screen filters; Downloaded calendar = course membership all dates (chooser UI arrives with Phase 4/5 scope work); Subscribed feed = chosen public sources + enrolment rules, no personal content in query strings; Evidence/attendance = eligible completed sessions per shared/eligibility.js; Group availability = busy/free intervals only, no titles/notes/addresses.
+
+Screenshots: not captured this phase (reliability release on the existing UI; the Phase 4 redesign carries the screenshot matrix requirement).
+
+Real-device/usability checks actually performed: none this phase — automated suites only. Importing the new UTC-based ICS into Google/Apple Calendar on real accounts is pending and listed below.
+
+Known limitations / intentionally deferred: in-app reminder scheduling still compares London dates with the device clock's minutes (exact only in the UK; full course-timezone scheduling arrives with the Phase 6 travel/time work); the feed emits no SEQUENCE/METHOD:CANCEL records (unchanged from Phase 2); durable (cross-isolate) abuse counters not added — in-memory per-IP caps retained; per-source status UI is minimal (statuses feed the existing error banner; richer surfacing is Phase 4).
+
+Worker versions + hosted commit statuses: recorded after deployment below.
