@@ -147,6 +147,7 @@ export default function App() {
     changes,
     setChanges,
     refresh,
+    identityReview,
   } = useTimetableData(active)
 
   // Close any open detail/jump target when the active profile switches.
@@ -758,6 +759,22 @@ export default function App() {
           onOpenFilters={() => setOpenSheet('filters')}
         />
       </header>
+
+      {identityReview.length > 0 && (
+        <button
+          type="button"
+          className="backup-banner identity-banner"
+          onClick={() => setSelected(identityReview[0])}
+        >
+          <span>
+            🔗 {identityReview.length} event{identityReview.length === 1 ? '' : 's'} need
+            {identityReview.length === 1 ? 's' : ''} an identity review (a sheet edit matched more
+            than one saved event) — <strong>tap to open the first</strong>:{' '}
+            {identityReview[0].dateISO.split('-').reverse().slice(0, 2).join('/')} ·{' '}
+            {identityReview[0].title.slice(0, 40)}. Affected sessions carry a 🔗 badge.
+          </span>
+        </button>
+      )}
 
       {error && (
         <div className="banner-error">

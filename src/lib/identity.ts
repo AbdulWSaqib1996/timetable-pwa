@@ -16,5 +16,8 @@ export function resolveIdentity(pid: string, session: Session, previousKey: stri
   if (record && !record.deleted) throw new Error('This new event already has saved records. Export a backup and keep the records separate until you have reviewed both.')
   const resolved = { ...session, eventKey:previousKey, calendarUid:previous.calendarUid ?? previous.id, identityCandidates:[], identityAt:Date.now() }
   const replace = (s: Session) => s.id === session.id && s.sourceKey === session.sourceKey ? resolved : s
-  saveCache(pid, { ...cache, sessions:cache.sessions.map(replace),keyDates:cache.keyDates?.map(replace),identityHistory:identityHistory(cache.identityHistory ?? [],[resolved]) })
+  // Drop the superseded auto-keyed history entry for this row, or the next
+  // refresh sees two history records with the same legacy key and re-flags.
+  const pruned = (cache.identityHistory ?? []).filter(h => eventKey(h) !== eventKey(session))
+  saveCache(pid, { ...cache, sessions:cache.sessions.map(replace),keyDates:cache.keyDates?.map(replace),identityHistory:identityHistory(pruned,[resolved]) })
 }

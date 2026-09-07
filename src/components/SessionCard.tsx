@@ -80,6 +80,9 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
         </div>
         {session.isKeyDate && <span className="badge badge-keydate">📌 Key date</span>}
         {conflict && <span className="badge badge-conflict">⚠ Clash</span>}
+        {(session.identityCandidates?.length || session.identityWarning) && (
+          <span className="badge badge-conflict">🔗 review</span>
+        )}
         {session.isSpecialism && session.specialismName && (
           <span className="badge badge-specialism">{session.specialismName}</span>
         )}

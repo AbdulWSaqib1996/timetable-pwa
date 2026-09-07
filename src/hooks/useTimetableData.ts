@@ -34,6 +34,9 @@ export function useTimetableData(active: ProfileEntry | null) {
   const [metaProfileId, setMetaProfileId] = useState<string | null>(null)
   const [changes, setChanges] = useState<SessionChange[]>([])
   const [keyDates, setKeyDates] = useState<Session[]>([])
+  // Sessions whose identity is ambiguous after a sheet edit — surfaced as their
+  // own actionable notice, never mixed into fetch errors.
+  const [identityReview, setIdentityReview] = useState<Session[]>([])
   const todayISO = localTodayISO()
 
   const refresh = useCallback(
@@ -125,8 +128,8 @@ export function useTimetableData(active: ProfileEntry | null) {
         setKeyDates(kd ?? [])
         const now = Date.now()
         setFetchedAt(now)
-        const identityWarnings = [...parsed, ...(kd ?? [])].filter(x => x.identityCandidates?.length || x.identityWarning).length
-        setError([...warnings, ...(identityWarnings ? [`${identityWarnings} event identities need review. Open the session to resolve them.`] : [])].join(' ') || null)
+        setIdentityReview([...parsed, ...(kd ?? [])].filter((x) => x.identityCandidates?.length || x.identityWarning))
+        setError(warnings.join(' ') || null)
         saveCache(pid, { fetchedAt: now, sessions: parsed, keyDates: kd, identityHistory: identityHistory(prev?.identityHistory ?? [...(prev?.sessions ?? []), ...(prev?.keyDates ?? [])], [...parsed, ...(kd ?? [])]) })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to refresh.')
@@ -147,6 +150,11 @@ export function useTimetableData(active: ProfileEntry | null) {
     setMetaProfileId(active.id)
     setChanges(loadChanges(active.id))
     setKeyDates((cached?.keyDates ?? []).map((k) => ({ ...k, isKeyDate: true })))
+    setIdentityReview(
+      [...(cached?.sessions ?? []), ...(cached?.keyDates ?? [])].filter(
+        (x) => x.identityCandidates?.length || x.identityWarning
+      )
+    )
     // Apply "✓ Attended"/"✗ Absent" taps made on notifications while the app was closed.
     const pid = active.id
     void drainPendingActions().then((actions) => {
@@ -176,6 +184,7 @@ export function useTimetableData(active: ProfileEntry | null) {
   }, [active?.settings.keyDatesSheetId, active?.settings.keyDatesGid, extraTabsKey])
 
   return {
+    identityReview,
     sessions,
     keyDates,
     fetchedAt,

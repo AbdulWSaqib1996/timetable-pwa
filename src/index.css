@@ -2416,3 +2416,14 @@ body {
   white-space: nowrap;
   font-size: 12.5px;
 }
+
+/* ---------- identity-review notice ---------- */
+
+.identity-banner {
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+}

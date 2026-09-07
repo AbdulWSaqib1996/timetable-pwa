@@ -12,13 +12,22 @@ export function reconcileEvents(fresh, cached = []) {
     const eligible = cached.filter(c => !used.has(c) && sameSource(s,c))
     const explicit = s.sourceId ? eligible.filter(c => c.sourceId === s.sourceId) : []
     const candidates = explicit.length ? explicit : eligible.filter(c => !(s.sourceId && c.sourceId && s.sourceId !== c.sourceId) && legacyKey(s) === legacyKey(c))
-    if (candidates.length === 1 && fresh.filter(f => sameSource(f,s) && (s.sourceId ? f.sourceId === s.sourceId : legacyKey(f) === legacyKey(s))).length === 1) {
+    if (candidates.length) {
+      // Key-identical rows are unchanged occurrences — a moved row can never enter
+      // this branch, so nothing can be stolen. Duplicated sheet rows (the source
+      // repeats some deadline rows verbatim) pair with duplicated history in order
+      // instead of deadlocking on a uniqueness check that flagged them forever.
+      // Prefer explicitly-resolved identities so a user's resolution sticks.
+      candidates.sort((a,b) => ((eventKey(b) !== legacyKey(b)) ? 1 : 0) - ((eventKey(a) !== legacyKey(a)) ? 1 : 0))
       matches.set(s,candidates[0]); used.add(candidates[0])
     }
   }
   return fresh.map(s => {
     let match = matches.get(s)
-    const candidates = cached.filter(c => !used.has(c) && sameSource(s,c) && !(s.sourceId && c.sourceId && s.sourceId !== c.sourceId) && normal(c.title) === normal(s.title) && normal(c.groups) === normal(s.groups) && normal(c.tutor) === normal(s.tutor) && Math.abs(Date.parse(c.dateISO)-Date.parse(s.dateISO)) <= 31*86400000)
+    // A row whose key twin already exact-matched is a sheet duplicate, not a
+    // move — treat it as its own new event rather than asking the user.
+    const dupOfMatched = !match && [...matches.keys()].some(f => f !== s && sameSource(f,s) && legacyKey(f) === legacyKey(s))
+    const candidates = dupOfMatched ? [] : cached.filter(c => !used.has(c) && sameSource(s,c) && !(s.sourceId && c.sourceId && s.sourceId !== c.sourceId) && normal(c.title) === normal(s.title) && normal(c.groups) === normal(s.groups) && normal(c.tutor) === normal(s.tutor) && Math.abs(Date.parse(c.dateISO)-Date.parse(s.dateISO)) <= 31*86400000)
     const competing = fresh.filter(f => !matches.has(f) && sameSource(f,s) && normal(f.title) === normal(s.title) && normal(f.groups) === normal(s.groups) && normal(f.tutor) === normal(s.tutor))
     if (!match && candidates.length === 1 && competing.length === 1) { match = candidates[0]; used.add(match) }
     const duplicateID = s.sourceId && fresh.filter(f => sameSource(f,s) && f.sourceId === s.sourceId).length > 1
