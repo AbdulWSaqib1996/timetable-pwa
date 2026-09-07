@@ -48,7 +48,7 @@ export function computeFreeSlots(sessions: Session[], todayISO: string, days = 7
     const dow = new Date(y, m - 1, d).getDay()
     if (dow === 0 || dow === 6) continue
     const busy = sessions
-      .filter((s) => s.dateISO === dateISO && !s.isKeyDate && !s.isSelfStudy && toMinutes(s.start) !== null)
+      .filter((s) => s.dateISO === dateISO && !s.isKeyDate && !s.isSelfStudy && !s.isFreeTime && toMinutes(s.start) !== null)
       .map((s) => {
         const from = toMinutes(s.start)!
         return { from, to: toMinutes(s.end) ?? from + 60 }

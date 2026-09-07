@@ -134,6 +134,8 @@ export interface CommitmentRec {
   location?: string
   /** counts as busy time for clashes/group availability (default true) */
   busy?: boolean
+  /** include in session reminders (default off) */
+  remind?: boolean
   notes?: string
   at: number
 }

@@ -266,3 +266,68 @@ test('binder preview shows counts and file availability before printing', async 
   await preview.getByLabel('From').fill('2026-09-05')
   await expect(preview.getByText('Targets (0)')).toBeVisible()
 })
+
+test('work plan: subtasks/blocks with progress; moved due date names stranded blocks; completion asks a policy', async ({ page }) => {
+  await seed(page)
+  await page.goto('./#/tasks')
+  await page.getByRole('button', { name: '＋ Add task' }).click()
+  await page.getByLabel('Title').fill('Big essay')
+  await page.getByLabel('Due date').fill('2026-09-30')
+  await page.getByRole('button', { name: 'Save task' }).click()
+  // Reopen to reach the work plan of the saved task.
+  await page.locator('.keydates-list li', { hasText: 'Big essay' }).locator('.keydate-row').click()
+  await page.getByPlaceholder('Subtask…').fill('Outline chapters')
+  await page.getByRole('button', { name: '＋ Add subtask' }).click()
+  await page.getByLabel('Type').selectOption('block')
+  await page.getByPlaceholder('Study block…').fill('Library session')
+  await page.getByLabel('Date', { exact: true }).fill('2026-09-28')
+  await page.getByRole('button', { name: '＋ Add block' }).click()
+  await expect(page.getByText('0/1 subtasks done')).toBeVisible()
+
+  // Move the due date BEFORE the planned block: the save names it for review
+  // instead of silently shifting anything.
+  await page.getByLabel('Due date').fill('2026-09-20')
+  await page.getByRole('button', { name: 'Save task' }).click()
+  await expect(page.getByText(/1 planned study block falls after the new due date/)).toBeVisible()
+  await page.getByRole('button', { name: 'Save anyway' }).click()
+
+  // Completing with an open subtask asks for an explicit policy.
+  await page.locator('.keydates-list li', { hasText: 'Big essay' }).locator('.keydate-row').click()
+  await page.getByRole('button', { name: '✓ Done' }).click()
+  await page.getByRole('button', { name: 'Save task' }).click()
+  await expect(page.getByText(/1 subtask is still open/)).toBeVisible()
+  await page.getByRole('button', { name: 'Mark them done too' }).click()
+  const plans = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.fx')!).plans)
+  expect(plans.find((c: { kind: string }) => c.kind === 'subtask').done).toBe(true)
+  // The block never became a Tasks entry of its own.
+  await expect(page.locator('.keydates-list li', { hasText: 'Library session' })).toHaveCount(0)
+})
+
+test('personal commitments: created on a day, marked Personal, block day-finished, and stay out of the feed URL', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await seed(page)
+  await page.goto('./#/schedule')
+  await page.getByRole('button', { name: 'Add a personal event on this day' }).click()
+  await page.getByLabel('Title').fill('Dentist')
+  await page.getByLabel('Starts').fill('18:00')
+  await page.getByLabel('Ends').fill('19:00')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.locator('.day-list .session-card', { hasText: 'Dentist' })).toBeVisible()
+  await expect(page.locator('.badge-personal').first()).toBeVisible()
+
+  // A later personal commitment prevents the "day finished" claim on Today
+  // (demo sessions end 16:30; the dentist is at 18:00).
+  await page.getByRole('button', { name: 'Today', exact: true }).nth(0).click()
+  await page.goto('./#/today')
+  await expect(page.locator('.today-finished')).toHaveCount(0)
+
+  // Editing the interval preserves identity and the note field.
+  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.fx')!).commitments[0])
+  await page.goto('./#/schedule')
+  await page.locator('.day-list .session-card', { hasText: 'Dentist' }).click()
+  await page.getByLabel('Starts').fill('18:30')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  const after = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.fx')!).commitments[0])
+  expect(after.id).toBe(before.id)
+  expect(after.startTime).toBe('18:30')
+})

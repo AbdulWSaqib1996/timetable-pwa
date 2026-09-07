@@ -49,7 +49,7 @@ export function DayList({ sessions, metaMap, coords, travelMode, placements, emp
   }
 
   // Genuine overlaps get a clash badge (never a break row inside them).
-  const timed = sessions.filter((s) => !s.isKeyDate && !s.isSelfStudy && toMinutes(s.start) !== null)
+  const timed = sessions.filter((s) => !s.isKeyDate && !s.isSelfStudy && !s.isFreeTime && toMinutes(s.start) !== null)
   const clashes = new Set<string>()
   for (let i = 0; i < timed.length; i++) {
     for (let j = i + 1; j < timed.length; j++) {

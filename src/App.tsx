@@ -53,9 +53,11 @@ import { parseShareHash } from './lib/share'
 import { DEFAULT_PUSH_BASE } from './lib/config'
 import { subscribePush } from './lib/push'
 import { EMPTY_ADMIN, loadAdminFile, saveAdminFile } from './lib/admin'
-import type { AdminFile, TaskRecord } from './lib/admin'
+import type { AdminFile, CommitmentRec, PlanChildRec, TaskRecord } from './lib/admin'
 import { duplicateTask, migrateCustomKeyDates, overlayTaskMeta, taskEventKey, taskToSession } from './lib/tasks'
 import { applyPlacementExceptions } from './lib/placement'
+import { busyCommitmentSessions, commitmentToSession, remindableCommitmentSessions } from './lib/commitments'
+import { CommitmentSheet } from './components/CommitmentSheet'
 import { PlacementPage } from './features/pgce/PlacementPage'
 import { TaskEditSheet } from './components/TaskEditSheet'
 import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
@@ -125,6 +127,9 @@ export default function App() {
   // Task editor: null = closed, { task: null } = create (P5-01).
   const [taskEdit, setTaskEdit] = useState<{ task: TaskRecord | null } | null>(null)
   const [taskUndo, setTaskUndo] = useState<TaskRecord | null>(null)
+  // Personal-event editor (P5-06): null closed; commitment null = create.
+  const [commitmentEdit, setCommitmentEdit] = useState<{ commitment: CommitmentRec | null; dateISO: string } | null>(null)
+  const [commitmentUndo, setCommitmentUndo] = useState<CommitmentRec | null>(null)
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
   const settings = active?.settings ?? null
@@ -220,6 +225,25 @@ export default function App() {
     // revision, deliberately beating the tombstone (never just hiding it).
     updateAdmin((prev) => ({ ...prev, tasks: prev.tasks.filter((t) => t.id !== task.id) }))
     setTaskUndo(task)
+  }
+
+  function saveCommitment(rec: CommitmentRec): boolean {
+    if (!active) return false
+    updateAdmin((prev) => ({ ...prev, commitments: [...prev.commitments.filter((c) => c.id !== rec.id), rec] }))
+    return true
+  }
+
+  function deleteCommitment(rec: CommitmentRec) {
+    updateAdmin((prev) => ({ ...prev, commitments: prev.commitments.filter((c) => c.id !== rec.id) }))
+    setCommitmentUndo(rec)
+  }
+
+  function savePlanChild(rec: PlanChildRec) {
+    updateAdmin((prev) => ({ ...prev, plans: [...prev.plans.filter((c) => c.id !== rec.id), rec] }))
+  }
+
+  function deletePlanChild(id: string) {
+    updateAdmin((prev) => ({ ...prev, plans: prev.plans.filter((c) => c.id !== id) }))
   }
 
   function cycleTaskStatus(task: TaskRecord) {
@@ -571,14 +595,39 @@ export default function App() {
   // writes always go through the task records, never these entries.
   const effectiveMeta = useMemo(() => overlayTaskMeta(metaMap, adminFile.tasks), [metaMap, adminFile.tasks])
 
+  // Personal commitments as clearly-marked sessions (P5-06): all of them for
+  // display; the busy subset for clashes and group availability; the
+  // reminder-enabled subset for notifications.
+  const personalSessions = useMemo(() => adminFile.commitments.map(commitmentToSession), [adminFile.commitments])
+  const busyPersonal = useMemo(() => busyCommitmentSessions(adminFile.commitments), [adminFile.commitments])
+  const remindablePersonal = useMemo(
+    () => remindableCommitmentSessions(adminFile.commitments),
+    [adminFile.commitments]
+  )
+  const withPersonal = useMemo(
+    () =>
+      [...courseSessions, ...personalSessions].sort((a, b) =>
+        (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99'))
+      ),
+    [courseSessions, personalSessions]
+  )
+  // Does a proposed interval overlap timetabled/busy time? (work-plan blocks)
+  const busyCheck = (dateISO: string, startTime: string, endTime: string) =>
+    [...courseSessions, ...busyPersonal].some((x) => {
+      if (x.dateISO !== dateISO || x.isKeyDate || x.isSelfStudy || x.isFreeTime) return false
+      const xs = x.start || '00:00'
+      const xe = x.end || x.start || '00:00'
+      return xs < endTime && startTime < xe
+    })
+
   // The open session detail is a ROUTE (#/session/<key>): Back returns to the
   // caller, notification opens deep-link, and profile switches clear it.
   const openSession = (s: Session) => navigate({ name: 'session', key: sessionKey(s) })
   const selected = useMemo(() => {
     if (route.name !== 'session' || sessions === null) return null
-    const all = [...sessions, ...allKeyDates]
+    const all = [...sessions, ...allKeyDates, ...personalSessions]
     return all.find((x) => sessionKey(x) === route.key) ?? all.find((x) => legacyKey(x) === route.key) ?? null
-  }, [route, sessions, allKeyDates])
+  }, [route, sessions, allKeyDates, personalSessions])
   // A session link that no longer resolves gets a safe notice, not a blank page.
   useEffect(() => {
     if (route.name === 'session' && sessions !== null && !selected) {
@@ -617,13 +666,12 @@ export default function App() {
   // Schedule rows: filtered sessions with key dates woven in as highlighted
   // blocks (toggle in Filters); the selected-day list slices these by date.
   const scheduleSessions = useMemo(() => {
-    if (!settings) return filteredSessions
-    if (!getFilters(settings).showKeyDates || allKeyDates.length === 0) return filteredSessions
-    return [...filteredSessions, ...allKeyDates].sort((a, b) =>
-      (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99'))
-    )
+    const base = [...filteredSessions, ...personalSessions]
+    const withKd =
+      settings && getFilters(settings).showKeyDates && allKeyDates.length > 0 ? [...base, ...allKeyDates] : base
+    return withKd.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredSessions, allKeyDates, settings])
+  }, [filteredSessions, personalSessions, allKeyDates, settings])
 
   const keyDateDays = useMemo(() => new Set(allKeyDates.map((k) => k.dateISO)), [allKeyDates])
 
@@ -750,7 +798,7 @@ export default function App() {
     metaReady,
     profileId: active?.id ?? null,
     settings,
-    reminderSessions,
+    reminderSessions: [...reminderSessions, ...remindablePersonal],
     allKeyDates,
     metaMap: effectiveMeta,
     coords,
@@ -836,6 +884,27 @@ export default function App() {
             {identityReview[0].title.slice(0, 40)}. Affected sessions carry a 🔗 badge.
           </span>
         </button>
+      )}
+
+      {commitmentUndo && (
+        <div className="backup-banner notice-banner">
+          <span>
+            Deleted “{commitmentUndo.title}”.{' '}
+            <button
+              type="button"
+              className="travel-link"
+              onClick={() => {
+                saveCommitment({ ...commitmentUndo, at: Date.now() })
+                setCommitmentUndo(null)
+              }}
+            >
+              Undo
+            </button>
+          </span>
+          <button type="button" className="btn-icon" aria-label="Dismiss" onClick={() => setCommitmentUndo(null)}>
+            ✕
+          </button>
+        </div>
       )}
 
       {openNotice && (
@@ -981,6 +1050,7 @@ export default function App() {
             onOpenSection={(sec) => navigate({ name: 'settings', section: sec })}
             sources={sources}
             exceptions={adminFile.exceptions}
+            personalSessions={personalSessions}
             settings={settings}
             store={store}
             courseSessions={courseSessions}
@@ -1104,6 +1174,7 @@ export default function App() {
           onClearFilters={() => updateSettings({ filters: { ...DEFAULT_FILTERS } })}
           onSelect={openSession}
           onMeta={handleMeta}
+          onAddPersonal={(dateISO) => setCommitmentEdit({ commitment: null, dateISO })}
         />
       ) : sessions === null && !settings.demo && !error ? (
         <div className="empty-state">Loading timetable…</div>
@@ -1115,7 +1186,7 @@ export default function App() {
           refreshing={refreshing}
           demo={settings.demo === true}
           onRefresh={() => refresh(settings, active.id)}
-          courseSessions={courseSessions}
+          courseSessions={withPersonal}
           allKeyDates={allKeyDates}
           metaMap={effectiveMeta}
           unseenChanges={unseenChanges}
@@ -1141,11 +1212,41 @@ export default function App() {
           onSave={saveTask}
           onDuplicate={(t) => saveTask(duplicateTask(t))}
           onDelete={deleteTask}
+          planChildren={taskEdit.task ? adminFile.plans.filter((c) => c.parentId === taskEdit.task!.id) : []}
+          onSavePlan={savePlanChild}
+          onDeletePlan={deletePlanChild}
+          busyCheck={busyCheck}
           onClose={() => setTaskEdit(null)}
         />
       )}
 
-      {selected && selected.id.startsWith('custom-') ? (
+      {commitmentEdit && active && (
+        <CommitmentSheet
+          profileId={active.id}
+          commitment={commitmentEdit.commitment}
+          defaultDateISO={commitmentEdit.dateISO}
+          latest={
+            commitmentEdit.commitment
+              ? adminFile.commitments.find((c) => c.id === commitmentEdit.commitment!.id) ?? null
+              : null
+          }
+          onSave={saveCommitment}
+          onDelete={deleteCommitment}
+          onClose={() => setCommitmentEdit(null)}
+        />
+      )}
+
+      {selected && selected.id.startsWith('cmt-') ? (
+        <CommitmentSheet
+          profileId={active.id}
+          commitment={adminFile.commitments.find((c) => c.id === selected.id.slice('cmt-'.length)) ?? null}
+          defaultDateISO={selected.dateISO}
+          latest={adminFile.commitments.find((c) => c.id === selected.id.slice('cmt-'.length)) ?? null}
+          onSave={saveCommitment}
+          onDelete={deleteCommitment}
+          onClose={() => goBackOr({ name: 'today' })}
+        />
+      ) : selected && selected.id.startsWith('custom-') ? (
         // A personal task opens its dedicated editable detail (P5-01), not the
         // session sheet.
         <TaskEditSheet
@@ -1155,6 +1256,10 @@ export default function App() {
           onSave={saveTask}
           onDuplicate={(t) => saveTask(duplicateTask(t))}
           onDelete={deleteTask}
+          planChildren={adminFile.plans.filter((c) => c.parentId === selected.id.slice('custom-'.length))}
+          onSavePlan={savePlanChild}
+          onDeletePlan={deletePlanChild}
+          busyCheck={busyCheck}
           onClose={() => goBackOr({ name: 'today' })}
         />
       ) : selected && (
@@ -1263,7 +1368,7 @@ export default function App() {
       {openSheet === 'group' && (
         <StudyGroupSheet
           settings={settings}
-          sessions={courseSessions}
+          sessions={[...courseSessions, ...busyPersonal]}
           todayISO={todayISO}
           onUpdateSettings={updateSettings}
           onClose={() => setOpenSheet('none')}

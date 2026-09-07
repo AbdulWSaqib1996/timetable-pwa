@@ -52,6 +52,8 @@ interface Props {
   sources: SourceStatus[]
   /** placement exceptions, for provenance in the day-log export */
   exceptions: PlacementExceptionRec[]
+  /** personal commitments as sessions — included in the .ics only by explicit choice */
+  personalSessions: Session[]
   settings: Settings
   store: ProfileStore
   /** sessions with the user's filters applied (specialisms etc.), all dates */
@@ -115,6 +117,7 @@ export function SettingsSheet({
   onOpenSection,
   sources,
   exceptions,
+  personalSessions,
   settings,
   store,
   courseSessions,
@@ -1207,11 +1210,32 @@ export function SettingsSheet({
             {keyDates.length > 0 ? ` + ${keyDates.length} key dates` : ''}) as an .ics file you can
             import into Google, Apple or Outlook calendars. Key dates export as all-day 📌 events.
           </p>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={settings.includePersonalInExport === true}
+              onChange={(e) => onUpdateSettings({ includePersonalInExport: e.target.checked })}
+            />
+            Include personal events ({personalSessions.length}) in the download
+          </label>
+          <p className="filter-hint">
+            Personal events only ever leave this device in this file when you tick the box — the
+            subscribed public feed never contains them.
+          </p>
           <button
             type="button"
             className="btn-secondary"
-            disabled={courseSessions.length === 0 && keyDates.length === 0}
-            onClick={() => downloadICS([...courseSessions, ...keyDates], 'My Timetable')}
+            disabled={courseSessions.length === 0 && keyDates.length === 0 && personalSessions.length === 0}
+            onClick={() =>
+              downloadICS(
+                [
+                  ...courseSessions,
+                  ...(settings.includePersonalInExport ? personalSessions : []),
+                  ...keyDates,
+                ],
+                'My Timetable'
+              )
+            }
           >
             Download .ics file
           </button>

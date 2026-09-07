@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { newAdminId } from '../lib/admin'
 import type { TaskRecord } from '../lib/admin'
 import { useDraft } from '../hooks/useDraft'
+import type { PlanChildRec } from '../lib/admin'
+import { WorkPlanSection } from './WorkPlanSection'
 import { Dialog, Field, StatusMessage } from './ui'
 
 interface TaskFields {
@@ -21,6 +23,11 @@ interface Props {
   onSave: (record: TaskRecord) => boolean
   onDuplicate?: (task: TaskRecord) => void
   onDelete?: (task: TaskRecord) => void
+  /** work-plan children of this task (P5-05) */
+  planChildren?: PlanChildRec[]
+  onSavePlan?: (rec: PlanChildRec) => void
+  onDeletePlan?: (id: string) => void
+  busyCheck?: (dateISO: string, startTime: string, endTime: string) => boolean
   onClose: () => void
 }
 
@@ -38,11 +45,27 @@ const fieldsOf = (t: TaskRecord | null): TaskFields => ({
  * revision check at save — if sync changed the task while editing, the user
  * chooses Keep mine / Use latest instead of silently overwriting.
  */
-export function TaskEditSheet({ profileId, task, latest, onSave, onDuplicate, onDelete, onClose }: Props) {
+export function TaskEditSheet({
+  profileId,
+  task,
+  latest,
+  onSave,
+  onDuplicate,
+  onDelete,
+  planChildren = [],
+  onSavePlan,
+  onDeletePlan,
+  busyCheck,
+  onClose,
+}: Props) {
   const [recordId] = useState(() => task?.id ?? newAdminId())
   const draft = useDraft<TaskFields>(profileId, 'task', recordId, task?.at ?? 0, fieldsOf(task))
   const [error, setError] = useState<string | null>(null)
   const [conflict, setConflict] = useState<TaskRecord | null>(null)
+  // P5-05 review prompts: blocks stranded past a new due date, and the policy
+  // for unfinished children when completing the assignment.
+  const [dueReview, setDueReview] = useState<number | null>(null)
+  const [completePolicy, setCompletePolicy] = useState<number | null>(null)
   const f = draft.value
   const set = (patch: Partial<TaskFields>) => draft.setValue((prev) => ({ ...prev, ...patch }))
 
@@ -84,6 +107,26 @@ export function TaskEditSheet({ profileId, task, latest, onSave, onDuplicate, on
       setConflict(latest)
       return
     }
+    // A moved due date never silently shifts planned study blocks — it names
+    // the stranded ones and asks for a review (P5-05).
+    if (task && dueReview === null && f.dueISO !== task.dueISO) {
+      const stranded = planChildren.filter(
+        (c) => c.kind === 'block' && c.dateISO && f.dueISO && c.dateISO > f.dueISO
+      ).length
+      if (stranded > 0) {
+        setDueReview(stranded)
+        return
+      }
+    }
+    // Completing the assignment with unfinished children asks for an explicit
+    // policy instead of guessing.
+    if (task && completePolicy === null && f.status === 'done' && task.status !== 'done') {
+      const open = planChildren.filter((c) => c.kind === 'subtask' && !c.done).length
+      if (open > 0) {
+        setCompletePolicy(open)
+        return
+      }
+    }
     commit(f)
   }
 
@@ -113,6 +156,58 @@ export function TaskEditSheet({ profileId, task, latest, onSave, onDuplicate, on
             ·{' '}
             <button type="button" className="travel-link" onClick={draft.discardDraft}>
               Discard draft
+            </button>
+          </span>
+        </StatusMessage>
+      )}
+
+      {dueReview !== null && (
+        <StatusMessage tone="info">
+          <span>
+            {dueReview} planned study block{dueReview === 1 ? ' falls' : 's fall'} after the new due
+            date — they stay where you put them.{' '}
+            <button
+              type="button"
+              className="travel-link"
+              onClick={() => {
+                setDueReview(-1)
+                commit(f)
+              }}
+            >
+              Save anyway
+            </button>{' '}
+            (review them in the work plan below)
+          </span>
+        </StatusMessage>
+      )}
+
+      {completePolicy !== null && completePolicy > 0 && (
+        <StatusMessage tone="info">
+          <span>
+            {completePolicy} subtask{completePolicy === 1 ? ' is' : 's are'} still open.{' '}
+            <button
+              type="button"
+              className="travel-link"
+              onClick={() => {
+                for (const c of planChildren) {
+                  if (c.kind === 'subtask' && !c.done) onSavePlan?.({ ...c, done: true, at: Date.now() })
+                }
+                setCompletePolicy(-1)
+                commit(f)
+              }}
+            >
+              Mark them done too
+            </button>{' '}
+            ·{' '}
+            <button
+              type="button"
+              className="travel-link"
+              onClick={() => {
+                setCompletePolicy(-1)
+                commit(f)
+              }}
+            >
+              Leave them open
             </button>
           </span>
         </StatusMessage>
@@ -176,6 +271,16 @@ export function TaskEditSheet({ profileId, task, latest, onSave, onDuplicate, on
       <Field label="Notes">
         <textarea className="note-input" rows={3} value={f.notes} onChange={(e) => set({ notes: e.target.value })} />
       </Field>
+
+      {task && onSavePlan && onDeletePlan && (
+        <WorkPlanSection
+          parentId={task.id}
+          children_={planChildren}
+          busyCheck={busyCheck}
+          onSave={onSavePlan}
+          onDelete={onDeletePlan}
+        />
+      )}
 
       <p className="filter-hint" aria-live="polite">
         {draft.draftStatus === 'saved'

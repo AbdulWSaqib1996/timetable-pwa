@@ -86,6 +86,11 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
             </span>
           )}
         </div>
+        {session.id.startsWith('cmt-') && (
+          <span className="badge badge-personal">
+            👤 Personal{session.isFreeTime ? ' · free' : ''}
+          </span>
+        )}
         {session.isKeyDate && <span className="badge badge-keydate">📌 Key date</span>}
         {conflict && <span className="badge badge-conflict">⚠ Clash</span>}
         {(session.identityCandidates?.length || session.identityWarning) && (

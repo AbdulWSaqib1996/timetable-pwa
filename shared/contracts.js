@@ -92,6 +92,7 @@ export function validatePayload(data) {
             if (key === 'commitments') assert(['appointment','work','study'].includes(item.kind), 'Invalid commitment kind.')
             if (item.done !== undefined) assert(typeof item.done === 'boolean', 'Invalid completion flag.')
             if (item.busy !== undefined) assert(typeof item.busy === 'boolean', 'Invalid busy flag.')
+            if (item.remind !== undefined) assert(typeof item.remind === 'boolean', 'Invalid reminder flag.')
             if (item.standards !== undefined) assert(Array.isArray(item.standards) && item.standards.every(x => typeof x === 'string'), 'Invalid admin standards.')
           }
         }

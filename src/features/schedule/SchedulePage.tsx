@@ -40,6 +40,8 @@ interface Props {
   onClearFilters: () => void
   onSelect: (s: Session) => void
   onMeta: (session: Session, patch: Partial<SessionMeta>) => void
+  /** add a personal event/study block on the given date (P5-06) */
+  onAddPersonal: (dateISO: string) => void
 }
 
 function matchesQuery(s: Session, q: string): boolean {
@@ -93,6 +95,7 @@ export function SchedulePage({
   onClearFilters,
   onSelect,
   onMeta,
+  onAddPersonal,
 }: Props) {
   const wide = useMinWidth(1024)
   // ≥1280px: selection fills the side panel instead of opening the full
@@ -125,8 +128,19 @@ export function SchedulePage({
         {longDay(anchorISO)}
         {anchorISO === todayISO && <span className="badge badge-today">Today</span>}
       </h2>
-      <span className="filter-hint">
-        {daySessions.length === 0 ? 'No sessions' : `${daySessions.length} session${daySessions.length === 1 ? '' : 's'}`}
+      <span className="day-heading-actions">
+        <span className="filter-hint">
+          {daySessions.length === 0 ? 'No sessions' : `${daySessions.length} session${daySessions.length === 1 ? '' : 's'}`}
+        </span>
+        <button
+          type="button"
+          className="btn-icon"
+          aria-label="Add a personal event on this day"
+          title="Add a personal event on this day"
+          onClick={() => onAddPersonal(anchorISO)}
+        >
+          ＋
+        </button>
       </span>
     </div>
   )

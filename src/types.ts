@@ -26,6 +26,8 @@ export interface Session {
   isOptional: boolean
   /** entry comes from the key-dates (submissions) tab */
   isKeyDate?: boolean
+  /** personal event marked free — excluded from clashes and busy time */
+  isFreeTime?: boolean
 }
 
 export type DateRange = 'today' | 'week' | 'all'
@@ -141,6 +143,8 @@ export interface Settings {
   placementHours?: { start: string; end: string; breakMins?: number }
   /** whether inset/training days count toward planned school days (default true) */
   placementInsetCounts?: boolean
+  /** include personal events in the .ics download (explicit choice, default off) */
+  includePersonalInExport?: boolean
 }
 
 /** One saved timetable (sheet + all its choices). */

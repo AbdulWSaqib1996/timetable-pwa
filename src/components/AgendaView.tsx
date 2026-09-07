@@ -126,7 +126,7 @@ export function AgendaView({
   const conflictIds = useMemo(() => {
     const ids = new Set<string>()
     for (const [, list] of days) {
-      const timed = list.filter((s) => !s.isKeyDate && !s.isSelfStudy && toMinutes(s.start) !== null)
+      const timed = list.filter((s) => !s.isKeyDate && !s.isSelfStudy && !s.isFreeTime && toMinutes(s.start) !== null)
       for (let i = 0; i < timed.length; i++) {
         for (let j = i + 1; j < timed.length; j++) {
           const aStart = toMinutes(timed[i].start)!

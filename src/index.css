@@ -3482,3 +3482,60 @@ body {
 .pb-missing {
   font-style: italic;
 }
+
+/* Personal commitments (P5-06) + work plans (P5-05) */
+.badge-personal {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.day-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.day-heading-actions .btn-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.workplan-list {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workplan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workplan-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  cursor: pointer;
+}
+
+.workplan-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.workplan-label {
+  flex: 1;
+  font-size: 14px;
+}
+
+.workplan-add {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
