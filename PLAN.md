@@ -605,3 +605,16 @@ Release-gate check (§6): every supported record type editable with recovering d
 Known limitations / intentionally deferred: three-way field-level merge falls back to whole-record Keep mine/Use latest (per-field merge deferred); commitment reminders reuse session-reminder offsets; imported-deadline work plans are supported in data (parentId = event key) but the plan UI attaches to personal tasks only; no recurrence for commitments (deliberate, per the handoff).
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+Phase 5 release verification (7 September 2026): workers deployed FIRST per the runbook (shared/contracts + shared/placement changed) — push worker `e3fb4354-cbb6-4476-9cb8-b7204743206a`, feed worker `05e5e74b-b774-411e-a00c-83a3e2c56e81`; worker behaviour is unchanged (validWorkerConfig untouched), the deploy keeps bundled shared code in step. GitHub Actions for `4b22653` concluded **success** (full browser gate incl. the 9 phase-five specs + Pages deploy); Vercel production serves the new bundle (deployed JS contains the Phase 5 surfaces). Live verification, verbatim:
+
+```text
+== verify live endpoints ==
+PASS: vercel app 200
+PASS: pages app 200
+PASS: push worker /vapid
+PASS: /stats locked (401)
+PASS: feed worker + cache header
+PASS: analytics dashboard 200
+done.
+```
