@@ -27,6 +27,8 @@ export interface ItineraryLeg {
   minutes: number
   fromLat?: number
   fromLng?: number
+  /** provider route geometry ([lat, lng] pairs); [] when the provider sent none */
+  geometry: [number, number][]
   summary: string
   disruptions: string[]
   isDisrupted: boolean

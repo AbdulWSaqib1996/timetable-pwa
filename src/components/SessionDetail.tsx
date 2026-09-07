@@ -23,6 +23,7 @@ import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
 import { SegmentedControl } from './ui'
+import { RouteMap } from './RouteMap'
 import { StaticMap } from './StaticMap'
 
 interface Props {
@@ -198,6 +199,10 @@ export function SessionDetail({
     enabled: tab === 'travel' && planable,
   })
   const shownItinerary = journey.departure === 'passed' ? journey.fallback : journey.itinerary
+  // Leg highlight for the route map (P7-03) — cleared whenever the itinerary
+  // itself changes so a stale selection can't point at the wrong route.
+  const [selectedLeg, setSelectedLeg] = useState<number | null>(null)
+  useEffect(() => setSelectedLeg(null), [shownItinerary])
 
   // Weather at the DESTINATION around the planned departure (provider horizon
   // honoured — outside it there is simply no forecast shown).
@@ -605,7 +610,17 @@ export function SessionDetail({
           Copy address
         </button>
       </div>
-      {travel.location ? (
+      {travel.location && shownItinerary && shownItinerary.legs.some((l) => l.geometry.length >= 2) ? (
+        // Full-route map (P7-03): drawn ONLY from provider geometry; a failed
+        // or geometry-less plan falls back to the destination-only map below.
+        <RouteMap
+          itinerary={shownItinerary}
+          origin={origin?.coords ?? null}
+          destination={travel.location}
+          selectedLeg={selectedLeg}
+          label={travel.building ?? undefined}
+        />
+      ) : travel.location ? (
         <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} />
       ) : (
         <div className="ui-card map-fallback">
@@ -613,6 +628,12 @@ export function SessionDetail({
             No map match for this location — the address and external directions below still work.
           </p>
         </div>
+      )}
+      {travel.location && (
+        <p className="filter-hint entrance-note">
+          The pin marks the approximate building centre — entrances and step-free access aren't
+          verified here; check the venue's own access information.
+        </p>
       )}
       {shownItinerary && shownItinerary.legs.length > 0 ? (
         <details className="journey-steps">
@@ -628,6 +649,8 @@ export function SessionDetail({
             legDeps={journey.legDeps}
             disruptions={journey.disruptions}
             showTimes={futurePlan && journey.departure !== 'passed'}
+            selectedLeg={selectedLeg}
+            onSelectLeg={setSelectedLeg}
           />
         </details>
       ) : shownItinerary && shownItinerary.legs.length === 0 && travelMode === 'transit' ? (
