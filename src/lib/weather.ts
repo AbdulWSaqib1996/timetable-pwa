@@ -36,6 +36,56 @@ async function loadForecast(): Promise<void> {
   }
 }
 
+/* Destination-aware forecasts (P6-03): per-location cache keyed by rounded
+ * coordinates; only hours inside the provider's 7-day horizon are ever
+ * returned — outside it the answer is honestly null. */
+const locationCaches = new Map<string, { at: number; hours: Map<string, HourWeather> }>()
+const locationInflight = new Map<string, Promise<void>>()
+
+async function loadForecastAt(lat: number, lng: number, key: string): Promise<void> {
+  try {
+    const res = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lng.toFixed(2)}&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=7&timezone=Europe%2FLondon`
+    )
+    if (!res.ok) return
+    const json = (await res.json()) as {
+      hourly?: { time?: string[]; temperature_2m?: number[]; precipitation_probability?: number[]; weather_code?: number[] }
+    }
+    const hours = new Map<string, HourWeather>()
+    ;(json.hourly?.time ?? []).forEach((t, i) => {
+      hours.set(t, {
+        tempC: json.hourly?.temperature_2m?.[i] ?? 0,
+        rainProb: json.hourly?.precipitation_probability?.[i] ?? 0,
+        code: json.hourly?.weather_code?.[i] ?? 0,
+      })
+    })
+    if (hours.size > 0) {
+      if (locationCaches.size > 12) locationCaches.clear()
+      locationCaches.set(key, { at: Date.now(), hours })
+    }
+  } catch {
+    /* offline — weather is decorative */
+  }
+}
+
+/** Forecast at the DESTINATION for a local hour; null outside the provider's
+ *  horizon or when the provider is unreachable. */
+export async function weatherForHourAt(
+  coords: { lat: number; lng: number },
+  dateISO: string,
+  hour: number
+): Promise<HourWeather | null> {
+  const key = `${coords.lat.toFixed(2)},${coords.lng.toFixed(2)}`
+  const hit = locationCaches.get(key)
+  if (!hit || Date.now() - hit.at > 30 * 60_000) {
+    if (!locationInflight.has(key)) {
+      locationInflight.set(key, loadForecastAt(coords.lat, coords.lng, key).finally(() => locationInflight.delete(key)))
+    }
+    await locationInflight.get(key)
+  }
+  return locationCaches.get(key)?.hours.get(`${dateISO}T${String(hour).padStart(2, '0')}:00`) ?? null
+}
+
 /** Forecast for a local hour ("2026-09-03", 9 → 09:00 that day); fetches when stale. */
 export async function weatherForHour(dateISO: string, hour: number): Promise<HourWeather | null> {
   if (!cache || Date.now() - cache.at > 30 * 60_000) {

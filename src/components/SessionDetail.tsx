@@ -2,7 +2,6 @@ import { IdentityReview } from './IdentityReview'
 import { reportPersistenceFailure } from '../lib/persistence'
 import { useEffect, useRef, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
-import { freshnessLabel } from '../../shared/travel-state.js'
 import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords } from '../lib/campus'
 import { geocodeAddress } from '../lib/geocode'
 import { TEACHERS_STANDARDS } from '../lib/standards'
@@ -13,9 +12,13 @@ import { sessionKey } from '../lib/diff'
 import { trackUse } from '../lib/usage'
 import { PHOTO_CAPTION_MAX, addPhoto, compressImage, deletePhoto, getPhotos, setPhotoCaption } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
-import { useLiveJourney } from '../hooks/useLiveJourney'
-import { RouteSteps } from './RouteSteps'
-import { weatherEmoji, weatherForHour } from '../lib/weather'
+import { wallToUTC, utcToZonedParts } from '../../shared/calendar-time.js'
+import { requiredArrivalMs } from '../../shared/journey.js'
+import { useJourney } from '../hooks/useJourney'
+import { ItinerarySteps } from './ItinerarySteps'
+import { OriginSelector } from './OriginSelector'
+import type { OriginOption } from '../lib/origins'
+import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
 import { SegmentedControl } from './ui'
@@ -32,6 +35,11 @@ interface Props {
   profileId: string
   /** full page (mobile) or dialog sheet (desktop) */
   presentation: 'page' | 'sheet'
+  /** selectable journey origins (P6-02) */
+  origins: OriginOption[]
+  /** arrival buffer minutes for arrive-by planning (P6-01) */
+  arrivalBufferMins: number
+  onSetArrivalBuffer: (mins: number) => void
   /** label for the Back control in page presentation */
   backLabel?: string
   /** placement details for this session's SE block (placement sessions only) */
@@ -94,6 +102,9 @@ export function SessionDetail({
   travelMode,
   profileId,
   presentation,
+  origins,
+  arrivalBufferMins,
+  onSetArrivalBuffer,
   backLabel = 'Back',
   placementInfo,
   onPlacementInfo,
@@ -154,41 +165,59 @@ export function SessionDetail({
     reloadPhotos()
   }
 
-  // Live TfL journey — departure boards poll only while Travel & map shows.
-  const { route, routeFetchedAt, legDeps, routeDisruptions } = useLiveJourney(
-    coords,
-    travel?.location ?? null,
-    tab === 'travel' && travelMode === 'transit' && !!coords && !!travel?.location
+  // Date-specific journey planning (P6-01/02): a FUTURE session gets an
+  // arrive-by plan for its actual date/time with the chosen buffer; a
+  // session happening about now gets a leave-now route. Driving stays a
+  // labelled distance estimate — nothing future is fabricated for it.
+  const startMs = !isTask && session.start ? wallToUTC(session.dateISO, session.start).utcMs : null
+  const planable = !isTask && !!travel?.location && travelMode !== 'driving'
+  const futurePlan = planable && startMs !== null && startMs > Date.now() + 5 * 60_000
+  const [originId, setOriginId] = useState<string | null>(
+    () => origins.find((o) => o.basis === 'device' && o.coords)?.id ?? null
   )
+  useEffect(() => {
+    // A fix arriving selects the device origin only if nothing was chosen —
+    // never silently replacing a deliberate saved-origin choice.
+    if (originId === null) {
+      const device = origins.find((o) => o.basis === 'device' && o.coords)
+      if (device) setOriginId(device.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origins.find((o) => o.basis === 'device')?.coords != null])
+  const origin = origins.find((o) => o.id === originId && o.coords) ?? null
+  const journey = useJourney({
+    origin,
+    destination: travel?.location ? { coords: travel.location, label: travel.building ?? undefined } : null,
+    mode: travelMode,
+    intent:
+      futurePlan && startMs !== null
+        ? { kind: 'arrive-by', arriveByMs: requiredArrivalMs(startMs, arrivalBufferMins), eventKey: sessionKey(session) }
+        : { kind: 'leave-now' },
+    eventKey: sessionKey(session),
+    enabled: tab === 'travel' && planable,
+  })
+  const shownItinerary = journey.departure === 'passed' ? journey.fallback : journey.itinerary
 
-  // Weather for the journey: forecast at the computed leave time (start − travel).
+  // Weather at the DESTINATION around the planned departure (provider horizon
+  // honoured — outside it there is simply no forecast shown).
   const [journeyWeather, setJourneyWeather] = useState<{ at: string; w: HourWeather } | null>(null)
-  const startMins = toMinutes(session.start)
-  const travelMins = travelMode === 'transit' && route ? route.minutes : travel?.minutes ?? null
   useEffect(() => {
     setJourneyWeather(null)
-    if (startMins === null || travelMins === null) return
-    const leaveMins = startMins - travelMins
-    if (leaveMins <= 0) return
+    const dest = travel?.location
+    const leaveMs = journey.leaveByMs ?? (shownItinerary ? Date.now() : null)
+    if (!dest || leaveMs === null) return
+    const wall = utcToZonedParts(leaveMs)
     let cancelled = false
-    void weatherForHour(session.dateISO, Math.floor(leaveMins / 60)).then((w) => {
-      if (!cancelled && w) {
-        setJourneyWeather({
-          at: `${String(Math.floor(leaveMins / 60)).padStart(2, '0')}:${String(leaveMins % 60).padStart(2, '0')}`,
-          w,
-        })
-      }
+    void weatherForHourAt(dest, wall.dateISO, parseInt(wall.hhmm.slice(0, 2), 10)).then((w) => {
+      if (!cancelled && w) setJourneyWeather({ at: wall.hhmm, w })
     })
     return () => {
       cancelled = true
     }
-  }, [session.dateISO, startMins, travelMins])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [journey.leaveByMs, shownItinerary, travel?.location?.lat])
 
-  const shownMinutes = travelMode === 'transit' && route ? route.minutes : travel?.minutes ?? null
-  const basisLabel =
-    travelMode === 'transit' && route
-      ? freshnessLabel({ basis: 'provider', fetchedAt: routeFetchedAt })
-      : 'estimate from distance'
+  const hhmm = (ms: number) => utcToZonedParts(ms).hhmm
 
   // The sheet's Location column glues building and room together — split them.
   const loc = parseLocation(session.isSelfStudy || isTask ? '' : session.room)
@@ -470,23 +499,92 @@ export function SessionDetail({
 
   const travelPanel = !isTask && travel && (
     <div className="detail-tabpanel" role="tabpanel" aria-label="Travel and map" hidden={tab !== 'travel'}>
+      {futurePlan && (
+        <div className="buffer-row">
+          <span className="ui-field-label">Arrive early by</span>
+          <div className="chip-grid" role="group" aria-label="Arrival buffer">
+            {[0, 5, 10, 15, 20].map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`chip chip-small${arrivalBufferMins === m ? ' chip-on' : ''}`}
+                aria-pressed={arrivalBufferMins === m}
+                onClick={() => onSetArrivalBuffer(m)}
+              >
+                {m === 0 ? 'On time' : `${m} min`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {planable && <OriginSelector options={origins} selectedId={originId} onSelect={setOriginId} />}
       <div className="travel-summary">
-        {shownMinutes !== null ? (
+        {travelMode === 'driving' ? (
+          travel.minutes !== null ? (
+            <>
+              <span className="travel-summary-mins">≈ {formatRemaining(travel.minutes)} drive</span>
+              <span className="filter-hint">
+                estimate from distance — live driving plans aren't available; use external navigation below
+              </span>
+            </>
+          ) : (
+            <span className="filter-hint">Driving estimates need a location — external navigation below works regardless.</span>
+          )
+        ) : !origin ? (
+          <span className="filter-hint">
+            {locationEnabled
+              ? 'Waiting for a device fix — or pick a saved origin above. Address and directions work below.'
+              : 'Pick an origin above (location is off) — address and directions work below.'}
+          </span>
+        ) : journey.status === 'loading' ? (
+          <span className="filter-hint">Planning the journey…</span>
+        ) : journey.departure === 'passed' && journey.itinerary ? (
           <>
-            <span className="travel-summary-mins">
-              ≈ {formatRemaining(shownMinutes)} {TRAVEL_MODE_PHRASE[travelMode]}
-            </span>
+            <span className="travel-summary-mins">Planned departure {hhmm(journey.itinerary.departureMs)} has passed</span>
             <span className="filter-hint">
-              {basisLabel}
-              {coords ? ' · from your current location' : ''}
+              {journey.fallback
+                ? `Leaving now instead: ≈ ${formatRemaining(journey.fallback.durationMins)} · arrive ~${hhmm(Date.now() + journey.fallback.durationMins * 60_000)}`
+                : 'Could not fetch a leave-now route — use external navigation below.'}
             </span>
           </>
-        ) : locationEnabled ? (
-          <span className="filter-hint">Waiting for your location… address and directions still work below.</span>
-        ) : (
+        ) : futurePlan && journey.itinerary && journey.leaveByMs !== null ? (
+          <>
+            <span className="travel-summary-mins">Leave by {hhmm(journey.leaveByMs)}</span>
+            <span className="filter-hint">
+              {formatRemaining(journey.itinerary.durationMins)} journey
+              {arrivalBufferMins > 0 ? ` + ${arrivalBufferMins} min buffer` : ''} · planned arrival{' '}
+              {hhmm(journey.itinerary.arrivalMs)} · planned with TfL for{' '}
+              {utcToZonedParts(journey.itinerary.departureMs).dateISO.split('-').reverse().slice(0, 2).join('/')}
+              {journey.fetchedAt ? ` · checked ${hhmm(journey.fetchedAt)}` : ''} · from {origin.label.toLowerCase()}
+            </span>
+          </>
+        ) : journey.itinerary ? (
+          <>
+            <span className="travel-summary-mins">
+              ≈ {formatRemaining(journey.itinerary.durationMins)} {TRAVEL_MODE_PHRASE[travelMode]}
+            </span>
+            <span className="filter-hint">
+              live TfL{journey.fetchedAt ? ` · checked ${hhmm(journey.fetchedAt)}` : ''} · from {origin.label.toLowerCase()}
+            </span>
+          </>
+        ) : journey.status === 'no-route' ? (
           <span className="filter-hint">
-            Turn on travel times in Settings for a journey estimate — the address and directions work without it.
+            {futurePlan
+              ? 'No feasible itinerary for that arrival time — there may be no service then. External navigation below still works.'
+              : 'No route found right now — the address and external navigation below still work.'}
           </span>
+        ) : journey.status === 'error' ? (
+          <>
+            {travel.minutes !== null && (
+              <span className="travel-summary-mins">≈ {formatRemaining(travel.minutes)} {TRAVEL_MODE_PHRASE[travelMode]}</span>
+            )}
+            <span className="filter-hint">
+              Couldn't reach TfL — {travel.minutes !== null ? 'showing a distance estimate only.' : 'no estimate available.'}{' '}
+              A route outage never hides the destination below.
+            </span>
+          </>
+        ) : (
+          <span className="filter-hint">Open this tab with a route provider available for a plan.</span>
         )}
       </div>
       <div className="ui-card destination-card">
@@ -515,18 +613,23 @@ export function SessionDetail({
           </p>
         </div>
       )}
-      {route && route.legs.length > 0 ? (
+      {shownItinerary && shownItinerary.legs.length > 0 ? (
         <details className="journey-steps">
           <summary>
             <span>Journey steps</span>
             <span className="route-total">
-              ≈ {formatRemaining(route.minutes)} ·{' '}
-              {[...new Set(route.legs.map((l) => (l.mode === 'walking' ? 'walk' : l.line || l.mode)))].join(' · ')}
+              ≈ {formatRemaining(shownItinerary.durationMins)} ·{' '}
+              {[...new Set(shownItinerary.legs.map((l) => (l.mode === 'walking' ? 'walk' : l.line || l.mode)))].join(' · ')}
             </span>
           </summary>
-          <RouteSteps route={route} legDeps={legDeps} routeDisruptions={routeDisruptions} />
+          <ItinerarySteps
+            itinerary={shownItinerary}
+            legDeps={journey.legDeps}
+            disruptions={journey.disruptions}
+            showTimes={futurePlan && journey.departure !== 'passed'}
+          />
         </details>
-      ) : route && route.legs.length === 0 && travelMode === 'transit' ? (
+      ) : shownItinerary && shownItinerary.legs.length === 0 && travelMode === 'transit' ? (
         <p className="route-info">Best option now: walk (no transit leg needed).</p>
       ) : null}
       {journeyWeather && (

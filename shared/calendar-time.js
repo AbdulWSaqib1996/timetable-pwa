@@ -44,6 +44,22 @@ export function shiftMonthISO(dateISO, deltaMonths) {
   return `${firstOfTarget.getUTCFullYear()}-${pad(firstOfTarget.getUTCMonth() + 1)}-${pad(Math.min(d, daysInTarget))}`
 }
 
+/** A UTC instant expressed as the zone's wall date/time parts. */
+export function utcToZonedParts(utcMs, zone = COURSE_TIMEZONE) {
+  const dtf = new Intl.DateTimeFormat('en-GB', {
+    timeZone: zone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+    hour12: false,
+  })
+  const parts = dtf.formatToParts(new Date(utcMs))
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? '00'
+  return {
+    dateISO: `${get('year')}-${get('month')}-${get('day')}`,
+    hhmm: `${get('hour') === '24' ? '00' : get('hour')}:${get('minute')}`,
+  }
+}
+
 /* ---------- course wall time → UTC (one implementation for both runtimes) ---------- */
 
 const offsetCache = new Map()

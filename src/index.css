@@ -3539,3 +3539,22 @@ body {
   padding-top: 8px;
   margin-top: 8px;
 }
+
+/* ---------- Journey planning (P6) ---------- */
+
+.buffer-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.origin-selector {
+  margin-bottom: 6px;
+}
+
+.route-leg-warning {
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
