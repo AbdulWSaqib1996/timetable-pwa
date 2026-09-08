@@ -187,3 +187,49 @@ test('capability-2 tokens make real eligible denominators and per-capability sta
   const detail = snap.features.find((f) => f.id === 'detail')
   assert.deepEqual([detail.adoption.numerator, detail.adoption.denominator], [1, 2])
 })
+
+/* ---- A5: reliability counters and build attribution ---- */
+
+test('reliability: outcomes counted transactionally by reason and day; rates suppressed below the minimum', async () => {
+  const { store } = makeStore()
+  await post(store, '/v2/batch', batch())
+  await post(store, '/v2/batch', batch()) // duplicate
+  await post(store, '/v2/outcome', { reason: 'rejected' })
+  await post(store, '/v2/outcome', { reason: 'oversize' })
+  await post(store, '/v2/outcome', { reason: 'rateLimited' })
+  assert.equal((await post(store, '/v2/outcome', { reason: 'made-up' })).status, 400)
+  const snap = await (await post(store, '/v2/aggregate', {})).json()
+  const today = snap.reliability.days[snap.reliability.days.length - 1]
+  assert.deepEqual(
+    { a: today.accepted, d: today.duplicate, r: today.rejected, o: today.oversize, l: today.rateLimited },
+    { a: 1, d: 1, r: 1, o: 1, l: 1 }
+  )
+  assert.ok(snap.reliability.lastAcceptedAt > 0)
+  // Yesterday had no attempts: rate is null and status is 'insufficient', never 0%.
+  assert.equal(snap.reliability.lastCompleteDay.ratePct, null)
+  assert.equal(snap.reliability.lastCompleteDay.status, 'insufficient')
+  assert.deepEqual(snap.reliability.thresholds, { staleAfterMinutes: 30, rejectRatePct: 2, minAttempts: 100 })
+})
+
+test('releases: latest observed build per token, Unknown category, comparison only with >= 20 eligible tokens', async () => {
+  const { store } = makeStore()
+  // Token A: old build yesterday, NEW build today -> attributed to the new build once.
+  await post(store, '/v2/batch', batch({ buildId: 'old0001', days: [{ date: dayISO(1), opens: 2, counts: {} }] }))
+  await post(store, '/v2/batch', batch({ batchId: 'b777777777777777', buildId: 'new0002', days: [{ date: dayISO(0), opens: 1, counts: {} }] }))
+  // 20 tokens on the old build over complete days -> comparison available for it.
+  for (let i = 0; i < 20; i++) {
+    await post(store, '/v2/batch', batch({ token: `cccc${String(i).padStart(12, '0')}`, batchId: `c${String(i).padStart(15, '0')}`, buildId: 'old0001', days: [{ date: dayISO(2), opens: 3, counts: {} }] }))
+  }
+  const snap = await (await post(store, '/v2/aggregate', {})).json()
+  const list = snap.builds.list
+  assert.equal(snap.builds.activeTokens, 21)
+  const oldB = list.find((b) => b.buildId === 'old0001')
+  const newB = list.find((b) => b.buildId === 'new0002')
+  assert.equal(oldB.tokens, 20, 'token A must not ALSO count for its earlier build')
+  assert.equal(newB.tokens, 1)
+  assert.equal(newB.firstObserved, dayISO(0))
+  assert.ok('unavailable' in newB.comparison && newB.comparison.minimum === 20)
+  assert.equal(oldB.comparison.eligibleTokens, 21) // A's old-build day is a complete day too
+  assert.equal(oldB.comparison.opensPerToken, Math.round(((20 * 3 + 2) / 21) * 10) / 10)
+  assert.equal(list.find((b) => b.buildId === 'unknown'), undefined, 'no unknown row without unknown tokens')
+})

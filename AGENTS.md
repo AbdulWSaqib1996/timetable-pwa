@@ -46,6 +46,8 @@ a new commit. `all` runs everything in order.
 - **Never delete or overwrite the KV key `vapid`** — it invalidates every push subscription irreversibly.
 - **Never delete KV records you did not create in the current task.** Real-user data lives beside operational keys (`sub:`, `sync:`, `aping:`, `adev:`, `snap:` — full prefix map in DEPLOYMENT.md §6). A deleted user ping/subscription cannot be restored.
 - **Never test against production analytics or push subscriptions.** If a test must ping, use a device id starting `ffffffff` and delete exactly that id afterwards.
+- **Never set `analytics:retention-policy` in KV unless the owner explicitly asks** — it activates a dormant job that deletes `adev:` first-seen rows (scoped, grace-period-gated, ≤200/run) and changes what “tokens ever recorded” means.
+- The `AnalyticsStore` Durable Object (`day:`/`dp:`/`seen:`/`rel:`/`meta:` rows) is analytics-owned; never reach into SyncStore/GroupStore storage from it or vice versa. `/stats` and `/stats/v2` are `Authorization: Bearer` only — do not reintroduce a query-string credential.
 - Never commit secrets; the only secret (`statskey`) lives in KV. Rotate with
   `npx wrangler kv key put --namespace-id <id-from-wrangler.toml> --remote statskey <new>` — only when asked.
 - Don't change `registerType`, the KV namespace ids, or `src/lib/config.ts` base URLs unless the task is explicitly about them.

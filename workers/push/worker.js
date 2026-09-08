@@ -993,6 +993,85 @@ async function runScheduled(env) {
   }
 
   await publishAnalyticsSnapshot(env)
+  await runAnalyticsRetention(env)
+}
+
+/** Fire-and-forget reason count for an attempt the worker refused (A5). */
+function reportOutcome(env, reason) {
+  if (!env.ANALYTICS) return
+  try {
+    const stub = env.ANALYTICS.get(env.ANALYTICS.idFromName('analytics-v2'))
+    void stub
+      .fetch(new Request('https://analytics/v2/outcome', { method: 'POST', body: JSON.stringify({ reason }), headers: { 'content-type': 'application/json' } }))
+      .catch(() => {})
+  } catch {
+    /* diagnostics never affect the request */
+  }
+}
+
+const LAST_SEEN_TTL_S = 200 * 86400
+/**
+ * Prospective last-seen ledger (A5 / ADM-20): `alast:<token>` = last observed
+ * UTC date, self-expiring after 200 days. Written at most weekly per token
+ * to protect the KV write budget. This is the basis for the PROPOSED
+ * bounded first-seen retention; recording it is non-destructive.
+ */
+async function touchLastSeen(env, token, today) {
+  try {
+    const prev = await env.PUSH.get(`alast:${token}`)
+    if (prev && prev >= new Date(Date.parse(today + 'T00:00:00Z') - 7 * 86400000).toISOString().slice(0, 10)) return
+    await env.PUSH.put(`alast:${token}`, today, { expirationTtl: LAST_SEEN_TTL_S })
+  } catch {
+    /* best effort */
+  }
+}
+
+export const RETENTION_GRACE_DAYS = 30
+export const FIRST_SEEN_RETENTION_DAYS = 180
+/**
+ * Pure retention rule (A5 / §7.3): a first-seen token expires when its
+ * first-seen date is older than 180 days AND no last-seen record exists —
+ * and only once the policy has been recording last-seen for the grace
+ * period, so an active-but-old token cannot be swept on day one. Returns
+ * the tokens to delete; the caller deletes ONLY `adev:` rows.
+ */
+export function expiredFirstSeenTokens(firstSeen, lastSeen, todayISO, activationISO) {
+  if (!activationISO || !/^\d{4}-\d{2}-\d{2}$/.test(activationISO)) return []
+  const dayMs = 86400000
+  const today = Date.parse(todayISO + 'T00:00:00Z')
+  if (today < Date.parse(activationISO + 'T00:00:00Z') + RETENTION_GRACE_DAYS * dayMs) return []
+  const cutoff = new Date(today - FIRST_SEEN_RETENTION_DAYS * dayMs).toISOString().slice(0, 10)
+  const out = []
+  for (const [token, first] of firstSeen) {
+    if (typeof first === 'string' && first < cutoff && !lastSeen.has(token)) out.push(token)
+  }
+  return out
+}
+
+/**
+ * Scoped, DORMANT retention job: runs only when the owner has set the KV
+ * flag `analytics:retention-policy` to the ISO activation date. Touches
+ * `adev:` rows only — never vapid/sub/sync/group/aping — and at most 200 per
+ * run so a single tick cannot mass-delete.
+ */
+async function runAnalyticsRetention(env) {
+  try {
+    const activation = await env.PUSH.get('analytics:retention-policy')
+    if (!activation) return
+    const today = new Date().toISOString().slice(0, 10)
+    const scan = await listAllKeysChecked(env.PUSH, { prefix: 'adev:' })
+    if (!scan.complete) return // never act on a partial view of the ledger
+    const firstSeen = new Map()
+    for (const k of scan.keys) {
+      const v = await env.PUSH.get(k.name)
+      if (v) firstSeen.set(k.name.slice(5), v)
+    }
+    const lastSeen = new Set((await listAllKeysChecked(env.PUSH, { prefix: 'alast:' })).keys.map((k) => k.name.slice(6)))
+    const expired = expiredFirstSeenTokens(firstSeen, lastSeen, today, activation).slice(0, 200)
+    for (const token of expired) await env.PUSH.delete(`adev:${token}`)
+  } catch {
+    /* retention must never break the scheduled run */
+  }
 }
 
 /**
@@ -1164,6 +1243,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS })
     const cap = RATE_CAPS[url.pathname]
     if (cap && rateLimited(request, url.pathname, cap)) {
+      if (url.pathname === '/v2/batch') reportOutcome(env, 'rateLimited')
       return json({ error: 'rate limited — try again in a minute' }, 429)
     }
     if (request.method === 'GET' && url.pathname === '/vapid') {
@@ -1287,16 +1367,23 @@ export default {
     /* ---------- v2 telemetry (A2): validated batches, atomic DO dedupe ---------- */
     if (request.method === 'POST' && url.pathname === '/v2/batch') {
       const raw = await boundedJSON(request, MAX_BATCH_BYTES)
-      if (!raw) return json({ error: 'invalid or oversized batch' }, 400)
+      if (!raw) {
+        reportOutcome(env, 'oversize')
+        return json({ error: 'invalid or oversized batch' }, 400)
+      }
       const { ok, errors, batch } = validateBatch(raw)
       // Any invalid day fails the WHOLE batch before a single write — the
       // batch is the idempotence unit, so partial acceptance is forbidden.
-      if (!ok || !batch) return json({ error: 'invalid batch', reasons: errors.slice(0, 5) }, 400)
+      if (!ok || !batch) {
+        reportOutcome(env, 'rejected')
+        return json({ error: 'invalid batch', reasons: errors.slice(0, 5) }, 400)
+      }
       // Keep the legacy first-seen union: v2 uses the SAME token namespace,
       // so one browser never counts twice across contracts.
       if (!(await env.PUSH.get(`adev:${batch.token}`))) {
         await env.PUSH.put(`adev:${batch.token}`, batch.days.map((d) => d.date).sort()[0])
       }
+      await touchLastSeen(env, batch.token, new Date().toISOString().slice(0, 10))
       const stub = env.ANALYTICS.get(env.ANALYTICS.idFromName('analytics-v2'))
       const res = await stub.fetch(
         new Request('https://analytics/v2/batch', {
@@ -1372,6 +1459,7 @@ export default {
       }
       await env.PUSH.put(`aping:${date}:${d}`, JSON.stringify(rec), { expirationTtl: 90 * 86400 })
       if (!(await env.PUSH.get(`adev:${d}`))) await env.PUSH.put(`adev:${d}`, date)
+      await touchLastSeen(env, d, date)
       return json({ ok: true })
     }
     if (request.method === 'GET' && url.pathname === '/stats') {

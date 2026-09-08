@@ -208,8 +208,10 @@ test('/v2/batch: schema failures are refused before any write; a valid batch rea
       idFromName: (n) => n,
       get: () => ({
         fetch: async (req) => {
-          calls.push(await req.json())
-          return Response.json({ ok: true, acked: calls[calls.length - 1].batchId })
+          const body = await req.json()
+          // Only BATCH deliveries count here; A5 outcome reports are separate.
+          if (new URL(req.url).pathname === '/v2/batch') calls.push(body)
+          return Response.json({ ok: true, acked: body.batchId })
         },
       }),
     },
@@ -234,4 +236,51 @@ test('/v2/batch: schema failures are refused before any write; a valid batch rea
   assert.equal(calls.length, 1)
   // Legacy first-seen union: the SAME token namespace gets its adev row.
   assert.equal(kv.rows.get('adev:abcd1234abcd1234'), today)
+})
+
+/* ---- A5: refused attempts are counted; retention is a pure, gated rule ---- */
+
+test('/v2/batch reports refused attempts (schema, oversize, rate-limit) to the coordinator, accepted ones record last-seen', async () => {
+  const kv = fakeKV({})
+  const outcomes = []
+  const env = {
+    PUSH: kv,
+    ANALYTICS: {
+      idFromName: (n) => n,
+      get: () => ({
+        fetch: async (req) => {
+          const body = await req.json()
+          if (new URL(req.url).pathname === '/v2/outcome') outcomes.push(body.reason)
+          return Response.json({ ok: true, acked: body.batchId })
+        },
+      }),
+    },
+  }
+  const ip = `10.4.0.${++ipCounter}`
+  const post = (body, headers = { 'content-type': 'application/json' }) =>
+    worker.fetch(new Request('https://push.test/v2/batch', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body), headers: { 'cf-connecting-ip': ip, ...headers } }), env)
+  await post({ schemaVersion: 2, token: 'abcd1234abcd1234', batchId: 'beefbeefbeefbeef', buildId: 'x', capabilityVersion: 1, platform: 'ios', days: [{ date: dayISO(0), counts: { nonsense: 1 } }] })
+  await post('{"d":"' + 'a'.repeat(20000) + '"}')
+  await post({ schemaVersion: 2, token: 'abcd1234abcd1234', batchId: 'beefbeefbeefbee1', buildId: 'x', capabilityVersion: 1, platform: 'ios', standalone: true, days: [{ date: dayISO(0), opens: 1, counts: {} }] })
+  await new Promise((r) => setTimeout(r, 10))
+  assert.deepEqual(outcomes.sort(), ['oversize', 'rejected'])
+  assert.equal(kv.rows.get('alast:abcd1234abcd1234'), dayISO(0), 'accepted batch records last-seen')
+  // Exhaust the per-IP cap: the refusal is counted as rate-limited.
+  for (let i = 0; i < 25; i++) await post({ schemaVersion: 2, token: 'abcd1234abcd1234', batchId: `beefbeefbeefbe${String(i).padStart(2, '0')}`, buildId: 'x', capabilityVersion: 1, platform: 'ios', days: [{ date: dayISO(0), opens: 1, counts: {} }] })
+  await new Promise((r) => setTimeout(r, 10))
+  assert.ok(outcomes.includes('rateLimited'))
+})
+
+test('retention rule: dormant without activation, grace period honoured, expires ONLY old first-seen tokens with no last-seen', async () => {
+  const { expiredFirstSeenTokens } = await import('../../workers/push/worker.js')
+  const firstSeen = new Map([
+    ['oldquiet', '2025-01-01'], // old, never seen since -> expires
+    ['oldactive', '2025-01-01'], // old but has a last-seen -> kept
+    ['recent', '2026-08-01'], // younger than 180 days -> kept
+  ])
+  const lastSeen = new Set(['oldactive'])
+  assert.deepEqual(expiredFirstSeenTokens(firstSeen, lastSeen, '2026-09-08', null), [], 'no activation date → no deletions')
+  assert.deepEqual(expiredFirstSeenTokens(firstSeen, lastSeen, '2026-09-08', '2026-09-01'), [], 'inside the 30-day grace → nothing')
+  assert.deepEqual(expiredFirstSeenTokens(firstSeen, lastSeen, '2026-09-08', '2026-07-01'), ['oldquiet'])
+  assert.deepEqual(expiredFirstSeenTokens(firstSeen, lastSeen, '2026-09-08', 'garbage'), [])
 })

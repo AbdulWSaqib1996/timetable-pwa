@@ -135,15 +135,21 @@ There are only two secret-ish values, both living in KV (never in the repo):
 
 | Key | Purpose | Notes |
 |---|---|---|
-| `statskey` | Guards `GET /stats` | Rotate any time: `npx wrangler kv key put --namespace-id … --remote statskey <new>`; re-enter in the dashboard |
+| `statskey` | Guards `GET /stats` and `GET /stats/v2` (`Authorization: Bearer`, fail-closed — absent key = 503) | Rotate any time: `npx wrangler kv key put --namespace-id … --remote statskey <new>`; re-enter in the dashboard (held in memory only) |
+| `analytics:retention-policy` | **Dormant** first-seen retention switch (A5) | Unset = no deletions ever. Set to the ISO activation date ONLY on the owner's explicit instruction; after a 30-day grace the cron removes `adev:` rows first-seen >180 days ago with no `alast:` record, ≤200 per run. Changes “ever recorded” semantics — see PLAN.md Pass 49 |
 | `vapid` | Web Push signing keypair | **Auto-generated; never delete/replace it** — doing so invalidates every push subscription and everyone must re-enable push |
 
 KV key prefixes (useful when inspecting with `wrangler kv key list`):
 `sub:` push subscriptions+config · `snap:` sheet snapshots (also feeds `/history`)
 · `sent:` notification dedupe · `snooze:` pending snoozes · `fail:` sheet-health
 counters · `ntcseen:` notices seen · `grp:` study groups · `sync:` encrypted
-device-sync blobs · `aping:`/`adev:` anonymous analytics · `hist:` calendar-feed
-history · `testlock` test-push throttle.
+device-sync blobs · `aping:`/`adev:` anonymous analytics (legacy receipt-day pings,
+first-seen ledger) · `alast:` last-seen dates (self-expire 200 d) · `astats:latest`
+the published v2 aggregate snapshot · `hist:` calendar-feed history · `testlock`
+test-push throttle. v2 telemetry rows (`day:`, `dp:`, `seen:`, `rel:`, `meta:`)
+live inside the `AnalyticsStore` Durable Object, not KV — analytics-owned, isolated
+from SyncStore/GroupStore; reserved `ffffffff…` test tokens are accepted but
+excluded from every metric.
 
 User data note: sync blobs are encrypted client-side (the worker never sees
 plaintext); analytics rows contain no personal data. Nothing else server-side
@@ -188,8 +194,15 @@ a subscribed device. `npm run test:e2e` locally reproduces the CI gate.
   KV reads (100k/day) have huge headroom.
 - The cron runs every 10 minutes; briefing 07:00, week-ahead Sun 18:00, Friday
   digest 16:00 (all Europe/London via the worker's own clock handling).
-- The dashboard (`/analytics.html`) caches `/stats` for 10 minutes per browser;
-  the refresh link forces.
+- The admin dashboard (`/analytics.html`, a Vite entry under
+  `src/admin-analytics/`) holds the owner key in memory only (no cache, no
+  persisted key; 15-min idle lock). It reads `/stats` (legacy receipt-day) and
+  `/stats/v2` (the snapshot the cron publishes to `astats:latest` every 10 min —
+  skipped when unchanged; failed aggregation keeps the last snapshot and shows
+  as stale after 30 min). Worker-side acceptance counters feed the Reliability
+  section; a refused v2 attempt costs one Durable Object request, nothing in KV.
+- Analytics retention: last-seen recording is on (≤1 KV write/token/week); the
+  first-seen expiry job is dormant until `analytics:retention-policy` is set.
 - Full change history and design decisions: [PLAN.md](PLAN.md).
 
 ## Phase 1 release and recovery

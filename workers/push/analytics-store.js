@@ -41,9 +41,24 @@ export class AnalyticsStore {
       if (!batch?.batchId || !batch?.token || !Array.isArray(batch.days)) return json({ error: 'invalid batch' }, 400)
       return this.state.storage.transaction(async (tx) => {
         const dedupeKey = `dp:${batch.token}:${batch.batchId}`
+        const todayKey = `rel:${dayISO(Date.now())}`
+        const rel = (await tx.get(todayKey)) ?? emptyOutcomes()
         // A replay returns the SAME successful acknowledgement without
         // touching a single counter — acks are idempotent by construction.
-        if (await tx.get(dedupeKey)) return json({ ok: true, acked: batch.batchId, duplicate: true })
+        if (await tx.get(dedupeKey)) {
+          rel.duplicate++
+          await tx.put(todayKey, rel)
+          return json({ ok: true, acked: batch.batchId, duplicate: true })
+        }
+        rel.accepted++
+        await tx.put(todayKey, rel)
+        if (!isTestToken(batch.token)) {
+          await tx.put('meta:lastAccepted', Date.now())
+          // Immutable build identity, first observed date (A5 releases).
+          if (batch.buildId && !(await tx.get(`meta:build:${batch.buildId}`))) {
+            await tx.put(`meta:build:${batch.buildId}`, batch.days.map((d) => d.date).sort()[0])
+          }
+        }
         for (const day of batch.days) {
           const key = `day:${day.date}:${batch.token}`
           const row = (await tx.get(key)) ?? { opens: 0, counts: {} }
@@ -79,6 +94,21 @@ export class AnalyticsStore {
         // The acknowledgement is produced INSIDE the transaction: it exists
         // only if the counters durably committed with it.
         return json({ ok: true, acked: batch.batchId })
+      })
+    }
+
+    if (request.method === 'POST' && url.pathname === '/v2/outcome') {
+      // Attempts the worker refused BEFORE a batch existed (schema/oversize/
+      // rate-limit): aggregate reason counts only — never request samples.
+      const body = await request.json().catch(() => null)
+      const reason = ['rejected', 'oversize', 'rateLimited'].includes(body?.reason) ? body.reason : null
+      if (!reason) return json({ error: 'invalid reason' }, 400)
+      return this.state.storage.transaction(async (tx) => {
+        const key = `rel:${dayISO(Date.now())}`
+        const rel = (await tx.get(key)) ?? emptyOutcomes()
+        rel[reason]++
+        await tx.put(key, rel)
+        return json({ ok: true })
       })
     }
 
@@ -214,6 +244,84 @@ export class AnalyticsStore {
       }))
       .reverse()
 
+    // Reliability (A5 / §4.5): worker-observed acceptance by reason and day,
+    // with the configured thresholds published beside the numbers. Rates
+    // are suppressed below the denominator minimum; the last COMPLETE UTC
+    // day is the alerting basis, never the partial current day.
+    const thresholds = { staleAfterMinutes: 30, rejectRatePct: 2, minAttempts: 100 }
+    const relDays = []
+    for (let i = 6; i >= 0; i--) {
+      const date = dayISO(now - i * 86400000)
+      const rel = (await this.state.storage.get(`rel:${date}`)) ?? emptyOutcomes()
+      relDays.push({ date, ...rel })
+    }
+    for (const key of (await this.state.storage.list({ prefix: 'rel:' })).keys()) {
+      if (key.slice(4) < dayISO(now - 30 * 86400000)) await this.state.storage.delete(key)
+    }
+    const yesterday = relDays[relDays.length - 2]
+    const attempts = yesterday.accepted + yesterday.duplicate + yesterday.rejected + yesterday.oversize
+    const refused = yesterday.rejected + yesterday.oversize
+    const lastCompleteDay = {
+      date: yesterday.date,
+      attempts,
+      refused,
+      rateLimited: yesterday.rateLimited,
+      ratePct: attempts >= thresholds.minAttempts ? Math.round((refused / attempts) * 1000) / 10 : null,
+      status:
+        attempts < thresholds.minAttempts
+          ? 'insufficient'
+          : (refused / attempts) * 100 > thresholds.rejectRatePct
+            ? 'alert'
+            : 'ok',
+    }
+    const lastAcceptedAt = (await this.state.storage.get('meta:lastAccepted')) ?? null
+
+    // Releases (A5 / §4.6): each active token attributed ONCE to its latest
+    // observed build in the 7-day window; Unknown stays a visible category.
+    // Comparisons only for builds with >= 20 eligible tokens over the last
+    // COMPLETE 7 UTC days (today excluded) — opens per token, no deltas.
+    const latestBuild = new Map()
+    const buildTokens = new Map()
+    const completeOpens = new Map() // build -> { opens, tokens:Set }
+    const ymd = (i) => dayISO(now - i * 86400000)
+    for (let i = 0; i < 8; i++) {
+      const date = ymd(i)
+      for (const [key, row] of await this.state.storage.list({ prefix: `day:${date}:` })) {
+        const token = key.slice(`day:${date}:`.length)
+        if (isTestToken(token)) continue
+        const build = row.buildId || 'unknown'
+        if (i < 7 && !latestBuild.has(token)) latestBuild.set(token, build)
+        if (i >= 1 && i <= 7) {
+          const c = completeOpens.get(build) ?? { opens: 0, tokens: new Set() }
+          c.opens += row.opens ?? 0
+          c.tokens.add(token)
+          completeOpens.set(build, c)
+        }
+      }
+    }
+    for (const [token, build] of latestBuild) {
+      ;(buildTokens.get(build) ?? buildTokens.set(build, new Set()).get(build)).add(token)
+    }
+    const buildFirst = new Map()
+    for (const [k, v] of await this.state.storage.list({ prefix: 'meta:build:' })) buildFirst.set(k.slice('meta:build:'.length), v)
+    const activeForBuilds = latestBuild.size
+    const builds = [...buildTokens.entries()]
+      .map(([buildId, tokens]) => {
+        const c = completeOpens.get(buildId)
+        const eligible = c ? c.tokens.size : 0
+        return {
+          buildId,
+          tokens: tokens.size,
+          sharePct: activeForBuilds > 0 ? Math.round((tokens.size / activeForBuilds) * 100) : null,
+          firstObserved: buildId === 'unknown' ? null : (buildFirst.get(buildId) ?? null),
+          comparison:
+            eligible >= 20
+              ? { periodFrom: ymd(7), periodTo: ymd(1), eligibleTokens: eligible, opensPerToken: Math.round((c.opens / eligible) * 10) / 10 }
+              : { unavailable: true, eligibleTokens: eligible, minimum: 20 },
+        }
+      })
+      .sort((a, b) => b.tokens - a.tokens)
+
     const eligibleFor = (since) =>
       [...active7].filter((t) => (tokenCapability.get(t) ?? 1) >= since).length
     const features = Object.entries(ACTION_CATALOGUE).map(([id, def]) => {
@@ -265,8 +373,14 @@ export class AnalyticsStore {
       daily,
       features,
       cohorts,
+      reliability: { thresholds, lastAcceptedAt, days: relDays, lastCompleteDay },
+      builds: { activeTokens: activeForBuilds, list: builds },
     })
   }
+}
+
+function emptyOutcomes() {
+  return { accepted: 0, duplicate: 0, rejected: 0, oversize: 0, rateLimited: 0 }
 }
 
 function count(value, definition) {
