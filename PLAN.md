@@ -930,3 +930,5 @@ Known limitations / deferred: "Open meeting" opens the meetings list rather than
 Rollback: revert view changes independently; keep the shared dedupe, the anchors and `SettingsAction`.
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+R3 release verification (8 September 2026): workers deployed FIRST (`shared/journey.js` cross-leg disruption dedupe) — push worker `07b24de0-8f62-490a-ade9-2bfdac060221`, feed worker `64eab726-d038-4af4-a6d6-9ca66ba9a8b7`; the deploy script's own regression pass was green. Released commit `0ac9b50` (merge `368bc16`; TT-21 commit `dc9c075`, main R3 commit `76099d4`); GitHub Actions run 34220109075 concluded **success**. `./scripts/deploy.sh verify` all six PASS. Deployed main chunks carry the R3 surfaces — Vercel `assets/main-Bz5HWof0.js`: skip link ×1, record menu ×1; Pages `assets/main-izQ3Th-Q.js`: skip link ×1, record menu ×1.
