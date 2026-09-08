@@ -12,6 +12,7 @@ export const DEFAULT_FILTERS: Filters = {
   showSelfStudy: true,
   showOptional: true,
   showKeyDates: true,
+  showPersonal: true,
   placementsOnly: false,
 }
 
@@ -138,6 +139,7 @@ export function activeFilterCount(settings: Settings): number {
   if (!filters.showSelfStudy) count++
   if (!filters.showOptional) count++
   if (!filters.showKeyDates) count++
+  if (filters.showPersonal === false) count++
   if (filters.placementsOnly) count++
   return count
 }

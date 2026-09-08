@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { needsScheduling, validatePlanChild } from '../../shared/planValidation.js'
 import { newAdminId } from '../lib/admin'
 import type { PlanChildRec } from '../lib/admin'
 import { formatRemaining } from '../lib/format'
@@ -32,21 +33,36 @@ export function WorkPlanSection({ parentId, children_, busyCheck, onSave, onDele
   const doneCount = subtasks.filter((c) => c.done).length
   const effortTotal = mine.reduce((n, c) => n + (c.effortMins ?? 0), 0)
 
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const titleRef = useRef<HTMLInputElement>(null)
+  const dateRef = useRef<HTMLInputElement>(null)
+  const endRef = useRef<HTMLInputElement>(null)
+  const effortRef = useRef<HTMLInputElement>(null)
+
   function add() {
     const trimmed = title.trim()
-    if (!trimmed) return
     const rec: PlanChildRec = {
       id: newAdminId(),
       parentId,
       kind,
       title: trimmed,
       done: false,
-      effortMins: effort.trim() ? Math.max(0, parseInt(effort, 10) || 0) : undefined,
+      effortMins: effort.trim() ? parseInt(effort, 10) : undefined,
       dateISO: kind === 'subtask' ? undefined : dateISO || undefined,
       startTime: kind === 'block' ? startTime : undefined,
       endTime: kind === 'block' ? endTime : undefined,
       at: Date.now(),
     }
+    // Shared validation (TT-10): nothing impossible can commit; the first
+    // failing field is named and focused.
+    const check = validatePlanChild(rec)
+    if (!check.ok) {
+      setErrors(check.errors)
+      const first = Object.keys(check.errors)[0]
+      ;({ title: titleRef, dateISO: dateRef, startTime: endRef, endTime: endRef, effortMins: effortRef }[first] ?? titleRef).current?.focus()
+      return
+    }
+    setErrors({})
     onSave(rec)
     setTitle('')
     setEffort('')
@@ -63,8 +79,11 @@ export function WorkPlanSection({ parentId, children_, busyCheck, onSave, onDele
       )}
       <ul className="workplan-list">
         {mine.map((c) => {
+          // A stored item that fails today's validation is kept and flagged
+          // for correction — never deleted, never drawn as a timed block.
+          const invalid = needsScheduling(c)
           const clash =
-            c.kind === 'block' && c.dateISO && c.startTime && c.endTime && busyCheck
+            !invalid && c.kind === 'block' && c.dateISO && c.startTime && c.endTime && busyCheck
               ? busyCheck(c.dateISO, c.startTime, c.endTime)
               : false
           return (
@@ -83,6 +102,7 @@ export function WorkPlanSection({ parentId, children_, busyCheck, onSave, onDele
                   {c.kind === 'milestone' ? '◆' : '⏱'} {c.title}
                   {c.dateISO && ` · ${c.dateISO.split('-').reverse().slice(0, 2).join('/')}`}
                   {c.kind === 'block' && c.startTime && ` ${c.startTime}–${c.endTime}`}
+                  {invalid && <span className="badge badge-conflict"> Needs scheduling</span>}
                   {clash && <span className="badge badge-conflict"> ⚠ clashes with a session</span>}
                 </span>
               )}
@@ -96,7 +116,7 @@ export function WorkPlanSection({ parentId, children_, busyCheck, onSave, onDele
       </ul>
       <div className="workplan-add">
         <Field label="Add to plan">
-          <input
+          <input ref={titleRef} aria-invalid={!!errors.title}
             type="text"
             placeholder={kind === 'subtask' ? 'Subtask…' : kind === 'milestone' ? 'Milestone…' : 'Study block…'}
             value={title}
@@ -113,25 +133,28 @@ export function WorkPlanSection({ parentId, children_, busyCheck, onSave, onDele
             </select>
           </Field>
           <Field label="Effort (min)">
-            <input type="number" className="date-input" min={0} max={6000} value={effort} onChange={(e) => setEffort(e.target.value)} />
+            <input ref={effortRef} aria-invalid={!!errors.effortMins} type="number" className="date-input" min={0} max={6000} value={effort} onChange={(e) => setEffort(e.target.value)} />
           </Field>
         </div>
         {kind !== 'subtask' && (
           <div className="task-edit-row">
             <Field label="Date">
-              <input type="date" className="date-input" value={dateISO} onChange={(e) => setDateISO(e.target.value)} />
+              <input ref={dateRef} type="date" className="date-input" value={dateISO} aria-invalid={!!errors.dateISO} onChange={(e) => setDateISO(e.target.value)} />
             </Field>
             {kind === 'block' && (
               <>
                 <Field label="Starts">
-                  <input type="time" className="date-input" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                  <input type="time" className="date-input" value={startTime} aria-invalid={!!errors.startTime} onChange={(e) => setStartTime(e.target.value)} />
                 </Field>
                 <Field label="Ends">
-                  <input type="time" className="date-input" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                  <input ref={endRef} type="time" className="date-input" value={endTime} aria-invalid={!!errors.endTime} onChange={(e) => setEndTime(e.target.value)} />
                 </Field>
               </>
             )}
           </div>
+        )}
+        {Object.keys(errors).length > 0 && (
+          <p className="setup-error" role="alert">{Object.values(errors)[0]}</p>
         )}
         <button type="button" className="btn-secondary" disabled={!title.trim()} onClick={add}>
           ＋ Add {kind}

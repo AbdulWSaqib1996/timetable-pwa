@@ -25,6 +25,8 @@ interface Props {
   onSave: (rec: CommitmentRec) => boolean
   onDelete?: (rec: CommitmentRec) => void
   onClose: () => void
+  /** ids of saved commitments — a recoverable NEW draft must not be one of them */
+  existingIds?: Set<string>
 }
 
 const fieldsOf = (c: CommitmentRec | null, defaultDateISO: string): Fields => ({
@@ -43,9 +45,10 @@ const fieldsOf = (c: CommitmentRec | null, defaultDateISO: string): Fields => ({
  * no recurrence is implied. Busy/free participation is explicit; the title
  * and notes never leave this device except in encrypted sync/backups.
  */
-export function CommitmentSheet({ profileId, commitment, defaultDateISO, latest, onSave, onDelete, onClose }: Props) {
-  const [recordId] = useState(() => commitment?.id ?? newAdminId())
-  const draft = useDraft<Fields>(profileId, 'commitment', recordId, commitment?.at ?? 0, fieldsOf(commitment, defaultDateISO))
+export function CommitmentSheet({ profileId, commitment, defaultDateISO, latest, onSave, onDelete, onClose, existingIds }: Props) {
+  const [initialId] = useState(() => commitment?.id ?? newAdminId())
+  const draft = useDraft<Fields>(profileId, 'commitment', initialId, commitment?.at ?? 0, fieldsOf(commitment, defaultDateISO), { existingIds })
+  const recordId = draft.recordId
   const [error, setError] = useState<string | null>(null)
   const [conflict, setConflict] = useState(false)
   const f = draft.value

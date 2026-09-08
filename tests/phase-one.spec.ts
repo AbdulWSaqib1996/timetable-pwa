@@ -32,8 +32,8 @@ test('overdue personal deadlines remain visible and completed tasks do not notif
   await expect(page.locator('.completed-tasks')).toContainText('Old submitted essay')
   await expect.poll(()=>page.evaluate(()=>(window as unknown as {received:string[]}).received)).toEqual(['📌 Upcoming essay'])
   const upcoming=page.locator('.keydates-list li').filter({hasText:'Upcoming essay'}).first()
-  await upcoming.getByTitle('Cycle status').click()
-  await upcoming.getByTitle('Cycle status').click()
+  // R1 / TT-09: explicit status control (was: cycle twice to reach done).
+  await upcoming.getByRole('combobox', { name: /^Status for/ }).first().selectOption('done')
   // Simulate another reminder offset becoming due: completed work stays suppressed.
   await page.evaluate(()=>localStorage.removeItem('timetable.notified.v2'))
   await page.clock.runFor(30_000)

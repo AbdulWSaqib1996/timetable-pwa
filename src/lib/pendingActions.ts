@@ -1,6 +1,7 @@
 import { groupPendingActions } from '../../shared/actions.js'
 import { loadAdminFile, saveAdminFile } from './admin'
 import { loadMeta, loadStore, saveMeta } from './storage'
+import { localTodayISO } from './filters'
 
 /**
  * Actions taken on notifications while no app window was open (the service worker
@@ -108,7 +109,7 @@ export async function applyPendingNotificationActions(): Promise<AppliedActions>
           const id = a.key.slice('task:'.length)
           tasks = tasks.map((t) =>
             t.id === id && a.action === 'done' && t.status !== 'done'
-              ? { ...t, status: 'done' as const, completedISO: new Date().toISOString().slice(0, 10), at: Date.now() }
+              ? { ...t, status: 'done' as const, completedISO: localTodayISO(), at: Date.now() }
               : t
           )
         }

@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import { telemetryTrack } from '../../lib/telemetry'
+import { useCourseClock } from '../../hooks/useCourseClock'
+import { utcToZonedParts } from '../../../shared/calendar-time.js'
+import { courseZone } from '../../lib/course'
 import { ItinerarySteps } from '../../components/ItinerarySteps'
 import { OriginSelector } from '../../components/OriginSelector'
 import { RouteMap } from '../../components/RouteMap'
@@ -71,15 +74,15 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
     return () => clearInterval(t)
   }, [])
 
-  const todayISO = (() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })()
+  // Course clock (TT-05): today and the forecast hour are course-local.
+  const clock = useCourseClock()
+  const todayISO = clock.todayISO
+  const courseHour = Math.floor(clock.nowMins / 60)
   const [weatherReady, setWeatherReady] = useState(false)
   useEffect(() => {
-    void weatherForHour(todayISO, new Date().getHours()).then((w) => setWeatherReady(w !== null))
-  }, [todayISO])
-  const forecast = weatherReady ? cachedWeatherForHour(todayISO, new Date().getHours()) : null
+    void weatherForHour(todayISO, courseHour).then((w) => setWeatherReady(w !== null))
+  }, [todayISO, courseHour])
+  const forecast = weatherReady ? cachedWeatherForHour(todayISO, courseHour) : null
 
   if (!home) {
     return (
@@ -115,10 +118,12 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
   } else if (journey.status === 'error' && minutes !== null) {
     basisLabel = "estimate from distance — couldn't reach TfL"
   }
-  const arrive = minutes !== null ? new Date(Date.now() + minutes * 60_000) : null
-  const arriveLabel = arrive
-    ? `${String(arrive.getHours()).padStart(2, '0')}:${String(arrive.getMinutes()).padStart(2, '0')}`
-    : null
+  // Arrival is formatted in the course zone and labelled when the device
+  // clock differs — never a mix of clocks in one sentence (TT-05).
+  const arriveLabel =
+    minutes !== null
+      ? `${utcToZonedParts(Date.now() + minutes * 60_000, courseZone()).hhmm}${clock.zoneDiffers ? ' course time' : ''}`
+      : null
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${home.lat},${home.lng}&travelmode=${travelMode === 'transit' ? 'transit' : travelMode}`
 
   return (

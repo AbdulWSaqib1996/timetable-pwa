@@ -44,6 +44,8 @@ export interface Filters {
   showOptional: boolean
   /** show key dates as highlighted blocks in the timetable (default true) */
   showKeyDates: boolean
+  /** personal events visible in calendars (R1 / TT-02); membership filters never touch them */
+  showPersonal?: boolean
   /** quick filter: show only placement (school experience) sessions */
   placementsOnly?: boolean
 }

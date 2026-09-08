@@ -3,13 +3,16 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import { recoverInterruptedRestore } from './lib/recovery'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 window.addEventListener('storage', event => { if (event.key === 'timetable.restore-pending.v1') { const root = document.getElementById('root')!; if (event.newValue) root.setAttribute('inert',''); else { root.removeAttribute('inert'); window.dispatchEvent(new Event('timetable-sync-applied')) } } })
 async function start() {
 await recoverInterruptedRestore()
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 )
 

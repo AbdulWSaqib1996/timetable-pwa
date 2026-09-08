@@ -1,5 +1,6 @@
 import type { Session } from '../types'
 import { toISODate } from './parseTimetable'
+import { localTodayISO } from './filters'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -43,9 +44,11 @@ const ITEMS: DemoItem[] = [
 const SPECIALISM_RE = /^Specialism\s*\d*\s*[-–—:]\s*(.+)$/i
 
 export function buildDemoSessions(): Session[] {
-  const today = new Date()
+  // Demo days are COURSE days (TT-05): offsets from the course-zone date, so a
+  // demo timetable reads the same on a device in any timezone.
+  const [ty, tm, td] = localTodayISO().split('-').map(Number)
   return ITEMS.map((item, i) => {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + item.offset)
+    const d = new Date(ty, tm - 1, td + item.offset)
     const specialismMatch = item.title.match(SPECIALISM_RE)
     return {
       id: `demo-${i}`,

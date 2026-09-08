@@ -1,3 +1,4 @@
+import { MAX_EFFORT_MINS } from './planValidation.js'
 /** Runtime-neutral input contracts, shared by browser and workers. */
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 export const MAX_SYNC_BYTES = 2 * 1024 * 1024
@@ -88,7 +89,11 @@ export function validatePayload(data) {
             if (key === 'exceptions') assert(['holiday','inset','part-day','cancelled','hours'].includes(item.kind), 'Invalid placement exception.')
             if (key === 'exceptions' && item.loggedMins !== undefined) assert(Number.isInteger(item.loggedMins) && item.loggedMins >= 0 && item.loggedMins <= 1440, 'Invalid logged minutes.')
             if (key === 'plans') assert(['subtask','milestone','block'].includes(item.kind), 'Invalid plan item.')
-            if (key === 'plans' && item.effortMins !== undefined) assert(Number.isInteger(item.effortMins) && item.effortMins >= 0 && item.effortMins <= 100000, 'Invalid effort.')
+            if (key === 'plans' && item.effortMins !== undefined) assert(Number.isInteger(item.effortMins) && item.effortMins >= 0 && item.effortMins <= MAX_EFFORT_MINS, 'Invalid effort.')
+            // Timed blocks must be real intervals; a legacy record that fails
+            // stays stored and is shown as "Needs scheduling" — the wire refuses
+            // only NEW impossible intervals (R1 / TT-10).
+            if (key === 'plans' && item.kind === 'block' && item.startTime !== undefined && item.endTime !== undefined) assert(item.endTime > item.startTime, 'A study block must end after it starts.')
             if (key === 'commitments') assert(['appointment','work','study'].includes(item.kind), 'Invalid commitment kind.')
             if (item.done !== undefined) assert(typeof item.done === 'boolean', 'Invalid completion flag.')
             if (item.busy !== undefined) assert(typeof item.busy === 'boolean', 'Invalid busy flag.')

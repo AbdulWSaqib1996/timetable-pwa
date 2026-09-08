@@ -20,7 +20,7 @@ interface Props {
   onSelect: (session: Session) => void
   onSetStatus: (kd: Session, status: SessionMeta['status']) => void
   onEditTask: (task: TaskRecord) => void
-  onCycleTask: (task: TaskRecord) => void
+  onSetTaskStatus: (task: TaskRecord, status: NonNullable<SessionMeta['status']>) => void
   onToggleAction: (meetingId: string, actionId: string) => void
   onAddTask: () => void
 }
@@ -35,7 +35,6 @@ function formatDate(dateISO: string): string {
   })
 }
 
-const STATUS_CYCLE: Record<string, SessionMeta['status']> = { todo: 'doing', doing: 'done', done: 'todo' }
 const STATUS_LABEL: Record<string, string> = { todo: '○ to do', doing: '◐ in progress', done: '✓ done' }
 
 /**
@@ -57,7 +56,7 @@ export function TasksPage({
   onSelect,
   onSetStatus,
   onEditTask,
-  onCycleTask,
+  onSetTaskStatus,
   onToggleAction,
   onAddTask,
 }: Props) {
@@ -89,8 +88,16 @@ export function TasksPage({
             className="keydate-row"
             onClick={() => (record ? onEditTask(record) : onSelect(k))}
           >
-            <span className={`kd-chip${days <= 7 && days >= 0 && status !== 'done' ? ' urgent' : ''}`}>
-              {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `in ${days}d`}
+            <span className={`kd-chip${days <= 7 && days >= 0 && status !== 'done' ? ' urgent' : ''}${status === 'done' ? ' kd-chip-done' : ''}`}>
+              {status === 'done'
+                ? 'Completed'
+                : days < 0
+                  ? `${Math.abs(days)}d overdue`
+                  : days === 0
+                    ? 'Today'
+                    : days === 1
+                      ? 'Tomorrow'
+                      : `in ${days}d`}
             </span>
             <div className="change-body">
               <span className="change-title">
@@ -99,23 +106,30 @@ export function TasksPage({
                 {note && ' 📝'}
               </span>
               <span className="change-meta">
-                {formatDate(k.dateISO)}
-                {k.start && ` · ${k.start}`}
-                {` · ${STATUS_LABEL[status ?? 'todo']}`}
+                {status === 'done' && record?.completedISO
+                  ? `Completed ${formatDate(record.completedISO)} · due ${formatDate(k.dateISO)}`
+                  : `${formatDate(k.dateISO)}${k.start ? ` · ${k.start}` : ''}`}
+                {status !== 'done' && ` · ${STATUS_LABEL[status ?? 'todo']}`}
                 {!record && configured && ' · from the key-dates sheet'}
                 {note && ` — ${note}`}
               </span>
             </div>
           </button>
           <span className="kd-actions">
-            <button
-              type="button"
+            <select
               className={`kd-status kd-status-${status}`}
-              title="Cycle status"
-              onClick={() => (record ? onCycleTask(record) : onSetStatus(k, STATUS_CYCLE[status ?? 'todo']))}
+              aria-label={`Status for ${k.title}`}
+              value={status ?? 'todo'}
+              onChange={(e) => {
+                const next = e.target.value as 'todo' | 'doing' | 'done'
+                if (record) onSetTaskStatus(record, next)
+                else onSetStatus(k, next)
+              }}
             >
-              {STATUS_LABEL[status ?? 'todo']}
-            </button>
+              <option value="todo">○ To do</option>
+              <option value="doing">◐ In progress</option>
+              <option value="done">✓ Done</option>
+            </select>
           </span>
         </div>
       </li>
@@ -176,7 +190,7 @@ export function TasksPage({
           <p className={`workload-line${nextFortnight >= 3 ? ' heavy' : ''}`}>
             {nextFortnight === 0
               ? 'Nothing due in the next 14 days.'
-              : `${nextFortnight} due in the next 14 days${nextFortnight >= 3 ? ' — busy stretch ahead' : ''}. Tap the status to cycle it; tap a row to open it.`}
+              : `${nextFortnight} due in the next 14 days${nextFortnight >= 3 ? ' — busy stretch ahead' : ''}. Use the status control to change a task; tap a row to open it.`}
           </p>
           <ul className="keydates-list">{upcoming.map(row)}</ul>
         </section>

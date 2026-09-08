@@ -2610,10 +2610,41 @@ body {
   }
   .shell-main {
     padding: 0 24px 32px;
+    /* Available-width contract (R1 / TT-01): the main grid item takes the
+       full column — an auto-margin item with no width shrinks to content,
+       which is how a 1440px shell produced a 322px calendar. Readable inner
+       pages constrain THEMSELVES; wide pages get the schedule cap. */
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
   }
   .shell-main:has(.page--wide) {
-    max-width: none;
+    max-width: 1440px;
   }
+  .page--wide {
+    width: 100%;
+    min-width: 0;
+  }
+}
+.kd-chip-done {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.week-keydate-more {
+  font-weight: 600;
+}
+.week-days-toggle {
+  margin: 4px 0 8px;
+}
+.search-scope-note {
+  margin: 0 0 8px;
+}
+.today-also-now {
+  margin: 8px 0 12px;
+}
+.today-clash {
+  color: var(--danger, #9f1d1d);
+  font-weight: 600;
 }
 
 @media (min-width: 1280px) {
