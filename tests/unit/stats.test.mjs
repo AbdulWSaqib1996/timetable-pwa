@@ -284,3 +284,27 @@ test('retention rule: dormant without activation, grace period honoured, expires
   assert.deepEqual(expiredFirstSeenTokens(firstSeen, lastSeen, '2026-09-08', '2026-07-01'), ['oldquiet'])
   assert.deepEqual(expiredFirstSeenTokens(firstSeen, lastSeen, '2026-09-08', 'garbage'), [])
 })
+
+test('snapshot publishing: republishes when ANY section changes, skips only pure timestamp churn, keeps the old snapshot on failure', async () => {
+  const { publishAnalyticsSnapshot } = await import('../../workers/push/worker.js')
+  let next = null
+  let fail = false
+  const env = {
+    PUSH: fakeKV({}),
+    ANALYTICS: { idFromName: (n) => n, get: () => ({ fetch: async () => (fail ? new Response('x', { status: 500 }) : Response.json(next)) }) },
+  }
+  const base = { schemaVersion: 2, snapshotId: 'a', generatedAt: 't1', metrics: { activeTokens7: { value: 1 } }, daily: [], features: [], cohorts: [] }
+  next = base
+  assert.equal(await publishAnalyticsSnapshot(env), true)
+  // Same data, new stamps only → no KV write.
+  next = { ...base, snapshotId: 'b', generatedAt: 't2' }
+  assert.equal(await publishAnalyticsSnapshot(env), false)
+  // A NEW section with otherwise identical metrics must republish (A5 regression).
+  next = { ...base, snapshotId: 'c', generatedAt: 't3', reliability: { days: [] } }
+  assert.equal(await publishAnalyticsSnapshot(env), true)
+  assert.ok(JSON.parse(env.PUSH.rows.get('astats:latest')).reliability)
+  // Aggregation failure keeps the last valid snapshot untouched.
+  fail = true
+  assert.equal(await publishAnalyticsSnapshot(env), false)
+  assert.equal(JSON.parse(env.PUSH.rows.get('astats:latest')).snapshotId, 'c')
+})

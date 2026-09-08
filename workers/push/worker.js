@@ -1081,20 +1081,28 @@ async function runAnalyticsRetention(env) {
  * (staleness is visible via its generatedAt). The KV write is skipped when
  * nothing but the timestamp changed, protecting the daily write budget.
  */
-async function publishAnalyticsSnapshot(env) {
-  if (!env.ANALYTICS) return
+export async function publishAnalyticsSnapshot(env) {
+  if (!env.ANALYTICS) return false
   try {
     const stub = env.ANALYTICS.get(env.ANALYTICS.idFromName('analytics-v2'))
     const res = await stub.fetch(new Request('https://analytics/v2/aggregate', { method: 'POST' }))
-    if (!res.ok) return
+    if (!res.ok) return false
     const snapshot = await res.json()
-    if (snapshot?.schemaVersion !== 2) return
+    if (snapshot?.schemaVersion !== 2) return false
     const previous = await env.PUSH.get('astats:latest', 'json')
-    const essence = (x) => JSON.stringify({ m: x?.metrics, d: x?.daily, f: x?.features, o: x?.observedThrough })
-    if (previous && essence(previous) === essence(snapshot)) return
+    // "Unchanged" means the WHOLE published shape is identical apart from the
+    // per-run stamps — any new section (cohorts, reliability, builds…) or
+    // counter movement must republish, or readers keep an old shape forever.
+    const essence = (x) => {
+      const { generatedAt: _g, snapshotId: _s, ...rest } = x ?? {}
+      return JSON.stringify(rest)
+    }
+    if (previous && essence(previous) === essence(snapshot)) return false
     await env.PUSH.put('astats:latest', JSON.stringify(snapshot))
+    return true
   } catch {
     // Keep the previous snapshot on any failure; never publish a partial one.
+    return false
   }
 }
 
