@@ -23,8 +23,10 @@ interface Props {
   filteredSessions: Session[]
   /** filtered sessions with in-range key dates woven in, time-sorted */
   scheduleSessions: Session[]
-  /** membership set (all dates) — the search corpus */
+  /** membership set (all dates) — kept for callers; search uses `searchCorpus` */
   courseSessions: Session[]
+  /** canonical search corpus: course members + personal events + task pins, all dates (TT-03) */
+  searchCorpus: Session[]
   allKeyDates: Session[]
   keyDateDays: Set<string>
   monthExtras: { placementDays: Set<string>; breakStarts: Map<string, number> }
@@ -79,7 +81,7 @@ export function SchedulePage({
   onSelectDate,
   filteredSessions,
   scheduleSessions,
-  courseSessions,
+  searchCorpus,
   allKeyDates,
   keyDateDays,
   monthExtras,
@@ -111,10 +113,13 @@ export function SchedulePage({
     else onSelect(s)
   }
 
+  // Search the canonical corpus (course members + personal + task pins) across
+  // all dates, independent of temporary display filters, deduplicated by
+  // owner identity upstream (TT-03). Query text never leaves the device.
   const searchResults = useMemo(() => {
     const q = query.trim()
-    return q ? [...courseSessions, ...allKeyDates].filter((s) => matchesQuery(s, q)) : null
-  }, [courseSessions, allKeyDates, query])
+    return q ? searchCorpus.filter((s) => matchesQuery(s, q)) : null
+  }, [searchCorpus, query])
 
   const busyDays = useMemo(() => new Set(scheduleSessions.map((s) => s.dateISO)), [scheduleSessions])
   const daySessions = useMemo(
@@ -227,6 +232,8 @@ export function SchedulePage({
       {!sessionsLoaded ? (
         <div className="empty-state">Loading timetable…</div>
       ) : searchResults ? (
+        <>
+        <p className="filter-hint search-scope-note">All dates; display filters not applied.</p>
         <AgendaView
           sessions={searchResults}
           onSelect={onSelect}
@@ -238,6 +245,7 @@ export function SchedulePage({
           placements={settings.placements}
           emptyMessage={`No sessions match “${query.trim()}”.`}
         />
+        </>
       ) : wide && mode === 'week' ? (
         <div className={`schedule-desktop${panel && hasPanel ? ' with-panel' : ''}`}>
           <div className="schedule-desktop-grid">

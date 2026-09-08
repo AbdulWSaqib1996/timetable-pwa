@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { noteHistoryPop, noteInternalNavigation, parseRouteSafe } from './navigationState'
 
 /**
  * Hash-based routing for the Phase 4 shell (works identically under both
@@ -14,6 +15,8 @@ export type Route =
   | { name: 'session'; key: string }
   | { name: 'homeJourney' }
   | { name: 'placement' }
+  /** untrusted hash that could not be opened (R1 / TT-08) */
+  | { name: 'invalid'; reason: 'malformed' | 'oversized' | 'unknown' }
 
 export const TOP_LEVEL: Route['name'][] = ['today', 'schedule', 'tasks', 'pgce']
 
@@ -35,29 +38,21 @@ export function routeHash(route: Route): string {
       return '#/home'
     case 'placement':
       return '#/placement'
+    case 'invalid':
+      return '#/today'
   }
 }
 
+/** Safe parse (never throws): malformed/oversized/unknown → an invalid route. */
 export function parseRoute(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, '').split('/')
-  switch (parts[0]) {
-    case 'schedule':
-      return { name: 'schedule' }
-    case 'tasks':
-      return { name: 'tasks' }
-    case 'pgce':
-      return { name: 'pgce' }
-    case 'settings':
-      return { name: 'settings', section: parts[1] || undefined }
-    case 'session':
-      return parts[1] ? { name: 'session', key: decodeURIComponent(parts[1]) } : { name: 'today' }
-    case 'home':
-      return { name: 'homeJourney' }
-    case 'placement':
-      return { name: 'placement' }
-    default:
-      return { name: 'today' }
-  }
+  const parsed = parseRouteSafe(hash)
+  return parsed.ok ? parsed.route : { name: 'invalid', reason: parsed.reason }
+}
+
+/** A notice attached to an otherwise-valid parse (e.g. unknown settings section). */
+export function parseRouteNotice(hash: string): string | null {
+  const parsed = parseRouteSafe(hash)
+  return parsed.ok ? (parsed.notice ?? null) : null
 }
 
 /**
@@ -67,12 +62,22 @@ export function parseRoute(hash: string): Route {
  * top-level scroll positions are per-page (the pages remount, and the
  * Schedule keeps its own anchors).
  */
-export function useRoute(): [Route, (route: Route, opts?: { replace?: boolean }) => void] {
+export function useRoute(): [Route, (route: Route, opts?: { replace?: boolean }) => void, string | null] {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash))
+  const [notice, setNotice] = useState<string | null>(() => parseRouteNotice(window.location.hash))
   useEffect(() => {
-    const onHash = () => setRoute(parseRoute(window.location.hash))
+    const onHash = () => {
+      setRoute(parseRoute(window.location.hash))
+      setNotice(parseRouteNotice(window.location.hash))
+    }
+    // Back/Forward consume one internal entry (R1 / TT-08 return context).
+    const onPop = () => noteHistoryPop()
     window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('hashchange', onHash)
+      window.removeEventListener('popstate', onPop)
+    }
   }, [])
   const navigate = (next: Route, opts?: { replace?: boolean }) => {
     const hash = routeHash(next)
@@ -80,9 +85,11 @@ export function useRoute(): [Route, (route: Route, opts?: { replace?: boolean })
     if (opts?.replace) {
       history.replaceState(null, '', hash)
       setRoute(next)
+      setNotice(null)
     } else {
+      noteInternalNavigation()
       window.location.hash = hash
     }
   }
-  return [route, navigate]
+  return [route, navigate, notice]
 }

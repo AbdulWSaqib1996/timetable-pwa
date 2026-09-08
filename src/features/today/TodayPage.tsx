@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { addDaysISO } from '../../../shared/calendar-time.js'
+import { classifyNow } from '../../../shared/intervals.js'
+import { useCourseClock } from '../../hooks/useCourseClock'
 import { estimateTravel, estimateTravelToCoords } from '../../lib/campus'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey } from '../../lib/diff'
@@ -19,6 +22,8 @@ interface Props {
   onRefresh: () => void
   /** course-membership sessions, all dates, sorted by date+start */
   courseSessions: Session[]
+  /** personal commitments as sessions (R1 / TT-06): shown on Today like any other event */
+  personalSessions?: Session[]
   allKeyDates: Session[]
   metaMap: MetaMap
   unseenChanges: number
@@ -71,6 +76,7 @@ export function TodayPage({
   demo,
   onRefresh,
   courseSessions,
+  personalSessions = [],
   allKeyDates,
   metaMap,
   unseenChanges,
@@ -86,26 +92,41 @@ export function TodayPage({
   onOpenSchedule,
   onOpenHomeJourney,
 }: Props) {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000)
-    return () => clearInterval(t)
-  }, [])
-  const nowMins = now.getHours() * 60 + now.getMinutes()
+  // ONE course clock (TT-05): "now" is course wall time, compared against
+  // course wall times — never the device's getHours().
+  const clock = useCourseClock()
+  const nowMins = clock.nowMins
 
-  const todays = courseSessions.filter((s) => s.dateISO === todayISO && !s.isKeyDate)
-  const current = todays.find((s) => {
-    const start = toMinutes(s.start)
-    const end = toMinutes(s.end)
-    return start !== null && end !== null && start <= nowMins && nowMins < end
-  })
-  const upcoming = todays.filter((s) => {
-    const start = toMinutes(s.start)
-    return start !== null && start > nowMins
-  })
+  // Every relevant record exactly once, classified by IDENTITY (TT-06):
+  // course sessions and personal events on the course day.
+  // Deduplicated by owner id: the caller may already fold personal events
+  // into `courseSessions`; identity, not position, decides membership.
+  const todays = (() => {
+    const seen = new Set<string>()
+    return [...courseSessions, ...personalSessions].filter((s) => {
+      if (s.dateISO !== todayISO || s.isKeyDate || seen.has(s.id)) return false
+      seen.add(s.id)
+      return true
+    })
+  })()
+  const classified = classifyNow(
+    todays.map((s) => ({ s, start: toMinutes(s.start), end: toMinutes(s.end), busy: !s.isFreeTime && !s.isSelfStudy })),
+    nowMins
+  )
+  const byStart = (a: { s: Session }, b: { s: Session }) => (a.s.start || '').localeCompare(b.s.start || '')
+  const currentAll = [...classified.current].sort(byStart).map((x) => x.s)
+  const upcoming = [...classified.upcoming].sort(byStart).map((x) => x.s)
+  const finished = [...classified.finished].sort(byStart).map((x) => x.s)
+  const untimed = classified.untimed.map((x) => x.s)
+  const clashCount = classified.clashCount
+  const current = currentAll[0]
   const hero = current ?? upcoming[0] ?? null
-  const rest = todays.filter((s) => s !== hero && (toMinutes(s.start) ?? 0) > (hero ? toMinutes(hero.start) ?? 0 : nowMins))
-  const dayFinished = todays.length > 0 && !hero
+  // "Also now": every other active event, never dropped for sharing a start.
+  const alsoNow = currentAll.filter((s) => s !== hero)
+  const rest = upcoming.filter((s) => s !== hero)
+  const [showFinished, setShowFinished] = useState(false)
+  // Day finished = every TIMED record has ended; untimed records don't count.
+  const dayFinished = currentAll.length + upcoming.length === 0 && finished.length > 0
 
   // At most ONE urgent item (P4-02): a fresh timetable change wins, else overdue work.
   const overdue = allKeyDates.filter(
@@ -133,11 +154,7 @@ export function TodayPage({
   // Tomorrow preview: the next date with sessions after today.
   const nextDay = courseSessions.find((s) => s.dateISO > todayISO && !s.isKeyDate)
   const nextDaySessions = nextDay ? courseSessions.filter((s) => s.dateISO === nextDay.dateISO && !s.isKeyDate) : []
-  const tomorrowISO = (() => {
-    const [y, m, d] = todayISO.split('-').map(Number)
-    const t = new Date(y, m - 1, d + 1)
-    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
-  })()
+  const tomorrowISO = addDaysISO(todayISO, 1)
 
   const heroTravel = hero
     ? isPlacementSession(hero) &&
@@ -208,6 +225,7 @@ export function TodayPage({
           <>
             {longDate(todayISO)} · {profileName}
             {demo ? ' · demo data' : fetchedAt ? ` · updated ${formatAge(fetchedAt)}` : ''}
+            {clock.zoneDiffers && <span className="badge" title={`Course time ${clock.courseZone}; your device is on ${clock.deviceZone}`}> · course time {clock.hhmm}</span>}
           </>
         }
         actions={
@@ -263,6 +281,28 @@ export function TodayPage({
           {heroTravel?.minutes != null && locationEnabled && (
             <p className="filter-hint">≈ {formatRemaining(heroTravel.minutes)} from your location (estimate)</p>
           )}
+        </section>
+      )}
+
+      {alsoNow.length > 0 && (
+        <section className="today-also-now" aria-label="Also now">
+          <h3 className="subheading">
+            Also now
+            {clashCount > 1 && <span className="today-clash"> · {clashCount} at the same time</span>}
+          </h3>
+          <div className="today-rest">
+            {alsoNow.map((s) => (
+              <button key={s.id} type="button" className="today-row" onClick={() => onSelect(s)}>
+                <span className="today-row-time">{s.start}</span>
+                <span className="today-row-body">
+                  <span className="today-row-title">{s.title}</span>
+                  <span className="today-row-meta">
+                    {[roomLines(s).room, s.end ? `ends ${s.end}` : '', s.isFreeTime ? 'free — not a clash' : ''].filter(Boolean).join(' · ')}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
         </section>
       )}
 
@@ -324,6 +364,43 @@ export function TodayPage({
               )
             })}
           </div>
+        </section>
+      )}
+
+      {untimed.length > 0 && (
+        <section aria-label="Today, no set time">
+          <h3 className="subheading">Today, no set time</h3>
+          <div className="today-rest">
+            {untimed.map((s) => (
+              <button key={s.id} type="button" className="today-row" onClick={() => onSelect(s)}>
+                <span className="today-row-time">—</span>
+                <span className="today-row-body">
+                  <span className="today-row-title">{s.title}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {finished.length > 0 && (
+        <section aria-label="Finished today">
+          <button type="button" className="travel-link" aria-expanded={showFinished} onClick={() => setShowFinished((v) => !v)}>
+            {showFinished ? 'Hide finished sessions' : `Show ${finished.length} finished session${finished.length === 1 ? '' : 's'}`}
+          </button>
+          {showFinished && (
+            <div className="today-rest">
+              {finished.map((s) => (
+                <button key={s.id} type="button" className="today-row" onClick={() => onSelect(s)}>
+                  <span className="today-row-time">{s.start}</span>
+                  <span className="today-row-body">
+                    <span className="today-row-title">{s.title}</span>
+                    <span className="today-row-meta">{s.end ? `ended ${s.end}` : ''}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

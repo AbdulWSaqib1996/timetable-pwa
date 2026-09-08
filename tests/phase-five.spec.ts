@@ -77,8 +77,8 @@ test('task CRUD: create, edit keeps identity, duplicate never inherits completio
 
   // Complete it, then edit the title: the id must not regenerate and the
   // completion history stays.
-  await page.locator('.keydates-list li', { hasText: 'Write assignment plan' }).getByTitle('Cycle status').click()
-  await page.locator('.keydates-list li', { hasText: 'Write assignment plan' }).getByTitle('Cycle status').click()
+  // R1 / TT-09: the status control is an explicit labelled menu, not a cycle.
+  await page.getByRole('combobox', { name: 'Status for Write assignment plan' }).selectOption('done')
   await page.locator('.completed-tasks summary').click()
   await page.locator('.completed-tasks li', { hasText: 'Write assignment plan' }).locator('.keydate-row').click()
   await page.getByLabel('Title').fill('Write assignment plan v2')

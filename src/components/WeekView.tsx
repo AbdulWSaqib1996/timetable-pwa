@@ -99,12 +99,17 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
     return mins === null ? null : cachedWeatherForHour(s.dateISO, Math.floor(mins / 60))
   }
 
+  // Visible days: weekdays always, a weekend day whenever ANY visible record
+  // (timed event OR deadline pin) falls on it — a Saturday-only deadline can
+  // never vanish (TT-04). `showWeekend` forces all seven.
+  const [showWeekend, setShowWeekend] = useState(false)
   const weekDays = useMemo(() => {
     const base = [0, 1, 2, 3, 4].map((i) => addDays(weekStart, i))
     const weekend = [5, 6].map((i) => addDays(weekStart, i))
-    const withSessions = new Set(sessions.map((s) => s.dateISO))
-    return [...base, ...weekend.filter((d) => withSessions.has(d))]
-  }, [weekStart, sessions])
+    const withRecords = new Set([...sessions.map((s) => s.dateISO), ...keyDates.map((k) => k.dateISO)])
+    return [...base, ...weekend.filter((d) => showWeekend || withRecords.has(d))]
+  }, [sessions, keyDates, weekStart, showWeekend])
+  const [expandedPins, setExpandedPins] = useState<string | null>(null)
 
   const byDay = useMemo(() => {
     const map = new Map<string, Session[]>()
@@ -223,22 +228,41 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
   return (
     <div className="week-view">
       {nav}
+      <p className="filter-hint week-days-toggle">
+        <button type="button" className="travel-link" aria-pressed={showWeekend} onClick={() => setShowWeekend((v) => !v)}>
+          {showWeekend ? 'Hide empty weekend' : 'Show all seven days'}
+        </button>
+      </p>
       <div className="week-grid" style={{ gridTemplateColumns: `48px repeat(${weekDays.length}, 1fr)` }}>
         <div />
         {weekDays.map((dateISO) => (
           <div key={dateISO} className={`week-col-head${dateISO === todayISO ? ' today' : ''}${dateISO === anchorISO && anchorISO !== todayISO ? ' selected' : ''}`}>
             {fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
-            {(keyDatesByDay.get(dateISO) ?? []).slice(0, 2).map((kd) => (
-              <button
-                key={kd.id}
-                type="button"
-                className="week-keydate"
-                title={kd.title}
-                onClick={() => onSelect(kd)}
-              >
-                📌 {kd.title.length > 18 ? kd.title.slice(0, 18) + '…' : kd.title}
-              </button>
-            ))}
+            {(() => {
+              const pins = keyDatesByDay.get(dateISO) ?? []
+              const open = expandedPins === dateISO
+              const shown = open ? pins : pins.slice(0, 2)
+              return (
+                <>
+                  {shown.map((kd) => (
+                    <button key={kd.id} type="button" className="week-keydate" title={kd.title} onClick={() => onSelect(kd)}>
+                      📌 {kd.title.length > 18 ? kd.title.slice(0, 18) + '…' : kd.title}
+                    </button>
+                  ))}
+                  {pins.length > 2 && (
+                    <button
+                      type="button"
+                      className="week-keydate week-keydate-more"
+                      aria-expanded={open}
+                      aria-label={open ? `Show fewer deadlines for ${dateISO}` : `${pins.length - 2} more deadlines on ${dateISO}`}
+                      onClick={() => setExpandedPins(open ? null : dateISO)}
+                    >
+                      {open ? 'Show fewer' : `+${pins.length - 2} more`}
+                    </button>
+                  )}
+                </>
+              )
+            })()}
           </div>
         ))}
         <div className="week-hours" style={{ height: gridHeight }}>

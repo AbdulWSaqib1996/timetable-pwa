@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { newAdminId } from '../lib/admin'
+import { localTodayISO } from '../lib/filters'
 import type { TaskRecord } from '../lib/admin'
 import { useDraft } from '../hooks/useDraft'
 import type { PlanChildRec } from '../lib/admin'
@@ -21,6 +22,8 @@ interface Props {
   /** the CURRENT saved copy (may be newer than `task` if sync applied mid-edit) */
   latest: TaskRecord | null
   onSave: (record: TaskRecord) => boolean
+  /** ids of saved tasks — a recoverable NEW draft must not be one of them */
+  existingIds?: Set<string>
   onDuplicate?: (task: TaskRecord) => void
   onDelete?: (task: TaskRecord) => void
   /** work-plan children of this task (P5-05) */
@@ -57,9 +60,11 @@ export function TaskEditSheet({
   onDeletePlan,
   busyCheck,
   onClose,
+  existingIds,
 }: Props) {
-  const [recordId] = useState(() => task?.id ?? newAdminId())
-  const draft = useDraft<TaskFields>(profileId, 'task', recordId, task?.at ?? 0, fieldsOf(task))
+  const [initialId] = useState(() => task?.id ?? newAdminId())
+  const draft = useDraft<TaskFields>(profileId, 'task', initialId, task?.at ?? 0, fieldsOf(task), { existingIds })
+  const recordId = draft.recordId
   const [error, setError] = useState<string | null>(null)
   const [conflict, setConflict] = useState<TaskRecord | null>(null)
   // P5-05 review prompts: blocks stranded past a new due date, and the policy
@@ -88,7 +93,7 @@ export function TaskEditSheet({
       notes: fields.notes.trim() || undefined,
       completedISO:
         fields.status === 'done'
-          ? task?.completedISO ?? new Date().toISOString().slice(0, 10)
+          ? task?.completedISO ?? localTodayISO()
           : task?.completedISO,
       at: Date.now(),
     }

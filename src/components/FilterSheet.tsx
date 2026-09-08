@@ -154,6 +154,14 @@ export function FilterSheet({
                 />
                 Show key dates in the timetable
               </label>
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={filters.showPersonal !== false}
+                  onChange={(e) => onUpdateFilters({ showPersonal: e.target.checked })}
+                />
+                Show personal events (appointments, work, study blocks)
+              </label>
               <button type="button" className="btn-secondary" onClick={onOpenKeyDates}>
                 📌 View all key dates
               </button>

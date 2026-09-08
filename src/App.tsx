@@ -17,6 +17,9 @@ import { TasksPage } from './features/tasks/TasksPage'
 import { JourneyHomePage } from './features/today/JourneyHomePage'
 import { TodayPage } from './features/today/TodayPage'
 import { parseRoute, useRoute } from './lib/router'
+import { hasInternalPredecessor } from './lib/navigationState'
+import { buildProjection } from './lib/scheduleProjection'
+import { InvalidLinkPage } from './components/InvalidLinkPage'
 import type { Route } from './lib/router'
 
 // The bottom sheets are modal and rarely part of first paint — split them out
@@ -157,7 +160,7 @@ export default function App() {
   }, [course.timezone])
 
   // Phase 4 shell: hash routing across Today · Schedule · Tasks · PGCE file.
-  const [route, navigate] = useRoute()
+  const [route, navigate, routeNotice] = useRoute()
   // Desktop keeps the detail as an accessible dialog sheet; phones get a full
   // page that replaces the bottom navigation (P4-05).
   const [detailAsSheet, setDetailAsSheet] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
@@ -167,10 +170,22 @@ export default function App() {
     mq.addEventListener('change', onChange)
     return () => mq.removeEventListener('change', onChange)
   }, [])
+  // Back only walks history when the previous entry is OURS: an external
+  // deep link (notification, share) has history but no in-app predecessor,
+  // and history.back() there would leave the PWA (R1 / TT-08).
   const goBackOr = (fallback: Route) => {
-    if (window.history.length > 1) window.history.back()
+    if (hasInternalPredecessor()) window.history.back()
     else navigate(fallback, { replace: true })
   }
+  // An unknown settings section lands on the index with a small notice and a
+  // clean hash, never an empty page.
+  useEffect(() => {
+    if (routeNotice) {
+      setOpenNotice(routeNotice)
+      navigate({ name: 'settings' }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeNotice])
   function handleNavigate(r: Route) {
     navigate(r)
   }
@@ -272,12 +287,13 @@ export default function App() {
     updateAdmin((prev) => ({ ...prev, plans: prev.plans.filter((c) => c.id !== id) }))
   }
 
-  function cycleTaskStatus(task: TaskRecord) {
-    const next = task.status === 'todo' ? 'doing' : task.status === 'doing' ? 'done' : 'todo'
+  function setTaskStatus(task: TaskRecord, next: 'todo' | 'doing' | 'done') {
+    if (task.status === next) return
     saveTask({
       ...task,
       status: next,
-      completedISO: next === 'done' ? new Date().toISOString().slice(0, 10) : task.completedISO,
+      // Completion is stamped with the COURSE day, not the device's UTC date.
+      completedISO: next === 'done' ? localTodayISO() : task.completedISO,
       at: Date.now(),
     })
   }
@@ -649,6 +665,8 @@ export default function App() {
   // display; the busy subset for clashes and group availability; the
   // reminder-enabled subset for notifications.
   const personalSessions = useMemo(() => adminFile.commitments.map(commitmentToSession), [adminFile.commitments])
+  const commitmentIds = useMemo(() => new Set(adminFile.commitments.map((c) => c.id)), [adminFile.commitments])
+  const taskIds = useMemo(() => new Set(adminFile.tasks.map((t) => t.id)), [adminFile.tasks])
   const busyPersonal = useMemo(() => busyCommitmentSessions(adminFile.commitments), [adminFile.commitments])
   const remindablePersonal = useMemo(
     () => remindableCommitmentSessions(adminFile.commitments),
@@ -715,13 +733,26 @@ export default function App() {
 
   // Schedule rows: filtered sessions with key dates woven in as highlighted
   // blocks (toggle in Filters); the selected-day list slices these by date.
-  const scheduleSessions = useMemo(() => {
-    const base = [...filteredSessions, ...personalSessions]
-    const withKd =
-      settings && getFilters(settings).showKeyDates && allKeyDates.length > 0 ? [...base, ...allKeyDates] : base
-    return withKd.sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99')))
+  // Canonical display/search projection (R1 / TT-02, TT-03): one decision
+  // about what each view shows, deduplicated by owner identity. Personal
+  // events follow their own toggle; course filters never touch them.
+  const projection = useMemo(
+    () =>
+      buildProjection({
+        filteredCourse: filteredSessions,
+        courseAll: courseSessions,
+        personal: personalSessions,
+        keyDates: allKeyDates,
+        showPersonal: settings ? getFilters(settings).showPersonal !== false : true,
+        showKeyDates: settings ? getFilters(settings).showKeyDates : true,
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredSessions, personalSessions, allKeyDates, settings])
+    [filteredSessions, courseSessions, personalSessions, allKeyDates, settings]
+  )
+  const scheduleSessions = useMemo(
+    () => [...projection.calendar, ...projection.pins].sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99'))),
+    [projection]
+  )
 
   const keyDateDays = useMemo(() => new Set(allKeyDates.map((k) => k.dateISO)), [allKeyDates])
 
@@ -867,7 +898,7 @@ export default function App() {
       if (kind === 'done' && key.startsWith('task:')) {
         const record = adminFile.tasks.find((t) => taskEventKey(t) === key)
         if (record && record.status !== 'done') {
-          saveTask({ ...record, status: 'done', completedISO: new Date().toISOString().slice(0, 10), at: Date.now() })
+          saveTask({ ...record, status: 'done', completedISO: localTodayISO(), at: Date.now() })
         }
         return
       }
@@ -1091,7 +1122,13 @@ export default function App() {
         </details>
       )}
 
-      {selected && !detailAsSheet ? null : route.name === 'homeJourney' ? (
+      {selected && !detailAsSheet ? null : route.name === 'invalid' ? (
+        <InvalidLinkPage
+          reason={route.reason}
+          onToday={() => navigate({ name: 'today' }, { replace: true })}
+          onSchedule={() => navigate({ name: 'schedule' }, { replace: true })}
+        />
+      ) : route.name === 'homeJourney' ? (
         <JourneyHomePage
           settings={settings}
           coords={coords}
@@ -1174,7 +1211,7 @@ export default function App() {
           onSelect={openSession}
           onSetStatus={(kd, status) => handleMeta(kd, { status })}
           onEditTask={(t) => setTaskEdit({ task: t })}
-          onCycleTask={cycleTaskStatus}
+          onSetTaskStatus={setTaskStatus}
           onToggleAction={(meetingId, actionId) =>
             updateAdmin((prev) => ({
               ...prev,
@@ -1215,7 +1252,8 @@ export default function App() {
           view={view}
           selectedDateISO={selectedDateISO}
           onSelectDate={setSelectedDateISO}
-          filteredSessions={filteredSessions}
+          filteredSessions={projection.calendar}
+          searchCorpus={projection.searchCorpus}
           scheduleSessions={scheduleSessions}
           courseSessions={courseSessions}
           allKeyDates={allKeyDates}
@@ -1259,6 +1297,7 @@ export default function App() {
           onOpenSettings={() => navigate({ name: 'settings' })}
           onOpenTasks={() => navigate({ name: 'tasks' })}
           onOpenSchedule={() => navigate({ name: 'schedule' })}
+          personalSessions={settings && getFilters(settings).showPersonal === false ? [] : personalSessions}
           onOpenHomeJourney={() => navigate({ name: 'homeJourney' })}
         />
       )}
@@ -1269,6 +1308,7 @@ export default function App() {
           task={taskEdit.task}
           latest={taskEdit.task ? adminFile.tasks.find((t) => t.id === taskEdit.task!.id) ?? null : null}
           onSave={saveTask}
+          existingIds={taskIds}
           onDuplicate={(t) => saveTask(duplicateTask(t))}
           onDelete={deleteTask}
           planChildren={taskEdit.task ? adminFile.plans.filter((c) => c.parentId === taskEdit.task!.id) : []}
@@ -1290,6 +1330,7 @@ export default function App() {
               : null
           }
           onSave={saveCommitment}
+          existingIds={commitmentIds}
           onDelete={deleteCommitment}
           onClose={() => setCommitmentEdit(null)}
         />
@@ -1302,6 +1343,7 @@ export default function App() {
           defaultDateISO={selected.dateISO}
           latest={adminFile.commitments.find((c) => c.id === selected.id.slice('cmt-'.length)) ?? null}
           onSave={saveCommitment}
+          existingIds={commitmentIds}
           onDelete={deleteCommitment}
           onClose={() => goBackOr({ name: 'today' })}
         />

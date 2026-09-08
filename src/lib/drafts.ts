@@ -28,7 +28,18 @@ export function loadDraft<T>(pid: string, kind: string, id: string): DraftEnvelo
     const raw = localStorage.getItem(draftKey(pid, kind, id))
     if (!raw) return null
     const parsed = JSON.parse(raw) as DraftEnvelope<T>
-    if (parsed.version !== 1 || parsed.profileId !== pid) return null
+    // Shape/version validation before anything populates a form (TT-07).
+    if (
+      !parsed ||
+      parsed.version !== 1 ||
+      parsed.profileId !== pid ||
+      typeof parsed.recordId !== 'string' ||
+      typeof parsed.savedAt !== 'number' ||
+      parsed.value === null ||
+      typeof parsed.value !== 'object'
+    ) {
+      return null
+    }
     return parsed
   } catch {
     return null
