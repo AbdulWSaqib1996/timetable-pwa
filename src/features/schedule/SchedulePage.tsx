@@ -3,7 +3,7 @@ import { addDaysISO, mondayOfISO } from '../../../shared/calendar-time.js'
 import { AgendaView } from '../../components/AgendaView'
 import { MonthView } from '../../components/MonthView'
 import { WeekView } from '../../components/WeekView'
-import { IconSearch, PageHeader, SegmentedControl } from '../../components/ui'
+import { IconSearch, PageHeader, SegmentedControl, SettingsAction } from '../../components/ui'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey as panelKey } from '../../lib/diff'
 import { getFilters } from '../../lib/filters'
@@ -44,6 +44,7 @@ interface Props {
   onMeta: (session: Session, patch: Partial<SessionMeta>) => void
   /** add a personal event/study block on the given date (P5-06) */
   onAddPersonal: (dateISO: string) => void
+  onOpenSettings: () => void
 }
 
 function matchesQuery(s: Session, q: string): boolean {
@@ -98,6 +99,7 @@ export function SchedulePage({
   onSelect,
   onMeta,
   onAddPersonal,
+  onOpenSettings,
 }: Props) {
   const wide = useMinWidth(1024)
   // ≥1280px: selection fills the side panel instead of opening the full
@@ -124,7 +126,7 @@ export function SchedulePage({
   }, [weekOf])
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const mode: 'week' | 'month' = view === 'month' ? 'month' : 'week'
+  const mode: 'week' | 'month' | 'list' = view === 'month' ? 'month' : view === 'list' ? 'list' : 'week'
   const anchorISO = selectedDateISO ?? todayISO
   const handleSelect = (s: Session) => {
     if (wide && hasPanel && mode === 'week') setPanel(s)
@@ -204,6 +206,7 @@ export function SchedulePage({
             <button type="button" className="btn-today-reset" onClick={() => onSelectDate(null)} title="Back to today">
               Today
             </button>
+            <SettingsAction onOpen={onOpenSettings} />
           </>
         }
       />
@@ -228,6 +231,7 @@ export function SchedulePage({
             options={[
               { value: 'week', label: 'Week' },
               { value: 'month', label: 'Month' },
+              { value: 'list', label: 'List' },
             ]}
             onChange={(v) => onView(v)}
           />
@@ -264,6 +268,42 @@ export function SchedulePage({
           emptyMessage={`No sessions match “${query.trim()}”.`}
         />
         </>
+      ) : mode === 'list' ? (
+        // List (R3 / §5): a first-class accessible alternative over the SAME
+        // filtered data and shared date anchor as Week and Month — the strip
+        // moves the anchor, the agenda scrolls to it, every record stays a
+        // focusable button opening the same detail.
+        <section className="schedule-list" aria-label="List view">
+          <WeekStrip
+            anchorISO={anchorISO}
+            todayISO={todayISO}
+            busyDays={busyDays}
+            onSelect={(iso) => onSelectDate(iso === todayISO ? null : iso)}
+            onShiftWeek={(delta) => {
+              const next = addDaysISO(anchorISO, delta)
+              onSelectDate(next === todayISO ? null : next)
+            }}
+          />
+          <p className="filter-hint search-scope-note">
+            Every day from {longDay(anchorISO)} onward, with your display filters applied
+            {activeCount > 0 ? ` (${activeCount} active)` : ''}.
+          </p>
+          <AgendaView
+            sessions={scheduleSessions}
+            onSelect={onSelect}
+            metaMap={metaMap}
+            todayISO={todayISO}
+            onToday={() => onSelectDate(null)}
+            scrollTo={anchorISO}
+            termStartISO={settings.termStartISO}
+            coords={coords}
+            travelMode={travelMode}
+            placements={settings.placements}
+            windowed
+            showAllPast={anchorISO < todayISO}
+            emptyMessage="No sessions match the current filters."
+          />
+        </section>
       ) : wide && mode === 'week' ? (
         <div className={`schedule-desktop${panelKeySel && hasPanel ? ' with-panel' : ''}`}>
           <div className="schedule-desktop-grid">

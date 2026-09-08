@@ -10,7 +10,7 @@ import { parseLocation, shortBuildingName } from '../../lib/location'
 import { freshnessLabel } from '../../../shared/travel-state.js'
 import { cachedRouteInfo } from '../../lib/tfl'
 import { TRAVEL_MODE_PHRASE } from '../../lib/campus'
-import { Card, EmptyState, IconBell, IconRefresh, IconSettings, PageHeader } from '../../components/ui'
+import { Card, EmptyState, IconBell, IconRefresh, PageHeader, SettingsAction } from '../../components/ui'
 import type { MetaMap, Session, SessionChange, Settings } from '../../types'
 
 interface Props {
@@ -244,9 +244,7 @@ export function TodayPage({
             >
               {refreshing ? '…' : <IconRefresh />}
             </button>
-            <button type="button" className="btn-icon" onClick={onOpenSettings} aria-label="Settings" title="Settings">
-              <IconSettings />
-            </button>
+            <SettingsAction onOpen={onOpenSettings} />
           </>
         }
       />

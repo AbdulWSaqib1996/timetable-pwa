@@ -122,6 +122,59 @@ const KEY_DATE_REMINDER_OPTIONS = [
   { value: 1, label: '1 day before' },
 ] as const
 
+/**
+ * Local Settings search (R3 / audit §5): a static index of every setting
+ * with plain-language synonyms (home/address, backup/export, sync/device,
+ * notifications/reminders). A result opens the real setting and focuses its
+ * heading; nothing is sent anywhere.
+ */
+const SEARCH_ENTRIES: { section: SettingsSection; anchor: SettingsAnchor; title: string; keywords: string[] }[] = [
+  { section: 'timetable', anchor: 'profiles', title: 'Timetables & profiles', keywords: ['profile', 'switch', 'timetable', 'sheet', 'merge', 'remove', 'add another'] },
+  { section: 'timetable', anchor: 'key-dates-source', title: 'Key dates source', keywords: ['key dates', 'deadline', 'submission', 'source', 'sheet', 'tab'] },
+  { section: 'timetable', anchor: 'notices', title: 'Notices (cohort broadcasts)', keywords: ['notice', 'broadcast', 'announcement', 'cohort', 'banner'] },
+  { section: 'timetable', anchor: 'specialisms', title: 'Specialisms', keywords: ['specialism', 'group', 'subject', 'choose', 'filter'] },
+  { section: 'reminders', anchor: 'session-reminders', title: 'Session reminders', keywords: ['reminder', 'notification', 'notify', 'session', 'attend', 'attendance', 'prompt', 'minutes before'] },
+  { section: 'reminders', anchor: 'key-date-reminders', title: 'Key-date reminders', keywords: ['key date', 'deadline', 'reminder', 'notification', 'days before', 'submission'] },
+  { section: 'reminders', anchor: 'quiet-hours', title: 'Quiet hours', keywords: ['quiet', 'night', 'silence', 'do not disturb', 'notification', 'sleep'] },
+  { section: 'reminders', anchor: 'leave-alerts', title: 'Leave alerts', keywords: ['leave', 'set off', 'travel', 'alert', 'notification', 'head start'] },
+  { section: 'reminders', anchor: 'background-push', title: 'Background push', keywords: ['push', 'background', 'closed', 'notification', 'morning briefing', 'week ahead'] },
+  { section: 'travel', anchor: 'travel-mode', title: 'Travel mode & location', keywords: ['travel', 'walk', 'walking', 'bus', 'transit', 'drive', 'driving', 'journey', 'tfl', 'location', 'gps', 'map'] },
+  { section: 'travel', anchor: 'home-address', title: 'Home address', keywords: ['home', 'address', 'postcode', 'head home', 'journey home', 'origin'] },
+  { section: 'calendars', anchor: 'calendar-feed', title: 'Calendar feed', keywords: ['calendar', 'feed', 'subscribe', 'ics', 'google calendar', 'apple', 'outlook', 'url'] },
+  { section: 'calendars', anchor: 'calendar-export', title: 'Calendar export', keywords: ['export', 'ics', 'download', 'calendar', 'file'] },
+  { section: 'data', anchor: 'data-health', title: 'Data health', keywords: ['saved', 'storage', 'health', 'device', 'data', 'quota', 'space'] },
+  { section: 'data', anchor: 'backup', title: 'Backup', keywords: ['backup', 'export', 'import', 'restore', 'file', 'device', 'json'] },
+  { section: 'data', anchor: 'sync', title: 'Sync between devices', keywords: ['sync', 'device', 'devices', 'phone', 'laptop', 'code', 'encrypted'] },
+  { section: 'appearance', anchor: 'theme', title: 'Theme', keywords: ['theme', 'dark', 'light', 'appearance', 'colour', 'color', 'system'] },
+  { section: 'appearance', anchor: 'density', title: 'Density', keywords: ['density', 'compact', 'comfortable', 'spacing', 'appearance', 'size'] },
+  { section: 'help', anchor: 'whats-new', title: "What's new", keywords: ['new', 'changelog', 'version', 'update', 'release'] },
+  { section: 'help', anchor: 'install', title: 'Install the app', keywords: ['install', 'home screen', 'app', 'ios', 'android', 'add to'] },
+]
+
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  address: ['home'],
+  home: ['address'],
+  backup: ['export'],
+  export: ['backup'],
+  sync: ['device'],
+  device: ['sync'],
+  devices: ['sync'],
+  notification: ['reminder'],
+  notifications: ['reminders', 'reminder'],
+  reminder: ['notification'],
+  reminders: ['notifications', 'notification'],
+}
+
+export function searchSettings(query: string): typeof SEARCH_ENTRIES {
+  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return []
+  const expanded = tokens.map((t) => [t, ...(SEARCH_SYNONYMS[t] ?? [])])
+  return SEARCH_ENTRIES.filter((entry) => {
+    const haystack = [entry.title, ...entry.keywords].join(' ').toLowerCase()
+    return expanded.every((variants) => variants.some((v) => haystack.includes(v)))
+  })
+}
+
 /** Stable in-page anchors that section links and Settings search can open. */
 export type SettingsAnchor =
   | 'profiles'
@@ -148,7 +201,7 @@ export type SettingsAnchor =
 function focusAnchor(anchor: SettingsAnchor) {
   const el = document.getElementById(anchor)
   if (!el) return
-  const heading = el.querySelector<HTMLElement>('h3, h2')
+  const heading = el.matches('h2, h3') ? el : el.querySelector<HTMLElement>('h3, h2')
   el.scrollIntoView({ block: 'start' })
   heading?.focus({ preventScroll: true })
 }
@@ -178,6 +231,8 @@ export function SettingsSheet({
   onClose,
 }: Props) {
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchResults = searchSettings(searchQuery)
   // Section links (TT-21) and search results open a section through the
   // existing settings navigation, then focus the target heading once it has
   // rendered — no new route, so `#/settings/<section>` stays the only form.
@@ -592,6 +647,38 @@ export function SettingsSheet({
             </button>
           }
         />
+        {store.profiles.length > 1 && (
+          <p className="filter-hint settings-profile-line">
+            Showing settings for <strong>{activeProfile?.name}</strong>.{' '}
+            <button type="button" className="travel-link" onClick={() => openAt('timetable', 'profiles')}>
+              Switch timetable
+            </button>
+          </p>
+        )}
+        <div className="searchbar settings-search">
+          <input
+            type="search"
+            aria-label="Search settings"
+            placeholder="Search settings (e.g. address, backup)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        {searchQuery.trim() && (
+          <ul className="settings-index settings-results" aria-label="Search results">
+            {searchResults.length === 0 && (
+              <li className="filter-hint settings-no-results">Nothing matches “{searchQuery.trim()}” — try another word, or browse the categories below.</li>
+            )}
+            {searchResults.map((r) => (
+              <li key={r.anchor}>
+                <button type="button" className="settings-index-row" onClick={() => openAt(r.section, r.anchor)}>
+                  <span className="settings-index-title">{r.title}</span>
+                  <span className="filter-hint">{CATEGORIES.find((c) => c.id === r.section)?.title}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <ul className="settings-index">
           {CATEGORIES.map((c) => (
             <li key={c.id}>
@@ -617,8 +704,8 @@ export function SettingsSheet({
       {section === 'timetable' && (
         <>
 
-        <section className="filter-section">
-          <h3>Timetables</h3>
+        <section className="filter-section" id="profiles">
+          <h3 tabIndex={-1}>Timetables</h3>
           <div className="chip-grid">
             {store.profiles.map((p) => (
               <button
@@ -727,8 +814,8 @@ export function SettingsSheet({
 
 
         {!settings.demo && (
-          <section className="filter-section">
-            <h3>Notices (cohort broadcasts)</h3>
+          <section className="filter-section" id="notices">
+            <h3 tabIndex={-1}>Notices (cohort broadcasts)</h3>
             <p className="filter-hint">
               A tab with Date / Message / Link columns becomes dismissible announcement banners for
               everyone using that sheet. Background delivery uses the push worker.
@@ -750,8 +837,8 @@ export function SettingsSheet({
         )}
 
 
-        <section className="filter-section">
-          <h3>Specialisms</h3>
+        <section className="filter-section" id="specialisms">
+          <h3 tabIndex={-1}>Specialisms</h3>
           <p className="filter-hint">
             {(settings.mySpecialisms ?? []).length > 0
               ? `Showing: ${(settings.mySpecialisms ?? []).join(', ')}`
@@ -823,7 +910,7 @@ export function SettingsSheet({
               </li>
             ))}
           </ul>
-          <h3 className="subheading">Quiet hours</h3>
+          <h3 className="subheading" id="quiet-hours" tabIndex={-1}>Quiet hours</h3>
           <p className="filter-hint">No notifications during these hours (in-app and push).</p>
           <div className="chip-grid">
             {(
@@ -860,8 +947,8 @@ export function SettingsSheet({
         </section>
 
 
-        <section className="filter-section">
-          <h3>Session reminders</h3>
+        <section className="filter-section" id="session-reminders">
+          <h3 tabIndex={-1}>Session reminders</h3>
           <p className="filter-hint">
             Pick as many as you like — e.g. 1 hour and 15 min gives two notifications before each
             session. Select none to turn reminders off.
@@ -954,8 +1041,8 @@ export function SettingsSheet({
         </section>
 
 
-        <section className="filter-section">
-          <h3>Leave alerts</h3>
+        <section className="filter-section" id="leave-alerts">
+          <h3 tabIndex={-1}>Leave alerts</h3>
           <p className="filter-hint">
             Notifies you when it's time to set off: session start minus your live travel estimate,
             with the head start you pick (e.g. "10 min" alerts 10 minutes before you need to leave).
@@ -992,8 +1079,8 @@ export function SettingsSheet({
 
 
         {!settings.demo && (
-          <section className="filter-section">
-            <h3>Background push (works with the app closed)</h3>
+          <section className="filter-section" id="background-push">
+            <h3 tabIndex={-1}>Background push (works with the app closed)</h3>
             <p className="filter-hint">
               Session and key-date reminders arrive even when the app isn't open. The push server is
               already deployed — just tap Enable (the URL below only needs changing for a different
@@ -1160,8 +1247,8 @@ export function SettingsSheet({
       {section === 'travel' && (
         <>
 
-        <section className="filter-section">
-          <h3>Travel times</h3>
+        <section className="filter-section" id="travel-mode">
+          <h3 tabIndex={-1}>Travel times</h3>
           <label className="toggle-row">
             <input
               type="checkbox"
@@ -1197,7 +1284,7 @@ export function SettingsSheet({
             OpenStreetMap. Background leave alerts additionally store your last app-open location
             in the push worker.
           </p>
-          <h3 className="subheading">Home</h3>
+          <h3 className="subheading" id="home-address" tabIndex={-1}>Home</h3>
           <div className="feed-row">
             <input
               type="text"
@@ -1267,8 +1354,8 @@ export function SettingsSheet({
       {section === 'calendars' && (
         <>
 
-        <section className="filter-section">
-          <h3>Calendar feed (stays in sync)</h3>
+        <section className="filter-section" id="calendar-feed">
+          <h3 tabIndex={-1}>Calendar feed (stays in sync)</h3>
           {settings.demo ? (
             <p className="filter-hint">Load a real sheet to use the calendar feed.</p>
           ) : (
@@ -1306,8 +1393,8 @@ export function SettingsSheet({
         </section>
 
 
-        <section className="filter-section">
-          <h3>Calendar export</h3>
+        <section className="filter-section" id="calendar-export">
+          <h3 tabIndex={-1}>Calendar export</h3>
           <p className="filter-hint">
             Downloads your timetable — your groups and specialisms, all dates, regardless of
             display filters ({courseSessions.length} sessions
@@ -1351,8 +1438,8 @@ export function SettingsSheet({
       )}
       {section === 'data' && (
         <>
-        <section className="filter-section">
-          <h3>Data health</h3>
+        <section className="filter-section" id="data-health">
+          <h3 tabIndex={-1}>Data health</h3>
           <ul className="notif-overview">
             <li>
               <span>Saved on this device</span>
@@ -1423,8 +1510,8 @@ export function SettingsSheet({
         )}
 
 
-        <section className="filter-section">
-          <h3>Backup</h3>
+        <section className="filter-section" id="backup">
+          <h3 tabIndex={-1}>Backup</h3>
           <p className="filter-hint">
             Everything lives on this device only. Export a backup (timetables, filters, notes,
             attendance) and import it on a new device or after clearing browser data.
@@ -1457,8 +1544,8 @@ export function SettingsSheet({
         </section>
 
 
-        <section className="filter-section">
-          <h3>Sync between devices</h3>
+        <section className="filter-section" id="sync">
+          <h3 tabIndex={-1}>Sync between devices</h3>
           <p className="filter-hint">
             Keeps your timetables, filters, notes and attendance the same on your phone and laptop
             via a shared code. Everything is encrypted on this device before it leaves — the server
@@ -1532,8 +1619,8 @@ export function SettingsSheet({
       {section === 'appearance' && (
         <>
 
-        <section className="filter-section">
-          <h3>Theme</h3>
+        <section className="filter-section" id="theme">
+          <h3 tabIndex={-1}>Theme</h3>
           <div className="chip-grid">
             {(
               [
@@ -1555,8 +1642,8 @@ export function SettingsSheet({
           </div>
         </section>
 
-        <section className="filter-section">
-          <h3>Density</h3>
+        <section className="filter-section" id="density">
+          <h3 tabIndex={-1}>Density</h3>
           <div className="chip-grid">
             {(
               [
@@ -1581,8 +1668,8 @@ export function SettingsSheet({
       )}
       {section === 'help' && (
         <>
-        <section className="filter-section">
-          <h3>What's new</h3>
+        <section className="filter-section" id="whats-new">
+          <h3 tabIndex={-1}>What's new</h3>
           <ul className="whatsnew-list">
             {WHATSNEW.map((n, i) => (
               <li key={i}>{n}</li>
@@ -1591,8 +1678,8 @@ export function SettingsSheet({
         </section>
 
         {onInstall && (
-          <section className="filter-section">
-            <h3>Install the app</h3>
+          <section className="filter-section" id="install">
+            <h3 tabIndex={-1}>Install the app</h3>
             <p className="filter-hint">
               Put My Timetable on your Home Screen / desktop — it opens full-screen, works offline
               and can receive background push.
