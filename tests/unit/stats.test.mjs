@@ -257,12 +257,15 @@ test('/v2/batch reports refused attempts (schema, oversize, rate-limit) to the c
     },
   }
   const ip = `10.4.0.${++ipCounter}`
+  const waited = []
+  const ctx = { waitUntil: (p) => waited.push(p) }
   const post = (body, headers = { 'content-type': 'application/json' }) =>
-    worker.fetch(new Request('https://push.test/v2/batch', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body), headers: { 'cf-connecting-ip': ip, ...headers } }), env)
+    worker.fetch(new Request('https://push.test/v2/batch', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body), headers: { 'cf-connecting-ip': ip, ...headers } }), env, ctx)
   await post({ schemaVersion: 2, token: 'abcd1234abcd1234', batchId: 'beefbeefbeefbeef', buildId: 'x', capabilityVersion: 1, platform: 'ios', days: [{ date: dayISO(0), counts: { nonsense: 1 } }] })
   await post('{"d":"' + 'a'.repeat(20000) + '"}')
   await post({ schemaVersion: 2, token: 'abcd1234abcd1234', batchId: 'beefbeefbeefbee1', buildId: 'x', capabilityVersion: 1, platform: 'ios', standalone: true, days: [{ date: dayISO(0), opens: 1, counts: {} }] })
-  await new Promise((r) => setTimeout(r, 10))
+  await Promise.all(waited)
+  assert.equal(waited.length, 2, 'refused attempts must be handed to ctx.waitUntil, not left dangling')
   assert.deepEqual(outcomes.sort(), ['oversize', 'rejected'])
   assert.equal(kv.rows.get('alast:abcd1234abcd1234'), dayISO(0), 'accepted batch records last-seen')
   // Exhaust the per-IP cap: the refusal is counted as rate-limited.

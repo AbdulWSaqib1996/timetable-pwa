@@ -996,14 +996,17 @@ async function runScheduled(env) {
   await runAnalyticsRetention(env)
 }
 
-/** Fire-and-forget reason count for an attempt the worker refused (A5). */
-function reportOutcome(env, reason) {
+/** Reason count for an attempt the worker refused (A5). The work runs after
+ *  the response via ctx.waitUntil — a bare dangling promise is cancelled
+ *  when a Worker request handler returns, and the count would be lost. */
+function reportOutcome(env, reason, ctx) {
   if (!env.ANALYTICS) return
   try {
     const stub = env.ANALYTICS.get(env.ANALYTICS.idFromName('analytics-v2'))
-    void stub
+    const work = stub
       .fetch(new Request('https://analytics/v2/outcome', { method: 'POST', body: JSON.stringify({ reason }), headers: { 'content-type': 'application/json' } }))
       .catch(() => {})
+    if (ctx?.waitUntil) ctx.waitUntil(work)
   } catch {
     /* diagnostics never affect the request */
   }
@@ -1246,12 +1249,12 @@ const constantEquals = (a, b) => {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url)
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS })
     const cap = RATE_CAPS[url.pathname]
     if (cap && rateLimited(request, url.pathname, cap)) {
-      if (url.pathname === '/v2/batch') reportOutcome(env, 'rateLimited')
+      if (url.pathname === '/v2/batch') reportOutcome(env, 'rateLimited', ctx)
       return json({ error: 'rate limited — try again in a minute' }, 429)
     }
     if (request.method === 'GET' && url.pathname === '/vapid') {
@@ -1376,14 +1379,14 @@ export default {
     if (request.method === 'POST' && url.pathname === '/v2/batch') {
       const raw = await boundedJSON(request, MAX_BATCH_BYTES)
       if (!raw) {
-        reportOutcome(env, 'oversize')
+        reportOutcome(env, 'oversize', ctx)
         return json({ error: 'invalid or oversized batch' }, 400)
       }
       const { ok, errors, batch } = validateBatch(raw)
       // Any invalid day fails the WHOLE batch before a single write — the
       // batch is the idempotence unit, so partial acceptance is forbidden.
       if (!ok || !batch) {
-        reportOutcome(env, 'rejected')
+        reportOutcome(env, 'rejected', ctx)
         return json({ error: 'invalid batch', reasons: errors.slice(0, 5) }, 400)
       }
       // Keep the legacy first-seen union: v2 uses the SAME token namespace,
