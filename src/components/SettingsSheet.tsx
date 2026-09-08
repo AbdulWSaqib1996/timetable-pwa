@@ -116,6 +116,43 @@ const REMINDER_OPTIONS = [
   { value: 120, label: '2 hours' },
 ]
 
+const KEY_DATE_REMINDER_OPTIONS = [
+  { value: 7, label: '7 days before' },
+  { value: 3, label: '3 days before' },
+  { value: 1, label: '1 day before' },
+] as const
+
+/** Stable in-page anchors that section links and Settings search can open. */
+export type SettingsAnchor =
+  | 'profiles'
+  | 'key-dates-source'
+  | 'notices'
+  | 'specialisms'
+  | 'key-date-reminders'
+  | 'session-reminders'
+  | 'quiet-hours'
+  | 'leave-alerts'
+  | 'background-push'
+  | 'travel-mode'
+  | 'home-address'
+  | 'calendar-feed'
+  | 'calendar-export'
+  | 'data-health'
+  | 'backup'
+  | 'sync'
+  | 'theme'
+  | 'density'
+  | 'whats-new'
+  | 'install'
+
+function focusAnchor(anchor: SettingsAnchor) {
+  const el = document.getElementById(anchor)
+  if (!el) return
+  const heading = el.querySelector<HTMLElement>('h3, h2')
+  el.scrollIntoView({ block: 'start' })
+  heading?.focus({ preventScroll: true })
+}
+
 export function SettingsSheet({
   section,
   onOpenSection,
@@ -141,6 +178,24 @@ export function SettingsSheet({
   onClose,
 }: Props) {
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE)
+  // Section links (TT-21) and search results open a section through the
+  // existing settings navigation, then focus the target heading once it has
+  // rendered — no new route, so `#/settings/<section>` stays the only form.
+  const pendingAnchor = useRef<SettingsAnchor | null>(null)
+  const openAt = (target: SettingsSection, anchor: SettingsAnchor) => {
+    if (target === section) {
+      focusAnchor(anchor)
+      return
+    }
+    pendingAnchor.current = anchor
+    onOpenSection(target)
+  }
+  useEffect(() => {
+    const anchor = pendingAnchor.current
+    if (!anchor) return
+    pendingAnchor.current = null
+    focusAnchor(anchor)
+  }, [section])
   // Local telemetry queue status (coarse counts only; nothing is sent here).
   const [telemetry, setTelemetry] = useState<{ openSegments: number; claimedSegments: number; dropped: number } | null>(null)
   useEffect(() => {
@@ -640,8 +695,8 @@ export function SettingsSheet({
 
 
         {!settings.demo && (
-          <section className="filter-section">
-            <h3>Key dates</h3>
+          <section className="filter-section" id="key-dates-source">
+            <h3 tabIndex={-1}>Key dates</h3>
             <p className="filter-hint">
               Paste the link to the submissions/key-dates tab (open that tab so the URL contains its
               gid). Upcoming deadlines get a countdown strip on the day view.
@@ -660,32 +715,12 @@ export function SettingsSheet({
               <p className="filter-hint">Key dates connected — they refresh with the timetable.</p>
             )}
             {settings.keyDatesSheetId && (
-              <>
-                <h3 className="subheading">Key-date reminders</h3>
-                <div className="chip-grid">
-                  {(
-                    [
-                      { value: 7, label: '7 days before' },
-                      { value: 3, label: '3 days' },
-                      { value: 1, label: '1 day' },
-                    ] as const
-                  ).map(({ value, label }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`chip${(settings.keyDateReminderDays ?? []).includes(value) ? ' chip-on' : ''}`}
-                      aria-pressed={(settings.keyDateReminderDays ?? []).includes(value)}
-                      onClick={() => void toggleOffset('keyDateReminderDays', value)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <p className="filter-hint">
-                  Notifies you the chosen number of days before each deadline, while the app is open
-                  or installed and running.
-                </p>
-              </>
+              <p className="filter-hint">
+                {/* Reminder timing lives with the other reminder settings (TT-21). */}
+                <button type="button" className="travel-link" onClick={() => openAt('reminders', 'key-date-reminders')}>
+                  Configure key-date reminders →
+                </button>
+              </p>
             )}
           </section>
         )}
@@ -875,6 +910,47 @@ export function SettingsSheet({
             The prompt's ✓ Attended button logs the session — attendance and the placement day
             counter then build themselves. Works in the background too when push is enabled.
           </p>
+        </section>
+
+
+        <section className="filter-section" id="key-date-reminders" aria-labelledby="key-date-reminders-heading">
+          <h3 id="key-date-reminders-heading" tabIndex={-1}>Key-date reminders</h3>
+          {settings.keyDatesSheetId ? (
+            <>
+              <p className="filter-hint">
+                Deadlines from your key-dates tab. Pick as many as you like; select none to turn them off.
+              </p>
+              <div className="chip-grid" role="group" aria-label="Days before each key date">
+                {KEY_DATE_REMINDER_OPTIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`chip${(settings.keyDateReminderDays ?? []).includes(value) ? ' chip-on' : ''}`}
+                    aria-pressed={(settings.keyDateReminderDays ?? []).includes(value)}
+                    onClick={() => void toggleOffset('keyDateReminderDays', value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="filter-hint">
+                {notifBlocked
+                  ? 'Notifications are blocked for this site — allow them in your browser settings.'
+                  : (settings.keyDateReminderDays ?? []).length === 0
+                    ? 'Key-date reminders are off.'
+                    : `Notifying ${(settings.keyDateReminderDays ?? []).map((d) => `${d} day${d === 1 ? '' : 's'}`).join(', ')} before each deadline while the app is open (or installed and running)${settings.pushEnabled ? ', and in the background through push' : ''}. A selected timing is not a delivery guarantee — for alerts anywhere, use your calendar app’s own reminders on the subscribed feed.`}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="filter-hint">
+                These need a connected submissions/key-dates tab — none is connected for this timetable yet.
+              </p>
+              <button type="button" className="travel-link" onClick={() => openAt('timetable', 'key-dates-source')}>
+                Connect key dates →
+              </button>
+            </>
+          )}
         </section>
 
 
