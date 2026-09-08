@@ -900,3 +900,5 @@ Known limitations / deferred: alternate-route selection and region-specific prov
 Rollback: revert view changes independently; keep the 15 s negative cache, profile-scoped plan keys and disruption dedupe.
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+R2 release verification (8 September 2026): workers deployed FIRST (`shared/journey.js` dedupe and `shared/course.js` `journeyProvider` changed) — push worker `5950336d-f548-4fd6-96b7-aae4e27c2671`, feed worker `7398397d-7a7c-4f7f-8b0a-8f9cd1a83c85`. The deploy script's own regression pass caught one older assertion (phase-seven "geometry absent" expected a blank static map where the new TT-16 state honestly shows "Map could not load"); the test now accepts either and the chain was re-run. Released commit `8ebc3f5` (merge `9c609d5`); GitHub Actions run 34216421659 concluded **success**. `./scripts/deploy.sh verify` all six PASS. Deployed main chunks carry the R2 surfaces — Vercel `assets/main-DjFmXJeN.js`: clipboard fallback copy ×1; Pages `assets/main-DBNjRKnd.js`: map-failure state ×1.
