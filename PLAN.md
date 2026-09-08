@@ -984,3 +984,5 @@ Known limitations / deferred: the encrypted export is downloaded, not shared thr
 Rollback: revert the sheets independently; keep the envelope module, `reviewLater` validation and the scoped export.
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+R5a release verification (8 September 2026): workers deployed FIRST (`shared/backupEnvelope.js` added; `shared/contracts.js` validates `reviewLater`) — push worker `fc0f1cd0-7ce2-4267-8186-7fbd2c942983`, feed worker `30951a2e-b1d1-4387-819c-d3e1a6aee039`. The deploy script's first regression pass failed without a captured test name and the immediate rerun was fully green (both validate gates had just passed 99/99 twice); recorded as a flake to watch. Released commit `04804e2` (merge `9c5d3a5`); GitHub Actions run 34224009607 concluded **success**. `./scripts/deploy.sh verify` all six PASS. The R5a surfaces are code-split: Vercel main `assets/main-CKH6n9dn.js` → envelope format in `SettingsSheet-YF0kl7ML.js`, binder selection in `JournalSheet-eAvDTxqz.js`; Pages main `assets/main-Bd9Qum69.js` → `SettingsSheet-BDsUKldQ.js` and `JournalSheet-BR-fbIuc.js`, each ×1.
