@@ -146,3 +146,38 @@ test('duplicate disruption entries on a leg collapse to one warning (TfL repeats
   })
   assert.deepEqual(it.legs[0].disruptions, ['Wembley Park: No Step Free Access - faulty lift'])
 })
+
+test('a station notice attached to two consecutive legs is shown once, on the first leg (owner report)', () => {
+  const it = validateItinerary({
+    startDateTime: '2026-09-08T08:00:00',
+    arrivalDateTime: '2026-09-08T08:59:00',
+    duration: 59,
+    legs: [
+      {
+        mode: { name: 'bus' },
+        duration: 21,
+        departureTime: '2026-09-08T08:05:00',
+        arrivalTime: '2026-09-08T08:26:00',
+        routeOptions: [{ name: '83' }],
+        departurePoint: { commonName: 'Alperton' },
+        arrivalPoint: { commonName: 'Wembley Park Station' },
+        disruptions: [
+          { description: 'BRENT STREET, NW4 - ROUTES 83 on diversion' },
+          { description: 'Wembley Park: No Step Free Access - faulty lift' },
+        ],
+      },
+      {
+        mode: { name: 'tube' },
+        duration: 18,
+        departureTime: '2026-09-08T08:30:00',
+        arrivalTime: '2026-09-08T08:48:00',
+        routeOptions: [{ name: 'Metropolitan' }],
+        departurePoint: { commonName: 'Wembley Park Underground Station' },
+        arrivalPoint: { commonName: 'Euston Square' },
+        disruptions: [{ description: 'Wembley Park:  No Step Free Access - faulty lift' }],
+      },
+    ],
+  })
+  assert.deepEqual(it.legs[0].disruptions, ['BRENT STREET, NW4 - ROUTES 83 on diversion', 'Wembley Park: No Step Free Access - faulty lift'])
+  assert.deepEqual(it.legs[1].disruptions, [])
+})

@@ -78,6 +78,18 @@ export function validateItinerary(raw, zone = COURSE_TIMEZONE) {
       isDisrupted: leg.isDisrupted === true,
     })
   }
+  // A station notice (e.g. a lift out at an interchange) is attached by TfL
+  // to BOTH the leg arriving there and the leg departing — the reader gets
+  // it once, with the first leg it applies to (owner report, R3).
+  const seen = new Set()
+  for (const leg of legs) {
+    leg.disruptions = leg.disruptions.filter((text) => {
+      const key = text.toLowerCase().replace(/\s+/g, ' ')
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
   return { departureMs, arrivalMs, durationMins, legs, lines: legs.map((l) => l.line).filter(Boolean) }
 }
 
