@@ -871,3 +871,32 @@ Rollback: view changes revert independently; the safe parser, course clock and p
 Worker versions + hosted commit statuses: recorded after deployment below.
 
 R1 release verification (8 September 2026): workers deployed FIRST because `shared/contracts.js` now enforces plan validation on sync ingestion — push worker `a9747db8-8ccd-4bcc-9055-a075b8c1d86c`, feed worker `110921d7-cd0c-462a-8818-434e87e96d9a` (the tightened rule only rejects NEW impossible intervals; existing stored records are untouched and shown as "Needs scheduling" in the app). Released commit `3ca665c`; GitHub Actions concluded **success**. `./scripts/deploy.sh verify` all six PASS. Deployed main chunks carry the R1 surfaces — Vercel `assets/main-DKGn5bUh.js`: invalid-link page string ×1; Pages `assets/main-D7aTWsw1.js`: search scope note ×1.
+
+### Pass 51 — Learner audit R2: journey continuity and consistent actions — 8 September 2026
+
+Work items: batch R2 of `timetable-app-audit/TIMETABLE_APP_AUDIT_AND_ENHANCEMENTS.md` (§9), per `timetable-app-audit/DEVELOPMENT_PLAN.md`. Findings addressed: **TT-11, TT-12, TT-13, TT-14, TT-15, TT-16, TT-17** (TT-18 was closed by admin A2), plus NF-06 groundwork and one owner-reported defect (duplicate disruption warnings on a leg).
+
+Commit and branch: one commit on `audit-r2`, merged to `main`. `shared/` changed (journey.js dedupe, course.js `journeyProvider`), so the workers deploy FIRST.
+
+Behaviour before → after:
+- **TT-11 replan when departure passes** — an open travel tab could reach "planned departure has passed" with no alternative → `useJourney` has a transition effect keyed by request identity + departure state: the FIRST transition into passed fetches exactly one leave-now alternative (abort/generation-protected), later ticks do nothing, a stale plan (>10 min) refreshes on visibility resume, and the UI distinguishes refreshing / alternative found / none found.
+- **TT-12 superseded plans + negative cache** — a published leave plan lived on for up to 20 min after origin/buffer changed, and a network failure was cached for 10 min → the leave plan is cleared the instant identity changes, publication/consumption is keyed by profile + event (+ request identity check), network failures are remembered for 15 s only, and a visible Retry bypasses the cache. The reminder consumer (`useNotifications`) reads plans for the active profile only.
+- **TT-13 reminder preference** — editing a commitment silently dropped `remind` → the editor carries the flag through every edit, with an explicit "Remind me" control (new events default off; busy never implies reminders).
+- **TT-14 overlap lanes** — a morning clash narrowed the whole day → lanes are assigned per connected overlap component via `shared/intervals.js`; an isolated afternoon block keeps full width (asserted: full column width vs the shared chain).
+- **TT-15 panel identity** — the desktop panel stored a session object → it stores a stable event key, resolves the record from current data on every render, shows "This session changed or is no longer visible" when it vanishes, closes on week change unless explicitly pinned.
+- **TT-16 map states** — a pin on blank space when tiles failed → `MapState` tracks tile load/error for both maps: "Map could not load"/"Map unavailable offline" with a single Retry and the readable address, "Some map tiles unavailable" for partial loads, one screen-reader status per state change, no automatic re-requests.
+- **TT-17 journey-home honesty** — "Leaving now — live route" before any plan, "turn location on" despite a usable saved origin, silent clipboard failures → the subtitle follows one journey state (choose origin / planning / live with age / estimate / unreachable / no route / external directions), saved origins are offered before any permission prompt, `CopyButton` says "Address copied" only after success and exposes selectable text with "Copy unavailable here" on failure.
+- **NF-06 groundwork** — `settings.defaultOriginHome` (a "Use this origin by default" action on the journey-home page) and a course-config `journeyProvider` (`'tfl' | 'none'`, default tfl, template-validated); a `'none'` course shows an explicit external-directions state instead of a failing provider.
+- **Owner report (8 Sep)**: TfL repeats the same disruption entry on a leg, so the travel tab showed each warning twice → deduplicated at the itinerary boundary; a line-status warning that restates a leg's own text is dropped.
+
+Stored schema/contract changes: `Settings.defaultOriginHome` (optional); `CourseConfig.journeyProvider` (optional in templates, default `tfl`); `CommitmentRec.remind` unchanged in shape, now preserved. Leave-plan store keys change shape in memory only.
+
+Automated checks + results: `npm run validate` AND `VERCEL=1 npm run validate` green — 138 unit and 76 browser tests. New: 7 `audit-r2` browser regressions (departure passing while mounted → exactly one alternative request and no flooding; failed fetch → Retry → origin change supersedes immediately; reminder flag survives an edit and toggles off explicitly; component lanes; panel closes on week change unless pinned; all-tiles-failed fallback with Retry and usable address; journey-home copy/saved-origin/default-origin/clipboard-failure) and unit tests for the course provider field and disruption dedupe. Screenshots (synthetic seed): `timetable-app-audit/evidence/r2-home-390-{light,dark}.png`, `r2-home-notiles-390-light.png`, `r2-schedule-lanes-1440-light.png`.
+
+R2 gate (audit §9): future departure crossing works without navigation ✓; a superseded route cannot drive the current display or a local reminder ✓; a reminder-enabled commitment survives edit ✓; all-map-failure remains useful ✓; no fake live/stale/arrival/accessibility claims ✓. TT-18 tracked as satisfied by A2.
+
+Known limitations / deferred: alternate-route selection and region-specific providers remain R6; the journey state is still expressed through the hook's status fields rather than a single discriminated-union type; background push leave alerts are unaffected (the worker never carried leave plans).
+
+Rollback: revert view changes independently; keep the 15 s negative cache, profile-scoped plan keys and disruption dedupe.
+
+Worker versions + hosted commit statuses: recorded after deployment below.
