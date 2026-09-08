@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import { useModalA11y } from '../lib/a11y'
 
 /**
@@ -108,11 +109,109 @@ export function PageHeader({
         </button>
       )}
       <div className="page-header-row">
-        <h1 className="page-title">{title}</h1>
+        {/* Focus target for route changes (R3 / §5): the shell moves focus
+            here when the destination changes, never on a routine refresh. */}
+        <h1 className="page-title" tabIndex={-1}>
+          {title}
+        </h1>
         {actions && <div className="page-actions">{actions}</div>}
       </div>
       {subtitle && <p className="page-subtitle">{subtitle}</p>}
     </header>
+  )
+}
+
+/**
+ * The same labelled Settings action in every primary page header (TT-19).
+ * Hidden from 1024px, where the sidebar footer carries Settings.
+ */
+export function SettingsAction({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button type="button" className="btn-icon page-settings-action" onClick={onOpen} aria-label="Settings" title="Settings">
+      <IconSettings />
+    </button>
+  )
+}
+
+/**
+ * A small action menu (R3 / TT-20, §5 interaction rules): one dominant
+ * trigger, a `menu` of `menuitem`s, Escape closes and returns focus, arrow
+ * keys move, clicking outside closes. Choosing an item closes the menu first
+ * so the chosen action can move focus wherever it opens.
+ */
+export function QuickMenu({
+  label,
+  items,
+  tone = 'primary',
+}: {
+  label: string
+  items: { label: string; onSelect: () => void }[]
+  tone?: 'primary' | 'secondary'
+}) {
+  const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  const id = useId()
+  useEffect(() => {
+    if (!open) return
+    listRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+    const onPointer = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (!listRef.current?.contains(target) && !buttonRef.current?.contains(target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointer)
+    return () => document.removeEventListener('mousedown', onPointer)
+  }, [open])
+  const onKey = (e: KeyboardEvent) => {
+    const els = [...(listRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])]
+    const i = els.indexOf(document.activeElement as HTMLElement)
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setOpen(false)
+      buttonRef.current?.focus()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      els[(i + 1) % els.length]?.focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      els[(i - 1 + els.length) % els.length]?.focus()
+    } else if (e.key === 'Tab') {
+      setOpen(false)
+    }
+  }
+  return (
+    <div className="quick-menu">
+      <button
+        ref={buttonRef}
+        type="button"
+        className={tone === 'primary' ? 'btn-primary' : 'btn-secondary'}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {label} ▾
+      </button>
+      {open && (
+        <ul ref={listRef} id={id} role="menu" aria-label={label} className="quick-menu-list" onKeyDown={onKey}>
+          {items.map((item) => (
+            <li key={item.label} role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className="quick-menu-item"
+                onClick={() => {
+                  setOpen(false)
+                  item.onSelect()
+                }}
+              >
+                {item.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

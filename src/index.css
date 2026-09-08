@@ -2515,12 +2515,48 @@ body {
 }
 
 /* Bottom navigation (320–1023px) */
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 60;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.shell-main:focus {
+  outline: none;
+}
+
+.page-title:focus {
+  outline: none;
+}
+
+.page-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 .bottom-nav {
   position: fixed;
   inset: auto 0 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* One column per real destination (TT-19): a three-destination course
+     divides evenly instead of leaving a fourth empty cell. */
+  grid-template-columns: repeat(var(--nav-count, 4), minmax(0, 1fr));
   gap: 2px;
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
@@ -2615,15 +2651,33 @@ body {
        which is how a 1440px shell produced a 322px calendar. Readable inner
        pages constrain THEMSELVES; wide pages get the schedule cap. */
     width: 100%;
+    max-width: none;
     min-width: 0;
     justify-self: stretch;
+    /* Page width contracts (R3 / audit §5): distinct inner containers, not
+       one width for every page — reading surfaces ~720px, task/PGCE lists
+       960px, the Schedule calendar up to 1440px. */
+    --page-max: 720px;
   }
-  .shell-main:has(.page--wide) {
-    max-width: 1440px;
+  .shell-main:has(> .page-tasks),
+  .shell-main:has(> .page-pgce) {
+    --page-max: 960px;
+  }
+  .shell-main:has(> .page--wide) {
+    --page-max: 1440px;
+  }
+  .shell-main > .page,
+  .shell-main > .backup-banner {
+    max-width: var(--page-max);
+    margin-left: auto;
+    margin-right: auto;
   }
   .page--wide {
     width: 100%;
     min-width: 0;
+  }
+  .page-settings-action {
+    display: none;
   }
 }
 .kd-chip-done {
@@ -3725,4 +3779,110 @@ body {
   padding: 2px 6px;
   border: 1px dashed var(--border);
   border-radius: 6px;
+}
+
+/* ---------- R3: hierarchy, menus, list view, settings search ---------- */
+
+.quick-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.quick-menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 240px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.quick-menu-item {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quick-menu-item:hover,
+.quick-menu-item:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent);
+  outline: none;
+}
+
+.pgce-section .btn-row {
+  align-items: center;
+}
+
+.pgce-section .btn-row .btn-primary {
+  min-height: 44px;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+.task-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.task-summary .kd-chip {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.task-search {
+  flex: 1;
+  min-width: 160px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.schedule-list {
+  max-width: 960px;
+}
+
+.settings-search input {
+  min-height: 44px;
+}
+
+.settings-results {
+  margin-bottom: 12px;
+}
+
+.settings-no-results {
+  padding: 8px 4px;
+  list-style: none;
+}
+
+.settings-profile-line {
+  margin: 0 0 8px;
+}
+
+/* The agenda's sticky day labels were positioned for the legacy top bar;
+   inside the Schedule shell the toolbar is the only sticky element above. */
+.schedule-list .day-header {
+  top: 54px;
 }

@@ -206,7 +206,8 @@ export async function tflDeparturesNear(lat: number, lng: number, line: string):
     return {
       stop: `${stop.commonName ?? 'stop'}${stop.stopLetter ? ` (Stop ${stop.stopLetter})` : ''}`,
       mins,
-      towards: mine[0]?.towards || mine[0]?.destinationName || undefined,
+      // TfL sometimes sends the literal string "null" for towards.
+      towards: [mine[0]?.towards, mine[0]?.destinationName].find((v) => v && v !== 'null') || undefined,
     }
   } catch {
     return null

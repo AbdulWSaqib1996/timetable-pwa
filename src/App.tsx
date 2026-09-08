@@ -1223,7 +1223,12 @@ export default function App() {
               ),
             }))
           }
+          onOpenMeeting={() => {
+            setAdminTab('meetings')
+            setOpenSheet('admin')
+          }}
           onAddTask={() => setTaskEdit({ task: null })}
+          onOpenSettings={() => navigate({ name: 'settings' })}
         />
       ) : route.name === 'pgce' ? (
         <PGCEPage
@@ -1244,6 +1249,7 @@ export default function App() {
           onOpenJournal={() => setOpenSheet('journal')}
           onOpenStats={() => setOpenSheet('stats')}
           onOpenPlacements={() => navigate({ name: 'placement' })}
+          onOpenSettings={() => navigate({ name: 'settings' })}
         />
       ) : route.name === 'schedule' ? (
         <SchedulePage
@@ -1273,6 +1279,7 @@ export default function App() {
           onSelect={openSession}
           onMeta={handleMeta}
           onAddPersonal={(dateISO) => setCommitmentEdit({ commitment: null, dateISO })}
+          onOpenSettings={() => navigate({ name: 'settings' })}
         />
       ) : sessions === null && !settings.demo && !error ? (
         <div className="empty-state">Loading timetable…</div>

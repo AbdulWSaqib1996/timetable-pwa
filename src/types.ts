@@ -32,7 +32,8 @@ export interface Session {
 
 export type DateRange = 'today' | 'week' | 'all'
 
-export type ViewMode = 'day' | 'week' | 'month'
+/** 'day' is the legacy stored value (treated as week); 'list' is the accessible agenda alternative (R3). */
+export type ViewMode = 'day' | 'week' | 'month' | 'list'
 
 export interface Filters {
   dateRange: DateRange
