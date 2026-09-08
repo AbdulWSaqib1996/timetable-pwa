@@ -90,27 +90,165 @@ export function Returning({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | n
   )
 }
 
-export function Reliability() {
+/**
+ * Reliability (§4.5): separate sources with their own denominators —
+ * aggregation freshness, worker-observed telemetry acceptance, and late
+ * client-reported outcomes. Thresholds are shown beside the figures; rates
+ * are suppressed below the denominator minimum; nothing here is a service
+ * health claim, and unobserved offline failures are never "zero failures".
+ */
+export function Reliability({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | null }) {
+  const rel = v2?.reliability
+  if (!v2 || !rel) {
+    return (
+      <StatePanel title="Reliability — v2 aggregate unavailable">
+        Worker-side acceptance counters and freshness diagnostics come from the published v2
+        snapshot, which has not been served yet. Nothing is shown in its place, because an
+        unobserved failure is not a zero failure rate.
+      </StatePanel>
+    )
+  }
+  const ageMin = Math.round((Date.now() - Date.parse(v2.generatedAt)) / 60_000)
+  const stale = ageMin > rel.thresholds.staleAfterMinutes
+  const lcd = rel.lastCompleteDay
+  const sync = v2.features.find((f) => f.id === 'sync_outcome')
+  const unknownBuild = v2.builds?.list.find((b) => b.buildId === 'unknown')
+  const issues: string[] = []
+  if (stale) issues.push(`Stale aggregate: the v2 snapshot is ${ageMin} min old (threshold ${rel.thresholds.staleAfterMinutes} min).`)
+  if (lcd.status === 'alert') issues.push(`Schema rejections above ${rel.thresholds.rejectRatePct}% on ${lcd.date} (${lcd.refused}/${lcd.attempts}).`)
+  if (unknownBuild && unknownBuild.tokens > 0) issues.push(`${unknownBuild.tokens} active token(s) report no build id (unknown build coverage).`)
+  if (legacy.completeness && !legacy.completeness.scanComplete) issues.push('Legacy scan incomplete — legacy totals are lower bounds.')
+  if (v2.completeness.status !== 'complete') issues.push(`v2 completeness: ${v2.completeness.status}${v2.completeness.reasons.length ? ` (${v2.completeness.reasons.join(', ')})` : ''}.`)
   return (
     <>
-      <StatePanel title="Reliability — not collected yet">
-        This section arrives with A5: worker-side acceptance/rejection reason counters, aggregation
-        freshness with configured thresholds, and coarse client-reported outcomes — each labelled
-        with its source and denominator. Until then nothing is shown, because an unobserved failure
-        is not a zero failure rate.
-      </StatePanel>
-      <StatePanel title="What already exists">
-        The status strip on Overview shows snapshot generation time and staleness, and completeness
-        warnings appear whenever a scan is incomplete or rows were unreadable.
-      </StatePanel>
+      {issues.length > 0 ? (
+        <div className="alertbox" role="alert">
+          <strong>Open issues</strong>
+          {issues.map((i) => (
+            <div key={i}>⚠ {i}</div>
+          ))}
+        </div>
+      ) : (
+        <StatePanel title="No open issues against the configured thresholds">
+          This is the absence of observed problems in the sources below — not a statement that every
+          client is healthy.
+        </StatePanel>
+      )}
+      <div className="kpis">
+        <Kpi
+          value={stale ? `${ageMin} min` : `${ageMin} min`}
+          label="Aggregate freshness"
+          support={`source: snapshot job · stale after ${rel.thresholds.staleAfterMinutes} min · last accepted batch ${rel.lastAcceptedAt ? new Date(rel.lastAcceptedAt).toLocaleString('en-GB') : 'none yet'}`}
+        />
+        <Kpi
+          value={lcd.ratePct === null ? '—' : `${lcd.ratePct}%`}
+          label={`Refused attempts — ${lcd.date}`}
+          support={
+            lcd.status === 'insufficient'
+              ? `source: worker ingestion · ${lcd.attempts}/${rel.thresholds.minAttempts} attempts — below the denominator minimum, rate suppressed`
+              : `source: worker ingestion · ${lcd.refused}/${lcd.attempts} attempts (last complete UTC day) · alert above ${rel.thresholds.rejectRatePct}%`
+          }
+        />
+        <Kpi
+          value={sync && sync.uses.value !== null ? sync.uses.value : '—'}
+          label="Client-reported sync outcomes (7d)"
+          support="source: late client reports, counts only · a client that cannot report contributes nothing — offline failures are unobserved, not zero"
+        />
+      </div>
+      <div className="card section-gap">
+        <h2>Telemetry acceptance by day (worker-observed)</h2>
+        <p className="support">
+          Counting boundary: attempts that reached the worker. Rate-limited attempts are refused
+          before any body is read and listed separately; duplicates are accepted replays, not
+          failures.
+        </p>
+        <div className="table-wrap">
+          <table>
+            <caption>Reason counts per UTC day — aggregate only, never request samples</caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Accepted</th>
+                <th scope="col">Duplicate</th>
+                <th scope="col">Schema-rejected</th>
+                <th scope="col">Oversize</th>
+                <th scope="col">Rate-limited</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...rel.days].reverse().map((d) => (
+                <tr key={d.date}>
+                  <th scope="row">{d.date}</th>
+                  <td>{d.accepted}</td>
+                  <td>{d.duplicate}</td>
+                  <td>{d.rejected}</td>
+                  <td>{d.oversize}</td>
+                  <td>{d.rateLimited}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </>
   )
 }
 
+/**
+ * Releases (§4.6): immutable build ids, each active token attributed once
+ * to its latest observed build, Unknown kept visible, comparisons only for
+ * builds with enough eligible tokens over a complete equal period — no
+ * deltas, no significance badges, no causal claims.
+ */
 export function Releases({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | null }) {
   const versions = Object.entries(legacy.todayVersions).sort((a, b) => Number(b[0]) - Number(a[0]))
+  const builds = v2?.builds
   return (
     <>
+      {builds && builds.list.length > 0 ? (
+        <div className="card section-gap">
+          <h2>Build coverage (v2, latest observed build per active token, 7 days)</h2>
+          <p className="support">
+            {builds.activeTokens} active tokens attributed once each. Comparisons show opens per
+            token over the last complete 7 UTC days for builds with at least 20 eligible tokens —
+            equal periods, eligible populations, and no claim that a release caused anything.
+          </p>
+          <div className="table-wrap">
+            <table>
+              <caption>Builds by latest observed attribution</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Build</th>
+                  <th scope="col">Tokens</th>
+                  <th scope="col">Share</th>
+                  <th scope="col">First observed</th>
+                  <th scope="col">Opens per token (complete 7d)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {builds.list.map((b) => (
+                  <tr key={b.buildId}>
+                    <th scope="row">{b.buildId === 'unknown' ? <span className="badge">Unknown</span> : <code>{b.buildId}</code>}</th>
+                    <td>{b.tokens}</td>
+                    <td>{b.sharePct === null ? '—' : `${b.sharePct}%`}</td>
+                    <td>{b.firstObserved ?? '—'}</td>
+                    <td>
+                      {'unavailable' in b.comparison
+                        ? `Comparison unavailable (${b.comparison.eligibleTokens}/${b.comparison.minimum} eligible tokens)`
+                        : `${b.comparison.opensPerToken} (${b.comparison.eligibleTokens} tokens, ${b.comparison.periodFrom} → ${b.comparison.periodTo})`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <StatePanel title="Build coverage — no v2 observations yet">
+          v2 batches carry an immutable build id (the git commit). Rows appear as clients report;
+          a new build without a complete period shows “Comparison unavailable”, never a delta.
+        </StatePanel>
+      )}
       <div className="card section-gap">
         <h2>Release-note markers seen today (legacy)</h2>
         {versions.length === 0 ? (
@@ -127,12 +265,6 @@ export function Releases({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
           deploys and cannot support release comparisons.
         </p>
       </div>
-      <StatePanel title="Build coverage — collecting under v2">
-        v2 batches carry an immutable build id (the git commit). Latest-build attribution, unknown
-        coverage and guarded equal-period comparisons ship in A5 once enough complete periods exist
-        {v2?.observedThrough ? ` (v2 data observed through ${v2.observedThrough})` : ' (no v2 observations yet)'}.
-        A new build without a complete period will show “Comparison unavailable”, never a delta.
-      </StatePanel>
     </>
   )
 }
@@ -229,11 +361,33 @@ export function DataAccess({ legacy, v2, onLock }: { legacy: LegacyStats; v2: St
           Clients keep coarse counters (opens and feature names with counts, by UTC day) plus
           standalone mode, platform class, build id and setup yes/nos, under a random token created
           on the device. No location, names, timetable content or notes — ever. Daily activity rows
-          expire after 90 days. The first-seen token ledger currently has NO expiry — a bounded
-          policy is proposed for A5 and will be labelled as a semantics change if adopted. Opting
-          out in the app clears unsent counters and stops collection; batches already delivered
-          cannot be unsent.
+          expire after 90 days; worker acceptance counters after 30 days; idempotence records after 8
+          days. A last-seen date per token is now recorded (self-expiring after 200 days). The
+          first-seen token ledger currently has NO expiry. A bounded policy is PROPOSED and not
+          active: tokens whose first-seen date is older than 180 days with no last-seen record would
+          be removed, after which a returning browser counts as newly observed — “ever recorded”
+          would become “recorded within retained history”. It runs only if the owner enables it,
+          touches analytics-owned first-seen rows only, and deletes at most 200 per run. Opting out in
+          the app clears unsent counters and stops collection; batches already delivered cannot be
+          unsent.
         </p>
+      </div>
+      <div className="card section-gap">
+        <h2>Collection start dates</h2>
+        {v2 ? (
+          <dl className="glossary">
+            {[...new Map(v2.features.map((f) => [f.contractVersion, f.collectionStartedAt])).entries()]
+              .sort((a, b) => a[0] - b[0])
+              .map(([version, started]) => (
+                <div key={version}>
+                  <dt>Capability {version}</dt>
+                  <dd>{started ? `collected since ${started} (UTC)` : 'no observations yet — not backdated'}</dd>
+                </div>
+              ))}
+          </dl>
+        ) : (
+          <p className="support">Available once the v2 snapshot is served.</p>
+        )}
       </div>
       <div className="card">
         <h2>Metric glossary</h2>

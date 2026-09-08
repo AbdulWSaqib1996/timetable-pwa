@@ -138,6 +138,26 @@ export interface StatsV2 {
     adoption: StatsV2Ratio
     uses: StatsV2Count
   }[]
+  /** reliability diagnostics (A5); absent from pre-A5 snapshots */
+  reliability?: {
+    thresholds: { staleAfterMinutes: number; rejectRatePct: number; minAttempts: number }
+    lastAcceptedAt: number | null
+    days: { date: string; accepted: number; duplicate: number; rejected: number; oversize: number; rateLimited: number }[]
+    lastCompleteDay: { date: string; attempts: number; refused: number; rateLimited: number; ratePct: number | null; status: 'ok' | 'alert' | 'insufficient' }
+  }
+  /** release coverage (A5); absent from pre-A5 snapshots */
+  builds?: {
+    activeTokens: number
+    list: {
+      buildId: string
+      tokens: number
+      sharePct: number | null
+      firstObserved: string | null
+      comparison:
+        | { periodFrom: string; periodTo: string; eligibleTokens: number; opensPerToken: number }
+        | { unavailable: true; eligibleTokens: number; minimum: number }
+    }[]
+  }
   /** weekly cohorts (A4); absent from pre-A4 snapshots */
   cohorts?: {
     week: string

@@ -44,6 +44,27 @@ export const v2Fixture = () => {
     completeness: { status: 'complete', missingRows: 0, invalidRows: 0, scanComplete: true, reasons: [] },
     metrics: { activeTokens7: count(3), activeTokens30: count(3), activeToday: { ...count(2), status: 'partial' } },
     daily: [{ date: today, active: count(2), new: count(1), returning: count(1) }],
+    reliability: {
+      thresholds: { staleAfterMinutes: 30, rejectRatePct: 2, minAttempts: 100 },
+      lastAcceptedAt: Date.now() - 5 * 60_000,
+      days: Array.from({ length: 7 }, (_, i) => ({
+        date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10),
+        accepted: 140,
+        duplicate: 3,
+        rejected: 1,
+        oversize: 0,
+        rateLimited: 0,
+      })),
+      lastCompleteDay: { date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), attempts: 144, refused: 1, rateLimited: 0, ratePct: 0.7, status: 'ok' },
+    },
+    builds: {
+      activeTokens: 30,
+      list: [
+        { buildId: '7af3942', tokens: 24, sharePct: 80, firstObserved: today, comparison: { periodFrom: 'x', periodTo: 'y', eligibleTokens: 24, opensPerToken: 3.4 } },
+        { buildId: '5c924c3', tokens: 4, sharePct: 13, firstObserved: today, comparison: { unavailable: true, eligibleTokens: 4, minimum: 20 } },
+        { buildId: 'unknown', tokens: 2, sharePct: 7, firstObserved: null, comparison: { unavailable: true, eligibleTokens: 2, minimum: 20 } },
+      ],
+    },
     features: [
       {
         id: 'task_created',
