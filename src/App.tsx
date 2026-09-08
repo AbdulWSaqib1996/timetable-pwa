@@ -1608,6 +1608,10 @@ export default function App() {
           profileId={active.id}
           admin={adminFile}
           onSelect={openSession}
+          onMeta={handleMeta}
+          profileName={active.name}
+          todayISO={todayISO}
+          placementTargetDays={settings.placementTargetDays}
           onClose={() => setOpenSheet('none')}
         />
       )}

@@ -17,6 +17,12 @@ export interface BinderOptions {
   toISO?: string
   /** included sections; omit for all */
   sections?: BinderSection[]
+  /** evidence keys chosen in the journal (session keys, `refl-<id>`, `les-<id>`) — only these print (R5a / NF-08) */
+  selection?: string[]
+  /** photo captions (default on) */
+  includeCaptions?: boolean
+  /** observer names on observation records (default on) */
+  includeObserverNames?: boolean
 }
 
 export type BinderSection =
@@ -91,7 +97,9 @@ export async function printBinder(input: BinderInput): Promise<void> {
   }
 
   // ---- Evidence per standard (session notes/photos + reflections + lesson evaluations) ----
+  const selected = opts.selection ? new Set(opts.selection) : null
   interface Ev {
+    key: string
     dateISO: string
     heading: string
     note?: string
@@ -108,6 +116,7 @@ export async function printBinder(input: BinderInput): Promise<void> {
     if (!m || (!m.note && !(m.photos ?? 0) && !(m.standards ?? []).length)) continue
     seen.add(key)
     evidence.push({
+      key,
       dateISO: s.dateISO,
       heading: s.title,
       note: m.note,
@@ -118,6 +127,7 @@ export async function printBinder(input: BinderInput): Promise<void> {
   }
   for (const r of admin.reflections.filter((r) => inRange(r.weekISO))) {
     evidence.push({
+      key: `refl-${r.id}`,
       dateISO: r.weekISO,
       heading: `Weekly reflection (w/c ${fmt(r.weekISO)})`,
       note: [r.wentWell && `Went well: ${r.wentWell}`, r.challenges && `Challenges: ${r.challenges}`, r.focus && `Next focus: ${r.focus}`]
@@ -130,6 +140,7 @@ export async function printBinder(input: BinderInput): Promise<void> {
   for (const l of admin.lessons.filter((l) => inRange(l.dateISO))) {
     if (!l.evaluation && l.standards.length === 0) continue
     evidence.push({
+      key: `les-${l.id}`,
       dateISO: l.dateISO,
       heading: `Lesson taught: ${l.subject}${l.classGroup ? ` (${l.classGroup})` : ''}`,
       note: l.evaluation,
@@ -141,6 +152,7 @@ export async function printBinder(input: BinderInput): Promise<void> {
   root.appendChild(el('h2', null, 'Evidence against the Teachers’ Standards'))
   for (const ts of [...TEACHERS_STANDARDS, { id: '', label: 'Not yet tagged' }]) {
     const mine = evidence
+      .filter((e) => !selected || selected.has(e.key))
       .filter((e) => (ts.id === '' ? e.standards.length === 0 : e.standards.includes(ts.id)))
       .sort((a, b) => a.dateISO.localeCompare(b.dateISO))
     if (mine.length === 0) continue
@@ -162,7 +174,7 @@ export async function printBinder(input: BinderInput): Promise<void> {
             img.src = url
             figure.appendChild(img)
             const caption = (photo as { caption?: string }).caption
-            if (caption) figure.appendChild(el('figcaption', 'pb-caption', caption))
+            if (caption && opts.includeCaptions !== false) figure.appendChild(el('figcaption', 'pb-caption', caption))
             grid.appendChild(figure)
           }
         } catch {
@@ -215,7 +227,7 @@ export async function printBinder(input: BinderInput): Promise<void> {
     root.appendChild(el('h2', null, 'Observation records'))
     for (const o of [...admin.observations].filter((o) => inRange(o.dateISO)).sort((a, b) => a.dateISO.localeCompare(b.dateISO))) {
       const item = el('div', 'pb-entry')
-      item.appendChild(el('h3', null, `${fmt(o.dateISO)} · ${o.subject || 'Lesson'}${o.observer ? ` · observed by ${o.observer}` : ''}`))
+      item.appendChild(el('h3', null, `${fmt(o.dateISO)} · ${o.subject || 'Lesson'}${o.observer && opts.includeObserverNames !== false ? ` · observed by ${o.observer}` : ''}`))
       if (o.focus) item.appendChild(el('p', null, `Focus: ${o.focus}`))
       if (o.strengths) item.appendChild(el('p', null, `Strengths: ${o.strengths}`))
       if (o.development) item.appendChild(el('p', null, `Development points: ${o.development}`))

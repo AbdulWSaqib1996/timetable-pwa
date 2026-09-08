@@ -461,6 +461,15 @@ export function SessionDetail({
             <p className="filter-hint">
               Tag notes/photos against the Teachers' Standards — they build your evidence journal.
             </p>
+            <button
+              type="button"
+              className={`chip chip-small${meta?.reviewLater ? ' chip-on' : ''}`}
+              aria-pressed={meta?.reviewLater === true}
+              title="Flag this record for the evidence review queue"
+              onClick={() => onMeta({ reviewLater: meta?.reviewLater ? undefined : true })}
+            >
+              {meta?.reviewLater ? '✓ Flagged: review later' : 'Review later'}
+            </button>
             <p className="filter-hint">{photos.length} photos available on this device.{(meta?.photos ?? 0) > photos.length ? ` ${(meta?.photos ?? 0) - photos.length} more recorded elsewhere; import a backup from that device to view them.` : ''}</p>
             <div className="photo-grid">
               {photos.map((p, i) => (

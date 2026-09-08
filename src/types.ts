@@ -193,6 +193,8 @@ export interface SessionMeta {
   status?: 'todo' | 'doing' | 'done'
   /** Teachers' Standards this note/photo evidences (e.g. ["TS1","TS4"]) */
   standards?: string[]
+  /** flagged for the evidence review queue (R5a / NF-08) — organisational, never a judgement */
+  reviewLater?: boolean
   /** last local edit time, used by cross-device sync to merge (newest wins per session) */
   at?: number
 }

@@ -8,7 +8,8 @@ import { printEvidenceBundle } from '../lib/printBundle'
 import { trackUse } from '../lib/usage'
 import { telemetryTrack } from '../lib/telemetry'
 import { TEACHERS_STANDARDS, standardLabel } from '../lib/standards'
-import type { MetaMap, Session } from '../types'
+import type { MetaMap, Session, SessionMeta } from '../types'
+import { BinderPreviewSheet } from './BinderPreviewSheet'
 
 interface Props {
   /** sessions with the user's filters applied, all dates (key dates included) */
@@ -19,6 +20,11 @@ interface Props {
   /** PGCE admin file — reflections, lessons, targets and observations join the journal */
   admin?: AdminFile
   onSelect: (session: Session) => void
+  /** flag/unflag a session record for the review queue (R5a / NF-08) */
+  onMeta: (session: Session, patch: Partial<SessionMeta>) => void
+  profileName: string
+  todayISO: string
+  placementTargetDays?: number
   onClose: () => void
 }
 
@@ -37,6 +43,11 @@ interface Entry {
   captions: string[]
   photos: number
   standards: string[]
+  /** photos actually present on this device for this record */
+  localPhotos: number
+  /** local photos without a caption */
+  uncaptioned: number
+  reviewLater: boolean
 }
 
 const TYPE_LABEL: Record<EntryType, string> = {
@@ -81,13 +92,15 @@ interface JournalContext {
   query: string
   standard: string | null
   untagged: boolean
+  /** review queue: untagged, missing captions or flagged "Review later" */
+  queue: boolean
   types: EntryType[]
   from: string
   to: string
 }
 
 const CONTEXT_KEY = 'timetable.journalctx.v1'
-const defaultContext: JournalContext = { query: '', standard: null, untagged: false, types: [], from: '', to: '' }
+const defaultContext: JournalContext = { query: '', standard: null, untagged: false, queue: false, types: [], from: '', to: '' }
 
 /**
  * Evidence journal with search (P5-04): query, date range, record type,
@@ -96,7 +109,7 @@ const defaultContext: JournalContext = { query: '', standard: null, untagged: fa
  * deterministic computed selector keyed by stable record identity; search
  * context survives Back via sessionStorage.
  */
-export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, onClose }: Props) {
+export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, onMeta, profileName, todayISO, placementTargetDays, onClose }: Props) {
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const [ctx, setCtx] = useState<JournalContext>(() => {
     try {
@@ -116,27 +129,36 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
       return next
     })
 
-  // Photo captions, indexed by owner key (updated when the sheet opens).
+  // Photo captions and local photo counts, indexed by owner key (updated when the sheet opens).
   const [captionsByKey, setCaptionsByKey] = useState<Map<string, string[]>>(new Map())
+  const [localByKey, setLocalByKey] = useState<Map<string, number>>(new Map())
+  // Binder selections reference canonical records by key — never copies (NF-08).
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [binderOpen, setBinderOpen] = useState(false)
   useEffect(() => {
     let live = true
     void readAttachments('photos')
       .then((all) => {
         if (!live) return
         const map = new Map<string, string[]>()
+        const counts = new Map<string, number>()
         for (const p of all) {
           const [pid, key] = [p.owner.slice(0, p.owner.indexOf('|')), p.owner.slice(p.owner.indexOf('|') + 1)]
+          if (pid !== profileId) continue
+          counts.set(key, (counts.get(key) ?? 0) + 1)
           const caption = (p as { caption?: string }).caption
-          if (pid !== profileId || !caption) continue
+          if (!caption) continue
           map.set(key, [...(map.get(key) ?? []), caption])
         }
         setCaptionsByKey(map)
+        setLocalByKey(counts)
       })
       .catch(() => {})
     return () => {
       live = false
     }
-  }, [profileId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, metaMap])
 
   const entries = useMemo(() => {
     const seen = new Set<string>()
@@ -160,6 +182,9 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         captions,
         photos: m?.photos ?? 0,
         standards: m?.standards ?? [],
+        localPhotos: localByKey.get(key) ?? 0,
+        uncaptioned: Math.max(0, (localByKey.get(key) ?? 0) - captions.length),
+        reviewLater: m?.reviewLater === true,
       })
     }
     // Older notes remain discoverable even if their source event vanished before identity migration.
@@ -176,6 +201,9 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         captions: captionsByKey.get(key) ?? [],
         photos: m.photos ?? 0,
         standards: m.standards ?? [],
+        localPhotos: localByKey.get(key) ?? 0,
+        uncaptioned: Math.max(0, (localByKey.get(key) ?? 0) - (captionsByKey.get(key) ?? []).length),
+        reviewLater: m.reviewLater === true,
       })
     }
     for (const r of admin?.reflections ?? []) {
@@ -192,6 +220,9 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         captions: [],
         photos: 0,
         standards: r.standards,
+        localPhotos: 0,
+        uncaptioned: 0,
+        reviewLater: false,
       })
     }
     for (const l of admin?.lessons ?? []) {
@@ -207,6 +238,9 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         captions: [],
         photos: 0,
         standards: l.standards,
+        localPhotos: 0,
+        uncaptioned: 0,
+        reviewLater: false,
       })
     }
     for (const t of admin?.targets ?? []) {
@@ -221,6 +255,9 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         captions: [],
         photos: 0,
         standards: t.standards,
+        localPhotos: 0,
+        uncaptioned: 0,
+        reviewLater: false,
       })
     }
     for (const o of admin?.observations ?? []) {
@@ -238,10 +275,13 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         captions: [],
         photos: 0,
         standards: [],
+        localPhotos: 0,
+        uncaptioned: 0,
+        reviewLater: false,
       })
     }
     return out.sort((a, b) => b.dateISO.localeCompare(a.dateISO))
-  }, [sessions, metaMap, admin, captionsByKey])
+  }, [sessions, metaMap, admin, captionsByKey, localByKey])
 
   const counts = useMemo(() => {
     const map = new Map<string, number>()
@@ -249,12 +289,15 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
     return map
   }, [entries])
   const untaggedCount = entries.filter((e) => e.standards.length === 0).length
+  const needsReview = (e: Entry) => e.standards.length === 0 || e.uncaptioned > 0 || e.reviewLater
+  const queueCount = entries.filter(needsReview).length
 
   const shown = useMemo(() => {
     const q = ctx.query.trim().toLowerCase()
     return entries.filter((e) => {
       if (ctx.standard && !e.standards.includes(ctx.standard)) return false
       if (ctx.untagged && e.standards.length > 0) return false
+      if (ctx.queue && !needsReview(e)) return false
       if (ctx.types.length > 0 && !ctx.types.includes(e.type)) return false
       if (ctx.from && e.dateISO < ctx.from) return false
       if (ctx.to && e.dateISO > ctx.to) return false
@@ -267,7 +310,14 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
   }, [entries, ctx])
 
   const filtersActive =
-    ctx.query.trim() !== '' || ctx.standard !== null || ctx.untagged || ctx.types.length > 0 || ctx.from !== '' || ctx.to !== ''
+    ctx.query.trim() !== '' || ctx.standard !== null || ctx.untagged || ctx.queue || ctx.types.length > 0 || ctx.from !== '' || ctx.to !== ''
+  const toggleSelected = (key: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -341,7 +391,22 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
           >
             Untagged ({untaggedCount})
           </button>
+          <button
+            type="button"
+            className={`chip chip-small${ctx.queue ? ' chip-on' : ''}`}
+            aria-pressed={ctx.queue}
+            title="Untagged records, photos without captions and records flagged Review later"
+            onClick={() => update({ queue: !ctx.queue })}
+          >
+            Review queue ({queueCount})
+          </button>
         </div>
+        {ctx.queue && (
+          <p className="filter-hint">
+            Organisational only: untagged records, photos without captions and anything you flagged “Review later”.
+            Nothing here judges the evidence itself.
+          </p>
+        )}
         {ctx.standard && <p className="filter-hint">{standardLabel(ctx.standard)}</p>}
         {shown.length === 0 ? (
           <div className="empty-state">
@@ -378,27 +443,82 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
                       </span>
                     ))}
                     {e.photos > 0 && <span className="badge badge-note">📷 {e.photos}</span>}
+                    {e.standards.length === 0 && <span className="badge badge-conflict">Untagged</span>}
+                    {e.uncaptioned > 0 && (
+                      <span className="badge badge-conflict">
+                        {e.uncaptioned} photo{e.uncaptioned === 1 ? '' : 's'} without a caption
+                      </span>
+                    )}
+                    {e.photos > e.localPhotos && <span className="badge badge-note">{e.photos - e.localPhotos} elsewhere</span>}
+                    {e.reviewLater && <span className="badge badge-personal">Review later</span>}
                   </span>
                 </>
               )
               return (
-                <li key={e.id}>
-                  {e.session ? (
-                    <button type="button" className="journal-entry" onClick={() => onSelect(e.session!)}>
-                      {body}
-                    </button>
-                  ) : (
-                    <div className="journal-entry journal-static">{body}</div>
+                <li key={e.id} className={selected.has(e.key) ? 'journal-selected' : ''}>
+                  <div className="journal-row">
+                    <label className="journal-select">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(e.key)}
+                        aria-label={`Select “${e.title}” for the binder`}
+                        onChange={() => toggleSelected(e.key)}
+                      />
+                    </label>
+                    {e.session ? (
+                      <button type="button" className="journal-entry" onClick={() => onSelect(e.session!)}>
+                        {body}
+                      </button>
+                    ) : (
+                      <div className="journal-entry journal-static">{body}</div>
+                    )}
+                  </div>
+                  {e.session && (
+                    <div className="journal-actions">
+                      <button
+                        type="button"
+                        className="travel-link"
+                        aria-pressed={e.reviewLater}
+                        onClick={() => onMeta(e.session!, { reviewLater: e.reviewLater ? undefined : true })}
+                      >
+                        {e.reviewLater ? 'Clear “Review later”' : 'Review later'}
+                      </button>
+                    </div>
                   )}
                 </li>
               )
             })}
           </ul>
         )}
+        {selected.size > 0 && (
+          <p className="filter-hint journal-selection-line" role="status">
+            {selected.size} selected for the binder.{' '}
+            <button type="button" className="travel-link" onClick={() => setSelected(new Set())}>
+              Clear selection
+            </button>{' '}
+            (clearing never deletes evidence)
+          </p>
+        )}
+        {binderOpen && (
+          <BinderPreviewSheet
+            profileId={profileId}
+            profileName={profileName}
+            sessions={sessions}
+            metaMap={metaMap}
+            admin={admin ?? { reflections: [], targets: [], meetings: [], observations: [], lessons: [], audits: [], tasks: [], exceptions: [], plans: [], commitments: [] }}
+            placementTargetDays={placementTargetDays}
+            todayISO={todayISO}
+            selection={[...selected]}
+            onClose={() => setBinderOpen(false)}
+          />
+        )}
         <div className="modal-actions">
+          <button type="button" className="btn-primary" disabled={selected.size === 0} onClick={() => setBinderOpen(true)}>
+            Binder from selection ({selected.size})
+          </button>
           <button
             type="button"
-            className="btn-primary"
+            className="btn-secondary"
             disabled={shown.length === 0}
             onClick={() => {
               trackUse('evidenceprint') // legacy attempt, fired at the start

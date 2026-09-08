@@ -68,6 +68,7 @@ export function validatePayload(data) {
           if (entry.at !== undefined) assert(Number.isFinite(entry.at), 'Invalid record revision.')
           if (entry.photos !== undefined) assert(Number.isInteger(entry.photos) && entry.photos >= 0, 'Invalid photo count.')
           if (entry.standards !== undefined) assert(Array.isArray(entry.standards) && entry.standards.every(x => typeof x === 'string'), 'Invalid standards.')
+          if (entry.reviewLater !== undefined) assert(typeof entry.reviewLater === 'boolean', 'Invalid review flag.')
         }
       }
       if (group === 'admin') {
