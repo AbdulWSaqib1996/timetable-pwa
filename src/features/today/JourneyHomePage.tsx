@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { telemetryTrack } from '../../lib/telemetry'
 import { ItinerarySteps } from '../../components/ItinerarySteps'
 import { OriginSelector } from '../../components/OriginSelector'
 import { RouteMap } from '../../components/RouteMap'
@@ -61,6 +62,7 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
 
   // A minute tick keeps the arrival estimate current.
   const [, setTick] = useState(0)
+  useEffect(() => telemetryTrack('journey_home_opened'), [])
   // Route-map leg highlight (P7-03), cleared when the itinerary changes.
   const [selectedLeg, setSelectedLeg] = useState<number | null>(null)
   useEffect(() => setSelectedLeg(null), [journey.itinerary])
@@ -217,7 +219,7 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
         </p>
       )}
 
-      <a className="btn-primary btn-link external-nav" href={mapsUrl} target="_blank" rel="noopener noreferrer">
+      <a className="btn-primary btn-link external-nav" href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={() => telemetryTrack('navigation_link_opened')}>
         Directions home ↗
       </a>
       <p className="filter-hint external-nav-caption">Opens navigation outside My Timetable</p>

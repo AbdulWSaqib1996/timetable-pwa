@@ -10,7 +10,10 @@ import { Kpi, StatePanel } from '../components/bits'
  * explicit denominator; weekly cohorts are honestly "not collected" until
  * A4's cohort aggregation exists.
  */
-export function Returning({ legacy }: { legacy: LegacyStats }) {
+const SMALL_COHORT = 10
+
+export function Returning({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | null }) {
+  const cohorts = v2?.cohorts ?? []
   const r = legacy.retention
   const total = r.oneDay + r.twoToFourDays + r.fivePlusDays
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}%` : '—')
@@ -22,10 +25,66 @@ export function Returning({ legacy }: { legacy: LegacyStats }) {
         <Kpi value={total === 0 ? '—' : `${r.fivePlusDays} (${pct(r.fivePlusDays)})`} label="Observed 5+ days" support="distinct observed days per token, this window" />
       </div>
       {total === 0 && <StatePanel title="No observations">No tokens were observed in this window.</StatePanel>}
-      <StatePanel title="Weekly cohorts — not collected yet">
-        Cohort retention (first-observed week → exact follow-on calendar weeks, UTC Monday
-        boundaries) ships with the A4 aggregation. Frequency above is a different measure and stays
-        alongside cohorts when they arrive. Nothing here will be backfilled.
+      {cohorts.length === 0 ? (
+        <StatePanel title="Weekly cohorts — no v2 observations yet">
+          Cohort membership is a token's first OBSERVED week under v2 event-day collection (UTC
+          Monday boundaries); rows appear as clients report under the new contract. Nothing is
+          backfilled from legacy receipt-day data.
+        </StatePanel>
+      ) : (
+        <div className="card section-gap">
+          <h2>Weekly cohorts (v2 event-day)</h2>
+          <p className="support">
+            Membership: first v2-observed week, UTC Monday boundaries, under the retained-identity
+            policy. A week-N return means at least one observation in that EXACT calendar week —
+            not “returned at any later date”. Open weeks show a dash; cohorts under {SMALL_COHORT}
+            tokens show counts without a headline percentage.
+          </p>
+          <div className="table-wrap">
+            <table>
+              <caption>Cohort returns by exact follow-on week</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Cohort week (Mon)</th>
+                  <th scope="col">Size</th>
+                  {[1, 2, 3, 4].map((n) => (
+                    <th scope="col" key={n}>
+                      Week {n}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {cohorts.map((c) => (
+                  <tr key={c.week}>
+                    <th scope="row">
+                      {c.week}
+                      {!c.complete && <span className="badge" style={{ marginLeft: 6 }}>forming</span>}
+                      {c.complete && c.size < SMALL_COHORT && <span className="badge" style={{ marginLeft: 6 }}>Small cohort</span>}
+                    </th>
+                    <td>{c.size}</td>
+                    {c.weeks.map((w) => (
+                      <td key={w.n}>
+                        {!w.complete || w.returned === null ? (
+                          <span className="muted" title="Not complete">— <span className="meta">Not complete</span></span>
+                        ) : c.size >= SMALL_COHORT ? (
+                          `${Math.round((w.returned / c.size) * 100)}% (${w.returned}/${c.size})`
+                        ) : (
+                          `${w.returned}/${c.size}`
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      <StatePanel title="Frequency vs cohorts">
+        Frequency (above) counts distinct observed DAYS per token inside one window; cohorts track
+        whether a token comes back in later CALENDAR WEEKS. They answer different questions and
+        will not match each other.
       </StatePanel>
     </>
   )

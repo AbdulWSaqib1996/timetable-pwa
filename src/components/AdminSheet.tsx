@@ -10,6 +10,7 @@ import { readAttachments } from '../lib/attachments'
 import { Dialog, Field } from './ui'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import { trackUse } from '../lib/usage'
+import { telemetryTrack } from '../lib/telemetry'
 import { RecordEditSheet } from './RecordEditSheet'
 import type { RecordKind } from './RecordEditSheet'
 import { StatusMessage } from './ui'
@@ -849,6 +850,9 @@ function BinderPreviewSheet({
               todayISO,
               options: { fromISO: fromISO || undefined, toISO: toISO || undefined, sections },
             })
+              // A4: "prepared" fires only after the artifact was generated —
+              // it never claims a print completed or a file was saved.
+              .then(() => telemetryTrack('export_prepared'))
               .catch(() => {})
               .finally(() => setPrinting(false))
           }}

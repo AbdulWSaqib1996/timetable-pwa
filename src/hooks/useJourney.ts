@@ -5,8 +5,11 @@ import type { Coords } from '../lib/campus'
 import { clearLeavePlan, planJourney, publishLeavePlan } from '../lib/journeyPlanner'
 import type { PlanResult } from '../lib/journeyPlanner'
 import type { OriginOption } from '../lib/origins'
+import { telemetryTrack } from '../lib/telemetry'
 import { tflDeparturesNear, tflDisruptions } from '../lib/tfl'
 import type { TflDepartures, TflDisruption } from '../lib/tfl'
+
+const plannedKeys = new Set<string>()
 
 export interface UseJourneyInput {
   origin: OriginOption | null
@@ -98,6 +101,13 @@ export function useJourney({ origin, destination, mode, intent, eventKey, enable
         }
         if (cancelled) return
         setState({ key, plan, fallback, loading: false })
+        // A4 success: a real provider plan was shown for this request
+        // identity (deduped per key; nothing about the journey is sent).
+        if (plan.itinerary && !plannedKeys.has(key)) {
+          if (plannedKeys.size > 50) plannedKeys.clear()
+          plannedKeys.add(key)
+          telemetryTrack('journey_planned')
+        }
         if (eventKey && request.intent.kind === 'arrive-by' && plan.itinerary) {
           publishLeavePlan(eventKey, {
             requestKey: plan.requestKey,

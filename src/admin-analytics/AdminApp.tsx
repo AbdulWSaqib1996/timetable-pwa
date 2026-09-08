@@ -229,7 +229,7 @@ export function AdminApp() {
       case 'adoption':
         return <Adoption legacy={legacy} v2={v2} />
       case 'returning':
-        return <Returning legacy={legacy} />
+        return <Returning legacy={legacy} v2={v2} />
       case 'reliability':
         return <Reliability />
       case 'releases':

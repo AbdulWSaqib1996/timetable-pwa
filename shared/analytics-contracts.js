@@ -14,10 +14,11 @@ export const ANALYTICS_SCHEMA_VERSION = 2
 /**
  * The capability version this build can report. Version 1 carries the legacy
  * action names (now recorded by OBSERVED day instead of receipt day).
- * Version 2 names are reserved for the A4 instrumentation of route views and
- * SUCCESSFUL persistence — bump CAPABILITY_VERSION when A4 wires them.
+ * Version 2 (A4) adds route views and SUCCESSFUL-persistence events. The
+ * catalogue sits exactly at the 32-events-per-version cap: session detail
+ * and search stay measured under their v1 names rather than duplicated.
  */
-export const CAPABILITY_VERSION = 1
+export const CAPABILITY_VERSION = 2
 
 /** semantics: what a count actually proves. */
 export const ACTION_CATALOGUE = {
@@ -40,13 +41,11 @@ export const ACTION_CATALOGUE = {
   photo: { label: 'Photo add attempt', semantics: 'attempt', since: 1 },
   binder: { label: 'Binder export attempt', semantics: 'attempt', since: 1 },
   evidenceprint: { label: 'Evidence print attempt', semantics: 'attempt', since: 1 },
-  // -- capability 2: A4 route views and SUCCESS events (not yet collected) --
+  // -- capability 2 (A4): route views and SUCCESS events --
   view_today: { label: 'Today viewed', semantics: 'view', since: 2 },
   view_schedule: { label: 'Schedule viewed', semantics: 'view', since: 2 },
   view_tasks: { label: 'Tasks viewed', semantics: 'view', since: 2 },
   view_pgce: { label: 'PGCE file viewed', semantics: 'view', since: 2 },
-  session_detail_opened: { label: 'Session detail opened', semantics: 'view', since: 2 },
-  schedule_search_used: { label: 'Schedule search used', semantics: 'attempt', since: 2 },
   journey_session_opened: { label: 'Journey to session opened', semantics: 'view', since: 2 },
   journey_home_opened: { label: 'Journey home opened', semantics: 'view', since: 2 },
   journey_planned: { label: 'Journey plan shown', semantics: 'success', since: 2 },
@@ -57,7 +56,6 @@ export const ACTION_CATALOGUE = {
   evidence_photo_saved: { label: 'Evidence photo saved', semantics: 'success', since: 2 },
   export_prepared: { label: 'Export prepared', semantics: 'success', since: 2 },
   sync_outcome: { label: 'Sync outcome reported', semantics: 'success', since: 2 },
-  course_template_applied: { label: 'Course template applied', semantics: 'success', since: 2 },
 }
 
 export const SETUP_FLAGS = ['push', 'location', 'home', 'keyDates', 'sync', 'placements']

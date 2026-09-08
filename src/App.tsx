@@ -35,6 +35,7 @@ import { sendTelemetry } from './lib/analytics'
 import { configureTelemetry } from './lib/telemetry'
 import { loadSyncState as loadSyncStateForPing } from './lib/sync'
 import { trackOpen, trackUse } from './lib/usage'
+import { telemetryTrack } from './lib/telemetry'
 import { UpdateToast } from './components/UpdateToast'
 import { legacyKey } from '../shared/identity.js'
 import { sessionKey } from './lib/diff'
@@ -214,17 +215,33 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
 
+  const PGCE_COLLECTIONS = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits'] as const
   function updateAdmin(updater: (prev: AdminFile) => AdminFile) {
     if (!active) return
     setAdminFile((prev) => {
       const next = updater(prev)
       saveAdminFile(active.id, next)
+      // A4: pgce_record_saved counts once per successful save that added or
+      // updated a PGCE record — every tab's create/edit/undo flow funnels
+      // through here, and deletes don't fire. Counts only; never record
+      // content or type.
+      const savedRecord = PGCE_COLLECTIONS.some((c) => {
+        const before = new Map((prev[c] as { id: string; at: number }[]).map((r) => [r.id, r.at]))
+        return (next[c] as { id: string; at: number }[]).some((r) => before.get(r.id) !== r.at)
+      })
+      if (savedRecord) telemetryTrack('pgce_record_saved')
       return next
     })
   }
 
   function saveTask(record: TaskRecord): boolean {
     if (!active) return false
+    // A4 success events, decided against the CURRENT store before the write:
+    // a brand-new id is a creation; a status transition to done is a
+    // completion. Retries of the same save cannot double-fire.
+    const existing = adminFile.tasks.find((t) => t.id === record.id)
+    if (!existing) telemetryTrack('task_created')
+    if (record.status === 'done' && existing?.status !== 'done') telemetryTrack('task_completed')
     updateAdmin((prev) => ({ ...prev, tasks: [...prev.tasks.filter((t) => t.id !== record.id), record] }))
     return true
   }
@@ -364,6 +381,10 @@ export default function App() {
   }, [openSheet])
   useEffect(() => {
     if (route.name === 'session') trackUse('detail')
+    // A4 route views: real navigations only (deps dedupe rerenders); no
+    // query strings or record identifiers ever accompany these.
+    const viewEvent = ({ today: 'view_today', schedule: 'view_schedule', tasks: 'view_tasks', pgce: 'view_pgce' } as Record<string, string>)[route.name]
+    if (viewEvent) telemetryTrack(viewEvent)
   }, [route.name])
   const viewForTrack = settings?.activeView ?? 'day'
   useEffect(() => {
@@ -814,6 +835,7 @@ export default function App() {
       const key = sessionKey(target)
       for (const blob of blobs) {
         await addPhoto(active.id, key, await compressImage(new File([blob], 'shared.jpg', { type: blob.type || 'image/jpeg' })))
+        telemetryTrack('evidence_photo_saved')
       }
       handleMeta(target, { photos: (metaMap[key]?.photos ?? 0) + blobs.length })
       openSession(target)

@@ -8,7 +8,7 @@ import { isPlacementSession, placementTag } from '../lib/format'
 import { downloadICS } from '../lib/ics'
 import { buildShareUrl } from '../lib/share'
 import { parseSheetUrl } from '../lib/sheetUrl'
-import { telemetryPending } from '../lib/telemetry'
+import { telemetryPending, telemetryTrack } from '../lib/telemetry'
 import { WHATSNEW_VERSION } from '../lib/changelog'
 import { geocodeAddress } from '../lib/geocode'
 import { needsIosInstall } from '../lib/platform'
@@ -1254,7 +1254,7 @@ export function SettingsSheet({
             type="button"
             className="btn-secondary"
             disabled={courseSessions.length === 0 && keyDates.length === 0 && personalSessions.length === 0}
-            onClick={() =>
+            onClick={() => {
               downloadICS(
                 [
                   ...courseSessions,
@@ -1263,7 +1263,9 @@ export function SettingsSheet({
                 ],
                 'My Timetable'
               )
-            }
+              // A4: the .ics artifact was generated and handed to the browser.
+              telemetryTrack('export_prepared')
+            }}
           >
             Download .ics file
           </button>

@@ -64,11 +64,16 @@ export class AnalyticsStore {
         if (!(await tx.get(`seen:${batch.token}`))) {
           await tx.put(`seen:${batch.token}`, batch.days.map((d) => d.date).sort()[0])
         }
-        // v2 measurement start: the first REAL batch's earliest day, kept
-        // forever so adoption figures can say when collection began (§7.3 —
-        // never silently backdated). Reserved test tokens don't set it.
-        if (!isTestToken(batch.token) && !(await tx.get('meta:start'))) {
-          await tx.put('meta:start', batch.days.map((d) => d.date).sort()[0])
+        // Measurement-start dates, kept forever so adoption figures can say
+        // when collection began (§7.3 — never silently backdated). Recorded
+        // PER capability version: a capability-2 event's history starts when
+        // capability-2 clients first reported, not at the v2 epoch. Reserved
+        // test tokens set none of them.
+        if (!isTestToken(batch.token)) {
+          const earliest = batch.days.map((d) => d.date).sort()[0]
+          if (!(await tx.get('meta:start'))) await tx.put('meta:start', earliest)
+          const capKey = `meta:startcap:${batch.capabilityVersion}`
+          if (!(await tx.get(capKey))) await tx.put(capKey, earliest)
         }
         await tx.put(dedupeKey, Date.now() + DEDUPE_HORIZON_DAYS * 86400000)
         // The acknowledgement is produced INSIDE the transaction: it exists
@@ -90,6 +95,10 @@ export class AnalyticsStore {
     const now = Date.now()
     const today = dayISO(now)
     const collectionStart = (await this.state.storage.get('meta:start')) ?? null
+    const capStarts = new Map()
+    for (const [k, v] of await this.state.storage.list({ prefix: 'meta:startcap:' })) {
+      capStarts.set(Number(k.slice('meta:startcap:'.length)), v)
+    }
     const seenEntries = await this.state.storage.list({ prefix: 'seen:' })
     const firstSeen = new Map()
     for (const [k, v] of seenEntries) {
@@ -159,6 +168,52 @@ export class AnalyticsStore {
       if (Number(expiry) < now) await this.state.storage.delete(key)
     }
 
+    // Weekly cohorts (§4.4): membership = first v2-observed week (UTC Monday
+    // 00:00 boundaries) under the retained-identity policy; week-N return =
+    // at least one valid event-day observation in that EXACT subsequent
+    // calendar week — not rolling N days, never "returned at any later
+    // date". Incomplete observation weeks are marked, not zeroed; size
+    // thresholds are applied by the display layer. No backfill: cohorts
+    // begin at v2 measurement start.
+    const mondayOf = (dateISO) => {
+      const d = new Date(dateISO + 'T00:00:00Z')
+      const shift = (d.getUTCDay() + 6) % 7
+      return dayISO(d.getTime() - shift * 86400000)
+    }
+    const addDays = (dateISO, n) => dayISO(Date.parse(dateISO + 'T00:00:00Z') + n * 86400000)
+    const thisMonday = mondayOf(today)
+    const tokenWeeks = new Map()
+    for (const key of allDays.keys()) {
+      const date = key.slice(4, 14)
+      const token = key.slice(15)
+      if (isTestToken(token) || date < horizon) continue
+      const wk = mondayOf(date)
+      ;(tokenWeeks.get(token) ?? tokenWeeks.set(token, new Set()).get(token)).add(wk)
+    }
+    const cohortMap = new Map()
+    for (const [token, first] of firstSeen) {
+      const wk = mondayOf(first)
+      ;(cohortMap.get(wk) ?? cohortMap.set(wk, []).get(wk)).push(token)
+    }
+    const cohorts = [...cohortMap.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 8)
+      .map(([week, tokens]) => ({
+        week,
+        size: tokens.length,
+        complete: week < thisMonday,
+        weeks: [1, 2, 3, 4].map((n) => {
+          const target = addDays(week, 7 * n)
+          const complete = target < thisMonday
+          return {
+            n,
+            complete,
+            returned: complete ? tokens.filter((t) => tokenWeeks.get(t)?.has(target)).length : null,
+          }
+        }),
+      }))
+      .reverse()
+
     const eligibleFor = (since) =>
       [...active7].filter((t) => (tokenCapability.get(t) ?? 1) >= since).length
     const features = Object.entries(ACTION_CATALOGUE).map(([id, def]) => {
@@ -168,7 +223,7 @@ export class AnalyticsStore {
       return {
         id,
         contractVersion: def.since,
-        collectionStartedAt: collected ? collectionStart : null,
+        collectionStartedAt: collected ? (capStarts.get(def.since) ?? (def.since === 1 ? collectionStart : null)) : null,
         measurement: collected ? 'available' : 'not-collected',
         adoption: {
           value: collected && eligible > 0 ? Math.round((tokens / eligible) * 100) : null,
@@ -209,6 +264,7 @@ export class AnalyticsStore {
       },
       daily,
       features,
+      cohorts,
     })
   }
 }
