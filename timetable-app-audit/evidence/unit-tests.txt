@@ -1,0 +1,638 @@
+
+> timetable-pwa@0.1.0 test:unit
+> node --test tests/unit/*.test.mjs
+
+TAP version 13
+# Subtest: actions route to their owning profile, even while another profile is active
+ok 1 - actions route to their owning profile, even while another profile is active
+  ---
+  duration_ms: 4.598
+  type: 'test'
+  ...
+# Subtest: an action owned by a deleted profile is dropped, never re-attached
+ok 2 - an action owned by a deleted profile is dropped, never re-attached
+  ---
+  duration_ms: 0.160792
+  type: 'test'
+  ...
+# Subtest: unscoped legacy actions apply only when exactly one profile exists
+ok 3 - unscoped legacy actions apply only when exactly one profile exists
+  ---
+  duration_ms: 0.292833
+  type: 'test'
+  ...
+# Subtest: duplicate action ids are applied once; malformed and unknown records are dropped safely
+ok 4 - duplicate action ids are applied once; malformed and unknown records are dropped safely
+  ---
+  duration_ms: 0.415708
+  type: 'test'
+  ...
+# Subtest: task 'done' and 'open' route with their kinds; open carries the owner
+ok 5 - task 'done' and 'open' route with their kinds; open carries the owner
+  ---
+  duration_ms: 0.389583
+  type: 'test'
+  ...
+# Subtest: notification data is versioned and drops snoozeUrl without a key
+ok 6 - notification data is versioned and drops snoozeUrl without a key
+  ---
+  duration_ms: 0.831125
+  type: 'test'
+  ...
+# Subtest: freshness policy: fresh within the window, stale after it, missing without data
+ok 7 - freshness policy: fresh within the window, stale after it, missing without data
+  ---
+  duration_ms: 1.276291
+  type: 'test'
+  ...
+# Subtest: personal busy blocks remove free time exactly like course sessions
+ok 8 - personal busy blocks remove free time exactly like course sessions
+  ---
+  duration_ms: 2.243542
+  type: 'test'
+  ...
+# Subtest: working hours and minimum meeting length are honoured, weekends skipped
+ok 9 - working hours and minimum meeting length are honoured, weekends skipped
+  ---
+  duration_ms: 0.319
+  type: 'test'
+  ...
+# Subtest: timezone difference: Paris wall slots land on London wall time, cross-day splits are honest
+ok 10 - timezone difference: Paris wall slots land on London wall time, cross-day splits are honest
+  ---
+  duration_ms: 61.2935
+  type: 'test'
+  ...
+# Subtest: intersection counts only fresh members; stale and missing are excluded with reasons
+ok 11 - intersection counts only fresh members; stale and missing are excluded with reasons
+  ---
+  duration_ms: 0.306542
+  type: 'test'
+  ...
+# Subtest: same-name members intersect as distinct people
+ok 12 - same-name members intersect as distinct people
+  ---
+  duration_ms: 0.103333
+  type: 'test'
+  ...
+# Subtest: a member in another timezone intersects on converted wall time
+ok 13 - a member in another timezone intersects on converted wall time
+  ---
+  duration_ms: 1.523625
+  type: 'test'
+  ...
+# Subtest: privacy: the published payload carries intervals and identity only — never titles
+ok 14 - privacy: the published payload carries intervals and identity only — never titles
+  ---
+  duration_ms: 0.176041
+  type: 'test'
+  ...
+# Subtest: export identity: the same proposal always yields the same calendar UID
+ok 15 - export identity: the same proposal always yields the same calendar UID
+  ---
+  duration_ms: 1.103791
+  type: 'test'
+  ...
+# Subtest: course "today" follows Europe/London, not the device zone
+ok 16 - course "today" follows Europe/London, not the device zone
+  ---
+  duration_ms: 61.953334
+  type: 'test'
+  ...
+# Subtest: day arithmetic crosses months, leap days and year boundaries
+ok 17 - day arithmetic crosses months, leap days and year boundaries
+  ---
+  duration_ms: 0.256041
+  type: 'test'
+  ...
+# Subtest: month navigation preserves the day number where valid and clamps otherwise
+ok 18 - month navigation preserves the day number where valid and clamps otherwise
+  ---
+  duration_ms: 1.410959
+  type: 'test'
+  ...
+# Subtest: migration fixture: the UCL built-in validates and matches the pre-P7 constants
+ok 19 - migration fixture: the UCL built-in validates and matches the pre-P7 constants
+  ---
+  duration_ms: 37.5695
+  type: 'test'
+  ...
+# Subtest: a second course in another timezone validates; its wall times convert on the shared path
+ok 20 - a second course in another timezone validates; its wall times convert on the shared path
+  ---
+  duration_ms: 3.638125
+  type: 'test'
+  ...
+# Subtest: two courses can share a subject/course name — identity is the configId, not the name
+ok 21 - two courses can share a subject/course name — identity is the configId, not the name
+  ---
+  duration_ms: 0.905791
+  type: 'test'
+  ...
+# Subtest: invalid templates are refused with reasons, never half-applied
+ok 22 - invalid templates are refused with reasons, never half-applied
+  ---
+  duration_ms: 0.4715
+  type: 'test'
+  ...
+# Subtest: template update preserves personal data: only courseConfig changes
+ok 23 - template update preserves personal data: only courseConfig changes
+  ---
+  duration_ms: 2.223125
+  type: 'test'
+  ...
+# Subtest: portable template contains no secrets: whitelist rebuild drops every foreign field
+ok 24 - portable template contains no secrets: whitelist rebuild drops every foreign field
+  ---
+  duration_ms: 2.917333
+  type: 'test'
+  ...
+# Subtest: release driver selects its own dispatch and fails closed on missing, failed or timed out runs
+ok 25 - release driver selects its own dispatch and fails closed on missing, failed or timed out runs
+  ---
+  duration_ms: 1629.76425
+  type: 'test'
+  ...
+# Subtest: shared hosting gate stops after each failed stage
+ok 26 - shared hosting gate stops after each failed stage
+  ---
+  duration_ms: 941.223458
+  type: 'test'
+  ...
+# Subtest: attended, absent and unrecorded are separate; future and non-eligible rows are excluded
+ok 27 - attended, absent and unrecorded are separate; future and non-eligible rows are excluded
+  ---
+  duration_ms: 1.709667
+  type: 'test'
+  ...
+# Subtest: all unrecorded and zero-denominator cases stay honest
+ok 28 - all unrecorded and zero-denominator cases stay honest
+  ---
+  duration_ms: 0.79375
+  type: 'test'
+  ...
+# Subtest: deleted metadata counts as unrecorded, never as attendance or absence
+ok 29 - deleted metadata counts as unrecorded, never as attendance or absence
+  ---
+  duration_ms: 2.546292
+  type: 'test'
+  ...
+# Subtest: a session later today is not completed until its end time passes
+ok 30 - a session later today is not completed until its end time passes
+  ---
+  duration_ms: 0.151625
+  type: 'test'
+  ...
+# Subtest: two placement events on one date are one school day; inferred days are labelled
+ok 31 - two placement events on one date are one school day; inferred days are labelled
+  ---
+  duration_ms: 0.366791
+  type: 'test'
+  ...
+# Subtest: create → join → get: stable ids, tokens never listed, same-name members stay distinct
+ok 32 - create → join → get: stable ids, tokens never listed, same-name members stay distinct
+  ---
+  duration_ms: 56.999958
+  type: 'test'
+  ...
+# Subtest: rename keeps identity; a stale/wrong token is refused, not applied to someone else
+ok 33 - rename keeps identity; a stale/wrong token is refused, not applied to someone else
+  ---
+  duration_ms: 5.1305
+  type: 'test'
+  ...
+# Subtest: two simultaneous joins both land (transactions serialize; no lost update)
+ok 34 - two simultaneous joins both land (transactions serialize; no lost update)
+  ---
+  duration_ms: 4.199458
+  type: 'test'
+  ...
+# Subtest: legacy KV members import once with stable ids and stay name-addressable; KV is never deleted
+ok 35 - legacy KV members import once with stable ids and stay name-addressable; KV is never deleted
+  ---
+  duration_ms: 2.157292
+  type: 'test'
+  ...
+# Subtest: invalid intervals are dropped and joins to a missing group 404
+ok 36 - invalid intervals are dropped and joins to a missing group 404
+  ---
+  duration_ms: 0.478375
+  type: 'test'
+  ...
+# Subtest: leaving the last member removes the group; a full group refuses a 13th member
+ok 37 - leaving the last member removes the group; a full group refuses a 13th member
+  ---
+  duration_ms: 8.476416
+  type: 'test'
+  ...
+# Subtest: KV listings paginate through every cursor page
+ok 38 - KV listings paginate through every cursor page
+  ---
+  duration_ms: 4.104708
+  type: 'test'
+  ...
+# Subtest: propose requires a valid capability; the proposal lists with stable id, rev and proposer-yes
+ok 39 - propose requires a valid capability; the proposal lists with stable id, rev and proposer-yes
+  ---
+  duration_ms: 2.853416
+  type: 'test'
+  ...
+# Subtest: simultaneous proposal edits: the second writer with a stale rev gets 409 plus the fresh copy
+ok 40 - simultaneous proposal edits: the second writer with a stale rev gets 409 plus the fresh copy
+  ---
+  duration_ms: 1.641
+  type: 'test'
+  ...
+# Subtest: withdraw is proposer-only; a member who leaves takes their votes and open proposals with them
+ok 41 - withdraw is proposer-only; a member who leaves takes their votes and open proposals with them
+  ---
+  duration_ms: 4.72275
+  type: 'test'
+  ...
+# Subtest: past-dated proposals are pruned on read; invalid slots are refused
+ok 42 - past-dated proposals are pruned on read; invalid slots are refused
+  ---
+  duration_ms: 2.389416
+  type: 'test'
+  ...
+# Subtest: London wall times convert to the right UTC instants in summer and winter
+ok 43 - London wall times convert to the right UTC instants in summer and winter
+  ---
+  duration_ms: 39.498125
+  type: 'test'
+  ...
+# Subtest: DST gap shifts forward with a warning; ambiguous hour takes the earlier instant with a warning
+ok 44 - DST gap shifts forward with a warning; ambiguous hour takes the earlier instant with a warning
+  ---
+  duration_ms: 2.527041
+  type: 'test'
+  ...
+# Subtest: ICS folding counts UTF-8 octets, unfolds back to the original
+ok 45 - ICS folding counts UTF-8 octets, unfolds back to the original
+  ---
+  duration_ms: 0.313708
+  type: 'test'
+  ...
+# Subtest: calendar output: UTC instants, all-day deadlines, escaped Unicode titles, stable UIDs
+ok 46 - calendar output: UTC instants, all-day deadlines, escaped Unicode titles, stable UIDs
+  ---
+  duration_ms: 0.737667
+  type: 'test'
+  ...
+# Subtest: verbatim duplicate sheet rows pair with duplicate history and are never flagged
+ok 47 - verbatim duplicate sheet rows pair with duplicate history and are never flagged
+  ---
+  duration_ms: 1.315666
+  type: 'test'
+  ...
+# Subtest: an extra new duplicate is treated as new, not fuzzy-linked to another date
+ok 48 - an extra new duplicate is treated as new, not fuzzy-linked to another date
+  ---
+  duration_ms: 0.149125
+  type: 'test'
+  ...
+# Subtest: a resolved identity sticks across refreshes (resolved history entry wins the claim)
+ok 49 - a resolved identity sticks across refreshes (resolved history entry wins the claim)
+  ---
+  duration_ms: 0.970042
+  type: 'test'
+  ...
+# Subtest: request identity covers origin+basis, destination, mode, intent time and buffer
+ok 50 - request identity covers origin+basis, destination, mode, intent time and buffer
+  ---
+  duration_ms: 0.656958
+  type: 'test'
+  ...
+# Subtest: required arrival subtracts the buffer; zero and large buffers behave
+ok 51 - required arrival subtracts the buffer; zero and large buffers behave
+  ---
+  duration_ms: 0.08425
+  type: 'test'
+  ...
+# Subtest: validateItinerary parses London wall times (BST) and rejects invalid responses
+ok 52 - validateItinerary parses London wall times (BST) and rejects invalid responses
+  ---
+  duration_ms: 36.101
+  type: 'test'
+  ...
+# Subtest: feasible pick: latest departure that still arrives by the required instant; none → null
+ok 53 - feasible pick: latest departure that still arrives by the required instant; none → null
+  ---
+  duration_ms: 0.176792
+  type: 'test'
+  ...
+# Subtest: departure state is timestamp-derived: future → imminent → passed, never negative
+ok 54 - departure state is timestamp-derived: future → imminent → passed, never negative
+  ---
+  duration_ms: 0.088292
+  type: 'test'
+  ...
+# Subtest: DST boundary: an arrive-by on the clock-change morning still parses to real instants
+ok 55 - DST boundary: an arrive-by on the clock-change morning still parses to real instants
+  ---
+  duration_ms: 0.3165
+  type: 'test'
+  ...
+# Subtest: group ranges, lists, dash variants and normalisation all match membership
+ok 56 - group ranges, lists, dash variants and normalisation all match membership
+  ---
+  duration_ms: 1.131875
+  type: 'test'
+  ...
+# Subtest: all-groups forms and empty cells are unrestricted
+ok 57 - all-groups forms and empty cells are unrestricted
+  ---
+  duration_ms: 1.004167
+  type: 'test'
+  ...
+# Subtest: malformed, reversed and oversized ranges are never expanded — literal match only, flagged unknown
+ok 58 - malformed, reversed and oversized ranges are never expanded — literal match only, flagged unknown
+  ---
+  duration_ms: 0.865291
+  type: 'test'
+  ...
+# Subtest: option expansion lists each joinable group once, numerically sorted
+ok 59 - option expansion lists each joinable group once, numerically sorted
+  ---
+  duration_ms: 12.062041
+  type: 'test'
+  ...
+# Subtest: membership combines specialisms and groups; empty selections never narrow
+ok 60 - membership combines specialisms and groups; empty selections never narrow
+  ---
+  duration_ms: 0.18
+  type: 'test'
+  ...
+# Subtest: worker-config adapter agrees with the membership test for a shared fixture
+ok 61 - worker-config adapter agrees with the membership test for a shared fixture
+  ---
+  duration_ms: 0.365667
+  type: 'test'
+  ...
+# Subtest: zero-duration marker rows (end === start) are kept; inverted times are dropped
+ok 62 - zero-duration marker rows (end === start) are kept; inverted times are dropped
+  ---
+  duration_ms: 10.415958
+  type: 'test'
+  ...
+# Subtest: legacy payloads without the Phase 5 collections still validate (back-compat)
+ok 63 - legacy payloads without the Phase 5 collections still validate (back-compat)
+  ---
+  duration_ms: 2.459834
+  type: 'test'
+  ...
+# Subtest: new collection records validate strictly: enums, dates, times, bounds
+ok 64 - new collection records validate strictly: enums, dates, times, bounds
+  ---
+  duration_ms: 5.848125
+  type: 'test'
+  ...
+# Subtest: task edits merge per record; identity survives title/due changes; undo beats the tombstone
+ok 65 - task edits merge per record; identity survives title/due changes; undo beats the tombstone
+  ---
+  duration_ms: 11.576166
+  type: 'test'
+  ...
+# Subtest: commitments and plan children merge with tombstones like every other record
+ok 66 - commitments and plan children merge with tombstones like every other record
+  ---
+  duration_ms: 0.288834
+  type: 'test'
+  ...
+# Subtest: shared parser rejects impossible dates/times and only forward fills blank cells
+ok 67 - shared parser rejects impossible dates/times and only forward fills blank cells
+  ---
+  duration_ms: 13.876542
+  type: 'test'
+  ...
+# Subtest: rescheduling and row movement keep legacy owner and calendar UID; explicit IDs handle title changes
+ok 68 - rescheduling and row movement keep legacy owner and calendar UID; explicit IDs handle title changes
+  ---
+  duration_ms: 0.502959
+  type: 'test'
+  ...
+# Subtest: merge tombstones prevent resurrection and converge in both directions
+ok 69 - merge tombstones prevent resurrection and converge in both directions
+  ---
+  duration_ms: 0.537084
+  type: 'test'
+  ...
+# Subtest: payload contracts reject unsafe settings and malformed collections
+ok 70 - payload contracts reject unsafe settings and malformed collections
+  ---
+  duration_ms: 0.750542
+  type: 'test'
+  ...
+# Subtest: sync object imports legacy ciphertext and rejects simultaneous stale revision without deleting KV
+ok 71 - sync object imports legacy ciphertext and rejects simultaneous stale revision without deleting KV
+  ---
+  duration_ms: 27.9945
+  type: 'test'
+  ...
+# Subtest: calendar feed preserves existing UIDs for moved sessions and deadlines
+ok 72 - calendar feed preserves existing UIDs for moved sessions and deadlines
+  ---
+  duration_ms: 78.68275
+  type: 'test'
+  ...
+# Subtest: holiday and cancelled days leave the plan; totals reflect it
+ok 73 - holiday and cancelled days leave the plan; totals reflect it
+  ---
+  duration_ms: 12.164666
+  type: 'test'
+  ...
+# Subtest: inset days follow the explicit policy, never an assumption
+ok 74 - inset days follow the explicit policy, never an assumption
+  ---
+  duration_ms: 0.336792
+  type: 'test'
+  ...
+# Subtest: half days and changed working hours adjust planned minutes; breaks subtract
+ok 75 - half days and changed working hours adjust planned minutes; breaks subtract
+  ---
+  duration_ms: 0.603708
+  type: 'test'
+  ...
+# Subtest: two source rows on one date are ONE day; whole-day tick logs it with honest provenance
+ok 76 - two source rows on one date are ONE day; whole-day tick logs it with honest provenance
+  ---
+  duration_ms: 0.160459
+  type: 'test'
+  ...
+# Subtest: an hours correction overrides the whole-day tick; missing records stay unrecorded, not absent
+ok 77 - an hours correction overrides the whole-day tick; missing records stay unrecorded, not absent
+  ---
+  duration_ms: 0.142959
+  type: 'test'
+  ...
+# Subtest: inferred (span-expanded) days are labelled until confirmed; policy defaults are explicit
+ok 78 - inferred (span-expanded) days are labelled until confirmed; policy defaults are explicit
+  ---
+  duration_ms: 0.093625
+  type: 'test'
+  ...
+# Subtest: legacy broadcast is disabled; absent or mismatched device credentials never send
+ok 79 - legacy broadcast is disabled; absent or mismatched device credentials never send
+  ---
+  duration_ms: 116.471958
+  type: 'test'
+  ...
+# Subtest: one authenticated device gets one correctly encrypted notification; cooldown is per device
+ok 80 - one authenticated device gets one correctly encrypted notification; cooldown is per device
+  ---
+  duration_ms: 48.733542
+  type: 'test'
+  ...
+# Subtest: reject untrusted destinations, malformed keys, oversized bodies and credential replacement
+ok 81 - reject untrusted destinations, malformed keys, oversized bodies and credential replacement
+  ---
+  duration_ms: 4.8955
+  type: 'test'
+  ...
+# Subtest: provider errors and redirects fail without leaking response bodies or changing subscriptions
+ok 82 - provider errors and redirects fail without leaking response bodies or changing subscriptions
+  ---
+  duration_ms: 3.705084
+  type: 'test'
+  ...
+# Subtest: planSources lists main, extra tabs and key dates in a stable order; demo plans nothing
+ok 83 - planSources lists main, extra tabs and key dates in a stable order; demo plans nothing
+  ---
+  duration_ms: 1.544542
+  type: 'test'
+  ...
+# Subtest: one failed source keeps its last good rows, labelled stale, without advancing success time
+ok 84 - one failed source keeps its last good rows, labelled stale, without advancing success time
+  ---
+  duration_ms: 1.046042
+  type: 'test'
+  ...
+# Subtest: a failed source with nothing cached reports an error and returns no rows
+ok 85 - a failed source with nothing cached reports an error and returns no rows
+  ---
+  duration_ms: 0.196333
+  type: 'test'
+  ...
+# Subtest: rows from a source that is no longer configured are dropped from the live set
+ok 86 - rows from a source that is no longer configured are dropped from the live set
+  ---
+  duration_ms: 0.149
+  type: 'test'
+  ...
+# Subtest: cached rows without a sourceKey belong to the main source and survive its failure
+ok 87 - cached rows without a sourceKey belong to the main source and survive its failure
+  ---
+  duration_ms: 0.280208
+  type: 'test'
+  ...
+# Subtest: warning-only source stays ok and keeps its warnings; empty rows are not an error
+ok 88 - warning-only source stays ok and keeps its warnings; empty rows are not an error
+  ---
+  duration_ms: 0.248334
+  type: 'test'
+  ...
+# Subtest: generation gate: an older request that resolves after a newer one is not current
+ok 89 - generation gate: an older request that resolves after a newer one is not current
+  ---
+  duration_ms: 31.076125
+  type: 'test'
+  ...
+# Subtest: parseLineString: provider JSON in, [lat,lng] pairs out; garbage and bad points dropped
+ok 90 - parseLineString: provider JSON in, [lat,lng] pairs out; garbage and bad points dropped
+  ---
+  duration_ms: 1.912
+  type: 'test'
+  ...
+# Subtest: very long lines downsample but keep both endpoints
+ok 91 - very long lines downsample but keep both endpoints
+  ---
+  duration_ms: 2.000083
+  type: 'test'
+  ...
+# Subtest: fitZoom: every route point projects inside the padded viewport at the returned zoom
+ok 92 - fitZoom: every route point projects inside the padded viewport at the returned zoom
+  ---
+  duration_ms: 0.318125
+  type: 'test'
+  ...
+# Subtest: a long route fits at a lower zoom than a short one; a single point stays a sane close-up
+ok 93 - a long route fits at a lower zoom than a short one; a single point stays a sane close-up
+  ---
+  duration_ms: 0.180875
+  type: 'test'
+  ...
+# Subtest: itinerary legs carry provider geometry when present, [] when absent or broken — never invented
+ok 94 - itinerary legs carry provider geometry when present, [] when absent or broken — never invented
+  ---
+  duration_ms: 45.331458
+  type: 'test'
+  ...
+# Subtest: ADM-01: /stats fails CLOSED — absent or empty server key is 503 and nothing is scanned
+ok 95 - ADM-01: /stats fails CLOSED — absent or empty server key is 503 and nothing is scanned
+  ---
+  duration_ms: 104.372542
+  type: 'test'
+  ...
+# Subtest: ADM-01/03: wrong or missing credentials are 401 before any scan; both auth forms work when correct
+ok 96 - ADM-01/03: wrong or missing credentials are 401 before any scan; both auth forms work when correct
+  ---
+  duration_ms: 35.562292
+  type: 'test'
+  ...
+# Subtest: ADM-09: days=1 does not truncate the NAMED 7/30-day figures
+ok 97 - ADM-09: days=1 does not truncate the NAMED 7/30-day figures
+  ---
+  duration_ms: 7.357375
+  type: 'test'
+  ...
+# Subtest: ADM-10: a listed row whose read returns null is completeness metadata, not activity
+ok 98 - ADM-10: a listed row whose read returns null is completeness metadata, not activity
+  ---
+  duration_ms: 0.908708
+  type: 'test'
+  ...
+# Subtest: ADM-11: a capped pagination scan is flagged incomplete, never a silent partial total
+ok 99 - ADM-11: a capped pagination scan is flagged incomplete, never a silent partial total
+  ---
+  duration_ms: 4.718333
+  type: 'test'
+  ...
+# Subtest: ADM-12: zero/negative counters never mint adopters; unknown setup is not false
+ok 100 - ADM-12: zero/negative counters never mint adopters; unknown setup is not false
+  ---
+  duration_ms: 1.523291
+  type: 'test'
+  ...
+# Subtest: ADM-12/16: /ping stores only positive counters and reported booleans; oversized/non-JSON is refused
+ok 101 - ADM-12/16: /ping stores only positive counters and reported booleans; oversized/non-JSON is refused
+  ---
+  duration_ms: 4.363083
+  type: 'test'
+  ...
+# Subtest: status derives from timestamps: live → cached → expired, never backwards
+ok 102 - status derives from timestamps: live → cached → expired, never backwards
+  ---
+  duration_ms: 1.326375
+  type: 'test'
+  ...
+# Subtest: provider data and old cached durations never share a live label; estimates say so
+ok 103 - provider data and old cached durations never share a live label; estimates say so
+  ---
+  duration_ms: 0.180875
+  type: 'test'
+  ...
+# Subtest: departure boards expire on their own short TTL
+ok 104 - departure boards expire on their own short TTL
+  ---
+  duration_ms: 0.086583
+  type: 'test'
+  ...
+1..104
+# tests 104
+# suites 0
+# pass 104
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2670.67925

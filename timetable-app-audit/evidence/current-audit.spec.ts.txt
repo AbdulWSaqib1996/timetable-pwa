@@ -1,0 +1,43 @@
+import {test,expect} from './fixtures'
+import fs from 'node:fs'
+import type {Page} from '@playwright/test'
+const out='../handoff/evidence';fs.mkdirSync(out+'/screens',{recursive:true});
+const record=(id:string,data:unknown)=>fs.writeFileSync(out+'/'+id+'.json',JSON.stringify(data,null,2));
+async function seed(page:Page){
+ await page.clock.install({time:new Date('2026-09-07T08:15:00Z')});
+ await page.addInitScript(()=>{
+ localStorage.setItem('timetable.whatsnew.v1','99');localStorage.setItem('timetable.store.v2',JSON.stringify({activeId:'audit',profiles:[{id:'audit',name:'Synthetic audit timetable',settings:{demo:true,sheetId:'',gid:null,specialismsChosen:true,checklistDismissed:true,usagePing:false,theme:'light',travelMode:'transit',homeLat:51.55,homeLng:-0.1,homeAddress:'Synthetic home'}}]}));
+ localStorage.setItem('timetable.admin.v1.audit',JSON.stringify({reflections:[],targets:[],observations:[],lessons:[],audits:[],meetings:[],exceptions:[],plans:[],tasks:[{id:'done',title:'Submitted assignment',dueISO:'2026-09-05',status:'done',at:1},{id:'weekend',title:'Saturday deadline',dueISO:'2026-09-12',status:'todo',at:1}],commitments:[{id:'dentist',title:'Personal appointment audit',dateISO:'2026-09-07',startTime:'17:00',endTime:'18:00',kind:'appointment',busy:true,at:1},{id:'clash',title:'Simultaneous appointment audit',dateISO:'2026-09-07',startTime:'09:00',endTime:'10:00',kind:'appointment',busy:true,at:1}]}));});
+ await page.setViewportSize({width:390,height:844});
+}
+test('audit: personal events disappear across desktop/search and weekend deadline omitted',async({page})=>{
+ await seed(page);await page.goto('./#/schedule');await expect(page.getByText('Personal appointment audit',{exact:true})).toBeVisible();
+ await page.screenshot({path:out+'/screens/schedule-mobile.png',fullPage:true});
+ await page.setViewportSize({width:1440,height:1000});await expect(page.locator('.week-grid')).toBeVisible();
+ record('desktop-sizing',await page.evaluate(()=>Object.fromEntries(['.shell','.shell-main','.page-schedule','.week-grid'].map(q=>[q,document.querySelector(q)?.getBoundingClientRect().width]))));
+ record('schedule-parity',{personalOnDesktop:await page.getByText('Personal appointment audit',{exact:true}).count(),weekendDeadline:await page.getByText('Saturday deadline',{exact:true}).count()});
+ await page.screenshot({path:out+'/screens/schedule-desktop.png',fullPage:true});
+ await page.getByRole('button',{name:'Search',exact:true}).click();await page.getByLabel('Search sessions').fill('Personal appointment audit');
+ record('search-parity',{noResults:await page.getByText('No sessions match “Personal appointment audit”.',{exact:true}).count()});
+});
+test('audit: Today timezone and overlapping session omission',async({browser})=>{
+ for(const zone of ['Europe/London','America/New_York']){const context=await browser.newContext({timezoneId:zone,serviceWorkers:'block'});await context.route('**/*',r=>['127.0.0.1','localhost'].includes(new URL(r.request().url()).hostname)?r.continue():r.abort());const p=await context.newPage();await seed(p);await p.goto('http://127.0.0.1:4281/timetable-pwa/#/today');await expect(p.locator('.today-hero-label')).toBeVisible();record('today-'+zone.replace('/','-'),{label:await p.locator('.today-hero-label').innerText(),overlappingAppointmentVisible:await p.getByText('Simultaneous appointment audit',{exact:true}).count()});await p.screenshot({path:out+'/screens/today-'+zone.replace('/','-')+'.png',fullPage:true});await context.close();}
+});
+test('audit: completed task still labelled overdue and work block validation',async({page})=>{
+ await seed(page);await page.goto('./#/tasks');await page.locator('.completed-tasks summary').click();record('completed-copy',{completedText:await page.locator('.completed-tasks').innerText()});await page.screenshot({path:out+'/screens/tasks-mobile.png',fullPage:true});
+ await page.getByRole('button',{name:'＋ Add task'}).click();await page.getByLabel('Title',{exact:true}).fill('Plan validation audit');await page.getByLabel('Due date').fill('2026-09-12');await page.getByRole('button',{name:'Save task'}).click();await page.locator('.keydate-row',{hasText:'Plan validation audit'}).click();
+ await page.getByRole('combobox',{name:'Type',exact:true}).selectOption('block');await page.getByLabel('Add to plan',{exact:true}).fill('Invalid interval');await page.getByLabel('Starts',{exact:true}).fill('18:00');await page.getByLabel('Ends',{exact:true}).fill('17:00');await page.getByRole('button',{name:'＋ Add block'}).click();
+ record('invalid-plan',{plans:await page.evaluate(()=>JSON.parse(localStorage.getItem('timetable.admin.v1.audit')!).plans)});
+});
+test('audit: malformed deep link and unknown settings category',async({page})=>{
+ await seed(page);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('./#/settings/not-a-category');await page.locator('.page-settings').waitFor();record('unknown-settings',{body:await page.locator('body').innerText()});await page.goto('./#/session/%E0%A4%A');await page.waitForTimeout(300);record('malformed-route',{errors,body:await page.locator('body').innerText()});
+});
+test('audit: capture current primary screens and narrow layouts',async({page})=>{
+ await seed(page);const results=[];
+ for(const width of [390,1440,320]){await page.setViewportSize({width,height:1000});for(const route of ['today','tasks','pgce','settings','settings/travel','settings/data','home']){await page.goto('./#/'+route);await page.locator('.page').first().waitFor();await page.waitForTimeout(80);results.push({width,route,...await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth}))});if(width!==320)await page.screenshot({path:out+'/screens/'+route.replace('/','-')+'-'+width+'.png',fullPage:true});}}
+ await page.setViewportSize({width:390,height:844});await page.goto('./#/schedule');await page.locator('.day-list .session-card').first().click();await page.screenshot({path:out+'/screens/session-overview-mobile.png',fullPage:true});await page.getByRole('tab',{name:'Travel & map'}).click();await page.screenshot({path:out+'/screens/session-travel-mobile.png',fullPage:true});record('layout-checks',results);
+});
+
+test('audit: new personal event draft is unreachable after reload',async({page})=>{
+ await seed(page);await page.goto('./#/schedule');await page.getByRole('button',{name:'Add a personal event on this day'}).click();await page.getByLabel('Title',{exact:true}).fill('Recover this unsaved event');await expect(page.getByText('Draft saved on this device.')).toBeVisible();const before=await page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('timetable.draft.v1.commitment')));await page.reload();await page.getByRole('button',{name:'Add a personal event on this day'}).click();record('new-commitment-draft',{before,continueVisible:await page.getByText('Continue draft',{exact:true}).count(),title:await page.getByLabel('Title',{exact:true}).inputValue()});
+});

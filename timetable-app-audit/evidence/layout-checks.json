@@ -1,0 +1,128 @@
+[
+  {
+    "width": 390,
+    "route": "today",
+    "scrollWidth": 390,
+    "viewport": 390
+  },
+  {
+    "width": 390,
+    "route": "tasks",
+    "scrollWidth": 390,
+    "viewport": 390
+  },
+  {
+    "width": 390,
+    "route": "pgce",
+    "scrollWidth": 390,
+    "viewport": 390
+  },
+  {
+    "width": 390,
+    "route": "settings",
+    "scrollWidth": 390,
+    "viewport": 390
+  },
+  {
+    "width": 390,
+    "route": "settings/travel",
+    "scrollWidth": 390,
+    "viewport": 390
+  },
+  {
+    "width": 390,
+    "route": "settings/data",
+    "scrollWidth": 390,
+    "viewport": 390
+  },
+  {
+    "width": 390,
+    "route": "home",
+    "scrollWidth": 390,
+    "viewport": 390
+  },
+  {
+    "width": 1440,
+    "route": "today",
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "width": 1440,
+    "route": "tasks",
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "width": 1440,
+    "route": "pgce",
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "width": 1440,
+    "route": "settings",
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "width": 1440,
+    "route": "settings/travel",
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "width": 1440,
+    "route": "settings/data",
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "width": 1440,
+    "route": "home",
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "width": 320,
+    "route": "today",
+    "scrollWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 320,
+    "route": "tasks",
+    "scrollWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 320,
+    "route": "pgce",
+    "scrollWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 320,
+    "route": "settings",
+    "scrollWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 320,
+    "route": "settings/travel",
+    "scrollWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 320,
+    "route": "settings/data",
+    "scrollWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 320,
+    "route": "home",
+    "scrollWidth": 320,
+    "viewport": 320
+  }
+]

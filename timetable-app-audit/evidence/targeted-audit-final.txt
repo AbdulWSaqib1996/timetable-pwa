@@ -1,0 +1,19 @@
+
+> timetable-pwa@0.1.0 test:e2e
+> playwright test tests/current-audit.spec.ts
+
+[WebServer] (node:44046) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 6 tests using 1 worker
+
+(node:44064) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/current-audit.spec.ts:13:1 › audit: personal events disappear across desktop/search and weekend deadline omitted (750ms)
+  ✓  2 tests/current-audit.spec.ts:23:1 › audit: Today timezone and overlapping session omission (388ms)
+  ✓  3 tests/current-audit.spec.ts:26:1 › audit: completed task still labelled overdue and work block validation (388ms)
+  ✓  4 tests/current-audit.spec.ts:32:1 › audit: malformed deep link and unknown settings category (427ms)
+  ✓  5 tests/current-audit.spec.ts:35:1 › audit: capture current primary screens and narrow layouts (2.5s)
+  ✓  6 tests/current-audit.spec.ts:41:1 › audit: new personal event draft is unreachable after reload (1.2s)
+
+  6 passed (7.6s)

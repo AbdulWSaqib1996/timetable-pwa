@@ -1,0 +1,44 @@
+
+> timetable-pwa@0.1.0 test:e2e
+> playwright test tests/current-audit.spec.ts
+
+[WebServer] (node:42750) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 6 tests using 1 worker
+
+(node:42778) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/current-audit.spec.ts:13:1 › audit: personal events disappear across desktop/search and weekend deadline omitted (749ms)
+  ✓  2 tests/current-audit.spec.ts:23:1 › audit: Today timezone and overlapping session omission (339ms)
+  ✘  3 tests/current-audit.spec.ts:26:1 › audit: completed task still labelled overdue and work block validation (1.0m)
+(node:43458) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  4 tests/current-audit.spec.ts:32:1 › audit: malformed deep link and unknown settings category (686ms)
+  ✓  5 tests/current-audit.spec.ts:35:1 › audit: capture current primary screens and narrow layouts (2.9s)
+  ✓  6 tests/current-audit.spec.ts:41:1 › audit: new personal event draft is unreachable after reload (1.1s)
+
+
+  1) tests/current-audit.spec.ts:26:1 › audit: completed task still labelled overdue and work block validation 
+
+    Test timeout of 60000ms exceeded.
+
+    Error: locator.selectOption: Test timeout of 60000ms exceeded.
+    Call log:
+      - waiting for getByLabel('Type', { exact: true })
+
+
+      27 |  await seed(page);await page.goto('./#/tasks');await page.locator('.completed-tasks summary').click();record('completed-copy',{completedText:await page.locator('.completed-tasks').innerText()});await page.screenshot({path:out+'/screens/tasks-mobile.png',fullPage:true});
+      28 |  await page.getByRole('button',{name:'＋ Add task'}).click();await page.getByLabel('Title',{exact:true}).fill('Plan validation audit');await page.getByLabel('Due date').fill('2026-09-12');await page.getByRole('button',{name:'Save task'}).click();await page.locator('.keydate-row',{hasText:'Plan validation audit'}).click();
+    > 29 |  await page.getByLabel('Type',{exact:true}).selectOption('block');await page.getByLabel('Add to plan',{exact:true}).fill('Invalid interval');await page.getByLabel('Starts',{exact:true}).fill('18:00');await page.getByLabel('Ends',{exact:true}).fill('17:00');await page.getByRole('button',{name:'＋ Add block'}).click();
+         |                                             ^
+      30 |  record('invalid-plan',{plans:await page.evaluate(()=>JSON.parse(localStorage.getItem('timetable.admin.v1.audit')!).plans)});
+      31 | });
+      32 | test('audit: malformed deep link and unknown settings category',async({page})=>{
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/tests/current-audit.spec.ts:29:45
+
+    Error Context: test-results/current-audit-audit-comple-d9875-e-and-work-block-validation/error-context.md
+
+  1 failed
+    tests/current-audit.spec.ts:26:1 › audit: completed task still labelled overdue and work block validation 
+  5 passed (1.1m)

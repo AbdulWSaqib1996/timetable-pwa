@@ -1,0 +1,14 @@
+{
+  "plans": [
+    {
+      "id": "mtqytgwri1gm",
+      "parentId": "mtqytgtsb6p6",
+      "kind": "block",
+      "title": "Invalid interval",
+      "done": false,
+      "startTime": "18:00",
+      "endTime": "17:00",
+      "at": 1788768900315
+    }
+  ]
+}

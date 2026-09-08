@@ -1,0 +1,9 @@
+{
+  "baseline": "f3426954ade244d5983ce267263df7cf0e6a3a54",
+  "unit_passed": 104,
+  "existing_browser_passed": 44,
+  "targeted_audit_scenarios_completed": 6,
+  "build": "TypeScript + Vite + PWA passed",
+  "note": "Targeted scenarios observe current defects, not fixes. Isolated harness port/selector issues corrected; shared application unchanged.",
+  "markdown_links_valid": true
+}

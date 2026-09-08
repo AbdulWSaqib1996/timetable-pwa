@@ -1,0 +1,45 @@
+
+> timetable-pwa@0.1.0 build
+> tsc && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 144 modules transformed.
+rendering chunks...
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/attachments.ts is dynamically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/storage.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/sync.ts but also statically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/components/AdminSheet.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/components/JournalSheet.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/backup.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/photos.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/recovery.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/storage.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/wallet.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/recovery.ts is dynamically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/storage.ts but also statically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/backup.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/sync.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/main.tsx, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/photos.ts is dynamically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/App.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/storage.ts but also statically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/components/SessionDetail.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/backup.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/printBinder.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/printBundle.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/wallet.ts is dynamically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/storage.ts but also statically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/components/AdminSheet.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/features/pgce/PGCEPage.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/timetable-current-audit/runtime/src/lib/backup.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/manifest.webmanifest                          0.95 kB
+dist/index.html                                    1.05 kB │ gzip:   0.53 kB
+dist/assets/index-DC_BvM7w.css                    46.23 kB │ gzip:   8.83 kB
+dist/assets/ics-DQA3W-PV.js                        0.36 kB │ gzip:   0.28 kB
+dist/assets/shareTarget-DB4larr5.js                0.65 kB │ gzip:   0.39 kB
+dist/assets/ChangesSheet-CkiCvEAK.js               1.65 kB │ gzip:   0.78 kB
+dist/assets/backup-BGDksMVK.js                     2.69 kB │ gzip:   1.30 kB
+dist/assets/FilterSheet-C9x4sbtR.js                4.60 kB │ gzip:   1.42 kB
+dist/assets/workbox-window.prod.es5-BqEJf4Xk.js    5.71 kB │ gzip:   2.34 kB
+dist/assets/StatsSheet-DMHCSRWv.js                 6.98 kB │ gzip:   2.99 kB
+dist/assets/CourseSheet-DgOvK-To.js                9.57 kB │ gzip:   2.74 kB
+dist/assets/JournalSheet-CN2FbiRx.js              10.48 kB │ gzip:   3.79 kB
+dist/assets/StudyGroupSheet-BcOSvVdJ.js           15.70 kB │ gzip:   5.36 kB
+dist/assets/AdminSheet-BS0Ylm86.js                35.95 kB │ gzip:   9.60 kB
+dist/assets/SettingsSheet-C5K6h2Y5.js             40.20 kB │ gzip:  12.24 kB
+dist/assets/index-C8LTOVe9.js                    391.54 kB │ gzip: 125.79 kB
+✓ built in 897ms
+
+PWA v1.3.0
+mode      generateSW
+precache  46 entries (647.78 KiB)
+files generated
+  dist/sw.js
+  dist/workbox-bdb082da.js
