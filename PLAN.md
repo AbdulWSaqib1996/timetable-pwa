@@ -869,3 +869,5 @@ Known limitations / deferred: remote deletion of a record mid-edit still resolve
 Rollback: view changes revert independently; the safe parser, course clock and plan validation stay. Draft index is read-only over existing envelopes.
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+R1 release verification (8 September 2026): workers deployed FIRST because `shared/contracts.js` now enforces plan validation on sync ingestion — push worker `a9747db8-8ccd-4bcc-9055-a075b8c1d86c`, feed worker `110921d7-cd0c-462a-8818-434e87e96d9a` (the tightened rule only rejects NEW impossible intervals; existing stored records are untouched and shown as "Needs scheduling" in the app). Released commit `3ca665c`; GitHub Actions concluded **success**. `./scripts/deploy.sh verify` all six PASS. Deployed main chunks carry the R1 surfaces — Vercel `assets/main-DKGn5bUh.js`: invalid-link page string ×1; Pages `assets/main-D7aTWsw1.js`: search scope note ×1.
