@@ -211,3 +211,14 @@ test('NF-08: a session detail can flag a record for review; the flag survives wi
   expect(meta[ENGLISH].reviewLater).toBe(true)
   expect(meta[ENGLISH].note).toBe('Keep me')
 })
+
+test('attendance percentage is shown again, always next to its honest denominator (Settings and Term stats)', async ({ page }) => {
+  await seed(page, { profiles: [{ id: 'a', name: 'Profile A', settings: DEMO }] })
+  await page.goto('./#/settings/data')
+  await expect(page.getByText(/^\d+%$/).first()).toBeVisible()
+  await expect(page.getByText(/\d+% attended — \d+ of \d+ eligible completed sessions; \d+ absent, \d+ unrecorded\./)).toBeVisible()
+  await page.getByRole('button', { name: '📊 Term stats' }).click()
+  const stats = page.getByRole('dialog')
+  await expect(stats.getByText(/^\d+%$/).first()).toBeVisible()
+  await expect(stats.getByText(/attended — \d+ of \d+ eligible completed sessions/).first()).toBeVisible()
+})

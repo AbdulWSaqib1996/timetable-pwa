@@ -21,7 +21,8 @@ test('attended, absent and unrecorded are separate; future and non-eligible rows
   assert.equal(out.attended, 1)
   assert.equal(out.absent, 1)
   assert.equal(out.unrecorded, 1)
-  assert.match(out.sentence, /1 attended of 3 eligible completed sessions; 1 absent, 1 unrecorded/)
+  assert.equal(out.attendedPct, 33)
+  assert.match(out.sentence, /33% attended — 1 of 3 eligible completed sessions; 1 absent, 1 unrecorded/)
 })
 
 test('all unrecorded and zero-denominator cases stay honest', () => {

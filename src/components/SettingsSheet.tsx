@@ -1526,8 +1526,11 @@ export function SettingsSheet({
         {attendance.eligible > 0 && (
           <section className="filter-section">
             <h3>Attendance</h3>
+            <p className="attendance-headline" aria-label={`${attendance.attendedPct}% attended`}>
+              {attendance.attendedPct}%
+            </p>
             <p className="filter-hint">
-              {attendance.sentence}
+              {attendance.sentence} Unrecorded sessions are not absences.
             </p>
             {subjectRows.length > 0 && (
               <ul className="attendance-list">
@@ -1535,7 +1538,7 @@ export function SettingsSheet({
                   <li key={subject}>
                     <span className="attendance-subject">{subject}</span>
                     <span className="attendance-count">
-                      {attended}/{total}
+                      {attended}/{total} · {Math.round((attended / total) * 100)}%
                     </span>
                   </li>
                 ))}

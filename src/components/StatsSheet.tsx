@@ -107,7 +107,7 @@ function buildTiles(stats: ReturnType<typeof computeStats>): { big: string; smal
   ]
   const a = stats.attendance
   if (a.eligible > 0) {
-    tiles.push({ big: `${a.attended}/${a.eligible}`, small: 'attended of eligible completed sessions' })
+    tiles.push({ big: `${a.attendedPct}%`, small: `attended — ${a.attended} of ${a.eligible} eligible completed session${a.eligible === 1 ? '' : 's'}` })
     if (a.absent > 0) tiles.push({ big: `${a.absent}`, small: 'absences recorded' })
     if (a.unrecorded > 0) tiles.push({ big: `${a.unrecorded}`, small: 'completed sessions unrecorded' })
   }
