@@ -10,6 +10,7 @@ import { formatRemaining, googleCalendarUrl, isPlacementSession } from '../lib/f
 import { parseLocation } from '../lib/location'
 import { sessionKey } from '../lib/diff'
 import { trackUse } from '../lib/usage'
+import { telemetryTrack } from '../lib/telemetry'
 import { PHOTO_CAPTION_MAX, addPhoto, compressImage, deletePhoto, getPhotos, setPhotoCaption } from '../lib/photos'
 import type { StoredPhoto } from '../lib/photos'
 import { wallToUTC, utcToZonedParts } from '../../shared/calendar-time.js'
@@ -115,6 +116,9 @@ export function SessionDetail({
 }: Props) {
   const isTask = session.isKeyDate === true
   const [tab, setTab] = useState<'overview' | 'travel'>('overview')
+  useEffect(() => {
+    if (tab === 'travel') telemetryTrack('journey_session_opened')
+  }, [tab])
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const duration = formatDuration(session.start, session.end)
   const gcalUrl = googleCalendarUrl(session)
@@ -154,9 +158,11 @@ export function SessionDetail({
   }, [session.id, profileId])
 
   async function handleAddPhoto(file: File) {
-    trackUse('photo')
+    trackUse('photo') // legacy attempt semantics, fired at the start
     const blob = await compressImage(file)
     await addPhoto(profileId, sessionKey(session), blob)
+    // A4 success: compression AND local persistence both completed.
+    telemetryTrack('evidence_photo_saved')
     onMeta({ photos: photos.length + 1 })
     reloadPhotos()
   }
@@ -663,7 +669,13 @@ export function SessionDetail({
           time ({journeyWeather.at})
         </p>
       )}
-      <a className="btn-primary btn-link external-nav" href={travel.mapsUrl} target="_blank" rel="noopener noreferrer">
+      <a
+        className="btn-primary btn-link external-nav"
+        href={travel.mapsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => telemetryTrack('navigation_link_opened')}
+      >
         Open in Google Maps ↗
       </a>
       <p className="filter-hint external-nav-caption">Opens navigation outside My Timetable</p>

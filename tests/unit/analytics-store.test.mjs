@@ -93,11 +93,13 @@ test('aggregate: distinct tokens, v2 first-seen new/returning, watermark, honest
   assert.equal(detail.adoption.denominator, 2)
   assert.equal(detail.uses.value, 3)
   assert.equal(detail.collectionStartedAt, dayISO(1))
-  // A4 events are visibly NOT collected — never zero.
+  // Capability-2 events are collected now, but these fixture tokens report
+  // capability 1 — the eligible denominator is honestly zero, never faked.
   const tasks = snap.features.find((f) => f.id === 'task_created')
-  assert.equal(tasks.measurement, 'not-collected')
-  assert.equal(tasks.adoption.value, null)
-  assert.equal(tasks.uses.value, null)
+  assert.equal(tasks.measurement, 'available')
+  assert.equal(tasks.adoption.status, 'unavailable')
+  assert.equal(tasks.adoption.denominator, 0)
+  assert.equal(tasks.collectionStartedAt, null, 'no capability-2 batch has arrived yet')
 })
 
 test('aggregate prunes only expired analytics rows; fresh rows and unexpired dedupe records stay', async () => {
@@ -120,4 +122,68 @@ test('reserved ffffffff test tokens are accepted (smoke tests) but never aggrega
   assert.equal(snap.metrics.activeToday.value, 0)
   assert.equal(snap.metrics.activeTokens7.value, 0)
   assert.equal(snap.features.find((f) => f.id === 'detail').uses.value, 0)
+})
+
+/* ---- A4: weekly cohorts and capability-2 eligibility ---- */
+
+const mondayOf = (iso) => {
+  const d = new Date(iso + 'T00:00:00Z')
+  return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10)
+}
+const addDaysISO = (iso, n) => new Date(Date.parse(iso + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10)
+
+test('cohorts: UTC Monday membership, EXACT-week returns, incomplete weeks dashed, no rolling windows', async () => {
+  const { store } = makeStore()
+  const thisMonday = mondayOf(dayISO(0))
+  const cohortMonday = addDaysISO(thisMonday, -28) // four full weeks ago
+  const send = (token, batchId, date) =>
+    post(store, '/v2/batch', batch({ token, batchId, days: [{ date, opens: 1, counts: {} }] }))
+  // Token A: first seen SUNDAY of cohort week (edge of the Monday boundary),
+  // returns in week 1 (its Monday) and week 3.
+  await send('aaaa000000000001', 'b100000000000001', addDaysISO(cohortMonday, 6))
+  await send('aaaa000000000001', 'b100000000000002', addDaysISO(cohortMonday, 7))
+  await send('aaaa000000000001', 'b100000000000003', addDaysISO(cohortMonday, 21))
+  // Token B: first seen MONDAY of the cohort week, never returns.
+  await send('bbbb000000000002', 'b200000000000001', cohortMonday)
+  // Token C: first seen THIS week — its cohort is incomplete.
+  await send('cccc000000000003', 'b300000000000001', dayISO(0))
+  const snap = await (await post(store, '/v2/aggregate', {})).json()
+  const cohort = snap.cohorts.find((c) => c.week === cohortMonday)
+  assert.ok(cohort, 'cohort week missing')
+  assert.equal(cohort.size, 2, 'Sunday first-seen belongs to the SAME Monday-keyed week')
+  assert.equal(cohort.complete, true)
+  // Week 1: only token A returned, in the exact following calendar week.
+  assert.deepEqual(cohort.weeks[0], { n: 1, complete: true, returned: 1 })
+  // Week 2: token A was active on day 21 — that is week 3, NOT a rolling
+  // 14-day window; week 2 must be zero.
+  assert.deepEqual(cohort.weeks[1], { n: 2, complete: true, returned: 0 })
+  assert.deepEqual(cohort.weeks[2], { n: 3, complete: true, returned: 1 })
+  // Week 4 of this cohort is the CURRENT week — incomplete, value withheld.
+  assert.equal(cohort.weeks[3].complete, false)
+  assert.equal(cohort.weeks[3].returned, null)
+  // Token C's cohort (this week) is itself incomplete.
+  const current = snap.cohorts.find((c) => c.week === thisMonday)
+  assert.equal(current.complete, false)
+})
+
+test('capability-2 tokens make real eligible denominators and per-capability start dates', async () => {
+  const { store } = makeStore()
+  await post(store, '/v2/batch', batch({ days: [{ date: dayISO(0), opens: 1, counts: { detail: 1 } }] })) // capV 1
+  await post(store, '/v2/batch', batch({
+    token: 'dddd000000000004',
+    batchId: 'b500000000000001',
+    capabilityVersion: 2,
+    days: [{ date: dayISO(0), opens: 1, counts: { task_created: 2, view_today: 1 } }],
+  }))
+  const snap = await (await post(store, '/v2/aggregate', {})).json()
+  const tasks = snap.features.find((f) => f.id === 'task_created')
+  assert.equal(tasks.measurement, 'available')
+  // Eligible = tokens that CAN report it (capability >= 2): exactly one.
+  assert.deepEqual([tasks.adoption.numerator, tasks.adoption.denominator], [1, 1])
+  assert.equal(tasks.adoption.eligibleCoverage.active, 2)
+  assert.equal(tasks.uses.value, 2)
+  assert.equal(tasks.collectionStartedAt, dayISO(0), 'capability-2 collection starts at its own first batch')
+  // The v1 feature keeps its own (older) start-date semantics.
+  const detail = snap.features.find((f) => f.id === 'detail')
+  assert.deepEqual([detail.adoption.numerator, detail.adoption.denominator], [1, 2])
 })

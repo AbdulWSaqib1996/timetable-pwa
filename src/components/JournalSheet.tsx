@@ -6,6 +6,7 @@ import { sessionKey } from '../lib/diff'
 import { downloadFile } from '../lib/files'
 import { printEvidenceBundle } from '../lib/printBundle'
 import { trackUse } from '../lib/usage'
+import { telemetryTrack } from '../lib/telemetry'
 import { TEACHERS_STANDARDS, standardLabel } from '../lib/standards'
 import type { MetaMap, Session } from '../types'
 
@@ -400,7 +401,7 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
             className="btn-primary"
             disabled={shown.length === 0}
             onClick={() => {
-              trackUse('evidenceprint')
+              trackUse('evidenceprint') // legacy attempt, fired at the start
               return void printEvidenceBundle(
                 profileId,
                 (filtersActive ? shown : entries).map((e) => ({
@@ -412,7 +413,8 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
                   photos: e.photos,
                   standards: e.standards,
                 }))
-              )
+                // A4: prepared = the bundle was generated, nothing more.
+              ).then(() => telemetryTrack('export_prepared')).catch(() => {})
             }}
           >
             🖨 Print / PDF ({filtersActive ? `${shown.length} filtered` : 'all'})

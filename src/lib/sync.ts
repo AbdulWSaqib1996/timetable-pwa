@@ -9,6 +9,7 @@ import type { MetaMap, ProfileStore } from '../types'
 import { loadAdminFile, mergeAdminFiles } from './admin'
 import type { AdminFile } from './admin'
 import { loadMeta, loadStore } from './storage'
+import { telemetryTrack } from './telemetry'
 
 /**
  * Cross-device sync via a shared code: the whole profile store + per-profile
@@ -255,7 +256,9 @@ export async function applySyncPayload(payload: SyncPayload): Promise<void> {
 export async function syncPullApply(base: string): Promise<boolean> {
   const state = loadSyncState()
   if (!state) return false
-  const at = await pushSync(base,state.code)
+  // A4: one coarse outcome count after the operation actually settles —
+  // no codes, payloads, endpoints or identifiers travel with it.
+  const at = await pushSync(base,state.code).finally(() => telemetryTrack('sync_outcome'))
   if (at) saveSyncState({...state,lastAt:at})
   return false // UI receives a data event, never a destructive page reload.
 }

@@ -44,7 +44,7 @@ test('invalid envelopes are refused whole: bad ids, versions, dates, counts, unk
     { ...base(), days: [{ date: TODAY, opens: 1, counts: { detail: 0 } }] },
     { ...base(), days: [{ date: TODAY, opens: 1, counts: { detail: 2.5 } }] },
     { ...base(), days: [{ date: TODAY, opens: 1, counts: { totally_unknown: 1 } }] },
-    { ...base(), days: [{ date: TODAY, opens: 1, counts: { view_today: 1 } }] }, // capability 2 event from a v1 client
+    { ...base(), capabilityVersion: 1, days: [{ date: TODAY, opens: 1, counts: { view_today: 1 } }] }, // capability 2 event from a v1 client
     { ...base(), days: [{ date: TODAY, opens: 1, counts: {} }, { date: TODAY, opens: 1, counts: {} }] }, // duplicate day
   ]
   for (const c of cases) {
@@ -63,11 +63,20 @@ test('tomorrow within skew is allowed; setup keeps reported booleans only', () =
   assert.deepEqual(batch.days[0].setup, { push: false })
 })
 
-test('the catalogue stays within the per-version event cap and v2 names are reserved, not yet allowed', () => {
+test('the catalogue stays within the per-version cap; capability gates which client may send what', () => {
   for (let v = 1; v <= CAPABILITY_VERSION; v++) {
     assert.ok(allowedEvents(v).length <= MAX_EVENTS_PER_VERSION, `capability ${v} exceeds cap`)
   }
-  assert.ok(!allowedEvents(CAPABILITY_VERSION).includes('task_created'))
+  // A4: capability 2 ships the success events…
+  assert.ok(allowedEvents(2).includes('task_created'))
+  assert.ok(allowedEvents(2).includes('evidence_photo_saved'))
+  // …but a capability-1 client still cannot report them.
+  assert.ok(!allowedEvents(1).includes('task_created'))
+  const v1client = validateBatch(
+    { ...base(), capabilityVersion: 1, days: [{ date: TODAY, opens: 1, counts: { task_created: 1 } }] },
+    { todayISO: TODAY }
+  )
+  assert.equal(v1client.ok, false)
   assert.equal(ACTION_CATALOGUE.photo.label, 'Photo add attempt')
   assert.equal(ACTION_CATALOGUE.evidence_photo_saved.semantics, 'success')
 })

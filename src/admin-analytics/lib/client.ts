@@ -138,6 +138,13 @@ export interface StatsV2 {
     adoption: StatsV2Ratio
     uses: StatsV2Count
   }[]
+  /** weekly cohorts (A4); absent from pre-A4 snapshots */
+  cohorts?: {
+    week: string
+    size: number
+    complete: boolean
+    weeks: { n: number; complete: boolean; returned: number | null }[]
+  }[]
 }
 
 export async function fetchV2Stats(key: string, signal?: AbortSignal): Promise<StatsV2> {
