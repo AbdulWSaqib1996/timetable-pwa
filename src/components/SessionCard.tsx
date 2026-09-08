@@ -91,6 +91,11 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
             👤 Personal{session.isFreeTime ? ' · free' : ''}
           </span>
         )}
+        {session.id.startsWith('plan-') && (
+          <span className="badge badge-personal">
+            ⏱ Study block{session.isFreeTime ? ' · done' : ''}
+          </span>
+        )}
         {session.isKeyDate && <span className="badge badge-keydate">📌 Key date</span>}
         {conflict && <span className="badge badge-conflict">⚠ Clash</span>}
         {(session.identityCandidates?.length || session.identityWarning) && (

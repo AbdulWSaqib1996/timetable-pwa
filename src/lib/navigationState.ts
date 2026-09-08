@@ -43,6 +43,8 @@ export function parseRouteSafe(hash: string): ParsedRoute {
       return { ok: true, route: { name: 'homeJourney' } }
     case 'placement':
       return { ok: true, route: { name: 'placement' } }
+    case 'find':
+      return { ok: true, route: { name: 'find' } }
     case 'settings': {
       const section = parts[1] ? safeDecode(parts[1]) : null
       if (!parts[1]) return { ok: true, route: { name: 'settings' } }

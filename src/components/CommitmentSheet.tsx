@@ -22,6 +22,10 @@ interface Props {
   commitment: CommitmentRec | null
   /** date to prefill for a new entry */
   defaultDateISO: string
+  /** times/kind to prefill for a new entry (Plan week suggestion, NF-03) */
+  defaultStartTime?: string
+  defaultEndTime?: string
+  defaultKind?: CommitmentRec['kind']
   latest: CommitmentRec | null
   onSave: (rec: CommitmentRec) => boolean
   onDelete?: (rec: CommitmentRec) => void
@@ -30,12 +34,12 @@ interface Props {
   existingIds?: Set<string>
 }
 
-const fieldsOf = (c: CommitmentRec | null, defaultDateISO: string): Fields => ({
+const fieldsOf = (c: CommitmentRec | null, defaultDateISO: string, defaults: { startTime?: string; endTime?: string; kind?: CommitmentRec['kind'] } = {}): Fields => ({
   title: c?.title ?? '',
   dateISO: c?.dateISO ?? defaultDateISO,
-  startTime: c?.startTime ?? '17:00',
-  endTime: c?.endTime ?? '18:00',
-  kind: c?.kind ?? 'appointment',
+  startTime: c?.startTime ?? defaults.startTime ?? '17:00',
+  endTime: c?.endTime ?? defaults.endTime ?? '18:00',
+  kind: c?.kind ?? defaults.kind ?? 'appointment',
   location: c?.location ?? '',
   busy: c?.busy !== false,
   // Preserved on every edit (TT-13); new events default to reminders OFF.
@@ -48,9 +52,9 @@ const fieldsOf = (c: CommitmentRec | null, defaultDateISO: string): Fields => ({
  * no recurrence is implied. Busy/free participation is explicit; the title
  * and notes never leave this device except in encrypted sync/backups.
  */
-export function CommitmentSheet({ profileId, commitment, defaultDateISO, latest, onSave, onDelete, onClose, existingIds }: Props) {
+export function CommitmentSheet({ profileId, commitment, defaultDateISO, defaultStartTime, defaultEndTime, defaultKind, latest, onSave, onDelete, onClose, existingIds }: Props) {
   const [initialId] = useState(() => commitment?.id ?? newAdminId())
-  const draft = useDraft<Fields>(profileId, 'commitment', initialId, commitment?.at ?? 0, fieldsOf(commitment, defaultDateISO), { existingIds })
+  const draft = useDraft<Fields>(profileId, 'commitment', initialId, commitment?.at ?? 0, fieldsOf(commitment, defaultDateISO, { startTime: defaultStartTime, endTime: defaultEndTime, kind: defaultKind }), { existingIds })
   const recordId = draft.recordId
   const [error, setError] = useState<string | null>(null)
   const [conflict, setConflict] = useState(false)

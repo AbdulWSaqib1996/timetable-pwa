@@ -3886,3 +3886,156 @@ body {
 .schedule-list .day-header {
   top: 54px;
 }
+
+/* ---------- R4: Find anything, Plan week, work-plan editing ---------- */
+
+.find-searchbar input {
+  min-height: 44px;
+  font-size: 16px;
+}
+
+.find-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.find-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.find-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.find-result:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.find-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.find-result-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.find-result-snippet {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.plan-week-range {
+  align-items: flex-end;
+}
+
+.plan-week-workload {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.plan-week-workload li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-week-workload li.today .plan-week-day {
+  color: var(--accent);
+}
+
+.plan-week-day {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.plan-week-suggestions {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-week-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-week-suggestion:hover,
+.plan-week-suggestion:focus-visible {
+  border-color: var(--accent);
+}
+
+.plan-week-when {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.workplan-row-editing {
+  background: var(--accent-soft);
+  border-radius: var(--radius-control);
+}
+
+.workplan-done {
+  flex-shrink: 0;
+}
+
+.schedule-undo {
+  margin-bottom: 8px;
+}
+
+.search-everything {
+  margin: 0 0 8px;
+}
+
+/* The Schedule toolbar gained Plan week (R4): wrap instead of overflowing
+   at 320px and at 200% zoom — the width contract forbids page-wide scroll. */
+.filterbar {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.filterbar .btn-filters {
+  flex-shrink: 0;
+}

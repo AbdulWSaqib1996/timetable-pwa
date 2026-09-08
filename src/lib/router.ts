@@ -15,6 +15,8 @@ export type Route =
   | { name: 'session'; key: string }
   | { name: 'homeJourney' }
   | { name: 'placement' }
+  /** local Find anything search (R4 / NF-01) */
+  | { name: 'find' }
   /** untrusted hash that could not be opened (R1 / TT-08) */
   | { name: 'invalid'; reason: 'malformed' | 'oversized' | 'unknown' }
 
@@ -38,6 +40,8 @@ export function routeHash(route: Route): string {
       return '#/home'
     case 'placement':
       return '#/placement'
+    case 'find':
+      return '#/find'
     case 'invalid':
       return '#/today'
   }
@@ -62,6 +66,9 @@ export function parseRouteNotice(hash: string): string | null {
  * top-level scroll positions are per-page (the pages remount, and the
  * Schedule keeps its own anchors).
  */
+/** true between our own `location.hash =` and the popstate it triggers */
+let ownHashWrite = false
+
 export function useRoute(): [Route, (route: Route, opts?: { replace?: boolean }) => void, string | null] {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash))
   const [notice, setNotice] = useState<string | null>(() => parseRouteNotice(window.location.hash))
@@ -71,7 +78,16 @@ export function useRoute(): [Route, (route: Route, opts?: { replace?: boolean })
       setNotice(parseRouteNotice(window.location.hash))
     }
     // Back/Forward consume one internal entry (R1 / TT-08 return context).
-    const onPop = () => noteHistoryPop()
+    // Assigning location.hash ALSO fires popstate in every browser — that
+    // pop is ours and must not cancel the entry it just created (R4 fix:
+    // Back from a detail previously always fell back to Today).
+    const onPop = () => {
+      if (ownHashWrite) {
+        ownHashWrite = false
+        return
+      }
+      noteHistoryPop()
+    }
     window.addEventListener('hashchange', onHash)
     window.addEventListener('popstate', onPop)
     return () => {
@@ -88,6 +104,7 @@ export function useRoute(): [Route, (route: Route, opts?: { replace?: boolean })
       setNotice(null)
     } else {
       noteInternalNavigation()
+      ownHashWrite = true
       window.location.hash = hash
     }
   }

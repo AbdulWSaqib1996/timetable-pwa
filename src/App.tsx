@@ -63,6 +63,14 @@ import { duplicateTask, migrateCustomKeyDates, overlayTaskMeta, taskEventKey, ta
 import { applyPlacementExceptions } from './lib/placement'
 import { availableOrigins } from './lib/origins'
 import { busyCommitmentSessions, commitmentToSession, remindableCommitmentSessions } from './lib/commitments'
+import { isPlanSession, planBlockSessions, planIdOf } from './lib/planProjection'
+import { useFindIndex } from './hooks/useFindIndex'
+import { FindPage } from './features/find/FindPage'
+import type { FindResult } from './features/find/FindPage'
+import { PlanWeekSheet } from './components/PlanWeekSheet'
+import type { BusyInterval, PlanPrefill } from './components/PlanWeekSheet'
+import type { BlockPrefill } from './components/WorkPlanSection'
+import { toMins } from '../shared/intervals.js'
 import { CommitmentSheet } from './components/CommitmentSheet'
 import { PlacementPage } from './features/pgce/PlacementPage'
 import { TaskEditSheet } from './components/TaskEditSheet'
@@ -96,7 +104,7 @@ import type {
   ViewMode,
 } from './types'
 
-type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course'
+type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek'
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -132,10 +140,12 @@ export default function App() {
   const [adminFile, setAdminFile] = useState<AdminFile>(EMPTY_ADMIN)
   const [adminTab, setAdminTab] = useState<AdminTab>('overview')
   // Task editor: null = closed, { task: null } = create (P5-01).
-  const [taskEdit, setTaskEdit] = useState<{ task: TaskRecord | null } | null>(null)
+  const [taskEdit, setTaskEdit] = useState<{ task: TaskRecord | null; focusPlanId?: string; prefillBlock?: BlockPrefill } | null>(null)
+  // A study block just added from a Plan-week suggestion — Undo removes it (NF-03).
+  const [planUndo, setPlanUndo] = useState<PlanChildRec | null>(null)
   const [taskUndo, setTaskUndo] = useState<TaskRecord | null>(null)
   // Personal-event editor (P5-06): null closed; commitment null = create.
-  const [commitmentEdit, setCommitmentEdit] = useState<{ commitment: CommitmentRec | null; dateISO: string } | null>(null)
+  const [commitmentEdit, setCommitmentEdit] = useState<{ commitment: CommitmentRec | null; dateISO: string; startTime?: string; endTime?: string; kind?: CommitmentRec['kind'] } | null>(null)
   const [commitmentUndo, setCommitmentUndo] = useState<CommitmentRec | null>(null)
 
   const active = store?.profiles.find((p) => p.id === store.activeId) ?? null
@@ -280,7 +290,9 @@ export default function App() {
   }
 
   function savePlanChild(rec: PlanChildRec) {
+    const isNewBlock = rec.kind === 'block' && !adminFile.plans.some((c) => c.id === rec.id)
     updateAdmin((prev) => ({ ...prev, plans: [...prev.plans.filter((c) => c.id !== rec.id), rec] }))
+    if (isNewBlock) setPlanUndo(rec)
   }
 
   function deletePlanChild(id: string) {
@@ -664,10 +676,20 @@ export default function App() {
   // Personal commitments as clearly-marked sessions (P5-06): all of them for
   // display; the busy subset for clashes and group availability; the
   // reminder-enabled subset for notifications.
-  const personalSessions = useMemo(() => adminFile.commitments.map(commitmentToSession), [adminFile.commitments])
+  // Work-plan blocks as read-only projections of their single stored record
+  // (R4 / NF-02): shown with personal events, busy for clashes/availability,
+  // never reminder-eligible here.
+  const planSessions = useMemo(() => planBlockSessions(adminFile.plans, adminFile.tasks), [adminFile.plans, adminFile.tasks])
+  const personalSessions = useMemo(
+    () => [...adminFile.commitments.map(commitmentToSession), ...planSessions],
+    [adminFile.commitments, planSessions]
+  )
   const commitmentIds = useMemo(() => new Set(adminFile.commitments.map((c) => c.id)), [adminFile.commitments])
   const taskIds = useMemo(() => new Set(adminFile.tasks.map((t) => t.id)), [adminFile.tasks])
-  const busyPersonal = useMemo(() => busyCommitmentSessions(adminFile.commitments), [adminFile.commitments])
+  const busyPersonal = useMemo(
+    () => [...busyCommitmentSessions(adminFile.commitments), ...planSessions.filter((s) => !s.isFreeTime)],
+    [adminFile.commitments, planSessions]
+  )
   const remindablePersonal = useMemo(
     () => remindableCommitmentSessions(adminFile.commitments),
     [adminFile.commitments]
@@ -680,9 +702,10 @@ export default function App() {
     [courseSessions, personalSessions]
   )
   // Does a proposed interval overlap timetabled/busy time? (work-plan blocks)
-  const busyCheck = (dateISO: string, startTime: string, endTime: string) =>
+  const busyCheck = (dateISO: string, startTime: string, endTime: string, ignorePlanId?: string) =>
     [...courseSessions, ...busyPersonal].some((x) => {
       if (x.dateISO !== dateISO || x.isKeyDate || x.isSelfStudy || x.isFreeTime) return false
+      if (ignorePlanId && x.id === `plan-${ignorePlanId}`) return false
       const xs = x.start || '00:00'
       const xe = x.end || x.start || '00:00'
       return xs < endTime && startTime < xe
@@ -755,6 +778,78 @@ export default function App() {
   )
 
   const keyDateDays = useMemo(() => new Set(allKeyDates.map((k) => k.dateISO)), [allKeyDates])
+
+  // Local "Find anything" index (R4 / NF-01): built lazily from every owner
+  // type, keyed by (profile, owner type, owner id); never leaves the device.
+  const findState = useFindIndex({
+    profileId: active?.id ?? '',
+    sessions,
+    admin: adminFile,
+    metaMap,
+    includeNotes: settings?.findIncludeNotes === true,
+  })
+  const openFindResult = (r: FindResult) => {
+    const all = [...(sessions ?? []), ...allKeyDates, ...personalSessions]
+    const byId = (id: string) => all.find((x) => x.id === id)
+    switch (r.ownerType) {
+      case 'session': {
+        const target = all.find((x) => sessionKey(x) === r.ownerId)
+        if (target) openSession(target)
+        return
+      }
+      case 'personal': {
+        const target = byId(`cmt-${r.ownerId}`)
+        if (target) openSession(target)
+        return
+      }
+      case 'task': {
+        const target = byId(`custom-${r.ownerId}`)
+        if (target) openSession(target)
+        else {
+          const task = adminFile.tasks.find((t) => t.id === r.ownerId)
+          if (task) setTaskEdit({ task })
+        }
+        return
+      }
+      case 'plan': {
+        const parent = adminFile.tasks.find((t) => t.id === r.meta?.parentId)
+        if (parent) setTaskEdit({ task: parent, focusPlanId: r.ownerId })
+        return
+      }
+      case 'pgce':
+        setAdminTab((r.meta?.tab as AdminTab) ?? 'overview')
+        setOpenSheet('admin')
+        return
+      case 'document':
+        setAdminTab('wallet')
+        setOpenSheet('admin')
+        return
+    }
+  }
+  // Plan week inputs (NF-03): plain intervals only — titles stay in the sheet.
+  const planWeekBusy = useMemo<BusyInterval[]>(() => {
+    const out: BusyInterval[] = []
+    for (const x of courseSessions) {
+      if (x.isKeyDate || x.isSelfStudy || x.isFreeTime) continue
+      const from = toMins(x.start)
+      if (from === null) continue
+      out.push({ d: x.dateISO, from, to: toMins(x.end) ?? from + 60, label: x.title, kind: 'session' })
+    }
+    for (const c of adminFile.commitments) {
+      const from = toMins(c.startTime)
+      const to = toMins(c.endTime)
+      if (from === null || to === null) continue
+      out.push({ d: c.dateISO, from, to, label: c.title, kind: c.busy === false ? 'free' : 'personal' })
+    }
+    for (const s of planSessions) {
+      const from = toMins(s.start)
+      const to = toMins(s.end)
+      if (from === null || to === null) continue
+      out.push({ d: s.dateISO, from, to, label: s.title, kind: s.isFreeTime ? 'free' : 'plan' })
+    }
+    return out
+  }, [courseSessions, adminFile.commitments, planSessions])
+  const planWeekDeadlines = useMemo(() => allKeyDates.map((k) => ({ d: k.dateISO, title: k.title })), [allKeyDates])
 
   // Placement progress: unique school days per block, attended via the ✓ tick.
   const placementStats = useMemo(() => {
@@ -1175,6 +1270,17 @@ export default function App() {
             }}
           />
         </Suspense>
+      ) : route.name === 'find' ? (
+        <FindPage
+          profileId={active.id}
+          profileName={active.name}
+          todayISO={todayISO}
+          state={findState}
+          includeNotes={settings.findIncludeNotes === true}
+          onToggleNotes={(next) => updateSettings({ findIncludeNotes: next })}
+          onOpen={openFindResult}
+          onBack={() => goBackOr({ name: 'schedule' })}
+        />
       ) : route.name === 'placement' ? (
         <PlacementPage
           profileName={active.name}
@@ -1280,6 +1386,13 @@ export default function App() {
           onMeta={handleMeta}
           onAddPersonal={(dateISO) => setCommitmentEdit({ commitment: null, dateISO })}
           onOpenSettings={() => navigate({ name: 'settings' })}
+          onPlanWeek={() => setOpenSheet('planWeek')}
+          onFindAnything={() => navigate({ name: 'find' })}
+          planUndo={planUndo}
+          onUndoPlan={(block) => {
+            deletePlanChild(block.id)
+            setPlanUndo(null)
+          }}
         />
       ) : sessions === null && !settings.demo && !error ? (
         <div className="empty-state">Loading timetable…</div>
@@ -1323,6 +1436,8 @@ export default function App() {
           onSavePlan={savePlanChild}
           onDeletePlan={deletePlanChild}
           busyCheck={busyCheck}
+          focusPlanId={taskEdit.focusPlanId}
+          prefillBlock={taskEdit.prefillBlock}
           onClose={() => setTaskEdit(null)}
         />
       )}
@@ -1332,6 +1447,9 @@ export default function App() {
           profileId={active.id}
           commitment={commitmentEdit.commitment}
           defaultDateISO={commitmentEdit.dateISO}
+          defaultStartTime={commitmentEdit.startTime}
+          defaultEndTime={commitmentEdit.endTime}
+          defaultKind={commitmentEdit.kind}
           latest={
             commitmentEdit.commitment
               ? adminFile.commitments.find((c) => c.id === commitmentEdit.commitment!.id) ?? null
@@ -1354,6 +1472,23 @@ export default function App() {
           existingIds={commitmentIds}
           onDelete={deleteCommitment}
           onClose={() => goBackOr({ name: 'today' })}
+        />
+      ) : selected && isPlanSession(selected) ? (
+        // A study-block projection opens its PARENT task's block editor,
+        // focused on that block (NF-02) — the block is never a record of its own.
+        <TaskEditSheet
+          profileId={active.id}
+          task={adminFile.tasks.find((t) => t.id === adminFile.plans.find((p) => p.id === planIdOf(selected))?.parentId) ?? null}
+          latest={adminFile.tasks.find((t) => t.id === adminFile.plans.find((p) => p.id === planIdOf(selected))?.parentId) ?? null}
+          onSave={saveTask}
+          onDuplicate={(t) => saveTask(duplicateTask(t))}
+          onDelete={deleteTask}
+          planChildren={adminFile.plans.filter((c) => c.parentId === adminFile.plans.find((p) => p.id === planIdOf(selected))?.parentId)}
+          onSavePlan={savePlanChild}
+          onDeletePlan={deletePlanChild}
+          busyCheck={busyCheck}
+          focusPlanId={planIdOf(selected)}
+          onClose={() => goBackOr({ name: 'schedule' })}
         />
       ) : selected && selected.id.startsWith('custom-') ? (
         // A personal task opens its dedicated editable detail (P5-01), not the
@@ -1491,6 +1626,28 @@ export default function App() {
           sessions={[...courseSessions, ...busyPersonal]}
           todayISO={todayISO}
           onUpdateSettings={updateSettings}
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'planWeek' && active && (
+        <PlanWeekSheet
+          anchorISO={selectedDateISO ?? todayISO}
+          todayISO={todayISO}
+          busy={planWeekBusy}
+          deadlines={planWeekDeadlines}
+          settings={settings}
+          tasks={adminFile.tasks}
+          onUpdateSettings={updateSettings}
+          onPlanForTask={(taskId, prefill: PlanPrefill) => {
+            const task = adminFile.tasks.find((t) => t.id === taskId)
+            setOpenSheet('none')
+            if (task) setTaskEdit({ task, prefillBlock: prefill })
+          }}
+          onPlanPersonal={(prefill: PlanPrefill) => {
+            setOpenSheet('none')
+            setCommitmentEdit({ commitment: null, dateISO: prefill.dateISO, startTime: prefill.startTime, endTime: prefill.endTime, kind: 'study' })
+          }}
           onClose={() => setOpenSheet('none')}
         />
       )}
