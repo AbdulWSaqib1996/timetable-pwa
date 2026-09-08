@@ -237,7 +237,7 @@ export function useNotifications({
             // A date-specific plan viewed in Travel & map owns the departure:
             // the reminder fires on the SAME itinerary the screen shows, and a
             // changed buffer/time replaced the plan wholesale (P6-01).
-            const plan = leavePlanFor(sessionKey(s))
+            const plan = leavePlanFor(profileIdRef.current ?? '', sessionKey(s))
             if (plan) {
               untilLeave = Math.round((plan.leaveByMs - Date.now()) / 60_000)
               travelMins = plan.durationMins

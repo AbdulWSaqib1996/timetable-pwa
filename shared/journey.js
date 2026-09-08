@@ -66,9 +66,15 @@ export function validateItinerary(raw, zone = COURSE_TIMEZONE) {
       // line is simply not drawn, never faked from stop coordinates.
       geometry: parseLineString(leg.path?.lineString),
       summary: leg.instruction?.summary ?? '',
-      disruptions: (Array.isArray(leg.disruptions) ? leg.disruptions : [])
-        .map((d) => String(d?.description ?? '').slice(0, 200))
-        .filter(Boolean),
+      // TfL repeats the same disruption entry on a leg (once per affected
+      // stop/direction) — the reader needs each warning ONCE.
+      disruptions: [
+        ...new Set(
+          (Array.isArray(leg.disruptions) ? leg.disruptions : [])
+            .map((d) => String(d?.description ?? '').trim().slice(0, 200))
+            .filter(Boolean)
+        ),
+      ],
       isDisrupted: leg.isDisrupted === true,
     })
   }

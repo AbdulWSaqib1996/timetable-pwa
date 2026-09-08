@@ -4,6 +4,7 @@ import { fitZoom, mercator, projectOffset, routeBounds } from '../../shared/rout
 import type { LatLng } from '../../shared/route-geometry.js'
 import type { Coords } from '../lib/campus'
 import { tflLineColor } from '../lib/tfl'
+import { MapState, useTileStatus } from './MapState'
 
 interface Props {
   itinerary: Itinerary
@@ -12,6 +13,8 @@ interface Props {
   /** highlighted leg index (from the text steps), or null for the whole route */
   selectedLeg: number | null
   label?: string
+  /** readable address for the no-tiles fallback (TT-16) */
+  address?: string | null
 }
 
 const W = 640
@@ -28,7 +31,7 @@ const TILE = 256
  * gesture handlers, nothing traps page scrolling; leg highlighting is done
  * from the keyboard-accessible text steps.
  */
-export function RouteMap({ itinerary, origin, destination, selectedLeg, label }: Props) {
+export function RouteMap({ itinerary, origin, destination, selectedLeg, label, address }: Props) {
   const view = useMemo(() => {
     const pts: LatLng[] = itinerary.legs.flatMap((l) => l.geometry)
     if (origin) pts.push([origin.lat, origin.lng])
@@ -39,27 +42,34 @@ export function RouteMap({ itinerary, origin, destination, selectedLeg, label }:
     return { zoom, center }
   }, [itinerary, origin?.lat, origin?.lng, destination.lat, destination.lng]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Tiles covering the viewport around the centre (world pixel space) —
+  // computed before any early return so the tile-status hook order is stable.
+  const tiles = useMemo(() => {
+    if (!view) return [] as { tx: number; ty: number; left: number; top: number }[]
+    const { zoom, center } = view
+    const scale = 2 ** zoom
+    const cMerc = mercator(center.lat, center.lng)
+    const cWorld = { x: cMerc.x * TILE * scale, y: cMerc.y * TILE * scale }
+    const out: { tx: number; ty: number; left: number; top: number }[] = []
+    const firstTx = Math.floor((cWorld.x - W / 2) / TILE)
+    const lastTx = Math.floor((cWorld.x + W / 2) / TILE)
+    const firstTy = Math.floor((cWorld.y - H / 2) / TILE)
+    const lastTy = Math.floor((cWorld.y + H / 2) / TILE)
+    for (let tx = firstTx; tx <= lastTx; tx++) {
+      for (let ty = firstTy; ty <= lastTy; ty++) {
+        if (tx < 0 || ty < 0 || tx >= scale || ty >= scale) continue
+        out.push({ tx, ty, left: tx * TILE - (cWorld.x - W / 2), top: ty * TILE - (cWorld.y - H / 2) })
+      }
+    }
+    return out
+  }, [view])
+  const tracker = useTileStatus(tiles.length)
+
   if (!view) return null
   const { zoom, center } = view
   const px = (lat: number, lng: number) => {
     const o = projectOffset(lat, lng, center, zoom)
     return { x: W / 2 + o.x, y: H / 2 + o.y }
-  }
-
-  // Tiles covering the viewport around the centre (world pixel space).
-  const scale = 2 ** zoom
-  const cMerc = mercator(center.lat, center.lng)
-  const cWorld = { x: cMerc.x * TILE * scale, y: cMerc.y * TILE * scale }
-  const tiles: { tx: number; ty: number; left: number; top: number }[] = []
-  const firstTx = Math.floor((cWorld.x - W / 2) / TILE)
-  const lastTx = Math.floor((cWorld.x + W / 2) / TILE)
-  const firstTy = Math.floor((cWorld.y - H / 2) / TILE)
-  const lastTy = Math.floor((cWorld.y + H / 2) / TILE)
-  for (let tx = firstTx; tx <= lastTx; tx++) {
-    for (let ty = firstTy; ty <= lastTy; ty++) {
-      if (tx < 0 || ty < 0 || tx >= scale || ty >= scale) continue
-      tiles.push({ tx, ty, left: tx * TILE - (cWorld.x - W / 2), top: ty * TILE - (cWorld.y - H / 2) })
-    }
   }
 
   const drawnLegs = itinerary.legs
@@ -69,6 +79,7 @@ export function RouteMap({ itinerary, origin, destination, selectedLeg, label }:
   const d = px(destination.lat, destination.lng)
 
   return (
+    <MapState tracker={tracker} address={address}>
     <div className="route-map-wrap">
       <a
         className="route-map"
@@ -82,7 +93,9 @@ export function RouteMap({ itinerary, origin, destination, selectedLeg, label }:
           {tiles.map((t) => (
             <img
               key={`${t.tx},${t.ty}`}
-              src={`https://tile.openstreetmap.org/${zoom}/${t.tx}/${t.ty}.png`}
+              src={`https://tile.openstreetmap.org/${zoom}/${t.tx}/${t.ty}.png${tracker.nonce ? `?r=${tracker.nonce}` : ''}`}
+              onLoad={tracker.onLoad}
+              onError={tracker.onError}
               style={{ left: `${(t.left / W) * 100}%`, top: `${(t.top / H) * 100}%`, width: `${(TILE / W) * 100}%`, height: `${(TILE / H) * 100}%` }}
               alt=""
               loading="lazy"
@@ -125,5 +138,6 @@ export function RouteMap({ itinerary, origin, destination, selectedLeg, label }:
         </p>
       )}
     </div>
+    </MapState>
   )
 }

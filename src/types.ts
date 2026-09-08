@@ -132,6 +132,8 @@ export interface Settings {
   groupMemberId?: string
   /** device-held membership capability — never synced to other devices */
   groupToken?: string
+  /** saved default origin id for the journey home (NF-06 groundwork) */
+  defaultOriginHome?: string
   /** versioned course configuration (P7-01); absent = UCL Primary PGCE built-in */
   courseConfig?: import('../shared/course.js').CourseConfig
   /** study-group working hours (minutes from midnight) and minimum meeting length */

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDaysISO } from '../../../shared/calendar-time.js'
+import { addDaysISO, mondayOfISO } from '../../../shared/calendar-time.js'
 import { AgendaView } from '../../components/AgendaView'
 import { MonthView } from '../../components/MonthView'
 import { WeekView } from '../../components/WeekView'
@@ -103,7 +103,25 @@ export function SchedulePage({
   // ≥1280px: selection fills the side panel instead of opening the full
   // detail, so the calendar never jumps (P4-04).
   const hasPanel = useMinWidth(1280)
-  const [panel, setPanel] = useState<Session | null>(null)
+  // The panel stores a stable EVENT KEY, never a session object: the record
+  // is resolved against current data on every render, so a refreshed room or
+  // time shows up and a vanished record shows an honest notice (TT-15).
+  const [panelKeySel, setPanelKeySel] = useState<string | null>(null)
+  const [panelPinned, setPanelPinned] = useState(false)
+  const panel = useMemo(
+    () => (panelKeySel ? [...filteredSessions, ...allKeyDates].find((s) => panelKey(s) === panelKeySel) ?? null : null),
+    [panelKeySel, filteredSessions, allKeyDates]
+  )
+  const setPanel = (s: Session | null) => {
+    setPanelKeySel(s ? panelKey(s) : null)
+    if (!s) setPanelPinned(false)
+  }
+  // Changing week closes the panel unless deliberately pinned.
+  const weekOf = mondayOfISO(selectedDateISO ?? todayISO)
+  useEffect(() => {
+    if (!panelPinned) setPanelKeySel(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekOf])
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const mode: 'week' | 'month' = view === 'month' ? 'month' : 'week'
@@ -247,7 +265,7 @@ export function SchedulePage({
         />
         </>
       ) : wide && mode === 'week' ? (
-        <div className={`schedule-desktop${panel && hasPanel ? ' with-panel' : ''}`}>
+        <div className={`schedule-desktop${panelKeySel && hasPanel ? ' with-panel' : ''}`}>
           <div className="schedule-desktop-grid">
             <WeekView
               sessions={filteredSessions}
@@ -270,7 +288,20 @@ export function SchedulePage({
               onMeta={onMeta}
               onOpenFull={(s) => onSelect(s)}
               onClose={() => setPanel(null)}
+              pinned={panelPinned}
+              onTogglePin={() => setPanelPinned((v) => !v)}
             />
+          )}
+          {!panel && panelKeySel && hasPanel && (
+            <aside className="session-panel" aria-label="Selected session changed">
+              <div className="session-panel-head">
+                <span className="session-panel-kicker">Selected session</span>
+                <button type="button" className="btn-icon" aria-label="Close panel" onClick={() => setPanel(null)}>
+                  ✕
+                </button>
+              </div>
+              <p className="filter-hint">This session changed or is no longer visible. Pick it again from the calendar.</p>
+            </aside>
           )}
         </div>
       ) : mode === 'month' ? (

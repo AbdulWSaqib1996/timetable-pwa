@@ -12,6 +12,7 @@ interface Fields {
   kind: CommitmentRec['kind']
   location: string
   busy: boolean
+  remind: boolean
   notes: string
 }
 
@@ -37,6 +38,8 @@ const fieldsOf = (c: CommitmentRec | null, defaultDateISO: string): Fields => ({
   kind: c?.kind ?? 'appointment',
   location: c?.location ?? '',
   busy: c?.busy !== false,
+  // Preserved on every edit (TT-13); new events default to reminders OFF.
+  remind: c?.remind === true,
   notes: c?.notes ?? '',
 })
 
@@ -69,6 +72,7 @@ export function CommitmentSheet({ profileId, commitment, defaultDateISO, latest,
       kind: fields.kind,
       location: fields.location.trim() || undefined,
       busy: fields.busy,
+      remind: fields.remind,
       notes: fields.notes.trim() || undefined,
       at: Date.now(),
     }
@@ -164,6 +168,14 @@ export function CommitmentSheet({ profileId, commitment, defaultDateISO, latest,
       <p className="filter-hint">
         Only the busy TIME interval is ever shared with a study group — never the title, notes or
         location.
+      </p>
+      <label className="toggle-row">
+        <input type="checkbox" checked={f.remind} onChange={(e) => set({ remind: e.target.checked })} />
+        Remind me
+      </label>
+      <p className="filter-hint">
+        Uses your session reminder timing from Settings → Reminders. Counting as busy never turns
+        reminders on by itself.
       </p>
       <Field label="Notes">
         <textarea className="note-input" rows={2} value={f.notes} onChange={(e) => set({ notes: e.target.value })} />

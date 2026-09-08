@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { addDaysISO, mondayOfISO } from '../../shared/calendar-time.js'
+import { assignLanesByComponent } from '../../shared/intervals.js'
 import type { Coords, TravelMode } from '../lib/campus'
 import { isPlacementSession, placementTag, subjectColor, toMinutes as toMins, weekNumber } from '../lib/format'
 import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
@@ -52,23 +53,17 @@ function toMinutes(time: string): number | null {
 }
 
 /** Assign overlapping sessions to side-by-side lanes within a day column. */
+/**
+ * Lanes per CONNECTED overlap component (R2 / TT-14): a three-way morning
+ * clash uses three lanes; an isolated afternoon lesson keeps full width.
+ * Numeric minutes, never lexical time strings.
+ */
 function assignLanes(daySessions: Session[]): { session: Session; lane: number; lanes: number }[] {
-  const sorted = [...daySessions].sort((a, b) => (a.start || '').localeCompare(b.start || ''))
-  const laneEnds: number[] = []
-  const placed = sorted.map((session) => {
+  const items = daySessions.map((session) => {
     const start = toMinutes(session.start) ?? 0
-    const end = toMinutes(session.end) ?? start + 60
-    let lane = laneEnds.findIndex((laneEnd) => laneEnd <= start)
-    if (lane === -1) {
-      lane = laneEnds.length
-      laneEnds.push(end)
-    } else {
-      laneEnds[lane] = end
-    }
-    return { session, lane, end }
+    return { session, start, end: toMinutes(session.end) ?? start + 60 }
   })
-  const lanes = Math.max(1, laneEnds.length)
-  return placed.map(({ session, lane }) => ({ session, lane, lanes }))
+  return assignLanesByComponent(items).map(({ item, lane, lanes }) => ({ session: item.session, lane, lanes }))
 }
 
 function useIsNarrow(): boolean {

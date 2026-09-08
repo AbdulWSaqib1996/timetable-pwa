@@ -120,3 +120,29 @@ test('DST boundary: an arrive-by on the clock-change morning still parses to rea
   assert.equal(it.arrivalMs - it.departureMs, 30 * 60_000)
   assert.equal(it.departureMs, wallToUTC('2026-10-25', '08:00').utcMs)
 })
+
+
+test('duplicate disruption entries on a leg collapse to one warning (TfL repeats them per stop)', () => {
+  const it = validateItinerary({
+    startDateTime: '2026-09-08T08:13:00',
+    arrivalDateTime: '2026-09-08T08:46:00',
+    duration: 33,
+    legs: [
+      {
+        mode: { name: 'tube' },
+        duration: 20,
+        departureTime: '2026-09-08T08:13:00',
+        arrivalTime: '2026-09-08T08:33:00',
+        routeOptions: [{ name: 'Metropolitan' }],
+        departurePoint: { commonName: 'Wembley Park' },
+        arrivalPoint: { commonName: 'Euston Square' },
+        disruptions: [
+          { description: 'Wembley Park: No Step Free Access - faulty lift' },
+          { description: 'Wembley Park: No Step Free Access - faulty lift' },
+          { description: ' Wembley Park: No Step Free Access - faulty lift ' },
+        ],
+      },
+    ],
+  })
+  assert.deepEqual(it.legs[0].disruptions, ['Wembley Park: No Step Free Access - faulty lift'])
+})

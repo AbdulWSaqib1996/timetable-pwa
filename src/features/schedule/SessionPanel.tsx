@@ -10,6 +10,9 @@ interface Props {
   onMeta: (session: Session, patch: Partial<SessionMeta>) => void
   onOpenFull: (session: Session) => void
   onClose: () => void
+  /** keep the panel open across week changes (TT-15) */
+  pinned?: boolean
+  onTogglePin?: () => void
 }
 
 function longDate(dateISO: string): string {
@@ -22,13 +25,18 @@ function longDate(dateISO: string): string {
  * Moodle/Directions, attendance and a quick note — with a route to the full
  * detail (travel, photos, standards). Nonmodal: no focus trap.
  */
-export function SessionPanel({ session, meta, travelMode, onMeta, onOpenFull, onClose }: Props) {
+export function SessionPanel({ session, meta, travelMode, onMeta, onOpenFull, onClose, pinned = false, onTogglePin }: Props) {
   const loc = parseLocation(session.isSelfStudy ? '' : session.room)
   const travel = session.room && !session.isSelfStudy ? estimateTravel(session.room, null, travelMode) : null
   return (
     <aside className="session-panel" aria-label={`Selected session: ${session.title}`}>
       <div className="session-panel-head">
         <span className="session-panel-kicker">Selected session</span>
+        {onTogglePin && (
+          <button type="button" className="btn-icon" aria-pressed={pinned} aria-label={pinned ? 'Unpin panel' : 'Pin panel across weeks'} title={pinned ? 'Unpin' : 'Pin'} onClick={onTogglePin}>
+            📌
+          </button>
+        )}
         <button type="button" className="btn-icon" aria-label="Close panel" onClick={onClose}>
           ✕
         </button>
