@@ -5,6 +5,7 @@ import type { TaskRecord } from '../lib/admin'
 import { useDraft } from '../hooks/useDraft'
 import type { PlanChildRec } from '../lib/admin'
 import { WorkPlanSection } from './WorkPlanSection'
+import type { BlockPrefill } from './WorkPlanSection'
 import { Dialog, Field, StatusMessage } from './ui'
 
 interface TaskFields {
@@ -30,7 +31,11 @@ interface Props {
   planChildren?: PlanChildRec[]
   onSavePlan?: (rec: PlanChildRec) => void
   onDeletePlan?: (id: string) => void
-  busyCheck?: (dateISO: string, startTime: string, endTime: string) => boolean
+  busyCheck?: (dateISO: string, startTime: string, endTime: string, ignorePlanId?: string) => boolean
+  /** open with this work-plan child in edit mode (NF-02) */
+  focusPlanId?: string
+  /** prefill a new study block from a Plan-week suggestion (NF-03) */
+  prefillBlock?: BlockPrefill
   onClose: () => void
 }
 
@@ -59,6 +64,8 @@ export function TaskEditSheet({
   onSavePlan,
   onDeletePlan,
   busyCheck,
+  focusPlanId,
+  prefillBlock,
   onClose,
   existingIds,
 }: Props) {
@@ -247,7 +254,7 @@ export function TaskEditSheet({
           maxLength={120}
           value={f.title}
           onChange={(e) => set({ title: e.target.value })}
-          autoFocus={!task}
+          autoFocus={!task && !prefillBlock}
         />
       </Field>
       <div className="task-edit-row">
@@ -284,6 +291,8 @@ export function TaskEditSheet({
           busyCheck={busyCheck}
           onSave={onSavePlan}
           onDelete={onDeletePlan}
+          focusPlanId={focusPlanId}
+          prefillBlock={prefillBlock}
         />
       )}
 

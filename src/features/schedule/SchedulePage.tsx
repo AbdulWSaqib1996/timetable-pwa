@@ -3,7 +3,8 @@ import { addDaysISO, mondayOfISO } from '../../../shared/calendar-time.js'
 import { AgendaView } from '../../components/AgendaView'
 import { MonthView } from '../../components/MonthView'
 import { WeekView } from '../../components/WeekView'
-import { IconSearch, PageHeader, SegmentedControl, SettingsAction } from '../../components/ui'
+import { IconSearch, PageHeader, SegmentedControl, SettingsAction, StatusMessage } from '../../components/ui'
+import type { PlanChildRec } from '../../lib/admin'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey as panelKey } from '../../lib/diff'
 import { getFilters } from '../../lib/filters'
@@ -45,6 +46,13 @@ interface Props {
   /** add a personal event/study block on the given date (P5-06) */
   onAddPersonal: (dateISO: string) => void
   onOpenSettings: () => void
+  /** Plan week suggestions over this week (R4 / NF-03) */
+  onPlanWeek: () => void
+  /** the local Find anything page (R4 / NF-01) */
+  onFindAnything: () => void
+  /** a study block just added from a suggestion — Undo removes it */
+  planUndo: PlanChildRec | null
+  onUndoPlan: (block: PlanChildRec) => void
 }
 
 function matchesQuery(s: Session, q: string): boolean {
@@ -100,6 +108,10 @@ export function SchedulePage({
   onMeta,
   onAddPersonal,
   onOpenSettings,
+  onPlanWeek,
+  onFindAnything,
+  planUndo,
+  onUndoPlan,
 }: Props) {
   const wide = useMinWidth(1024)
   // ≥1280px: selection fills the side panel instead of opening the full
@@ -222,6 +234,9 @@ export function SchedulePage({
               autoFocus
             />
             {searchResults && <span className="search-count">{searchResults.length}</span>}
+            <button type="button" className="travel-link search-everything" onClick={onFindAnything}>
+              Search everything →
+            </button>
           </div>
         )}
         <div className="filterbar">
@@ -244,12 +259,28 @@ export function SchedulePage({
           >
             🏫
           </button>
+          <button type="button" className="btn-filters" onClick={onPlanWeek} title="Suggested gaps this week">
+            Plan week
+          </button>
           <button type="button" className="btn-filters" onClick={onOpenFilters}>
             Filters
             {activeCount > 0 && <span className="filter-count">{activeCount}</span>}
           </button>
         </div>
       </div>
+
+      {planUndo && (
+        <div className="schedule-undo">
+          <StatusMessage tone="info">
+            <span>
+              Added study block “{planUndo.title}” on {planUndo.dateISO} {planUndo.startTime}–{planUndo.endTime}.{' '}
+              <button type="button" className="travel-link" onClick={() => onUndoPlan(planUndo)}>
+                Undo
+              </button>
+            </span>
+          </StatusMessage>
+        </div>
+      )}
 
       {!sessionsLoaded ? (
         <div className="empty-state">Loading timetable…</div>

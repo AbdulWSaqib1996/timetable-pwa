@@ -126,6 +126,11 @@ export interface Settings {
   bgLeaveAlerts?: boolean
   /** user-added personal deadlines, merged into the key-dates views */
   customKeyDates?: { id: string; title: string; dateISO: string; start?: string }[]
+  /** Find anything: also search notes, captions and record text (default off; local only) */
+  findIncludeNotes?: boolean
+  /** Plan week visible range in wall minutes (default 08:00–20:00) */
+  planRangeStart?: number
+  planRangeEnd?: number
   /** study group membership */
   groupCode?: string
   groupName?: string
