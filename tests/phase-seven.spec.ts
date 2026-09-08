@@ -111,7 +111,9 @@ test('geometry absent: destination-only map, complete text steps — no invented
   await openTravelTab(page)
   await expect(page.getByText(/Leave by 08:13/)).toBeVisible()
   await expect(page.locator('.route-map-overlay polyline')).toHaveCount(0)
-  await expect(page.locator('.static-map')).toBeVisible()
+  // Destination-only map — or, with tiles blocked, its honest "could not
+  // load" card (R2 / TT-16); never a route line either way.
+  await expect(page.locator('.static-map, .map-fallback').first()).toBeVisible()
   await page.locator('.journey-steps summary').click()
   await expect(page.getByText('Highbury → Euston')).toBeVisible()
   await expect(page.getByText('Walk to IOE')).toBeVisible()
