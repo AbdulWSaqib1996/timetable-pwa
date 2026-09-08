@@ -188,9 +188,14 @@ test('NF-05: scoped export keeps owner ids, the passphrase envelope round-trips,
   await expect(restoreContents.getByRole('listitem')).toHaveCount(1)
   await expect(restoreContents).toContainText('Profile A')
   await expect(restore.getByText(/other timetables on this device stay as they are/)).toBeVisible()
+  // Restore commits through the recovery journal and reloads the app: wait for
+  // that navigation to finish before reading storage (a poll during the reload
+  // races the destroyed execution context).
+  const reloaded = page.waitForEvent('load')
   await restore.getByRole('button', { name: 'Restore', exact: true }).click()
-  await page.waitForLoadState('load')
-  await expect.poll(async () => (await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.a')!))).tasks.map((t: { title: string }) => t.title)).toEqual(['Only in A'])
+  await reloaded
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  expect((await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.a')!))).tasks.map((t: { title: string }) => t.title)).toEqual(['Only in A'])
   const b = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.b')!))
   expect(b.tasks.map((t: { title: string }) => t.title)).toEqual(['Only in B'])
   const store = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.store.v2')!))
