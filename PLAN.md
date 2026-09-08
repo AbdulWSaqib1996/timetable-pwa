@@ -956,3 +956,5 @@ Known limitations / deferred: photo captions are indexed only when the opt-in is
 Rollback: revert the Find page and Plan week sheet independently; keep the router pop fix and the block projection.
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+R4 release verification (8 September 2026): workers deployed FIRST (`shared/find.js` and `shared/planWeek.js` added; no worker imports them) — push worker `13b3095d-a640-4e82-a5eb-776bb1d91ea3`, feed worker `7d2046c9-78ce-4331-9a09-8e379c9febba`; the deploy script's regression pass was green. Released commit `f5fc684` (merge `1530310`); GitHub Actions run 34222320530 concluded **success**. `./scripts/deploy.sh verify` all six PASS. Deployed main chunks carry the R4 surfaces — Vercel `assets/main-DJst2hHi.js`: Find page ×2, Plan-week prefill ×1; Pages `assets/main-B_eg9GuI.js`: Find page ×2, Plan-week prefill ×1.
