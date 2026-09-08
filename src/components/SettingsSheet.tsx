@@ -1,6 +1,3 @@
-import { validateBackup, backupPreview } from '../lib/backup'
-import { reportPersistenceFailure } from '../lib/persistence'
-import { markBackedUp } from '../lib/storage'
 import { useRef, useState } from 'react'
 import { attendanceSummary, isCompleted, isEligibleSession } from '../../shared/eligibility.js'
 import { sessionKey } from '../lib/diff'
@@ -26,12 +23,16 @@ import {
   saveSyncState,
 } from '../lib/sync'
 import type { SyncState } from '../lib/sync'
-import { exportBackup, importBackup } from '../lib/storage'
 import type { SourceStatus } from '../../shared/refresh.js'
 import type { PlacementExceptionRec } from '../lib/admin'
 import { placementBlocks as computePlacementBlocks } from '../lib/placement'
 import { WHATSNEW } from '../lib/changelog'
 import { IconBack, PageHeader } from './ui'
+import { BackupSheet, RestoreSheet } from './BackupSheets'
+import { lastBackupAt } from '../lib/storage'
+import { listDrafts } from '../lib/draftIndex'
+import { hasPendingSaves, persistenceFailure } from '../lib/persistence'
+import { readAttachments } from '../lib/attachments'
 import { useEffect } from 'react'
 import type { MetaMap, ProfileStore, Session, Settings } from '../types'
 
@@ -281,10 +282,27 @@ export function SettingsSheet({
   const [homeAddr, setHomeAddr] = useState(settings.homeAddress ?? '')
   const [homeGeoStatus, setHomeGeoStatus] = useState<'working' | 'ok' | 'fail' | null>(null)
   const [storageEstimate, setStorageEstimate] = useState<string | null>(null)
+  const [backupOpen, setBackupOpen] = useState(false)
+  const [restoreText, setRestoreText] = useState<string | null>(null)
+  const [localFiles, setLocalFiles] = useState<{ photos: number; wallet: number } | null>(null)
+  useEffect(() => {
+    if (section !== 'data') return
+    let live = true
+    void Promise.all([readAttachments('photos'), readAttachments('wallet')])
+      .then(([photos, wallet]) => {
+        if (!live) return
+        const mine = (owner: string) => owner.split('|')[0] === store.activeId
+        setLocalFiles({ photos: photos.filter((p) => mine(p.owner)).length, wallet: wallet.filter((w) => mine(w.owner)).length })
+      })
+      .catch(() => live && setLocalFiles(null))
+    return () => {
+      live = false
+    }
+  }, [section, store.activeId])
   useEffect(() => {
     if (section !== 'data') return
     if (!navigator.storage?.estimate) {
-      setStorageEstimate('not reported by this browser')
+      setStorageEstimate('Storage estimate unavailable — not reported by this browser')
       return
     }
     void navigator.storage
@@ -293,7 +311,7 @@ export function SettingsSheet({
         const mb = (n?: number) => (n != null ? `${Math.round(n / 1048576)} MB` : '?')
         setStorageEstimate(`${mb(e.usage)} used of ~${mb(e.quota)} available (browser estimate, not a guarantee)`)
       })
-      .catch(() => setStorageEstimate('not reported by this browser'))
+      .catch(() => setStorageEstimate('Storage estimate unavailable — not reported by this browser'))
   }, [section])
 
   function saveHomeAddress() {
@@ -451,12 +469,10 @@ export function SettingsSheet({
   function handleImportFile(file: File) {
     void (async () => {
       if (file.size > 50 * 1024 * 1024) throw new Error('Backup exceeds the 50 MB limit.')
-      const text = await file.text()
-      const data = validateBackup(text)
-      if (!window.confirm(backupPreview(data))) return
-      await importBackup(text)
-      window.location.reload()
-    })().catch(error => window.alert('Restore did not finish: ' + String(error)))
+      // Plain or encrypted — the restore sheet unlocks, validates and
+      // previews before anything is committed (R5a).
+      setRestoreText(await file.text())
+    })().catch((error) => window.alert('Could not read that file: ' + String(error)))
   }
 
   // Attendance insights over eligible completed sessions — the same shared
@@ -1440,17 +1456,48 @@ export function SettingsSheet({
         <>
         <section className="filter-section" id="data-health">
           <h3 tabIndex={-1}>Data health</h3>
-          <ul className="notif-overview">
+          <ul className="notif-overview" aria-label="Data health">
             <li>
               <span>Saved on this device</span>
-              <span className="notif-state">notes, attendance & settings persist locally</span>
+              <span className={`notif-state${hasPendingSaves() || persistenceFailure() ? ' warn' : ''}`}>
+                {hasPendingSaves()
+                  ? 'changes are waiting to save — keep this tab open'
+                  : persistenceFailure()
+                    ? `last save failed: ${persistenceFailure()}`
+                    : 'all changes written to this device'}
+              </span>
             </li>
             <li>
-              <span>Sync</span>
+              <span>Synced records</span>
               <span className={`notif-state${syncState ? '' : ' off'}`}>
                 {syncState
-                  ? `on — last parked ${new Date(syncState.lastAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                  ? `at ${new Date(syncState.lastAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} — records only, never photos or documents`
                   : 'off (this device only)'}
+              </span>
+            </li>
+            <li>
+              <span>Photos & documents</span>
+              <span className="notif-state">
+                {localFiles
+                  ? `${localFiles.photos} photo${localFiles.photos === 1 ? '' : 's'}, ${localFiles.wallet} document${localFiles.wallet === 1 ? '' : 's'} on this device only — not part of sync; move them with a backup`
+                  : 'on this device only — not part of sync'}
+              </span>
+            </li>
+            <li>
+              <span>Last backup generated</span>
+              <span className={`notif-state${lastBackupAt() ? '' : ' warn'}`}>
+                {lastBackupAt()
+                  ? `${new Date(lastBackupAt()!).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} — generated here; only you can confirm the file was kept`
+                  : 'never on this device'}
+              </span>
+            </li>
+            <li>
+              <span>Recoverable drafts</span>
+              <span className="notif-state">
+                {(() => {
+                  const n = listDrafts(store.activeId).length
+                  return n === 0 ? 'none' : `${n} unsaved draft${n === 1 ? '' : 's'} kept on this device — reopen the record to continue`
+                })()}
               </span>
             </li>
             {sources.map((src) => (
@@ -1468,10 +1515,6 @@ export function SettingsSheet({
             <li>
               <span>Storage</span>
               <span className="notif-state">{storageEstimate ?? '…'}</span>
-            </li>
-            <li>
-              <span>Photos & wallet files</span>
-              <span className="notif-state">on this device only — move them with a backup</span>
             </li>
           </ul>
           <p className="filter-hint">
@@ -1513,21 +1556,21 @@ export function SettingsSheet({
         <section className="filter-section" id="backup">
           <h3 tabIndex={-1}>Backup</h3>
           <p className="filter-hint">
-            Everything lives on this device only. Export a backup (timetables, filters, notes,
-            attendance) and import it on a new device or after clearing browser data.
+            Everything lives on this device only. Generate a backup (timetables, filters, notes,
+            attendance, photos and documents) and restore it on a new device or after clearing browser
+            data. You choose the scope and can seal it with a passphrase; a preview shows exactly what is
+            inside before anything is generated or restored.
           </p>
+          {backupOpen && <BackupSheet store={store} onClose={() => setBackupOpen(false)} />}
+          {restoreText !== null && (
+            <RestoreSheet text={restoreText} onClose={() => setRestoreText(null)} onRestored={() => window.location.reload()} />
+          )}
           <div className="btn-row">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() =>
-                void exportBackup().then((json) => { downloadFile('my-timetable-backup.json', json, 'application/json'); markBackedUp() }).catch(error => reportPersistenceFailure('Backup export failed: ' + String(error)))
-              }
-            >
-              Export backup
+            <button type="button" className="btn-primary" onClick={() => setBackupOpen(true)}>
+              Back up… (preview first)
             </button>
             <button type="button" className="btn-secondary" onClick={() => importInput.current?.click()}>
-              Import backup
+              Restore from backup…
             </button>
             <input
               ref={importInput}

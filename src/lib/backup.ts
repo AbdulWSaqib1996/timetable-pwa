@@ -30,6 +30,31 @@ export function validateBackup(text: string): Backup {
   }
   return data
 }
+export interface BackupSummary {
+  version: number
+  profiles: { id: string; name: string; records: number; events: number; adminRecords: number; photos: number; wallet: number }[]
+  photos: number
+  wallet: number
+}
+/** Structured contents of a backup for previews before export or restore (R5a). */
+export function backupSummary(data: Backup): BackupSummary {
+  const countAdmin = (a: unknown) =>
+    a && typeof a === 'object' ? Object.values(a as Record<string, unknown>).reduce<number>((n, v) => n + (Array.isArray(v) ? v.length : 0), 0) : 0
+  return {
+    version: data.version,
+    profiles: data.store.profiles.map((p) => ({
+      id: p.id,
+      name: p.name,
+      records: Object.keys(data.meta?.[p.id] ?? {}).length,
+      events: (data.cache?.[p.id]?.sessions.length ?? 0) + (data.cache?.[p.id]?.keyDates?.length ?? 0),
+      adminRecords: countAdmin(data.admin?.[p.id]),
+      photos: (data.photos ?? []).filter((f) => f.owner.split('|')[0] === p.id).length,
+      wallet: (data.wallet ?? []).filter((f) => f.owner.split('|')[0] === p.id).length,
+    })),
+    photos: data.photos?.length ?? 0,
+    wallet: data.wallet?.length ?? 0,
+  }
+}
 export function backupPreview(data: Backup): string {
   const records = Object.values(data.meta ?? {}).reduce((n, m) => n + Object.keys(m).length, 0)
   const events = Object.values(data.cache ?? {}).reduce((n,c) => n + c.sessions.length + (c.keyDates?.length ?? 0), 0)

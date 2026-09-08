@@ -4039,3 +4039,41 @@ body {
 .filterbar .btn-filters {
   flex-shrink: 0;
 }
+
+/* ---------- R5a: review queue, binder selections, backup sheets ---------- */
+
+.journal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.journal-select {
+  display: flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+}
+
+.journal-row .journal-entry {
+  flex: 1;
+  min-width: 0;
+}
+
+.journal-actions {
+  padding: 0 0 4px 50px;
+}
+
+.journal-selected .journal-entry {
+  border-color: var(--accent);
+}
+
+.journal-selection-line {
+  margin: 8px 0 0;
+}
+
+.binder-contents,
+.backup-summary {
+  margin: 4px 0 8px;
+}

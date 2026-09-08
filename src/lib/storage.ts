@@ -136,16 +136,35 @@ export function saveChanges(pid: string, changes: SessionChange[]): void {
 }
 
 /** Everything worth keeping (profiles, notes, attendance, photos, PGCE admin file, wallet). */
-export async function exportBackup(): Promise<string> {
+export interface ExportScope {
+  /** export only these profiles (owner ids are kept exactly); omit for all */
+  profileIds?: string[]
+}
+
+/**
+ * Plain backup JSON. With a scope (R5a / NF-05) only the chosen profiles and
+ * the attachments they own are included; owner ids are never remapped, so a
+ * scoped backup restores back onto the same profile identity.
+ */
+export async function exportBackup(scope: ExportScope = {}): Promise<string> {
   requireSavedData()
   return withDataLock(async () => {
-  const store = readJSON<ProfileStore>(STORE_KEY)
-  if (!store) throw new Error('No timetable to back up.')
+  const full = readJSON<ProfileStore>(STORE_KEY)
+  if (!full) throw new Error('No timetable to back up.')
+  const wanted = scope.profileIds ? new Set(scope.profileIds) : null
+  const profiles = wanted ? full.profiles.filter((p) => wanted.has(p.id)) : full.profiles
+  if (profiles.length === 0) throw new Error('No matching profile to back up.')
+  const store: ProfileStore = {
+    ...full,
+    profiles,
+    activeId: profiles.some((p) => p.id === full.activeId) ? full.activeId : profiles[0].id,
+  }
+  const ownerIn = (owner: string) => !wanted || wanted.has(owner.split('|')[0])
   const cache: Record<string, CachedData> = {}
   const changes: Record<string, SessionChange[]> = {}
   const meta: Record<string, MetaMap> = {}
   const admin: Record<string, unknown> = {}
-  for (const p of store?.profiles ?? []) {
+  for (const p of profiles) {
     meta[p.id] = loadMeta(p.id)
     const snapshot = loadCache(p.id)
     if (snapshot) cache[p.id] = snapshot
@@ -154,9 +173,9 @@ export async function exportBackup(): Promise<string> {
     if (rawAdmin) admin[p.id] = rawAdmin
   }
   const { exportPhotos } = await import('./photos')
-  const photos = await exportPhotos()
+  const photos = (await exportPhotos()).filter((p) => ownerIn(p.owner))
   const { exportWallet } = await import('./wallet')
-  const wallet = await exportWallet()
+  const wallet = (await exportWallet()).filter((w) => ownerIn(w.owner))
   const json = JSON.stringify(
     { version: 4, cache, changes, exportedAt: new Date().toISOString(), store, meta, admin, photos, wallet },
     null,
@@ -177,6 +196,11 @@ export async function importBackup(text: string): Promise<boolean> {
 
 /* ---------- backup nudge bookkeeping ---------- */
 const BACKUP_KEY = 'timetable.backup.v1'
+
+/** When a backup file was last GENERATED on this device (never proof it was kept). */
+export function lastBackupAt(): number | null {
+  return readJSON<{ lastBackupAt?: number }>(BACKUP_KEY)?.lastBackupAt ?? null
+}
 
 export function markBackedUp(): void {
   const state = readJSON<{ lastBackupAt?: number; lastNudgeAt?: number }>(BACKUP_KEY) ?? {}

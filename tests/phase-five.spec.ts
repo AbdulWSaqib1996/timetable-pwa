@@ -261,7 +261,8 @@ test('binder preview shows counts and file availability before printing', async 
   const preview = page.getByRole('dialog', { name: 'Binder preview' })
   await expect(preview).toBeVisible()
   await expect(preview.getByText('Targets (1)')).toBeVisible()
-  await expect(preview.getByText(/photos? available on this device|Checking photo availability/)).toBeVisible()
+  // R5a: the preview states exact contents — photos embedded from this device vs recorded elsewhere.
+  await expect(preview.getByRole('list', { name: 'Binder contents' })).toContainText(/Photos embedded from this device/)
   // Narrow the range so the target falls out — the count updates before print.
   await preview.getByLabel('From').fill('2026-09-05')
   await expect(preview.getByText('Targets (0)')).toBeVisible()
