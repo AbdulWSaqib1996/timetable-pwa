@@ -120,3 +120,10 @@ test('portable template contains no secrets: whitelist rebuild drops every forei
   // An invalid config yields NO template rather than a best-effort one.
   assert.equal(sanitizeTemplate({ configId: 'x' }), null)
 })
+
+test('journeyProvider is part of the template: defaults to tfl, accepts none, rejects anything else', () => {
+  assert.equal(validateCourseConfig(UCL_PGCE_CONFIG).config.journeyProvider, 'tfl')
+  assert.equal(validateCourseConfig({ ...OTHER_COURSE, journeyProvider: 'none' }).config.journeyProvider, 'none')
+  assert.equal(validateCourseConfig({ ...OTHER_COURSE, journeyProvider: 'citymapper' }).ok, false)
+  assert.ok(Object.keys(sanitizeTemplate(OTHER_COURSE)).includes('journeyProvider'))
+})

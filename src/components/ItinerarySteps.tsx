@@ -36,7 +36,12 @@ export function ItinerarySteps({ itinerary, legDeps, disruptions, showTimes = fa
       {itinerary.legs.map((leg, i) => {
         const color = tflLineColor(leg.line, leg.mode)
         const times = showTimes && leg.departMs !== null ? `${t(leg.departMs)}–${t(leg.arriveMs) ?? ''}` : null
-        const lineWarnings = leg.mode === 'walking' ? [] : legLineDisruptions(leg.line)
+        // A line-status warning that merely restates a disruption the leg
+        // already carries is dropped — one warning per fact.
+        const lineWarnings =
+          leg.mode === 'walking'
+            ? []
+            : legLineDisruptions(leg.line).filter((d) => !leg.disruptions.some((text) => text.includes(d.status) || d.status.includes(text)))
         const selectable = !!onSelectLeg && leg.geometry.length >= 2
         return (
           <div

@@ -7,6 +7,7 @@ import { ItinerarySteps } from '../../components/ItinerarySteps'
 import { OriginSelector } from '../../components/OriginSelector'
 import { RouteMap } from '../../components/RouteMap'
 import { StaticMap } from '../../components/StaticMap'
+import { CopyButton } from '../../components/CopyButton'
 import { EmptyState, PageHeader } from '../../components/ui'
 import { useJourney } from '../../hooks/useJourney'
 import { TRAVEL_MODE_PHRASE, estimateTravelToCoords, haversineMeters } from '../../lib/campus'
@@ -25,6 +26,7 @@ interface Props {
   origins: OriginOption[]
   onBack: () => void
   onOpenSettings: () => void
+  onUpdateSettings?: (patch: Partial<Settings>) => void
 }
 
 /**
@@ -34,7 +36,7 @@ interface Props {
  * map, collapsible steps, external directions. Intent is leave-now to home;
  * never an arrival-by plan (Phase 6).
  */
-export function JourneyHomePage({ settings, coords, locationEnabled, travelMode, origins, onBack, onOpenSettings }: Props) {
+export function JourneyHomePage({ settings, coords, locationEnabled, travelMode, origins, onBack, onOpenSettings, onUpdateSettings }: Props) {
   const homeSet = settings.homeLat != null && settings.homeLng != null
   const home = homeSet ? { lat: settings.homeLat!, lng: settings.homeLng! } : null
   const nearHome = home && coords ? haversineMeters(coords, home) <= 400 : false
@@ -43,9 +45,13 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
   // request is always leave-now (an earlier session's arrive-by plan can
   // never be reused: the request identity differs by construction, P6-04).
   const originOptions = origins.filter((o) => o.basis !== 'home')
-  const [originId, setOriginId] = useState<string | null>(
-    () => originOptions.find((o) => o.basis === 'device' && o.coords)?.id ?? null
-  )
+  // NF-06 groundwork: a saved default origin for the journey home is used
+  // before any live fix; a device fix only fills in when nothing is chosen.
+  const [originId, setOriginId] = useState<string | null>(() => {
+    const saved = settings.defaultOriginHome
+    if (saved && originOptions.some((o) => o.id === saved && o.coords)) return saved
+    return originOptions.find((o) => o.basis === 'device' && o.coords)?.id ?? null
+  })
   useEffect(() => {
     if (originId === null) {
       const device = originOptions.find((o) => o.basis === 'device' && o.coords)
@@ -131,7 +137,25 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
       <button type="button" className="page-back" onClick={onBack}>
         ‹ Back
       </button>
-      <PageHeader title="Journey home" subtitle="Leaving now — live route to your saved home" />
+      <PageHeader
+        title="Journey home"
+        subtitle={
+          // Copy follows ONE journey state — never "live" before a live plan exists (TT-17).
+          !origin
+            ? 'Leaving now — choose where you are starting from'
+            : journey.status === 'loading'
+              ? 'Leaving now — planning the route'
+              : journey.itinerary
+                ? `Leaving now — live route${journey.fetchedAt ? ` (checked ${new Date(journey.fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})` : ''}`
+                : journey.status === 'error'
+                  ? 'Leaving now — route provider unreachable, estimate only'
+                  : journey.status === 'no-route'
+                    ? 'Leaving now — no route found'
+                    : journey.status === 'no-provider'
+                      ? 'Leaving now — external directions'
+                      : 'Leaving now — distance estimate'
+        }
+      />
 
       {nearHome && (
         <p className="filter-hint">You look to be near home already (approximate). The route below still works.</p>
@@ -148,10 +172,15 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
               {arriveLabel ? ` · arrive ~${arriveLabel}` : ''}
             </span>
           </>
+        ) : originOptions.some((o) => o.basis !== 'device' && o.coords) ? (
+          <span className="filter-hint">
+            Pick a saved origin above for a route — no location permission needed. The address, map and
+            external directions below work regardless.
+          </span>
         ) : !locationEnabled ? (
           <span className="filter-hint">
-            Travel times are off. Turn them on in Settings for a live journey — the address, map and external
-            directions below work without them.
+            No saved origin yet. Turn travel times on in Settings for a live journey from your location, or
+            save a campus/placement origin — the address and external directions below work without either.
           </span>
         ) : (
           <span className="filter-hint">
@@ -162,6 +191,13 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
       </div>
 
       <OriginSelector options={originOptions} selectedId={originId} onSelect={setOriginId} />
+      {origin && onUpdateSettings && settings.defaultOriginHome !== origin.id && origin.basis !== 'device' && (
+        <p className="filter-hint journey-origin">
+          <button type="button" className="travel-link" onClick={() => onUpdateSettings({ defaultOriginHome: origin.id })}>
+            Use this origin by default for the journey home
+          </button>
+        </p>
+      )}
       {!origin && (
         <p className="filter-hint journey-origin">
           {locationEnabled
@@ -173,15 +209,7 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
       <div className="ui-card destination-card">
         <span className="today-hero-room-name">Home</span>
         {settings.homeAddress && <span className="today-hero-building">{settings.homeAddress}</span>}
-        {settings.homeAddress && (
-          <button
-            type="button"
-            className="travel-link copy-address"
-            onClick={() => void navigator.clipboard?.writeText(settings.homeAddress!).catch(() => {})}
-          >
-            Copy address
-          </button>
-        )}
+        {settings.homeAddress && <CopyButton text={settings.homeAddress} />}
       </div>
 
       {journey.itinerary && journey.itinerary.legs.some((l) => l.geometry.length >= 2) ? (
@@ -193,7 +221,7 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
           label="Home"
         />
       ) : (
-        <StaticMap lat={home.lat} lng={home.lng} label="Home" />
+        <StaticMap lat={home.lat} lng={home.lng} label="Home" address={settings.homeAddress} />
       )}
 
       {journey.itinerary && journey.itinerary.legs.length > 0 ? (

@@ -14,6 +14,7 @@ export interface CourseConfig {
   campus: { label: string; lat: number; lng: number; searchSuffix: string }
   buildings: CourseBuilding[]
   features: { placement: boolean; pgceFile: boolean }
+  journeyProvider: 'tfl' | 'none'
 }
 
 export const TEMPLATE_FIELDS: readonly string[]

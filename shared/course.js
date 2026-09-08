@@ -11,7 +11,7 @@ import { COURSE_TIMEZONE } from './calendar-time.js'
  */
 
 /** Whitelisted template fields — a shared template can carry NOTHING else. */
-export const TEMPLATE_FIELDS = ['configId', 'version', 'name', 'timezone', 'terminology', 'campus', 'buildings', 'features']
+export const TEMPLATE_FIELDS = ['configId', 'version', 'name', 'timezone', 'terminology', 'campus', 'buildings', 'features', 'journeyProvider']
 
 export const UCL_PGCE_CONFIG = {
   configId: 'ucl-primary-pgce',
@@ -51,6 +51,9 @@ export const UCL_PGCE_CONFIG = {
   ],
   /** PGCE-specific surfaces; another course can switch them off */
   features: { placement: true, pgceFile: true },
+  /** internal route planning provider for this course's region ('none' =
+   *  external directions only — never a London-only provider failing forever) */
+  journeyProvider: 'tfl',
 }
 
 const isFiniteNum = (n) => typeof n === 'number' && Number.isFinite(n)
@@ -117,6 +120,9 @@ export function validateCourseConfig(input) {
     }
   }
 
+  const journeyProvider = o.journeyProvider === undefined ? 'tfl' : o.journeyProvider
+  if (!['tfl', 'none'].includes(journeyProvider)) errors.push("journeyProvider must be 'tfl' or 'none'")
+
   const feat = o.features && typeof o.features === 'object' ? o.features : {}
   const features = {
     placement: feat.placement !== false,
@@ -141,6 +147,7 @@ export function validateCourseConfig(input) {
       },
       buildings,
       features,
+      journeyProvider,
     },
   }
 }

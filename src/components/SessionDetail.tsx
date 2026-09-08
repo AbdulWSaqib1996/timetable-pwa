@@ -24,6 +24,7 @@ import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
 import { SegmentedControl } from './ui'
+import { CopyButton } from './CopyButton'
 import { RouteMap } from './RouteMap'
 import { StaticMap } from './StaticMap'
 
@@ -202,6 +203,7 @@ export function SessionDetail({
         ? { kind: 'arrive-by', arriveByMs: requiredArrivalMs(startMs, arrivalBufferMins), timeZone: courseZone(), eventKey: sessionKey(session) }
         : { kind: 'leave-now' },
     eventKey: sessionKey(session),
+    profileId,
     enabled: tab === 'travel' && planable,
   })
   const shownItinerary = journey.departure === 'passed' ? journey.fallback : journey.itinerary
@@ -556,7 +558,11 @@ export function SessionDetail({
             <span className="filter-hint">
               {journey.fallback
                 ? `Leaving now instead: ≈ ${formatRemaining(journey.fallback.durationMins)} · arrive ~${hhmm(Date.now() + journey.fallback.durationMins * 60_000)}`
-                : 'Could not fetch a leave-now route — use external navigation below.'}
+                : journey.refreshing
+                  ? 'Finding a leave-now alternative…'
+                  : journey.fallbackUnavailable
+                    ? 'No leave-now alternative was found — use external navigation below.'
+                    : 'Checking for a leave-now alternative…'}
             </span>
           </>
         ) : futurePlan && journey.itinerary && journey.leaveByMs !== null ? (
@@ -592,9 +598,17 @@ export function SessionDetail({
             )}
             <span className="filter-hint">
               Couldn't reach TfL — {travel.minutes !== null ? 'showing a distance estimate only.' : 'no estimate available.'}{' '}
-              A route outage never hides the destination below.
+              A route outage never hides the destination below.{' '}
+              <button type="button" className="travel-link" onClick={journey.retry}>
+                Retry
+              </button>
             </span>
           </>
+        ) : journey.status === 'no-provider' ? (
+          <span className="filter-hint">
+            Internal route planning isn't available for this course's region — the address and
+            external navigation below are the route.
+          </span>
         ) : (
           <span className="filter-hint">Open this tab with a route provider available for a plan.</span>
         )}
@@ -608,13 +622,7 @@ export function SessionDetail({
           </span>
         )}
         {placementInfo?.address && <span className="today-hero-building">{placementInfo.address}</span>}
-        <button
-          type="button"
-          className="travel-link copy-address"
-          onClick={() => void navigator.clipboard?.writeText(placementInfo?.address || session.room).catch(() => {})}
-        >
-          Copy address
-        </button>
+        <CopyButton text={placementInfo?.address || session.room} />
       </div>
       {travel.location && shownItinerary && shownItinerary.legs.some((l) => l.geometry.length >= 2) ? (
         // Full-route map (P7-03): drawn ONLY from provider geometry; a failed
@@ -627,7 +635,7 @@ export function SessionDetail({
           label={travel.building ?? undefined}
         />
       ) : travel.location ? (
-        <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} />
+        <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} address={placementInfo?.address || session.room} />
       ) : (
         <div className="ui-card map-fallback">
           <p className="filter-hint">

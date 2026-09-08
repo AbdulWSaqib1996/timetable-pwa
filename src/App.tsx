@@ -1137,6 +1137,7 @@ export default function App() {
           origins={journeyOrigins}
           onBack={() => goBackOr({ name: 'today' })}
           onOpenSettings={() => navigate({ name: 'settings' })}
+          onUpdateSettings={updateSettings}
         />
       ) : route.name === 'settings' && store ? (
         <Suspense fallback={null}>
