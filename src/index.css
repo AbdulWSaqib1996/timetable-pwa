@@ -4077,3 +4077,11 @@ body {
 .backup-summary {
   margin: 4px 0 8px;
 }
+
+/* Attendance percentage restored (owner request, 8 Sep 2026) — shown with its honest denominator. */
+.attendance-headline {
+  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}

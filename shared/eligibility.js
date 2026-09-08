@@ -62,7 +62,7 @@ export function attendanceSummary(sessions, metaOf, todayISO, nowMinutes = null)
     sentence:
       eligible === 0
         ? 'No eligible completed sessions yet.'
-        : `${attended} attended of ${eligible} eligible completed session${eligible === 1 ? '' : 's'}; ${absent} absent, ${unrecorded} unrecorded.`,
+        : `${Math.round((attended / eligible) * 100)}% attended — ${attended} of ${eligible} eligible completed session${eligible === 1 ? '' : 's'}; ${absent} absent, ${unrecorded} unrecorded.`,
   }
 }
 
