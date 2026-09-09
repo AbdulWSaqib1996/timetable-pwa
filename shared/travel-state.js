@@ -37,3 +37,28 @@ export function freshnessLabel({ basis, fetchedAt }, now = Date.now()) {
   if (status === 'cached') return `TfL route from ${ageLabel(fetchedAt, now)} ago`
   return 'route unavailable'
 }
+
+/** Being "already there": within this many metres of the destination… */
+export const AT_DESTINATION_METERS = 150
+/** …on a fix no older than this — an old fix at the building proves nothing. */
+export const AT_DESTINATION_MAX_AGE_MS = 3 * 3_600_000
+
+function haversineMeters(a, b) {
+  const toRad = (d) => (d * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * 6371000 * Math.asin(Math.sqrt(h))
+}
+
+/**
+ * A leave alert is pointless when the person is already at the session's
+ * location (owner request, 9 Sep 2026). True only for a recent fix within
+ * AT_DESTINATION_METERS of the destination; a fix without a timestamp is
+ * treated as current (the in-app watcher), a stale one never suppresses.
+ */
+export function alreadyAtDestination(loc, dest, { now = Date.now(), maxMeters = AT_DESTINATION_METERS, maxAgeMs = AT_DESTINATION_MAX_AGE_MS } = {}) {
+  if (!loc || !dest || !Number.isFinite(loc.lat) || !Number.isFinite(loc.lng) || !Number.isFinite(dest.lat) || !Number.isFinite(dest.lng)) return false
+  if (typeof loc.at === 'number' && now - loc.at > maxAgeMs) return false
+  return haversineMeters(loc, dest) <= maxMeters
+}

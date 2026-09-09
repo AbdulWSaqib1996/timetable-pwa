@@ -68,6 +68,7 @@ import { useFindIndex } from './hooks/useFindIndex'
 import { FindPage } from './features/find/FindPage'
 import type { FindResult } from './features/find/FindPage'
 import { PlanWeekSheet } from './components/PlanWeekSheet'
+import { AttendancePromptSheet } from './components/AttendancePrompt'
 import type { BusyInterval, PlanPrefill } from './components/PlanWeekSheet'
 import type { BlockPrefill } from './components/WorkPlanSection'
 import { toMins } from '../shared/intervals.js'
@@ -134,7 +135,9 @@ export default function App() {
   const [notices, setNotices] = useState<Notice[]>([])
   // A notification tap carrying an owner: switch to that profile, then open
   // the stable event (P3-05). Falls back to a safe notice when it's gone.
-  const [pendingOpen, setPendingOpen] = useState<{ profileId: string; key: string } | null>(null)
+  const [pendingOpen, setPendingOpen] = useState<{ profileId: string; key: string; prompt?: boolean } | null>(null)
+  // Quick attendance answer for a tapped "did you attend?" notification (9 Sep 2026).
+  const [attendancePrompt, setAttendancePrompt] = useState<Session | null>(null)
   const [openNotice, setOpenNotice] = useState<string | null>(null)
   const [dismissedNotices, setDismissedNotices] = useState<Set<string>>(() => loadDismissedNotices())
   const [adminFile, setAdminFile] = useState<AdminFile>(EMPTY_ADMIN)
@@ -313,15 +316,17 @@ export default function App() {
   // Notification taps and queued 'open' actions arrive here with their owner.
   useEffect(() => {
     const onOpenRequest = (e: Event) => {
-      const d = (e as CustomEvent).detail as { profileId?: string; key?: string }
-      if (d?.profileId && d?.key) setPendingOpen({ profileId: d.profileId, key: d.key })
+      const d = (e as CustomEvent).detail as { profileId?: string; key?: string; kind?: string }
+      if (d?.profileId && d?.key) setPendingOpen({ profileId: d.profileId, key: d.key, prompt: d.kind === 'attendance' })
     }
     const onSwMessage = (event: MessageEvent) => {
-      const msg = event.data as { type?: string; profileId?: string; key?: string }
+      const msg = event.data as { type?: string; profileId?: string; key?: string; kind?: string }
       if (msg?.type !== 'timetable-open' || !msg.key) return
       const profiles = loadStore()?.profiles ?? []
       const owner = msg.profileId ?? (profiles.length === 1 ? profiles[0].id : undefined)
-      if (owner) setPendingOpen({ profileId: owner, key: msg.key })
+      // A tapped "did you attend?" opens the quick answer, not the full detail —
+      // on platforms without notification buttons this IS the quick action.
+      if (owner) setPendingOpen({ profileId: owner, key: msg.key, prompt: msg.kind === 'attendance' })
     }
     window.addEventListener('timetable-open-request', onOpenRequest)
     if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', onSwMessage)
@@ -745,7 +750,9 @@ export default function App() {
     const target =
       all.find((x) => sessionKey(x) === pendingOpen.key) ?? all.find((x) => legacyKey(x) === pendingOpen.key)
     if (target) {
-      openSession(target)
+      const marked = effectiveMeta[sessionKey(target)]?.attended || effectiveMeta[sessionKey(target)]?.absent
+      if (pendingOpen.prompt && !marked) setAttendancePrompt(target)
+      else openSession(target)
     } else {
       setOpenNotice('That session is no longer on your timetable — Changes shows what moved or was cancelled.')
       setOpenSheet('changes')
@@ -1416,6 +1423,7 @@ export default function App() {
           onSelect={openSession}
           onOpenChanges={openChanges}
           onOpenSettings={() => navigate({ name: 'settings' })}
+          onMarkAttendance={(s, answer) => handleMeta(s, { attended: answer === 'attended', absent: answer === 'absent' })}
           onOpenTasks={() => navigate({ name: 'tasks' })}
           onOpenSchedule={() => navigate({ name: 'schedule' })}
           personalSessions={settings && getFilters(settings).showPersonal === false ? [] : personalSessions}
@@ -1631,6 +1639,21 @@ export default function App() {
           todayISO={todayISO}
           onUpdateSettings={updateSettings}
           onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {attendancePrompt && (
+        <AttendancePromptSheet
+          session={attendancePrompt}
+          onAnswer={(s, answer) => {
+            handleMeta(s, { attended: answer === 'attended', absent: answer === 'absent' })
+            setAttendancePrompt(null)
+          }}
+          onOpen={(s) => {
+            setAttendancePrompt(null)
+            openSession(s)
+          }}
+          onClose={() => setAttendancePrompt(null)}
         />
       )}
 

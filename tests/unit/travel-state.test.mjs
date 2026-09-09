@@ -33,3 +33,15 @@ test('provider data and old cached durations never share a live label; estimates
 test('departure boards expire on their own short TTL', () => {
   assert.ok(DEPARTURES_TTL_MS < LIVE_TTL_MS)
 })
+
+test('alreadyAtDestination: recent fix within 150 m suppresses; far, stale or missing fixes never do', async () => {
+  const { alreadyAtDestination } = await import('../../shared/travel-state.js')
+  const dest = { lat: 51.5236, lng: -0.1282 }
+  const now = 1_800_000_000_000
+  assert.equal(alreadyAtDestination({ lat: 51.5237, lng: -0.1281, at: now - 60_000 }, dest, { now }), true)
+  assert.equal(alreadyAtDestination({ lat: 51.5237, lng: -0.1281 }, dest, { now }), true) // live watcher, no stamp
+  assert.equal(alreadyAtDestination({ lat: 51.53, lng: -0.1282, at: now - 60_000 }, dest, { now }), false) // ~700 m
+  assert.equal(alreadyAtDestination({ lat: 51.5237, lng: -0.1281, at: now - 4 * 3_600_000 }, dest, { now }), false) // stale
+  assert.equal(alreadyAtDestination(null, dest, { now }), false)
+  assert.equal(alreadyAtDestination({ lat: 51.5237, lng: -0.1281 }, null, { now }), false)
+})

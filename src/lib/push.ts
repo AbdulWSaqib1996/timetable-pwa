@@ -112,6 +112,23 @@ export async function reportLocation(base: string, lat: number, lng: number): Pr
   })
 }
 
+/**
+ * Tell the push worker which of today's sessions are already marked attended
+ * or absent, so its end-of-session "did you attend?" push is not sent for
+ * them (owner request, 9 Sep 2026). Keys only — no notes, no attendance value.
+ */
+export async function reportAttendanceMarks(base: string, keys: string[]): Promise<void> {
+  if (!('serviceWorker' in navigator)) return
+  const reg = await navigator.serviceWorker.ready
+  const subscription = await reg.pushManager.getSubscription()
+  if (!subscription) return
+  await fetch(`${trim(base)}/attendance`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ endpoint: subscription.endpoint, keys: keys.slice(0, 300) }),
+  })
+}
+
 export async function unsubscribePush(base: string): Promise<void> {
   if (!('serviceWorker' in navigator)) return
   const reg = await navigator.serviceWorker.ready

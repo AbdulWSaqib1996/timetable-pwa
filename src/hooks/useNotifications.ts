@@ -18,7 +18,8 @@ import {
 } from '../lib/format'
 import { leavePlanFor } from '../lib/journeyPlanner'
 import { showReminder } from '../lib/notify'
-import { reportLocation } from '../lib/push'
+import { reportAttendanceMarks, reportLocation } from '../lib/push'
+import { alreadyAtDestination } from '../../shared/travel-state.js'
 import { loadNotified, saveNotified } from '../lib/storage'
 import { cachedRouteMinutes, tflRoute } from '../lib/tfl'
 import type { TflDisruption } from '../lib/tfl'
@@ -220,7 +221,11 @@ export function useNotifications({
               )
             }
           }
-          if (est.minutes !== null) {
+          // Already at the session's location: no "time to leave" (owner
+          // request, 9 Sep 2026). Nothing is marked notified, so the alert
+          // still fires if they leave again before the session.
+          const alreadyThere = est.location ? alreadyAtDestination(here, est.location) : false
+          if (est.minutes !== null && !alreadyThere) {
             // In transit mode, prefer the live TfL journey time (cache warmed here, used
             // next tick) so disruptions automatically make the alert fire earlier.
             let travelMins = est.minutes
@@ -280,11 +285,12 @@ export function useNotifications({
           const key = sessionKey(s)
           const marked = metaRef.current[key]?.attended || metaRef.current[key]?.absent
           if (since < 0 || since > 30 || notified[`${key}#att`] || marked) continue
-          showReminder(`Did you attend ${s.title}?`, 'Tap ✓ Attended to log it.', {
+          showReminder(`Did you attend ${s.title}?`, '✓ Attended or ✗ Absent — or tap to answer in the app.', {
             key,
             profileId: profileIdRef.current ?? undefined,
             snoozeUrl: snoozeUrlRef.current,
             tag: `att-${key}`,
+            kind: 'attendance',
           })
           notified[`${key}#att`] = Date.now()
           dirty = true
@@ -316,4 +322,39 @@ export function useNotifications({
     const t = setInterval(check, 30_000)
     return () => clearInterval(t)
   }, [metaReady, offsetsKey, leaveKey, kdDaysKey, attendancePrompts])
+
+  // The push worker cannot see attendance marks, so it is told which of
+  // today's sessions are already answered (keys only) whenever that set
+  // changes — then its background "did you attend?" push stays silent for
+  // them (owner request, 9 Sep 2026).
+  const marksOn = settings?.pushEnabled === true && attendancePrompts
+  const pushBase = settings?.pushServerBase ?? DEFAULT_PUSH_BASE
+  useEffect(() => {
+    if (!marksOn || !metaReady) return
+    const today = localTodayISO()
+    const keys = exportRef.current
+      .filter((s) => s.dateISO === today && !s.isKeyDate && !s.isSelfStudy)
+      .map((s) => sessionKey(s))
+      .filter((k) => metaMap[k]?.attended || metaMap[k]?.absent)
+      .sort()
+    let last: { day: string; keys: string[] } | null = null
+    try {
+      last = JSON.parse(localStorage.getItem('timetable.marks-reported.v1') ?? 'null')
+    } catch {
+      /* ignore */
+    }
+    if (last && last.day === today && JSON.stringify(last.keys) === JSON.stringify(keys)) return
+    const t = setTimeout(() => {
+      void reportAttendanceMarks(pushBase, keys)
+        .then(() => {
+          try {
+            localStorage.setItem('timetable.marks-reported.v1', JSON.stringify({ day: today, keys }))
+          } catch {
+            /* ignore */
+          }
+        })
+        .catch(() => {})
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [marksOn, metaReady, metaMap, pushBase])
 }
