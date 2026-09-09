@@ -4085,3 +4085,18 @@ body {
   font-weight: 700;
   line-height: 1.1;
 }
+
+/* Quick attendance answers (9 Sep 2026) */
+.attendance-prompt-card {
+  margin: 0 0 12px;
+}
+
+.attendance-prompt-title {
+  margin: 4px 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.attendance-prompt-actions {
+  flex-wrap: wrap;
+}

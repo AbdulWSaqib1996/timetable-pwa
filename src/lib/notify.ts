@@ -5,8 +5,8 @@ export interface ReminderOpts {
   key?: string
   /** owning profile — actions and taps route back to it (P3-05) */
   profileId?: string
-  /** 'task' switches the actions to Open task / Mark done / Snooze */
-  kind?: 'session' | 'task'
+  /** 'task' switches the actions to Open task / Mark done / Snooze; 'attendance' asks attended-or-absent */
+  kind?: 'session' | 'task' | 'attendance'
   snoozeUrl?: string
   tag?: string
 }
@@ -41,7 +41,7 @@ export function showReminder(title: string, body: string, opts: ReminderOpts = {
                   { action: 'done', title: '✓ Mark done' },
                   { action: 'snooze', title: '⏰ Snooze 10m' },
                 ]
-              : tag?.startsWith('att-')
+              : kind === 'attendance' || tag?.startsWith('att-')
                 ? [
                     { action: 'attended', title: '✓ Attended' },
                     { action: 'absent', title: '✗ Absent' },

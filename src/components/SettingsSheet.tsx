@@ -1010,8 +1010,9 @@ export function SettingsSheet({
             Ask “did you attend?” when each session ends
           </label>
           <p className="filter-hint">
-            The prompt's ✓ Attended button logs the session — attendance and the placement day
-            counter then build themselves. Works in the background too when push is enabled.
+            Answer with ✓ Attended or ✗ Absent on the notification, or tap it to answer in the app
+            (a card on Today offers the same two answers for a session that just ended). A session
+            you have already answered is never asked. Works in the background too when push is enabled.
           </p>
         </section>
 
@@ -1062,6 +1063,7 @@ export function SettingsSheet({
           <p className="filter-hint">
             Notifies you when it's time to set off: session start minus your live travel estimate,
             with the head start you pick (e.g. "10 min" alerts 10 minutes before you need to leave).
+            Nothing is sent when you are already at the session's location.
           </p>
           {settings.locationEnabled ? (
             <div className="chip-grid">

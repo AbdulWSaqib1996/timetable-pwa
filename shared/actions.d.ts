@@ -3,14 +3,14 @@ export interface NotificationData {
   v: number
   url: string
   key?: string
-  kind: 'session' | 'task'
+  kind: 'session' | 'task' | 'attendance'
   profileId?: string
   snoozeUrl?: string
 }
 export function makeNotificationData(opts: {
   profileId?: string
   key?: string
-  kind?: 'session' | 'task'
+  kind?: 'session' | 'task' | 'attendance'
   url?: string
   snoozeUrl?: string
 }): NotificationData

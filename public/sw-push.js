@@ -27,7 +27,7 @@ const ACTIONS_TASK = [
 function actionsFor(data, tag) {
   if (!data.key) return []
   if (data.kind === 'task' || String(tag || '').startsWith('task-')) return ACTIONS_TASK
-  if (String(tag || '').startsWith('att-')) return ACTIONS_ATTENDANCE
+  if (data.kind === 'attendance' || String(tag || '').startsWith('att-')) return ACTIONS_ATTENDANCE
   return ACTIONS
 }
 

@@ -781,6 +781,9 @@ async function runScheduled(env) {
           }
         }
         if (!building) continue
+        // Already at the session's location on a recent fix: no "time to
+        // leave" (owner request, 9 Sep 2026). Mirrors shared/travel-state.js.
+        if (haversineM(loc, building) <= 150 && Date.now() - loc.at <= 3 * 3600 * 1000) continue
         const mode = config.travelMode ?? 'walking'
         let travelMins = heuristicMinutes(loc, building, mode)
         let liveLabel = ''
@@ -821,12 +824,15 @@ async function runScheduled(env) {
         const since = now.minutes - end
         if (since >= 0 && since < CRON_MINUTES) {
           const sKey = eventKey(s)
+          // Already answered in the app (reported via /attendance): stay silent.
+          if (record.marks && record.marks[sKey]) continue
           due.push({
             dedupe: `att|${s.dateISO}|${s.end}|${s.title}`,
             key: sKey,
+            kind: 'attendance',
             tag: `att-${sKey}`,
             title: `Did you attend ${s.title}?`,
-            body: 'Tap ✓ Attended to log it — it counts toward attendance and placement days.',
+            body: '✓ Attended or ✗ Absent — or tap to answer in the app. It counts toward attendance and placement days.',
           })
         }
       }
@@ -1134,6 +1140,7 @@ const RATE_CAPS = {
   '/unsubscribe': 10,
   '/snooze': 10,
   '/location': 10,
+  '/attendance': 10,
   '/ping': 6,
   '/sync': 10,
   '/sync-v2': 20,
@@ -1281,7 +1288,7 @@ export default {
       if (existing && !sameSubscription(existing.subscription, body.subscription)) return json({ error: 'subscription credentials do not match' }, 403)
       await env.PUSH.put(
         subKey,
-        JSON.stringify({ subscription: body.subscription, config: body.config, base: url.origin, loc: existing?.loc })
+        JSON.stringify({ subscription: body.subscription, config: body.config, base: url.origin, loc: existing?.loc, marks: existing?.marks })
       )
       return json({ ok: true })
     }
@@ -1643,6 +1650,26 @@ export default {
         return json({ ok: true, skipped: true })
       }
       record.loc = { lat, lng, at: Date.now() }
+      await env.PUSH.put(subKey, JSON.stringify(record))
+      return json({ ok: true })
+    }
+    if (request.method === 'POST' && url.pathname === '/attendance') {
+      // Keys of today's sessions already marked attended/absent (no values,
+      // no notes) so the end-of-session prompt is not sent for them.
+      const body = await request.json().catch(() => null)
+      if (!body?.endpoint || !Array.isArray(body.keys) || body.keys.length > 300 || !body.keys.every((k) => typeof k === 'string' && k.length <= 200)) {
+        return json({ error: 'invalid attendance report' }, 400)
+      }
+      const subKey = await endpointKey(body.endpoint)
+      const record = await env.PUSH.get(subKey, 'json')
+      if (!record) return json({ error: 'unknown subscription' }, 404)
+      const now = Date.now()
+      const marks = {}
+      for (const [k, at] of Object.entries(record.marks ?? {})) if (now - at < 2 * 86400 * 1000) marks[k] = at
+      for (const k of body.keys) marks[k] = now
+      const unchanged = JSON.stringify(Object.keys(marks).sort()) === JSON.stringify(Object.keys(record.marks ?? {}).sort())
+      if (unchanged) return json({ ok: true, skipped: true })
+      record.marks = marks
       await env.PUSH.put(subKey, JSON.stringify(record))
       return json({ ok: true })
     }

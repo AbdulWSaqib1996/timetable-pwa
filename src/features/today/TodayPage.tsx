@@ -11,6 +11,8 @@ import { freshnessLabel } from '../../../shared/travel-state.js'
 import { cachedRouteInfo } from '../../lib/tfl'
 import { TRAVEL_MODE_PHRASE } from '../../lib/campus'
 import { Card, EmptyState, IconBell, IconRefresh, PageHeader, SettingsAction } from '../../components/ui'
+import { AttendancePromptCard } from '../../components/AttendancePrompt'
+import type { AttendanceAnswer } from '../../components/AttendancePrompt'
 import type { MetaMap, Session, SessionChange, Settings } from '../../types'
 
 interface Props {
@@ -35,6 +37,8 @@ interface Props {
   onSelect: (s: Session) => void
   onOpenChanges: () => void
   onOpenSettings: () => void
+  /** quick attendance answer for a session that just ended (9 Sep 2026) */
+  onMarkAttendance: (s: Session, answer: AttendanceAnswer) => void
   onOpenTasks: () => void
   onOpenSchedule: () => void
   onOpenHomeJourney: () => void
@@ -88,6 +92,7 @@ export function TodayPage({
   onSelect,
   onOpenChanges,
   onOpenSettings,
+  onMarkAttendance,
   onOpenTasks,
   onOpenSchedule,
   onOpenHomeJourney,
@@ -125,6 +130,20 @@ export function TodayPage({
   const alsoNow = currentAll.filter((s) => s !== hero)
   const rest = upcoming.filter((s) => s !== hero)
   const [showFinished, setShowFinished] = useState(false)
+  // Quick attendance answer: the most recently ended real session (within 30
+  // minutes) with no answer yet, only when prompts are on — the same window
+  // and rule the notification uses, so an answered session is never asked.
+  const promptSession =
+    settings.attendancePrompts === true
+      ? finished
+          .filter((s) => !s.isSelfStudy && !s.isKeyDate && !s.id.startsWith('cmt-') && !s.id.startsWith('plan-') && s.end)
+          .filter((s) => {
+            const end = toMinutes(s.end)
+            const m = metaMap[sessionKey(s)]
+            return end !== null && clock.nowMins - end >= 0 && clock.nowMins - end <= 30 && !m?.attended && !m?.absent
+          })
+          .sort((a, b) => (b.end || '').localeCompare(a.end || ''))[0] ?? null
+      : null
   // Day finished = every TIMED record has ended; untimed records don't count.
   const dayFinished = currentAll.length + upcoming.length === 0 && finished.length > 0
 
@@ -250,6 +269,8 @@ export function TodayPage({
       />
 
       {urgent}
+
+      {promptSession && <AttendancePromptCard session={promptSession} onAnswer={onMarkAttendance} />}
 
       {hero && (
         <section className="today-hero" aria-label={current ? 'Current session' : 'Next session'}>
