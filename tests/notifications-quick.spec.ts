@@ -8,6 +8,10 @@ import type { Page } from '@playwright/test'
  * prompt notification is opened. Demo profile, frozen clock, no network.
  */
 
+// The in-app reminder loop reads the DEVICE clock; CI runs in UTC, so pin the
+// browser to the course zone the fixtures were written in.
+test.use({ timezoneId: 'Europe/London' })
+
 const DEMO = { demo: true, sheetId: '', gid: null, specialismsChosen: true, checklistDismissed: true, usagePing: false }
 // Demo Monday 7 Sept 2026: PS1 09:00–11:00 (Bedford Way), Maths 1 14:30–16:30.
 const BEDFORD_WAY = { latitude: 51.5227, longitude: -0.1276 }
