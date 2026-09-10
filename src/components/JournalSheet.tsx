@@ -10,6 +10,7 @@ import { telemetryTrack } from '../lib/telemetry'
 import { TEACHERS_STANDARDS, standardLabel } from '../lib/standards'
 import type { MetaMap, Session, SessionMeta } from '../types'
 import { BinderPreviewSheet } from './BinderPreviewSheet'
+import { IconClose, IconPrint } from './ui'
 
 interface Props {
   /** sessions with the user's filters applied, all dates (key dates included) */
@@ -332,7 +333,7 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         <div className="sheet-header">
           <h2>Evidence journal</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-            ✕
+            <IconClose />
           </button>
         </div>
         <div className="searchbar">
@@ -537,7 +538,7 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
               ).then(() => telemetryTrack('export_prepared')).catch(() => {})
             }}
           >
-            🖨 Print / PDF ({filtersActive ? `${shown.length} filtered` : 'all'})
+            <IconPrint /> Print / PDF ({filtersActive ? `${shown.length} filtered` : 'all'})
           </button>
           <button
             type="button"

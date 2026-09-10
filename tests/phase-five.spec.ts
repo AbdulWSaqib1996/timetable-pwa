@@ -67,7 +67,7 @@ test('task CRUD: create, edit keeps identity, duplicate never inherits completio
   await seed(page)
   await page.goto('./#/tasks')
   // Create.
-  await page.getByRole('button', { name: '＋ Add task' }).click()
+  await page.getByRole('button', { name: 'Add task' }).click()
   await page.getByLabel('Title').fill('Write assignment plan')
   await page.getByLabel('Due date').fill('2026-09-15')
   await page.getByRole('button', { name: 'Save task' }).click()
@@ -142,7 +142,7 @@ test('mentor actions project into Tasks and complete exactly once in both views'
 test('task drafts survive a reload and offer Continue/Discard', async ({ page }) => {
   await seed(page)
   await page.goto('./#/tasks')
-  await page.getByRole('button', { name: '＋ Add task' }).click()
+  await page.getByRole('button', { name: 'Add task' }).click()
   await page.getByLabel('Title').fill('Half-typed thought')
   await page.getByLabel('Due date').fill('2026-09-20')
   await expect(page.getByText('Draft saved on this device.')).toBeVisible()
@@ -271,18 +271,18 @@ test('binder preview shows counts and file availability before printing', async 
 test('work plan: subtasks/blocks with progress; moved due date names stranded blocks; completion asks a policy', async ({ page }) => {
   await seed(page)
   await page.goto('./#/tasks')
-  await page.getByRole('button', { name: '＋ Add task' }).click()
+  await page.getByRole('button', { name: 'Add task' }).click()
   await page.getByLabel('Title').fill('Big essay')
   await page.getByLabel('Due date').fill('2026-09-30')
   await page.getByRole('button', { name: 'Save task' }).click()
   // Reopen to reach the work plan of the saved task.
   await page.locator('.keydates-list li', { hasText: 'Big essay' }).locator('.keydate-row').click()
   await page.getByPlaceholder('Subtask…').fill('Outline chapters')
-  await page.getByRole('button', { name: '＋ Add subtask' }).click()
+  await page.getByRole('button', { name: 'Add subtask' }).click()
   await page.getByLabel('Type').selectOption('block')
   await page.getByPlaceholder('Study block…').fill('Library session')
   await page.getByLabel('Date', { exact: true }).fill('2026-09-28')
-  await page.getByRole('button', { name: '＋ Add block' }).click()
+  await page.getByRole('button', { name: 'Add block' }).click()
   await expect(page.getByText('0/1 subtasks done')).toBeVisible()
 
   // Move the due date BEFORE the planned block: the save names it for review

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { PLAN_RANGE_END, PLAN_RANGE_START, hhmm, suggestPlanWeek } from '../../shared/planWeek.js'
 import type { TaskRecord } from '../lib/admin'
 import type { Settings } from '../types'
-import { Dialog, Field } from './ui'
+import { Dialog, Field, IconClose } from './ui'
 
 export interface BusyInterval {
   d: string
@@ -71,7 +71,7 @@ export function PlanWeekSheet({ anchorISO, todayISO, busy, deadlines, settings, 
       <div className="sheet-header">
         <h2>Plan week</h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
       <p className="filter-hint">

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EmptyState, PageHeader, SettingsAction, StatusMessage } from '../../components/ui'
+import { EmptyState, IconPlus, PageHeader, SettingsAction, StatusMessage } from '../../components/ui'
 import type { Meeting, TaskRecord } from '../../lib/admin'
 import { sessionKey } from '../../lib/diff'
 import { daysUntil } from '../../lib/format'
@@ -164,7 +164,8 @@ export function TasksPage({
         actions={
           <>
             <button type="button" className="btn-primary" onClick={onAddTask}>
-              ＋ Add task
+              <IconPlus />
+              Add task
             </button>
             <SettingsAction onOpen={onOpenSettings} />
           </>

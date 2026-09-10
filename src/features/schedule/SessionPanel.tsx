@@ -2,6 +2,7 @@ import { estimateTravel } from '../../lib/campus'
 import type { TravelMode } from '../../lib/campus'
 import { parseLocation, shortBuildingName } from '../../lib/location'
 import type { Session, SessionMeta } from '../../types'
+import { IconClose } from '../../components/ui'
 
 interface Props {
   session: Session
@@ -38,7 +39,7 @@ export function SessionPanel({ session, meta, travelMode, onMeta, onOpenFull, on
           </button>
         )}
         <button type="button" className="btn-icon" aria-label="Close panel" onClick={onClose}>
-          ✕
+          <IconClose />
         </button>
       </div>
       <h2 className="session-panel-title">{session.title}</h2>

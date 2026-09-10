@@ -26,6 +26,7 @@ import {
 import type { FreeSlot, GroupState, Proposal } from '../lib/groups'
 import { downloadICS } from '../lib/ics'
 import type { Session, Settings } from '../types'
+import { IconClose } from './ui'
 
 interface Props {
   settings: Settings
@@ -187,7 +188,7 @@ export function StudyGroupSheet({ settings, sessions, todayISO, onUpdateSettings
         <div className="sheet-header">
           <h2>Study group</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-            ✕
+            <IconClose />
           </button>
         </div>
         {!settings.groupCode ? (

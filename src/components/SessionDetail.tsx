@@ -23,7 +23,7 @@ import type { OriginOption } from '../lib/origins'
 import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
-import { SegmentedControl } from './ui'
+import { IconClose, SegmentedControl } from './ui'
 import { CopyButton } from './CopyButton'
 import { RouteMap } from './RouteMap'
 import { StaticMap } from './StaticMap'
@@ -496,7 +496,7 @@ export function SessionDetail({
                     aria-label="Delete photo"
                     onClick={() => void handleDeletePhoto(p.id).catch(error => reportPersistenceFailure('Photo deletion failed: ' + String(error)))}
                   >
-                    ✕
+                    <IconClose />
                   </button>
                 </span>
               ))}
@@ -706,7 +706,7 @@ export function SessionDetail({
         <IdentityReview session={session} profileId={profileId} />
         {presentation === 'sheet' && (
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-            ✕
+            <IconClose />
           </button>
         )}
       </div>

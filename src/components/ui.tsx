@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { useModalA11y } from '../lib/a11y'
+import { useAttention } from '../lib/attention'
 
 /**
  * Phase 4 shared primitives (P4-01). Small, semantic and token-driven — one
@@ -88,6 +89,39 @@ export const IconHome = ({ size = 20 }: IconProps) => (
   </svg>
 )
 
+export const IconPlus = ({ size = 20 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+)
+export const IconClose = ({ size = 20 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </svg>
+)
+export const IconEdit = ({ size = 20 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
+    <path d="M13.5 7.5l3 3" />
+  </svg>
+)
+export const IconPrint = ({ size = 20 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M7 9V4h10v5M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+    <path d="M7 14h10v6H7z" />
+  </svg>
+)
+export const IconChart = ({ size = 20 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+  </svg>
+)
+export const IconSchool = ({ size = 20 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6M12 12h.01" />
+  </svg>
+)
+
 /* ---------- primitives ---------- */
 
 export function PageHeader({
@@ -126,9 +160,12 @@ export function PageHeader({
  * Hidden from 1024px, where the sidebar footer carries Settings.
  */
 export function SettingsAction({ onOpen }: { onOpen: () => void }) {
+  const attention = useAttention()
+  const label = attention.length > 0 ? `Settings — ${attention.length} item${attention.length === 1 ? '' : 's'} need${attention.length === 1 ? 's' : ''} attention` : 'Settings'
   return (
-    <button type="button" className="btn-icon page-settings-action" onClick={onOpen} aria-label="Settings" title="Settings">
+    <button type="button" className="btn-icon page-settings-action" onClick={onOpen} aria-label={label} title={label}>
       <IconSettings />
+      {attention.length > 0 && <span className="attention-dot" aria-hidden="true" />}
     </button>
   )
 }

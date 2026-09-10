@@ -13,7 +13,7 @@ import { readAttachments } from '../lib/attachments'
 import { exportBackup, markBackedUp } from '../lib/storage'
 import { telemetryTrack } from '../lib/telemetry'
 import type { ProfileStore, Settings } from '../types'
-import { Card, Field } from './ui'
+import { Card, Field, IconClose } from './ui'
 
 declare const __BUILD_ID__: string
 
@@ -373,7 +373,7 @@ export function CloudBackupsSection({ settings, store, onUpdateSettings, onResto
                       </button>
                       {s.installationId === mine && (
                         <button type="button" className="btn-icon" aria-label={`Delete snapshot from ${whenISO(s.createdAt)}`} disabled={busy} onClick={() => void deleteSnapshot(s)}>
-                          ✕
+                          <IconClose />
                         </button>
                       )}
                     </span>

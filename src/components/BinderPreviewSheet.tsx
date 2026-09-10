@@ -7,7 +7,7 @@ import type { BinderSection } from '../lib/printBinder'
 import { telemetryTrack } from '../lib/telemetry'
 import { trackUse } from '../lib/usage'
 import type { MetaMap, Session } from '../types'
-import { Dialog, Field } from './ui'
+import { Dialog, Field, IconClose, IconPrint } from './ui'
 
 export const BINDER_SECTIONS: { id: BinderSection; label: string }[] = [
   { id: 'attendance', label: 'Attendance & placement days' },
@@ -107,7 +107,7 @@ export function BinderPreviewSheet({ profileId, profileName, sessions, metaMap, 
       <div className="sheet-header">
         <h2>Binder preview</h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
       {selection ? (
@@ -189,7 +189,7 @@ export function BinderPreviewSheet({ profileId, profileName, sessions, metaMap, 
               .finally(() => setPrinting(false))
           }}
         >
-          {printing ? 'Preparing…' : '🖨 Print / save as PDF'}
+          {printing ? 'Preparing…' : <><IconPrint /> Print / save as PDF</>}
         </button>
         <button type="button" className="btn-ghost" onClick={onClose}>
           Cancel

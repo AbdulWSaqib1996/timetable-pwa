@@ -3,7 +3,7 @@ import { addDaysISO, mondayOfISO } from '../../../shared/calendar-time.js'
 import { AgendaView } from '../../components/AgendaView'
 import { MonthView } from '../../components/MonthView'
 import { WeekView } from '../../components/WeekView'
-import { IconSearch, PageHeader, SegmentedControl, SettingsAction, StatusMessage } from '../../components/ui'
+import { IconClose, IconSchool, IconSearch, PageHeader, SegmentedControl, SettingsAction, StatusMessage } from '../../components/ui'
 import type { PlanChildRec } from '../../lib/admin'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey as panelKey } from '../../lib/diff'
@@ -257,7 +257,8 @@ export function SchedulePage({
             title={filters.placementsOnly ? 'Showing placements only — tap to show everything' : 'Show placements only'}
             onClick={onTogglePlacements}
           >
-            🏫
+            <IconSchool />
+            <span>Placements</span>
           </button>
           <button type="button" className="btn-filters" onClick={onPlanWeek} title="Suggested gaps this week">
             Plan week
@@ -368,7 +369,7 @@ export function SchedulePage({
               <div className="session-panel-head">
                 <span className="session-panel-kicker">Selected session</span>
                 <button type="button" className="btn-icon" aria-label="Close panel" onClick={() => setPanel(null)}>
-                  ✕
+                  <IconClose />
                 </button>
               </div>
               <p className="filter-hint">This session changed or is no longer visible. Pick it again from the calendar.</p>

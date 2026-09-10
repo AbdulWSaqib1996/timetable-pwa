@@ -1,5 +1,6 @@
 import { useModalA11y } from '../lib/a11y'
 import type { SessionChange } from '../types'
+import { IconClose } from './ui'
 
 interface Props {
   changes: SessionChange[]
@@ -26,7 +27,7 @@ export function ChangesSheet({ changes, onClear, onClose }: Props) {
         <div className="sheet-header">
           <h2>Timetable changes</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-            ✕
+            <IconClose />
           </button>
         </div>
         {changes.length === 0 ? (

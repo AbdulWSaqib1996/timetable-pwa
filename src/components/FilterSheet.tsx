@@ -2,6 +2,7 @@ import { useModalA11y } from '../lib/a11y'
 import { activeCourse } from '../lib/course'
 import type { FilterOptions } from '../lib/filters'
 import type { Filters, Settings } from '../types'
+import { IconClose } from './ui'
 
 interface Props {
   settings: Settings
@@ -65,7 +66,7 @@ export function FilterSheet({
         <div className="sheet-header">
           <h2>Filters</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-            ✕
+            <IconClose />
           </button>
         </div>
 

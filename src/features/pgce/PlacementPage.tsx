@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Card, Dialog, EmptyState, Field, PageHeader } from '../../components/ui'
+import { Card, Dialog, EmptyState, Field, IconClose, PageHeader } from '../../components/ui'
 import { newAdminId } from '../../lib/admin'
 import type { PlacementExceptionRec } from '../../lib/admin'
 import { placementBlocks, placementPolicy } from '../../lib/placement'
@@ -267,7 +267,7 @@ function ExceptionDialog({
           {day.tag} · {fmt(day.dateISO)}
         </h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
       {day.inferred && (

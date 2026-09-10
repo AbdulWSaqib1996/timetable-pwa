@@ -232,9 +232,11 @@ test('FA-06: backup coverage is tracked per timetable; a legacy timestamp is sco
   await expect(health).toContainText('Profile B: scope unknown (older backup)')
   const book = JSON.parse((await ls(page, 'timetable.backup.v1'))!)
   expect(book.history[0]).toMatchObject({ profiles: ['a'], all: false, kind: 'file' })
-  // The device-wide nudge stays because B is not covered.
+  // The attention item stays because B is not covered (V-04: a dot on Settings, the prompt in Data & devices).
   await page.goto('./#/today')
-  await expect(page.getByText(/live only on this device/)).toBeVisible()
+  await expect(page.getByRole('button', { name: /Settings — 1 item needs attention/ })).toBeVisible()
+  await page.goto('./#/settings')
+  await expect(page.getByText(/has not been backed up recently/)).toBeVisible()
   // Everything → both covered → the nudge goes; a NEW profile is not covered by that export.
   await page.goto('./#/settings/data')
   await page.getByRole('button', { name: 'Back up… (preview first)' }).click()
@@ -244,7 +246,8 @@ test('FA-06: backup coverage is tracked per timetable; a legacy timestamp is sco
   await sheet.getByRole('button', { name: 'Done' }).click()
   await expect(health).toContainText(/Profile B: included 7 Sept/)
   await page.goto('./#/today')
-  await expect(page.getByText(/live only on this device/)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /needs attention/ })).toHaveCount(0)
 })
 
 test('FA-07: the restore preview states per-section effects, absent vs empty, attachments already present and newer local edits', async ({ page }) => {

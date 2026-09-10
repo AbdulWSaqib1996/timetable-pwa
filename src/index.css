@@ -14,6 +14,19 @@
   --danger-soft: #fdecea;
   --error-bg: #fdecea;
   --error-text: #9f1d1d;
+  /* V1 (visual audit §15): semantic status pairs, each ≥ 4.5:1 text contrast,
+     checked by tests/unit/tokens.test.mjs in both themes. Colour is never the
+     only signal — every use pairs with text or an icon. */
+  --text-supporting: #526078;
+  --saved-text: #116653;
+  --saved-bg: #e6f4f0;
+  --attention-text: #865000;
+  --attention-bg: #fff3d6;
+  --development-text: #7041a2;
+  --development-bg: #f2ebff;
+  --info-text: #1e5f98;
+  --info-bg: #e7f1fc;
+  --control-min: 44px;
   --shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
   --space-1: 4px;
   --space-2: 8px;
@@ -31,10 +44,10 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #111722;
-    --surface: #1a2230;
-    --text: #e9edf6;
-    --text-muted: #adb7cb;
+    --bg: #121b29;
+    --surface: #1d2a3d;
+    --text: #edf2fb;
+    --text-muted: #b1bfd2;
     --accent: #b1bcff;
     --accent-soft: #2a3557;
     --on-accent: #172041;
@@ -45,15 +58,24 @@
     --danger-soft: #3a1f1f;
     --error-bg: #3a1f1f;
     --error-text: #f3b8b8;
+    --text-supporting: #b1bfd2;
+    --saved-text: #9fe1cd;
+    --saved-bg: #12332a;
+    --attention-text: #f5c86a;
+    --attention-bg: #3d2c08;
+    --development-text: #d8c4f6;
+    --development-bg: #2d1f47;
+    --info-text: #a9cff5;
+    --info-bg: #12304a;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   }
 }
 
 :root[data-theme='dark'] {
-  --bg: #111722;
-  --surface: #1a2230;
-  --text: #e9edf6;
-  --text-muted: #adb7cb;
+  --bg: #121b29;
+  --surface: #1d2a3d;
+  --text: #edf2fb;
+  --text-muted: #b1bfd2;
   --accent: #b1bcff;
   --accent-soft: #2a3557;
   --on-accent: #172041;
@@ -64,6 +86,15 @@
   --danger-soft: #3a1f1f;
   --error-bg: #3a1f1f;
   --error-text: #f3b8b8;
+  --text-supporting: #b1bfd2;
+  --saved-text: #9fe1cd;
+  --saved-bg: #12332a;
+  --attention-text: #f5c86a;
+  --attention-bg: #3d2c08;
+  --development-text: #d8c4f6;
+  --development-bg: #2d1f47;
+  --info-text: #a9cff5;
+  --info-bg: #12304a;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
@@ -141,14 +172,18 @@ body {
 }
 
 .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  border-radius: 8px;
-  width: 36px;
-  height: 36px;
+  border-radius: var(--radius-control);
+  width: var(--control-min);
+  height: var(--control-min);
   font-size: 16px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .btn-icon:disabled {
@@ -178,9 +213,10 @@ body {
   border: none;
   background: none;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  padding: 6px 12px;
+  min-height: var(--control-min);
+  padding: 8px 14px;
   border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
@@ -195,12 +231,13 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-height: var(--control-min);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   border-radius: 10px;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -286,12 +323,15 @@ body {
 }
 
 .chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-min);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
   border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 13px;
+  padding: 8px 14px;
+  font-size: 14px;
   cursor: pointer;
   text-align: left;
 }
@@ -336,12 +376,18 @@ body {
 }
 
 .filter-hint {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-supporting);
   margin: 6px 0 0;
 }
 
 .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--control-min);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
@@ -392,7 +438,7 @@ body {
   position: absolute;
   top: -4px;
   right: -4px;
-  background: #e64980;
+  background: var(--error-text);
   color: #fff;
   border-radius: 999px;
   min-width: 16px;
@@ -428,17 +474,17 @@ body {
 
 .badge-change-added {
   background: rgba(55, 178, 77, 0.18);
-  color: #37b24d;
+  color: var(--saved-text);
 }
 
 .badge-change-removed {
-  background: rgba(230, 73, 128, 0.18);
-  color: #e64980;
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 .badge-change-changed {
-  background: rgba(240, 140, 0, 0.18);
-  color: #f08c00;
+  background: var(--attention-bg);
+  color: var(--attention-text);
 }
 
 .change-body {
@@ -453,8 +499,9 @@ body {
 }
 
 .change-meta {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-supporting);
 }
 
 .week-badge {
@@ -484,7 +531,7 @@ body {
 
 .badge-attended {
   background: rgba(55, 178, 77, 0.18);
-  color: #37b24d;
+  color: var(--saved-text);
 }
 
 .badge-note {
@@ -493,16 +540,16 @@ body {
 }
 
 .badge-optional {
-  background: rgba(240, 140, 0, 0.18);
-  color: #f08c00;
+  background: var(--attention-bg);
+  color: var(--attention-text);
 }
 
 /* Key-date entries render as solid highlighted blocks in the timetable */
 .session-card.key-date {
-  background: linear-gradient(135deg, #e64980, #c2255c);
+  background: linear-gradient(135deg, var(--error-text), var(--error-text));
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 3px 10px rgba(230, 73, 128, 0.35);
+  box-shadow: 0 3px 10px var(--error-bg);
 }
 
 .session-card.key-date .session-end,
@@ -547,8 +594,8 @@ body {
 }
 
 .badge-conflict {
-  background: rgba(230, 73, 128, 0.18);
-  color: #e64980;
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 /* ---------- Round-5 bits ---------- */
@@ -593,24 +640,25 @@ body {
 }
 
 .kd-status {
+  min-height: var(--control-min);
   border: 1px solid var(--border);
   background: var(--bg);
-  color: var(--text-muted);
+  color: var(--text);
   border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 11px;
+  padding: 6px 10px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .kd-status-doing {
-  color: #f08c00;
-  border-color: rgba(240, 140, 0, 0.5);
+  color: var(--attention-text);
+  border-color: var(--attention-bg);
 }
 
 .kd-status-done {
-  color: #37b24d;
+  color: var(--saved-text);
   border-color: rgba(55, 178, 77, 0.5);
 }
 
@@ -641,7 +689,7 @@ body {
   gap: 3px;
   width: 100%;
   border: 1px solid rgba(12, 166, 120, 0.45);
-  border-left: 4px solid #0ca678;
+  border-left: 4px solid var(--saved-text);
   border-radius: 12px;
   background: rgba(12, 166, 120, 0.1);
   color: var(--text);
@@ -700,7 +748,7 @@ body {
 
 .btn-placements.on {
   background: rgba(12, 166, 120, 0.15);
-  border-color: #0ca678;
+  border-color: var(--saved-text);
 }
 
 .placement-sub {
@@ -741,7 +789,7 @@ body {
   height: 20px;
   border-radius: 50%;
   border: none;
-  background: #e64980;
+  background: var(--error-text);
   color: #fff;
   font-size: 11px;
   line-height: 20px;
@@ -904,8 +952,9 @@ body {
 }
 
 .workload-line.heavy {
-  border-color: rgba(230, 73, 128, 0.5);
-  color: #e64980;
+  border-color: var(--error-text);
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 /* ---------- TfL status ---------- */
@@ -913,16 +962,16 @@ body {
 .tfl-banner {
   margin: 10px 0 2px;
   padding: 10px 14px;
-  border: 1px solid rgba(240, 140, 0, 0.4);
+  border: 1px solid var(--attention-bg);
   border-radius: 12px;
-  background: rgba(240, 140, 0, 0.1);
+  background: var(--attention-bg);
   font-size: 13px;
 }
 
 .tfl-banner summary {
   cursor: pointer;
   font-weight: 600;
-  color: #f08c00;
+  color: var(--attention-text);
 }
 
 .tfl-banner p {
@@ -1017,15 +1066,16 @@ body {
   margin: 8px 0 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(240, 140, 0, 0.12);
-  color: #f08c00;
+  background: var(--attention-bg);
+  color: var(--attention-text);
   font-size: 13px;
   line-height: 1.45;
 }
 
 .subheading {
-  margin: 14px 0 4px;
-  font-size: 13px;
+  margin: 16px 0 6px;
+  font-size: 18px;
+  line-height: 24px;
 }
 
 .merged-tab {
@@ -1105,8 +1155,8 @@ body {
 }
 
 .kd-chip.urgent {
-  background: rgba(230, 73, 128, 0.18);
-  color: #e64980;
+  background: var(--attention-bg);
+  color: var(--attention-text);
 }
 
 .keydates-list {
@@ -1193,11 +1243,18 @@ body {
 }
 
 .travel-link {
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-min);
+  padding: 0 4px;
+  border: none;
+  background: none;
+  font-size: 14px;
   font-weight: 600;
   color: var(--accent);
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .travel-chip {
@@ -1651,7 +1708,7 @@ body {
   flex-wrap: wrap;
   gap: 4px 12px;
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
@@ -1660,7 +1717,7 @@ body {
   margin-top: 6px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -1766,11 +1823,13 @@ body {
 
 .btn-ghost {
   width: 100%;
+  min-height: var(--control-min);
   margin-top: 12px;
   border: none;
   background: none;
   color: var(--accent);
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   padding: 8px;
 }
@@ -1786,7 +1845,8 @@ body {
   color: var(--error-text);
   border-radius: 8px;
   padding: 10px 12px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 /* ---------- Misc ---------- */
@@ -1832,8 +1892,8 @@ body {
 }
 
 .chip-small {
-  padding: 4px 8px;
-  font-size: 12px;
+  padding: 6px 12px;
+  font-size: 13px;
 }
 
 .badge-standard {
@@ -1908,7 +1968,7 @@ body {
 }
 
 .check-ok {
-  color: #0a7a58;
+  color: var(--saved-text);
 }
 
 .check-bad {
@@ -1920,12 +1980,12 @@ body {
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .check-ok {
-    color: #4ad3a5;
+    color: var(--saved-text);
   }
 }
 
 :root[data-theme='dark'] .check-ok {
-  color: #4ad3a5;
+  color: var(--saved-text);
 }
 
 .sync-code strong {
@@ -1944,13 +2004,13 @@ body {
 }
 
 .route-live {
-  color: #0a7a58;
+  color: var(--saved-text);
   font-weight: 600;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .route-live {
-    color: #4ad3a5;
+    color: var(--saved-text);
   }
   /* Contrast bump: the placement tint reads too faint on dark surfaces. */
   :root:not([data-theme='light']) .session-card.placement-session {
@@ -1960,7 +2020,7 @@ body {
 }
 
 :root[data-theme='dark'] .route-live {
-  color: #4ad3a5;
+  color: var(--saved-text);
 }
 
 :root[data-theme='dark'] .session-card.placement-session {
@@ -2130,8 +2190,8 @@ body {
 /* ---------- Round 8: absence, view parity, notifications overview ---------- */
 
 .chip-absent {
-  background: #b02a37 !important;
-  border-color: #b02a37 !important;
+  background: var(--error-text) !important;
+  border-color: var(--error-text) !important;
   color: #fff !important;
 }
 
@@ -2306,7 +2366,7 @@ body {
 }
 
 .admin-overview .notif-state.warn {
-  color: #e8590c;
+  color: var(--attention-text);
 }
 
 .admin-gaps {
@@ -2721,9 +2781,9 @@ body {
 
 .page-title {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.25;
-  font-weight: 600;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 700;
 }
 
 .page-subtitle {
@@ -4187,4 +4247,116 @@ body {
 
 .restore-impact {
   margin: 4px 0 8px;
+}
+
+
+/* ---------- V1 foundations: control minimums and generic type ---------- */
+.btn-primary,
+.btn-window,
+.settings-index-row,
+.quick-menu button,
+.photo-delete,
+.month-nav button {
+  min-height: var(--control-min);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Inline SVG icons inside controls: decorative, sized for 44px targets. */
+.btn-icon svg,
+.btn-secondary svg,
+.btn-primary svg,
+.btn-filters svg,
+.chip svg,
+.fab-add svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.status-message {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* Attention dot on the Settings action (V-04: the backup nudge lives in Data & devices now). */
+.attention-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--attention-text);
+  border: 2px solid var(--surface);
+}
+
+.page-settings-action,
+.shell-settings {
+  position: relative;
+}
+
+.settings-attention {
+  margin: 0 0 12px;
+}
+
+
+/* ---------- V1 measured follow-ups (evidence/ui-measurements + own walk) ---------- */
+.segmented {
+  padding: 2px;
+}
+
+.day-heading-actions .btn-icon,
+.page-actions .btn-icon,
+.btn-icon.btn-bell {
+  width: var(--control-min);
+  height: var(--control-min);
+}
+
+.keydate-strip,
+.page-back {
+  min-height: var(--control-min);
+}
+
+.feed-row input,
+.date-input,
+input[type='text'],
+input[type='url'],
+input[type='password'],
+input[type='number'],
+input[type='date'],
+input[type='time'],
+select.date-input {
+  min-height: var(--control-min);
+  font-size: 16px;
+}
+
+.nav-item {
+  font-size: 13px;
+}
+
+.keydate-title,
+.workload-line,
+.notif-overview,
+.notif-state,
+.attendance-subject,
+.attendance-count,
+.toggle-row,
+.ui-field-label {
+  font-size: 14px;
+}
+
+.today-hero-label,
+.kd-chip {
+  font-size: 13px;
+}
+
+.week-strip-dow,
+.room-chip {
+  font-size: 12px;
 }

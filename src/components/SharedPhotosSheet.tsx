@@ -7,7 +7,7 @@ import { listSharedPhotos, removeSharedPhoto } from '../lib/shareTarget'
 import type { SharedPhoto } from '../lib/shareTarget'
 import { telemetryTrack } from '../lib/telemetry'
 import type { Session, SessionMeta } from '../types'
-import { Dialog, Field, StatusMessage } from './ui'
+import { Dialog, Field, IconClose, StatusMessage } from './ui'
 
 interface Props {
   profileId: string
@@ -105,7 +105,7 @@ export function SharedPhotosSheet({ profileId, profileName, sessions, onMeta, on
       <div className="sheet-header">
         <h2>Shared photos</h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
       {items === null ? (

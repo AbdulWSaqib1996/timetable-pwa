@@ -134,7 +134,7 @@ test('another course applies from a validated template: preview, feature flags, 
   await seed(page)
   await page.goto('./#/settings/timetable')
   await expect(page.getByText(/UCL Primary PGCE · timezone Europe\/London/)).toBeVisible()
-  await page.getByRole('button', { name: '🎓 Course setup' }).click()
+  await page.getByRole('button', { name: 'Course setup' }).click()
   await page.getByRole('button', { name: 'Import template…' }).click()
   // An invalid template is refused with reasons, nothing applied.
   await page.getByLabel('Course template JSON').fill('{"configId": "x"}')
@@ -165,7 +165,7 @@ test('another course applies from a validated template: preview, feature flags, 
   await expect(maps).toHaveAttribute('href', /NYU%20New%20York/)
   // Switching back to the built-in restores everything.
   await page.goto('./#/settings/timetable')
-  await page.getByRole('button', { name: '🎓 Course setup' }).click()
+  await page.getByRole('button', { name: 'Course setup' }).click()
   await page.getByRole('button', { name: 'Switch back to UCL Primary PGCE' }).click()
   await page.getByRole('button', { name: 'Close' }).click()
   await page.goto('./#/today')
