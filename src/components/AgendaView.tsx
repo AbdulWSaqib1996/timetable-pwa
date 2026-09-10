@@ -5,6 +5,7 @@ import { isPlacementSession, placementTag, toMinutes, weekNumber } from '../lib/
 import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import type { MetaMap, Session } from '../types'
 import { SessionCard } from './SessionCard'
+import { IconSchool } from './ui'
 
 interface Props {
   sessions: Session[]
@@ -196,7 +197,7 @@ export function AgendaView({
           >
             {gapDays >= 7 && (
               <div className="break-band" role="note">
-                🏖 {gapDays}-day break — no sessions until {formatDayHeader(dateISO)}
+                Break: {gapDays}-day gap — no sessions until {formatDayHeader(dateISO)}
               </div>
             )}
             <h2 className="day-header">
@@ -216,7 +217,7 @@ export function AgendaView({
                       <SessionCard key={s.id} session={s} onSelect={onSelect} />
                     ))}
                     <button type="button" className="placement-day" onClick={() => onSelect(real[0])}>
-                      🏫 {real[0].title}
+                      <IconSchool size={16} /> {real[0].title}
                       {real.length > 1 ? ` (+${real.length - 1} more)` : ''}
                       <span className="placement-sub">
                         School experience day
@@ -229,7 +230,7 @@ export function AgendaView({
                             placementProgress.attended === 1 && !placementProgress.target ? '' : 's'
                           } logged`}
                         {(placementProgress?.openTargets ?? 0) > 0 &&
-                          ` · 🎯 ${placementProgress!.openTargets} open target${placementProgress!.openTargets === 1 ? '' : 's'}`}
+                          ` · ${placementProgress!.openTargets} open target${placementProgress!.openTargets === 1 ? '' : 's'}`}
                       </span>
                     </button>
                   </div>
@@ -255,7 +256,7 @@ export function AgendaView({
                   <div key={s.id} className="session-slot">
                     {gapMins >= 45 && (
                       <div className="free-gap">
-                        ☕ {Math.floor(gapMins / 60) > 0 ? `${Math.floor(gapMins / 60)}h ` : ''}
+                        {Math.floor(gapMins / 60) > 0 ? `${Math.floor(gapMins / 60)}h ` : ''}
                         {gapMins % 60 > 0 ? `${gapMins % 60}m ` : ''}free
                       </div>
                     )}

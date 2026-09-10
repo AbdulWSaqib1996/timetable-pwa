@@ -6,7 +6,7 @@ import { useDraft } from '../hooks/useDraft'
 import type { PlanChildRec } from '../lib/admin'
 import { WorkPlanSection } from './WorkPlanSection'
 import type { BlockPrefill } from './WorkPlanSection'
-import { Dialog, Field, IconClose, StatusMessage } from './ui'
+import { Dialog, Field, IconCheck, IconClose, StatusMessage } from './ui'
 
 interface TaskFields {
   title: string
@@ -275,7 +275,8 @@ export function TaskEditSheet({
               aria-pressed={f.status === status}
               onClick={() => set({ status })}
             >
-              {status === 'todo' ? '○ To do' : status === 'doing' ? '◐ In progress' : '✓ Done'}
+              {status === 'done' && <IconCheck />}
+              {status === 'todo' ? 'To do' : status === 'doing' ? 'In progress' : 'Done'}
             </button>
           ))}
         </div>

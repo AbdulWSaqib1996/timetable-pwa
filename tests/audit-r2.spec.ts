@@ -160,7 +160,7 @@ test('TT-17: journey-home copy never claims a live route before one exists; save
   await seed(page, { locationEnabled: false, noClipboard: true })
   await page.goto('./#/home')
   await expect(page.getByText('Leaving now — choose where you are starting from')).toBeVisible()
-  await expect(page.getByText(/Pick a saved origin above for a route — no location permission needed/)).toBeVisible()
+  await expect(page.getByText(/Pick a saved starting point below for a route — no location permission needed/)).toBeVisible()
   await expect(page.getByText(/Turn them on in Settings for a live journey/)).toHaveCount(0)
   await page.getByLabel('Journey origin').selectOption('campus')
   await expect(page.getByText(/Leaving now — live route/)).toBeVisible()

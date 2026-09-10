@@ -161,7 +161,7 @@ export function WorkPlanSection({ parentId, children_, busyCheck, onSave, onDele
                   {c.kind === 'block' && c.startTime && ` ${c.startTime}–${c.endTime}`}
                   {c.kind === 'block' && c.done && <span className="badge badge-personal"> done</span>}
                   {invalid && <span className="badge badge-conflict"> Needs scheduling</span>}
-                  {clash && <span className="badge badge-conflict"> ⚠ clashes with a session</span>}
+                  {clash && <span className="badge badge-conflict"> clashes with a session</span>}
                 </span>
               )}
               {(c.effortMins ?? 0) > 0 && <span className="filter-hint">~{formatRemaining(c.effortMins!)}</span>}

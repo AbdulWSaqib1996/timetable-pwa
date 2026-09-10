@@ -210,7 +210,7 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
         ) : originOptions.some((o) => o.basis !== 'device' && o.coords) ? (
           <span className="filter-hint">
             <IconAlert size={16} /> Travel time needs a starting point — a past session does not confirm where you are now. Pick a saved
-            origin above for a route — no location permission needed. The address, map and external directions below work regardless.
+            starting point below for a route — no location permission needed. The address, map and external directions below work regardless.
           </span>
         ) : !locationEnabled ? (
           <span className="filter-hint">

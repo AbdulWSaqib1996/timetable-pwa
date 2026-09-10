@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { shiftMonthISO } from '../../shared/calendar-time.js'
 import type { Session } from '../types'
+import { IconNote, IconSun } from './ui'
 
 interface Props {
   sessions: Session[]
@@ -13,7 +14,7 @@ interface Props {
   keyDateDays?: Set<string>
   /** days that are entirely school-experience (tinted green) */
   placementDays?: Set<string>
-  /** first day of each ≥7-day session gap → total gap days (marked 🏖) */
+  /** first day of each ≥7-day session gap → total gap days (marked with a sun icon) */
   breakStarts?: Map<string, number>
   onPickDay: (dateISO: string) => void
 }
@@ -103,12 +104,12 @@ export function MonthView({ sessions, todayISO, anchorISO, onNavigate, keyDateDa
               <span className="month-daynum">{Number(dateISO.slice(-2))}</span>
               {keyDateDays?.has(dateISO) && (
                 <span className="month-keydate" aria-label="Key date">
-                  📌
+                  <IconNote size={10} />
                 </span>
               )}
               {breakStarts?.has(dateISO) && (
                 <span className="month-break" aria-label={`${breakStarts.get(dateISO)}-day break starts`} title={`${breakStarts.get(dateISO)}-day break`}>
-                  🏖
+                  <IconSun size={10} />
                 </span>
               )}
               {(counts.get(dateISO) ?? 0) > 0 && (

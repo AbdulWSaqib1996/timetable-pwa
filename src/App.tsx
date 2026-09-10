@@ -6,7 +6,7 @@ import { BACKUP_GENERATED_EVENT } from './lib/storage'
 import { PersistenceNotice } from './components/PersistenceNotice'
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
-import { IconPlus } from './components/ui'
+import { IconAlert, IconBell, IconClose, IconPlus } from './components/ui'
 import { clearAttention, setAttention } from './lib/attention'
 import { SessionDetail } from './components/SessionDetail'
 import { SetupScreen } from './components/SetupScreen'
@@ -1095,11 +1095,11 @@ export default function App() {
           onClick={() => openSession(identityReview[0])}
         >
           <span>
-            🔗 {identityReview.length} event{identityReview.length === 1 ? '' : 's'} need
+            Identity review: {identityReview.length} event{identityReview.length === 1 ? '' : 's'} need
             {identityReview.length === 1 ? 's' : ''} an identity review (a sheet edit matched more
             than one saved event) — <strong>tap to open the first</strong>:{' '}
             {identityReview[0].dateISO.split('-').reverse().slice(0, 2).join('/')} ·{' '}
-            {identityReview[0].title.slice(0, 40)}. Affected sessions carry a 🔗 badge.
+            {identityReview[0].title.slice(0, 40)}. Affected sessions carry an “Identity review” badge.
           </span>
         </button>
       )}
@@ -1120,16 +1120,16 @@ export default function App() {
             </button>
           </span>
           <button type="button" className="btn-icon" aria-label="Dismiss" onClick={() => setCommitmentUndo(null)}>
-            ✕
+            <IconClose />
           </button>
         </div>
       )}
 
       {openNotice && (
         <div className="backup-banner notice-banner">
-          <span>🔔 {openNotice}</span>
+          <span><IconBell size={16} /> {openNotice}</span>
           <button type="button" className="btn-icon" aria-label="Dismiss" onClick={() => setOpenNotice(null)}>
-            ✕
+            <IconClose />
           </button>
         </div>
       )}
@@ -1147,7 +1147,7 @@ export default function App() {
         .map((n) => (
           <div className="backup-banner notice-banner" key={n.id}>
             <span>
-              📣 {n.dateISO ? `${n.dateISO.split('-').reverse().slice(0, 2).join('/')} — ` : ''}
+              <IconBell size={16} /> {n.dateISO ? `${n.dateISO.split('-').reverse().slice(0, 2).join('/')} — ` : ''}
               {n.message}
               {n.link && (
                 <>
@@ -1167,7 +1167,7 @@ export default function App() {
                 setDismissedNotices((prev) => new Set([...prev, n.id]))
               }}
             >
-              ✕
+              <IconClose />
             </button>
           </div>
         ))}
@@ -1192,7 +1192,7 @@ export default function App() {
                   {items.map((i) => (
                     <li key={i.label}>
                       <button type="button" className="checklist-link" onClick={i.act}>
-                        ☐ {i.label}
+                        {i.label}
                       </button>
                     </li>
                   ))}
@@ -1213,7 +1213,7 @@ export default function App() {
       {route.name === 'today' && sessions !== null && travelMode === 'transit' && tubeStatus.length > 0 && (
         <details className="tfl-banner">
           <summary>
-            ⚠ TfL disruptions: {tubeStatus.slice(0, 3).map((d) => d.line).join(', ')}
+            <IconAlert size={16} /> TfL disruptions: {tubeStatus.slice(0, 3).map((d) => d.line).join(', ')}
             {tubeStatus.length > 3 && ` +${tubeStatus.length - 3} more`}
           </summary>
           {tubeStatus.map((d) => (

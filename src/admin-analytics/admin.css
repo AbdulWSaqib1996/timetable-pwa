@@ -902,3 +902,27 @@ a svg {
     display: none;
   }
 }
+/* Sweep follow-ups: table headers and sort controls, refresh height, brand sub, picker label */
+th {
+  font-size: 14px;
+}
+th button {
+  min-height: 36px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+}
+.status-strip button {
+  min-height: 44px;
+}
+.admin-brand .sub,
+.lock-brand .sub {
+  font-size: 13px;
+}
+.card-head--start {
+  justify-content: flex-start;
+}
+@media (max-width: 767px) {
+  .admin-mobile-head label {
+    font-size: 14px;
+  }
+}

@@ -72,7 +72,7 @@ test('route views and task create/complete fire exactly once at their success po
   expect(totals.task_completed).toBeUndefined()
   // Complete it: exactly one completion, no second creation, EDIT is not a create.
   await page.getByText('Fixture task', { exact: false }).first().click()
-  await page.getByRole('button', { name: '✓ Done' }).click()
+  await page.getByRole('button', { name: 'Done' }).click()
   await page.getByRole('button', { name: 'Save task' }).click()
   await expect(page.getByRole('heading', { name: 'Edit task' })).toHaveCount(0)
   await page.reload()

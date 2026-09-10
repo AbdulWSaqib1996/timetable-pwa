@@ -1,3 +1,4 @@
+import { IconClock, IconSchool } from './ui'
 import type { ViewMode } from '../types'
 
 interface Props {
@@ -44,7 +45,7 @@ export function FilterBar({ view, activeCount, placementsOnly, historyOn, onTogg
           aria-label={historyOn ? 'Hide past days' : 'Show past days'}
           onClick={onToggleHistory}
         >
-          🕰
+          <IconClock size={18} />
         </button>
       )}
       <button
@@ -54,7 +55,7 @@ export function FilterBar({ view, activeCount, placementsOnly, historyOn, onTogg
         title={placementsOnly ? 'Showing placements only — tap to show everything' : 'Show placements only'}
         onClick={onTogglePlacements}
       >
-        🏫
+        <IconSchool />
       </button>
       <button type="button" className="btn-filters" onClick={onOpenFilters}>
         Filters

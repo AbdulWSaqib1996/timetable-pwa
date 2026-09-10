@@ -294,7 +294,7 @@ test('work plan: subtasks/blocks with progress; moved due date names stranded bl
 
   // Completing with an open subtask asks for an explicit policy.
   await page.locator('.keydates-list li', { hasText: 'Big essay' }).locator('.keydate-row').click()
-  await page.getByRole('button', { name: '✓ Done' }).click()
+  await page.getByRole('button', { name: 'Done' }).click()
   await page.getByRole('button', { name: 'Save task' }).click()
   await expect(page.getByText(/1 subtask is still open/)).toBeVisible()
   await page.getByRole('button', { name: 'Mark them done too' }).click()

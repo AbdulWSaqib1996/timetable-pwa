@@ -45,7 +45,7 @@ const SCHEMAS: Record<RecordKind, { title: string; fields: FieldDef[] }> = {
         options: [
           { value: 'open', label: '○ Open' },
           { value: 'progress', label: '◐ In progress' },
-          { value: 'met', label: '✓ Met' },
+          { value: 'met', label: 'Met' },
         ],
       },
       { name: 'setISO', label: 'Set on', type: 'date', required: true },

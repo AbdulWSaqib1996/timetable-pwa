@@ -280,7 +280,7 @@ export function RestoreSheet({ text, passphrase, onClose, onRestored }: { text: 
                     <span className={`notif-state${p.newerLocalEdits ? ' warn' : ''}`}>
                       session records {word(p.sections.meta)} · PGCE/tasks {word(p.sections.admin)} · cached timetable {word(p.sections.cache)} · change history {word(p.sections.changes)} ·{' '}
                       {p.attachments.incoming} attachment{p.attachments.incoming === 1 ? '' : 's'} merge ({p.attachments.alreadyPresent} already here)
-                      {p.newerLocalEdits ? ' · ⚠ this device has edits newer than the backup that would be replaced' : ''}
+                      {p.newerLocalEdits ? ' · warning: this device has edits newer than the backup that would be replaced' : ''}
                     </span>
                   </li>
                 )

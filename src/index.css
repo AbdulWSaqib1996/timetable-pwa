@@ -5189,3 +5189,118 @@ select.date-input {
   gap: 6px;
   margin: 12px 0 0;
 }
+
+/* ---------- Gap closure after the visual audit sweep (Pass 62) ---------- */
+/* Settings sub-pages: every section is a card with an 18px heading, 14px copy and its state beside the heading. */
+.settings-body > .filter-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  margin: 0 0 12px;
+}
+.settings-body > .filter-section h3,
+.settings-body > .filter-section .subheading {
+  font-size: 18px;
+  line-height: 24px;
+  margin: 0 0 6px;
+}
+.settings-body > .filter-section .section-head h3,
+.settings-body > .filter-section .section-head .subheading {
+  margin: 0;
+}
+.section-head--sub {
+  margin-top: 14px;
+}
+.settings-body .filter-hint,
+.settings-body .toggle-row,
+.settings-body .settings-url {
+  font-size: 14px;
+  line-height: 20px;
+}
+.settings-body .settings-url {
+  color: var(--text-supporting);
+}
+.settings-more {
+  margin: 4px 0 8px;
+}
+.settings-more > summary {
+  min-height: var(--control-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+}
+.settings-more > summary::before {
+  content: '▸';
+  margin-right: 6px;
+  color: var(--text-muted);
+}
+.settings-more[open] > summary::before {
+  content: '▾';
+}
+.settings-body .btn-secondary,
+.settings-body .btn-ghost,
+.settings-body .btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.settings-body .whatsnew-list {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-supporting);
+}
+/* Session detail identity card */
+.detail-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.detail-identity .badge-kind {
+  align-self: flex-start;
+}
+.journal-kind {
+  margin: 0 4px 0 0;
+}
+/* Measured follow-ups from the sweep */
+.urgent-chip {
+  min-height: var(--control-min);
+  display: flex;
+  align-items: center;
+}
+.week-label {
+  min-height: var(--control-min);
+}
+.shell-profile {
+  font-size: 13px;
+}
+.session-panel-kicker {
+  font-size: 13px;
+}
+.note-input,
+.placement-input,
+.photo-caption-input {
+  font-size: 16px;
+}
+.stat-small {
+  font-size: 13px;
+}
+.subject-count-list {
+  font-size: 14px;
+}
+.subject-count-nums {
+  font-size: 13px;
+}
+.map-pin {
+  font-size: 0;
+  transform: translate(-50%, -100%);
+}
+.map-pin svg {
+  display: block;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}

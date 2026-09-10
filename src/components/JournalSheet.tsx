@@ -82,7 +82,7 @@ function buildMarkdown(entries: Entry[]): string {
         .join(' ')
       lines.push(`- ${bits}`)
       if (e.note) lines.push(`  ${e.note.replace(/\n/g, '\n  ')}`)
-      for (const c of e.captions) lines.push(`  📷 ${c}`)
+      for (const c of e.captions) lines.push(`  Photo: ${c}`)
       if (e.photos > 0) lines.push(`  _${e.photos} photo${e.photos === 1 ? '' : 's'} recorded; check availability on this device_`)
     }
   }
@@ -214,7 +214,7 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         type: 'reflection',
         dateISO: r.weekISO,
         title: `Weekly reflection (w/c ${formatShortDate(r.weekISO)})`,
-        marker: '📔',
+        marker: 'Reflection',
         note: [r.wentWell && `Went well: ${r.wentWell}`, r.challenges && `Challenges: ${r.challenges}`, r.focus && `Next focus: ${r.focus}`]
           .filter(Boolean)
           .join(' · '),
@@ -234,7 +234,7 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         type: 'lesson',
         dateISO: l.dateISO,
         title: `Lesson taught: ${l.subject}${l.classGroup ? ` (${l.classGroup})` : ''}`,
-        marker: '🍎',
+        marker: 'Lesson',
         note: l.evaluation,
         captions: [],
         photos: 0,
@@ -251,7 +251,7 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         type: 'target',
         dateISO: t.metISO ?? t.setISO,
         title: `Target ${t.status === 'met' ? '(met)' : t.status === 'progress' ? '(in progress)' : '(open)'}`,
-        marker: '🎯',
+        marker: 'Target',
         note: t.text,
         captions: [],
         photos: 0,
@@ -269,7 +269,7 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
         type: 'observation',
         dateISO: o.dateISO,
         title: `Observation: ${o.subject || 'Lesson'}${o.observer ? ` · ${o.observer}` : ''}`,
-        marker: '👀',
+        marker: 'Observation',
         note: [o.strengths && `Strengths: ${o.strengths}`, o.development && `Development: ${o.development}`]
           .filter(Boolean)
           .join(' · '),
@@ -431,19 +431,19 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
                   <span className="journal-head">
                     <span className="journal-date">{formatShortDate(e.dateISO)}</span>
                     <span className="journal-title">
-                      {e.marker ? `${e.marker} ` : ''}
+                      {e.marker ? <span className="badge badge-kind journal-kind">{e.marker}</span> : null}{e.marker ? ' ' : ''}
                       {e.title}
                     </span>
                   </span>
                   {e.note && <span className="journal-note">{e.note}</span>}
-                  {e.captions.length > 0 && <span className="journal-note">📷 {e.captions.join(' · ')}</span>}
+                  {e.captions.length > 0 && <span className="journal-note">Photo captions: {e.captions.join(' · ')}</span>}
                   <span className="journal-tags">
                     {e.standards.map((ts) => (
                       <span className="badge badge-standard" key={ts} title={standardLabel(ts)}>
                         {ts}
                       </span>
                     ))}
-                    {e.photos > 0 && <span className="badge badge-note">📷 {e.photos}</span>}
+                    {e.photos > 0 && <span className="badge badge-note">{e.photos} photo{e.photos === 1 ? '' : 's'}</span>}
                     {e.standards.length === 0 && <span className="badge badge-conflict">Untagged</span>}
                     {e.uncaptioned > 0 && (
                       <span className="badge badge-conflict">

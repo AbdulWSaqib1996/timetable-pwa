@@ -164,7 +164,7 @@ export function FilterSheet({
                 Show personal events (appointments, work, study blocks)
               </label>
               <button type="button" className="btn-secondary" onClick={onOpenKeyDates}>
-                📌 View all key dates
+                View all key dates
               </button>
             </>
           )}

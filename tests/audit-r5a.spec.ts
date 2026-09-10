@@ -211,7 +211,7 @@ test('NF-08: a session detail can flag a record for review; the flag survives wi
   await page.locator('.day-list .session-card', { hasText: 'English 1' }).click()
   await expect(page.locator('.detail-page')).toBeVisible()
   await page.getByRole('button', { name: 'Review later' }).click()
-  await expect(page.getByRole('button', { name: '✓ Flagged: review later' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'Flagged: review later' })).toHaveAttribute('aria-pressed', 'true')
   const meta = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.meta.v2.a')!))
   expect(meta[ENGLISH].reviewLater).toBe(true)
   expect(meta[ENGLISH].note).toBe('Keep me')

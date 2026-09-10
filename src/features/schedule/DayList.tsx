@@ -1,3 +1,4 @@
+import { IconSchool } from '../../components/ui'
 import { SessionCard } from '../../components/SessionCard'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey } from '../../lib/diff'
@@ -35,7 +36,7 @@ export function DayList({ sessions, metaMap, coords, travelMode, placements, emp
             <SessionCard key={s.id} session={s} onSelect={onSelect} />
           ))}
         <button type="button" className="placement-day" onClick={() => onSelect(real[0])}>
-          🏫 {real[0].title}
+          <IconSchool size={16} /> {real[0].title}
           {real.length > 1 ? ` (+${real.length - 1} more)` : ''}
           <span className="placement-sub">
             School experience day
