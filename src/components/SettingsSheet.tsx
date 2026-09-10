@@ -13,9 +13,11 @@ import { subscribePush, unsubscribePush } from '../lib/push'
 import { runPushSelfCheck, sendTestPush } from '../lib/pushCheck'
 import type { CheckRow } from '../lib/pushCheck'
 import {
+  SYNC_STATUS_EVENT,
   applySyncPayload,
   clearSyncState,
   deleteSync,
+  getSyncStatusDetail,
   loadSyncState,
   newSyncCode,
   pullSync,
@@ -275,6 +277,12 @@ export function SettingsSheet({
   const [checkRows, setCheckRows] = useState<CheckRow[] | null>(null)
   const [checkBusy, setCheckBusy] = useState(false)
   const [syncState, setSyncState] = useState<SyncState | null>(loadSyncState)
+  const [syncDetail, setSyncDetail] = useState(getSyncStatusDetail)
+  useEffect(() => {
+    const update = () => setSyncDetail(getSyncStatusDetail())
+    window.addEventListener(SYNC_STATUS_EVENT, update)
+    return () => window.removeEventListener(SYNC_STATUS_EVENT, update)
+  }, [])
   const [syncInput, setSyncInput] = useState('')
   const [syncBusy, setSyncBusy] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
@@ -1477,6 +1485,17 @@ export function SettingsSheet({
                   : 'off (this device only)'}
               </span>
             </li>
+            {syncState && (
+              <li>
+                <span>Sync status</span>
+                <span className={`notif-state${syncDetail.failed || syncDetail.busy ? ' warn' : ''}`} aria-live="polite">
+                  {syncDetail.message
+                    ? `${syncDetail.message}${syncDetail.at ? ` (${new Date(syncDetail.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})` : ''}`
+                    : 'no sync attempt yet this session'}
+                  {' · '}checks every 3 minutes while open, and when the app is shown, focused or back online
+                </span>
+              </li>
+            )}
             <li>
               <span>Photos & documents</span>
               <span className="notif-state">

@@ -49,8 +49,39 @@ export function clearSyncState(): void { persistValue(SYNC_STATE_KEY, null) }
 export const SYNC_STATUS_EVENT = 'timetable-sync-status'
 export const SYNC_APPLIED_EVENT = 'timetable-sync-applied'
 let syncStatus = ''
+let syncStatusAt = 0
 export function getSyncStatus() { return syncStatus }
-export function setSyncStatus(message: string) { syncStatus = message; window.dispatchEvent(new Event(SYNC_STATUS_EVENT)) }
+/** The current status with when it was set — for the data-health list (10 Sep 2026). */
+export function getSyncStatusDetail(): { message: string; at: number; failed: boolean; busy: boolean } {
+  return { message: syncStatus, at: syncStatusAt, failed: syncStatus.startsWith('Sync failed'), busy: syncStatus.startsWith('Sync server busy') }
+}
+export function setSyncStatus(message: string) { syncStatus = message; syncStatusAt = Date.now(); window.dispatchEvent(new Event(SYNC_STATUS_EVENT)) }
+
+/** Sync requests must never hang: a stalled mobile connection used to block
+ *  every later sync on the device (queue + Web Lock) until a restart. */
+export const SYNC_FETCH_TIMEOUT_MS = 15_000
+export class SyncBusyError extends Error {
+  retryAfterMs: number
+  constructor(retryAfterMs = 60_000) { super('Sync server busy — the app will retry shortly.'); this.retryAfterMs = retryAfterMs }
+}
+async function syncFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), SYNC_FETCH_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, { ...init, signal: ctrl.signal })
+    if (res.status === 429) {
+      const after = Number(res.headers.get('retry-after'))
+      throw new SyncBusyError(Number.isFinite(after) && after > 0 ? after * 1000 : 60_000)
+    }
+    return res
+  } catch (error) {
+    if (error instanceof SyncBusyError) throw error
+    if ((error as Error)?.name === 'AbortError') throw new Error('Sync timed out after 15 seconds. Your changes remain on this device; it will retry.')
+    throw error
+  } finally {
+    clearTimeout(t)
+  }
+}
 
 /** 8 chars from an unambiguous alphabet (no 0/O/1/I/L). */
 export function newSyncCode(): string {
@@ -155,7 +186,7 @@ const trim = (base: string) => {
 }
 interface Remote { payload?: SyncPayload; at: number; revision: number; deleted?: boolean }
 async function readRemote(base: string, code: string): Promise<Remote> {
-  const res = await fetch(`${trim(base)}/sync-v2?id=${await syncId(code)}`)
+  const res = await syncFetch(`${trim(base)}/sync-v2?id=${await syncId(code)}`)
   if (!res.ok) throw new Error('Sync could not be read. Check your connection and app/server version.')
   const rec = await res.json() as { blob?: string; at?: number; revision: number; deleted?: boolean }
   if (!Number.isSafeInteger(rec.revision) || (rec.blob?.length ?? 0) > 400000) throw new Error('Invalid sync response.')
@@ -193,7 +224,7 @@ async function exchange(base: string, code: string): Promise<number | null> {
         if (new Blob([JSON.stringify(merged)]).size > MAX_SYNC_BYTES) throw new Error('Sync is too large. Export a backup to transfer your data.')
         const blob = await encrypt(code, merged)
         if (blob.length > 400000) throw new Error('Encrypted sync exceeds the server limit. Export a backup instead.')
-        const res = await fetch(`${trim(base)}/sync-v2`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({id:await syncId(code), blob, revision:remote.revision}) })
+        const res = await syncFetch(`${trim(base)}/sync-v2`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({id:await syncId(code), blob, revision:remote.revision}) })
         if (res.status === 409) continue
         if (!res.ok) throw new Error('The sync server rejected the update.')
         at = (await res.json()).at
@@ -213,7 +244,8 @@ async function exchange(base: string, code: string): Promise<number | null> {
     }
     throw new Error('Sync is busy with newer edits. Your changes remain local; retry shortly.')
   } catch (error) {
-    setSyncStatus('Sync failed: ' + (error instanceof Error ? error.message : String(error)))
+    if (error instanceof SyncBusyError) setSyncStatus(error.message)
+    else setSyncStatus('Sync failed: ' + (error instanceof Error ? error.message : String(error)))
     throw error
   }
 }
@@ -264,6 +296,6 @@ export async function syncPullApply(base: string): Promise<boolean> {
 }
 export async function deleteSync(base: string, code: string): Promise<void> {
   const remote = await readRemote(base,code)
-  const res = await fetch(`${trim(base)}/sync-v2/delete`, {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:await syncId(code),revision:remote.revision})})
+  const res = await syncFetch(`${trim(base)}/sync-v2/delete`, {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:await syncId(code),revision:remote.revision})})
   if (!res.ok) throw new Error('Sync changed while disconnecting. Retry before rotating your code.')
 }
