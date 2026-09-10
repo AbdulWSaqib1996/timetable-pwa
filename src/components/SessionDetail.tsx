@@ -23,7 +23,7 @@ import type { OriginOption } from '../lib/origins'
 import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
-import { IconAlert, IconCamera, IconCheck, IconClose, IconSchool, SegmentedControl } from './ui'
+import { IconAlert, IconBook, IconCamera, IconCheck, IconClose, IconPin, IconSchool, SegmentedControl } from './ui'
 import { CopyButton } from './CopyButton'
 import { RouteMap } from './RouteMap'
 import { StaticMap } from './StaticMap'
@@ -194,6 +194,7 @@ export function SessionDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origins.find((o) => o.basis === 'device')?.coords != null])
   const origin = origins.find((o) => o.id === originId && o.coords) ?? null
+  const originSelect = useRef<HTMLSelectElement>(null)
   const journey = useJourney({
     origin,
     destination: travel?.location ? { coords: travel.location, label: travel.building ?? undefined } : null,
@@ -544,28 +545,43 @@ export function SessionDetail({
     </div>
   )
 
+  // One status tone for the summary (V3): live plan / estimate / attention / waiting for an origin.
+  const tone = journey.itinerary
+    ? 'live'
+    : journey.status === 'error' || journey.status === 'no-route'
+      ? 'attention'
+      : origin || travelMode === 'driving'
+        ? 'estimate'
+        : 'missing'
   const travelPanel = !isTask && travel && (
     <div className="detail-tabpanel" role="tabpanel" aria-label="Travel and map" hidden={tab !== 'travel'}>
-      {futurePlan && (
-        <div className="buffer-row">
-          <span className="ui-field-label">Arrive early by</span>
-          <div className="chip-grid" role="group" aria-label="Arrival buffer">
-            {[0, 5, 10, 15, 20].map((m) => (
-              <button
-                key={m}
-                type="button"
-                className={`chip chip-small${arrivalBufferMins === m ? ' chip-on' : ''}`}
-                aria-pressed={arrivalBufferMins === m}
-                onClick={() => onSetArrivalBuffer(m)}
-              >
-                {m === 0 ? 'On time' : `${m} min`}
-              </button>
-            ))}
-          </div>
+      {/* Origin → destination first (V3): the missing input is named, never inferred. */}
+      <div className="ui-card travel-od" aria-label="Journey summary">
+        <div className="travel-od-row">
+          <IconPin />
+          <span>
+            <strong>{planable ? (origin ? origin.label : 'Choose a starting point') : 'Your location'}</strong>
+            <span className="travel-od-detail">
+              {planable ? (origin ? origin.detail ?? 'Chosen starting point' : 'Use your current location or a saved place') : 'Driving estimates use the distance from your device'}
+            </span>
+          </span>
         </div>
-      )}
-      {planable && <OriginSelector options={origins} selectedId={originId} onSelect={setOriginId} />}
-      <div className="travel-summary">
+        <div className="travel-od-row destination-card">
+          <IconBook />
+          <span>
+            <strong className="today-hero-room-name">{travel.building ?? (loc.raw || session.room)}</strong>
+            <span className="today-hero-building travel-od-detail">
+              {loc.room ? `Room ${loc.room}${loc.roomName ? ` · ${loc.roomName}` : ''} · ` : ''}
+              {session.start ? `Session starts ${session.start}` : ''}
+            </span>
+            {placementInfo?.address && <span className="today-hero-building travel-od-detail">{placementInfo.address}</span>}
+          </span>
+        </div>
+        <div className="travel-od-actions">
+          <CopyButton text={placementInfo?.address || session.room} />
+        </div>
+      </div>
+      <div className={`travel-summary travel-summary--${tone}`}>
         {travelMode === 'driving' ? (
           travel.minutes !== null ? (
             <>
@@ -646,17 +662,31 @@ export function SessionDetail({
           <span className="filter-hint">Open this tab with a route provider available for a plan.</span>
         )}
       </div>
-      <div className="ui-card destination-card">
-        <span className="today-hero-room-name">{travel.building ?? (loc.raw || session.room)}</span>
-        {loc.room && (
-          <span className="today-hero-building">
-            Room {loc.room}
-            {loc.roomName ? ` · ${loc.roomName}` : ''}
-          </span>
-        )}
-        {placementInfo?.address && <span className="today-hero-building">{placementInfo.address}</span>}
-        <CopyButton text={placementInfo?.address || session.room} />
-      </div>
+      {planable && !origin && origins.some((o) => o.coords) && (
+        <button type="button" className="btn-primary travel-primary" onClick={() => originSelect.current?.focus()}>
+          <IconPin size={18} /> Choose starting point
+        </button>
+      )}
+      {planable && <OriginSelector options={origins} selectedId={originId} onSelect={setOriginId} selectRef={originSelect} />}
+      {futurePlan && (
+        <div className="buffer-row">
+          <span className="ui-field-label">Arrive early by</span>
+          <div className="chip-grid" role="group" aria-label="Arrival buffer">
+            {[0, 5, 10, 15, 20].map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`chip chip-small${arrivalBufferMins === m ? ' chip-on' : ''}`}
+                aria-pressed={arrivalBufferMins === m}
+                onClick={() => onSetArrivalBuffer(m)}
+              >
+                {m === 0 ? 'On time' : `${m} min`}
+              </button>
+            ))}
+          </div>
+          <p className="filter-hint">A secondary preference — changing it plans the journey again for the new arrival time.</p>
+        </div>
+      )}
       {travel.location && shownItinerary && shownItinerary.legs.some((l) => l.geometry.length >= 2) ? (
         // Full-route map (P7-03): drawn ONLY from provider geometry; a failed
         // or geometry-less plan falls back to the destination-only map below.

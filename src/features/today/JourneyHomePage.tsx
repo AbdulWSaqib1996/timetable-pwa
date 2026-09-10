@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { telemetryTrack } from '../../lib/telemetry'
 import { useCourseClock } from '../../hooks/useCourseClock'
 import { utcToZonedParts } from '../../../shared/calendar-time.js'
@@ -8,7 +8,7 @@ import { OriginSelector } from '../../components/OriginSelector'
 import { RouteMap } from '../../components/RouteMap'
 import { StaticMap } from '../../components/StaticMap'
 import { CopyButton } from '../../components/CopyButton'
-import { EmptyState, PageHeader } from '../../components/ui'
+import { EmptyState, IconAlert, IconChevronLeft, IconHome, IconPin, PageHeader } from '../../components/ui'
 import { useJourney } from '../../hooks/useJourney'
 import { TRAVEL_MODE_PHRASE, estimateTravelToCoords, haversineMeters } from '../../lib/campus'
 import type { Coords, TravelMode } from '../../lib/campus'
@@ -30,11 +30,12 @@ interface Props {
 }
 
 /**
- * Journey home (P4-06): a full-width screen (contained panel on desktop via
- * the shell's reading width) with the same journey structure as session
- * travel — summary + freshness, explicit origin, destination card, visible
- * map, collapsible steps, external directions. Intent is leave-now to home;
- * never an arrival-by plan (Phase 6).
+ * Journey home (P4-06 → V3): one origin/destination summary, one state
+ * sentence, then the primary action for the state ("Choose starting point"
+ * until an origin exists), the explicit origin control, the visible map,
+ * collapsible steps and external directions. Intent is leave-now to home;
+ * never an arrival-by plan (Phase 6). The starting point is never inferred
+ * from the last session.
  */
 export function JourneyHomePage({ settings, coords, locationEnabled, travelMode, origins, onBack, onOpenSettings, onUpdateSettings }: Props) {
   const homeSet = settings.homeLat != null && settings.homeLng != null
@@ -60,6 +61,7 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [originOptions.find((o) => o.basis === 'device')?.coords != null])
   const origin = originOptions.find((o) => o.id === originId && o.coords) ?? null
+  const originSelect = useRef<HTMLSelectElement>(null)
 
   const journey = useJourney({
     origin,
@@ -94,7 +96,7 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
     return (
       <div className="page journey-home-page">
         <button type="button" className="page-back" onClick={onBack}>
-          ‹ Back
+          <IconChevronLeft size={18} /> Back
         </button>
         <PageHeader title="Journey home" />
         <EmptyState
@@ -131,11 +133,12 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
       ? `${utcToZonedParts(Date.now() + minutes * 60_000, courseZone()).hhmm}${clock.zoneDiffers ? ' course time' : ''}`
       : null
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${home.lat},${home.lng}&travelmode=${travelMode === 'transit' ? 'transit' : travelMode}`
+  const tone = journey.itinerary ? 'live' : journey.status === 'error' || journey.status === 'no-route' ? 'attention' : origin ? 'estimate' : 'missing'
 
   return (
     <div className="page journey-home-page">
       <button type="button" className="page-back" onClick={onBack}>
-        ‹ Back
+        <IconChevronLeft size={18} /> Back
       </button>
       <PageHeader
         title="Journey home"
@@ -157,11 +160,43 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
         }
       />
 
+      {/* Origin → destination summary (V3): the starting point is explicitly unknown until chosen. */}
+      <div className="ui-card travel-od" aria-label="Your return journey">
+        <p className="travel-od-title">
+          <span className="travel-od-tile" aria-hidden="true">
+            <IconHome />
+          </span>
+          Your return journey
+        </p>
+        <div className="travel-od-row">
+          <IconPin />
+          <span>
+            <strong>{origin ? origin.label : 'Starting point not selected'}</strong>
+            <span className="travel-od-detail">{origin ? origin.detail ?? 'Chosen starting point' : 'Choose your current location or a saved place'}</span>
+          </span>
+        </div>
+        <div className="travel-od-row destination-card">
+          <IconHome />
+          <span>
+            <strong className="today-hero-room-name">Home</strong>
+            {settings.homeAddress && <span className="today-hero-building travel-od-detail">{settings.homeAddress}</span>}
+          </span>
+        </div>
+        {settings.homeAddress && (
+          <div className="travel-od-actions">
+            <CopyButton text={settings.homeAddress} />
+            <button type="button" className="travel-link" onClick={onOpenSettings}>
+              Edit home location
+            </button>
+          </div>
+        )}
+      </div>
+
       {nearHome && (
         <p className="filter-hint">You look to be near home already (approximate). The route below still works.</p>
       )}
 
-      <div className="travel-summary">
+      <div className={`travel-summary travel-summary--${tone}`}>
         {minutes !== null ? (
           <>
             <span className="travel-summary-mins">
@@ -174,12 +209,12 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
           </>
         ) : originOptions.some((o) => o.basis !== 'device' && o.coords) ? (
           <span className="filter-hint">
-            Pick a saved origin above for a route — no location permission needed. The address, map and
-            external directions below work regardless.
+            <IconAlert size={16} /> Travel time needs a starting point — a past session does not confirm where you are now. Pick a saved
+            origin above for a route — no location permission needed. The address, map and external directions below work regardless.
           </span>
         ) : !locationEnabled ? (
           <span className="filter-hint">
-            No saved origin yet. Turn travel times on in Settings for a live journey from your location, or
+            <IconAlert size={16} /> No saved origin yet. Turn travel times on in Settings for a live journey from your location, or
             save a campus/placement origin — the address and external directions below work without either.
           </span>
         ) : (
@@ -190,7 +225,13 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
         )}
       </div>
 
-      <OriginSelector options={originOptions} selectedId={originId} onSelect={setOriginId} />
+      {!origin && originOptions.some((o) => o.coords) && (
+        <button type="button" className="btn-primary travel-primary" onClick={() => originSelect.current?.focus()}>
+          <IconPin size={18} /> Choose starting point
+        </button>
+      )}
+
+      <OriginSelector options={originOptions} selectedId={originId} onSelect={setOriginId} selectRef={originSelect} />
       {origin && onUpdateSettings && settings.defaultOriginHome !== origin.id && origin.basis !== 'device' && (
         <p className="filter-hint journey-origin">
           <button type="button" className="travel-link" onClick={() => onUpdateSettings({ defaultOriginHome: origin.id })}>
@@ -201,16 +242,10 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
       {!origin && (
         <p className="filter-hint journey-origin">
           {locationEnabled
-            ? 'Waiting for a device fix — or pick a saved origin above.'
-            : 'Location is off — pick a saved origin above, or use the external directions below.'}
+            ? 'Waiting for a device fix — or pick a saved starting point.'
+            : 'Location is off — pick a saved starting point, or use the external directions below.'}
         </p>
       )}
-
-      <div className="ui-card destination-card">
-        <span className="today-hero-room-name">Home</span>
-        {settings.homeAddress && <span className="today-hero-building">{settings.homeAddress}</span>}
-        {settings.homeAddress && <CopyButton text={settings.homeAddress} />}
-      </div>
 
       {journey.itinerary && journey.itinerary.legs.some((l) => l.geometry.length >= 2) ? (
         <RouteMap
@@ -252,10 +287,10 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
         </p>
       )}
 
-      <a className="btn-primary btn-link external-nav" href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={() => telemetryTrack('navigation_link_opened')}>
-        Directions home ↗
+      <a className={`${origin ? 'btn-primary' : 'btn-secondary'} btn-link external-nav`} href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={() => telemetryTrack('navigation_link_opened')}>
+        Open home in Maps ↗
       </a>
-      <p className="filter-hint external-nav-caption">Opens navigation outside My Timetable</p>
+      <p className="filter-hint external-nav-caption">Opens navigation outside My Timetable — Maps may ask for your location when you start.</p>
     </div>
   )
 }

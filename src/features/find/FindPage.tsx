@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { FIND_PAGE_SIZE, searchFindIndex } from '../../../shared/find.js'
-import { PageHeader } from '../../components/ui'
+import { IconSearch, IconShield, PageHeader } from '../../components/ui'
 import type { FindIndexState } from '../../hooks/useFindIndex'
 
 export interface FindResult {
@@ -29,6 +29,7 @@ interface Props {
 }
 
 const DEBOUNCE_MS = 200
+const TYPES = ['session', 'personal', 'task', 'plan', 'pgce', 'document'] as const
 const TYPE_LABEL: Record<FindResult['ownerType'], string> = {
   session: 'Timetable',
   personal: 'Personal',
@@ -36,6 +37,14 @@ const TYPE_LABEL: Record<FindResult['ownerType'], string> = {
   plan: 'Work plan',
   pgce: 'PGCE file',
   document: 'Document',
+}
+const GROUP_LABEL: Record<FindResult['ownerType'], string> = {
+  session: 'Timetable sessions',
+  personal: 'Personal events',
+  task: 'Tasks',
+  plan: 'Work-plan items',
+  pgce: 'PGCE records',
+  document: 'Documents',
 }
 
 const contextKey = (profileId: string) => `timetable.find.${profileId}`
@@ -47,11 +56,13 @@ function formatDate(dateISO: string): string {
 }
 
 /**
- * "Find anything" (R4 / NF-01): one local search over sessions, personal
+ * "Find anything" (R4 / NF-01 → V3): one local search over sessions, personal
  * events, tasks, work-plan items, PGCE records and wallet file names. The
- * query is debounced, results are paged at 50, and the query/scope/page are
- * kept per profile in sessionStorage so Back returns to the same view. No
- * request ever carries query text or results.
+ * query is debounced, results are paged at 50 and grouped by record type in
+ * relevance order (the best-ranked group first, so the first button is still
+ * the best match), and the query/scope/page are kept per profile in
+ * sessionStorage so Back returns to the same view. No request ever carries
+ * query text or results; there is no recent-search history.
  */
 export function FindPage({ profileId, profileName, todayISO, state, includeNotes, onToggleNotes, onOpen, onBack }: Props) {
   const [query, setQuery] = useState(() => {
@@ -89,6 +100,21 @@ export function FindPage({ profileId, profileName, todayISO, state, includeNotes
     return { results: out.results as FindResult[], total: out.total }
   }, [state.index, debounced, includeNotes, limit, types, todayISO])
 
+  // Groups in the order their best result ranks — never a fixed type order
+  // that would push the top match below a weaker one.
+  const groups = useMemo(() => {
+    const order: FindResult['ownerType'][] = []
+    const byType = new Map<FindResult['ownerType'], FindResult[]>()
+    for (const r of results) {
+      if (!byType.has(r.ownerType)) {
+        byType.set(r.ownerType, [])
+        order.push(r.ownerType)
+      }
+      byType.get(r.ownerType)!.push(r)
+    }
+    return order.map((t) => ({ type: t, items: byType.get(t)! }))
+  }, [results])
+
   const onListKey = (e: KeyboardEvent) => {
     const items = [...(listRef.current?.querySelectorAll<HTMLElement>('.find-result') ?? [])]
     const i = items.indexOf(document.activeElement as HTMLElement)
@@ -103,11 +129,19 @@ export function FindPage({ profileId, profileName, todayISO, state, includeNotes
   }
 
   const q = debounced.trim()
+  const activeTypes = types ?? [...TYPES]
   return (
     <div className="page page-find">
-      <PageHeader title="Find anything" subtitle={profileName} back={{ label: 'Back', onBack }} />
+      <PageHeader title="Find anything" subtitle={`Search ${profileName} and your own records`} back={{ label: 'Back', onBack }} />
+      <label className="ui-field-label find-label" htmlFor="find-input">
+        Search
+      </label>
       <div className="searchbar find-searchbar">
+        <span className="find-search-icon" aria-hidden="true">
+          <IconSearch />
+        </span>
         <input
+          id="find-input"
           ref={inputRef}
           type="search"
           aria-label="Find anything"
@@ -124,13 +158,9 @@ export function FindPage({ profileId, profileName, todayISO, state, includeNotes
         />
       </div>
       <div className="find-scope">
-        <label className="toggle-row">
-          <input type="checkbox" checked={includeNotes} onChange={(e) => onToggleNotes(e.target.checked)} />
-          Include my notes and captions
-        </label>
-        <div className="chip-grid" role="group" aria-label="Record types">
-          {(['session', 'personal', 'task', 'plan', 'pgce', 'document'] as const).map((t) => {
-            const on = !types || types.includes(t)
+        <div className="chip-grid find-scope-chips" role="group" aria-label="Record types">
+          {TYPES.map((t) => {
+            const on = activeTypes.includes(t)
             return (
               <button
                 key={t}
@@ -139,10 +169,9 @@ export function FindPage({ profileId, profileName, todayISO, state, includeNotes
                 aria-pressed={on}
                 onClick={() =>
                   setTypes((prev) => {
-                    const all = ['session', 'personal', 'task', 'plan', 'pgce', 'document'] as const
-                    const current = prev ?? [...all]
+                    const current = prev ?? [...TYPES]
                     const next = current.includes(t) ? current.filter((x) => x !== t) : [...current, t]
-                    return next.length === all.length ? null : next
+                    return next.length === TYPES.length ? null : next
                   })
                 }
               >
@@ -150,10 +179,20 @@ export function FindPage({ profileId, profileName, todayISO, state, includeNotes
               </button>
             )
           })}
+          {types !== null && (
+            <button type="button" className="travel-link" onClick={() => setTypes(null)}>
+              All types
+            </button>
+          )}
         </div>
-        <p className="filter-hint">
-          Titles, rooms, tutors, subjects and file names are searched on this device only
-          {includeNotes ? ', plus your notes, captions and record text' : ''}. Nothing is sent anywhere.
+        <label className="toggle-row">
+          <input type="checkbox" checked={includeNotes} onChange={(e) => onToggleNotes(e.target.checked)} />
+          Include my notes and captions
+        </label>
+        <p className="filter-hint find-indexed-note">
+          <IconShield size={16} /> Titles, rooms, tutors, subjects and file names are searched on this device only
+          {includeNotes ? ', plus your notes, captions and record text' : ''}. Nothing is sent anywhere, and nothing is remembered
+          between searches. A document that is not on this device is never treated as empty — it just cannot be searched here.
         </p>
       </div>
 
@@ -162,7 +201,10 @@ export function FindPage({ profileId, profileName, todayISO, state, includeNotes
           Loading your timetable — results will appear from the saved copy as soon as it is ready.
         </p>
       ) : !q ? (
-        <p className="filter-hint">Type to search. Use ↓ to move into the results and Enter to open one.</p>
+        <div className="ui-card find-empty">
+          <p className="find-empty-title">Find the right record</p>
+          <p className="filter-hint">Try a session title, room, task name or a word from your notes. Use ↓ to move into the results and Enter to open one.</p>
+        </div>
       ) : results.length === 0 ? (
         <p className="filter-hint" role="status">
           No results for “{q}”{includeNotes ? '' : ' — turn on notes and captions to search inside records'}.
@@ -173,22 +215,31 @@ export function FindPage({ profileId, profileName, todayISO, state, includeNotes
             {total} result{total === 1 ? '' : 's'} for “{q}”{total > results.length ? ` — showing ${results.length}` : ''}
           </p>
           <ul className="find-results" ref={listRef} onKeyDown={onListKey} aria-label="Search results">
-            {results.map((r) => (
-              <li key={r.key}>
-                <button type="button" className="find-result" onClick={() => onOpen(r)}>
-                  <span className="find-result-head">
-                    <span className="badge badge-personal">{TYPE_LABEL[r.ownerType]}</span>
-                    <span className="find-result-kind">{r.kind}</span>
-                    {r.date && (
-                      <span className="find-result-date">
-                        {formatDate(r.date)}
-                        {r.time ? ` · ${r.time}` : ''}
-                      </span>
-                    )}
-                  </span>
-                  <span className="find-result-title">{r.title}</span>
-                  {r.snippet && <span className="find-result-snippet">{r.snippet}</span>}
-                </button>
+            {groups.map((g) => (
+              <li key={g.type} className="find-group">
+                <h3 className="find-group-title">
+                  {GROUP_LABEL[g.type]} <span className="find-group-count">({g.items.length})</span>
+                </h3>
+                <ul className="find-group-list">
+                  {g.items.map((r) => (
+                    <li key={r.key}>
+                      <button type="button" className="find-result" onClick={() => onOpen(r)}>
+                        <span className="find-result-head">
+                          <span className="badge badge-personal">{TYPE_LABEL[r.ownerType]}</span>
+                          <span className="find-result-kind">{r.kind}</span>
+                          {r.date && (
+                            <span className="find-result-date">
+                              {formatDate(r.date)}
+                              {r.time ? ` · ${r.time}` : ''}
+                            </span>
+                          )}
+                        </span>
+                        <span className="find-result-title">{r.title}</span>
+                        {r.snippet && <span className="find-result-snippet">{r.snippet}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>
