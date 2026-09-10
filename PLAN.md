@@ -1223,3 +1223,5 @@ Behaviour before → after:
 Automated checks + results: legacy names updated (`Open session`; the light canvas colour). `npm run validate` AND `VERCEL=1 npm run validate` green — **161 unit and 138 browser tests**. Captures in `visual-ui-audit-2026-09-10/evidence/fidelity-*.png`.
 
 Known limits: Back stays a 44px control (the mockup's 30px would fail V-03); Reminders keep their controls inline rather than "Configure" links; the desktop grid keeps its measured lanes and 68px hour height.
+
+Released 10 September 2026: merge `56d72ec`, CI run 34535511182 success, `deploy.sh verify` six PASS. No worker change.
