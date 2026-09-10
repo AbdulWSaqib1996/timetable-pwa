@@ -1199,3 +1199,9 @@ Automated checks + results: new `tests/gap-closure.spec.ts` (3): sub-page cards/
 Known limits: admin table sort controls stay at 36px by design (compact table headers); the What's new list keeps its wording without emoji; the audit's V5 (matrix captures + archive) follows as Pass 63.
 
 Released 10 September 2026: merge `017c0bf`, CI run 34533058288 success, `deploy.sh verify` six PASS. No worker change.
+
+#### Pass 62 addendum — the evening Today state — 10 September 2026
+
+The owner reported the UI "still looks incomplete" after Pass 62. A capture of the LIVE site (seeded demo profile, 390px and 1280px, real tiles) confirmed every shipped change was being served (`detail-identity`, tiled Settings, `travel-od` all present in the live bundles). What looked incomplete was the state being viewed: in the evening, after the last session, Today collapsed to a "Show N finished sessions" link plus the promoted Journey-home row (the finished-day card was hidden whenever home was promoted, and the tomorrow preview was gated off), and the demo profile has no tasks, so Tasks and PGCE show their empty states.
+
+Fix (branch `today-evening`): after the last session Today always shows the "That's the day done" card with the next-day line and `See the week` / `See deadlines`, then the Journey-home row, then the day's sessions listed by default under "Today's sessions" (still collapsible; during the day they stay collapsed under "Finished today"). `v2-daily-use`, `phase-four-visual`, `audit-r1`, `notifications-quick`, `v1-foundations` and `phase-five` (which asserts no finished card while a personal event is still running) all pass. Live captures for comparison are in `visual-ui-audit-2026-09-10/evidence/live-*.png`.

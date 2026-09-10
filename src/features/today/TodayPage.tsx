@@ -163,7 +163,9 @@ export function TodayPage({
   // "Also now": every other active event, never dropped for sharing a start.
   const alsoNow = currentAll.filter((s) => s !== hero)
   const rest = upcoming.filter((s) => s !== hero)
-  const [showFinished, setShowFinished] = useState(false)
+  // Finished sessions stay visible once the day is over (the evening view
+  // must not collapse to a single link); during the day they are collapsed.
+  const [showFinishedChoice, setShowFinished] = useState<boolean | null>(null)
   // Quick attendance answer: the most recently ended real session (within 30
   // minutes) with no answer yet, only when prompts are on — the same window
   // and rule the notification uses, so an answered session is never asked.
@@ -180,6 +182,7 @@ export function TodayPage({
       : null
   // Day finished = every TIMED record has ended; untimed records don't count.
   const dayFinished = currentAll.length + upcoming.length === 0 && finished.length > 0
+  const showFinished = showFinishedChoice ?? dayFinished
 
   // At most ONE urgent item (P4-02): a fresh timetable change wins, else overdue work.
   const overdue = allKeyDates.filter(
@@ -429,7 +432,7 @@ export function TodayPage({
         />
       )}
 
-      {dayFinished && !homePromoted && (
+      {dayFinished && (
         <Card tone="accent" className="today-finished">
           <p className="today-finished-title">That's the day done</p>
           <p className="filter-hint">{nextDayLine}</p>
@@ -483,9 +486,12 @@ export function TodayPage({
 
       {finished.length > 0 && (
         <section aria-label="Finished today">
-          <button type="button" className="travel-link" aria-expanded={showFinished} onClick={() => setShowFinished((v) => !v)}>
-            {showFinished ? 'Hide finished sessions' : `Show ${finished.length} finished session${finished.length === 1 ? '' : 's'}`}
-          </button>
+          <div className="today-section-head">
+            <h3 className="subheading">{dayFinished ? 'Today’s sessions' : 'Finished today'}</h3>
+            <button type="button" className="travel-link" aria-expanded={showFinished} onClick={() => setShowFinished(!showFinished)}>
+              {showFinished ? 'Hide finished sessions' : `Show ${finished.length} finished session${finished.length === 1 ? '' : 's'}`}
+            </button>
+          </div>
           {showFinished && <div className="today-rest today-rest-finished">{finished.map((s) => row(s, s.end ? `ended ${s.end}` : undefined))}</div>}
         </section>
       )}
