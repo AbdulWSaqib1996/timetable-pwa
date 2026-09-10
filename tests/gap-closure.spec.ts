@@ -71,8 +71,9 @@ test('Session detail opens with an identity card (kind, date, time, place) and t
   const card = page.locator('.detail-identity')
   await expect(card).toBeVisible()
   await expect(card.locator('.badge-kind')).toHaveText('Course session')
-  await expect(card.locator('.today-fact')).toHaveCount(3)
-  await expect(card).toContainText('Monday, 7 September 2026')
+  await expect(card.locator('.hero-detail')).toHaveCount(2)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Session details')
+  await expect(page.locator('.page-subtitle')).toContainText('Mon 7 Sept')
   await expect(card).toContainText(/\d\d:\d\d–\d\d:\d\d/)
   await expect(card).toContainText(/Room /)
   // The identity card sits above the details list and the tabs sit above it.
