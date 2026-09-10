@@ -1,4 +1,4 @@
-# Visual UI audit — development plan (batches V0–V5 → PLAN.md Passes 56–61)
+# Visual UI audit — development plan (batches V0–V5 → PLAN.md Passes 56–57 and 59–62; Pass 58 is the owner-requested cloud backup removal)
 
 **Source:** [VISUAL_UI_AUDIT.md](VISUAL_UI_AUDIT.md) (10 September 2026) with its `designs/` and `evidence/`, plus the carry-forward defects FA-01–07 in [../project-audit-2026-09-10/PROJECT_AUDIT_2026-09-10.md](../project-audit-2026-09-10/PROJECT_AUDIT_2026-09-10.md). **Owner instruction (10 Sep 2026):** *no functionality may be lost — e.g. the map and the train/TfL view.* Section 1 is therefore a preservation register that every batch is gated on, before any visual work is judged.
 
@@ -21,7 +21,7 @@ Each row is a control or state that exists today. A batch that touches the scree
 | **Tasks** | Overdue / Today / Upcoming / Completed grouping and order; summary chips; local search; explicit status `<select>` (todo/doing/done) that updates the single owner; row opens editor/detail; mentor actions with named checkbox + **Open meeting**; Add task; delete + Undo; work-plan editor with in-place block editing | `phase-one`, `phase-five`, `audit-r1/r3/r4` |
 | **PGCE** | Four cards → placements page, evidence journal, weekly reflections, targets / meetings / observations / lessons / audits (QuickMenu), wallet, **Print binder & exports**, **Term stats**; counts from real records; journal review queue + binder selections | `phase-five`, `audit-r3/r5a` |
 | **Settings** | Seven categories, index search + synonyms, anchors/deep links (`#/settings/<section>`), Done/Back, profile switcher; My timetable (sources, merge tabs, key-dates **source**, notices, specialisms, term start, course setup, study group); Reminders (session offsets, **key-date reminders**, attendance prompts, leave alerts, quiet hours, background push, self-check/test push); Travel & home; Connected calendars (feed URL, .ics export incl. personal toggle); Data & devices; Appearance; Help | `phase-four-visual`, `phase-seven`, `audit-r3` (TT-21, search) |
-| **Data & devices** | Data-health states (saved/synced/photos/last backup **generated**/drafts/storage/sources/sync status + cadence); Attendance analysis + CSV (**relocates** to PGCE stats with a link back — V3); Back up sheet (scope, preview, passphrase); Restore sheet (unlock, preview, recovery journal); **Cloud backups** (session passphrase, scope preview, Google card with progress/list/restore/retention/auto, iCloud file card); Sync (code, Sync now, rotate, disconnect) | `audit-r5a`, `cloud-backups`, `sync-devices`, `phase-two` |
+| **Data & devices** | Data-health states (saved/synced/photos/last backup **generated**/drafts/storage/sources/sync status + cadence); Attendance analysis + CSV (**relocates** to PGCE stats with a link back — V3); Back up sheet (scope, preview, passphrase); Restore sheet (unlock, preview, recovery journal); ~~Cloud backups~~ (**removed on the owner's instruction, 10 Sep 2026 — Pass 58**: only the standard Back up / Restore remains); Sync (code, Sync now, rotate, disconnect) | `audit-r5a`, `backup-only`, `sync-devices`, `phase-two` |
 | **Find** | All six record types, notes/captions opt-in, type chips, ↓/↑/Enter, Show more, preserved query, pending-refresh honesty | `audit-r4` |
 | **Admin analytics** | Six pages (Overview, Return visits, Feature adoption, Reliability, Releases, Data & access) + Lock; Bearer-only, no credential in URL; legacy vs v2 datasets kept separate; charts with zero baseline, units, legend, data table, keyboard/tooltip; CSV export | `admin-a1…a5` |
 
@@ -59,7 +59,7 @@ Gate: existing 153/113 stay green; new tests per item; PLAN record.
 
 Gate: measurement test (no essential control under 44px; no ordinary text under 14px except allowed metadata classes); contrast unit test; all suites green; before/after at same viewports.
 
-### V2 — Daily use: Today, Schedule (mobile + desktop), Tasks, Session detail (Pass 58) — V-01, V-06 (detail structure), V-09, V-10
+### V2 — Daily use: Today, Schedule (mobile + desktop), Tasks, Session detail (Pass 59) — V-01, V-06 (detail structure), V-09, V-10
 
 - **Today:** heading/date, one attention summary, one next-session card with labelled time/room icons, title split into heading/subtitle with the full title in the accessible name and detail; later sessions as readable cards; Journey home as an explicit row; **Directions stays a one-tap secondary hero action**; state contract (before first / current / overlapping / after last / empty) each with a next action; attendance card above the finished-day state.
 - **Schedule mobile:** larger segmented control, labelled strip (selected-state, keyboard, full spoken date), day summary, consistent time/title/location hierarchy; secondary functions into a labelled **More** menu (QuickMenu) rather than removed.
@@ -69,25 +69,25 @@ Gate: measurement test (no essential control under 44px; no ordinary text under 
 
 Gate: preservation rows for these four screens; new tests for the overlap group (expansion + keyboard), Today state contract, tasks at 320px, detail tab order.
 
-### V3 — Travel and settings (Pass 59) — V-06, V-07, Reminders, Find
+### V3 — Travel and settings (Pass 60) — V-06, V-07, Reminders, Find
 
 - **Travel & map:** origin → destination → status → **primary action** ("Choose starting point" when missing; Directions/leave-by when planned) → options (arrival buffer as a secondary preference); compact unavailable-map card with Retry; 200–240px map viewport on mobile with the address outside the image and attribution kept; **every current travel component stays** (origin selector, plan status/freshness/Retry, journey steps with live departures and disruptions, RouteMap geometry/leg highlight/tile states, StaticMap fallback, Copy address, Google Maps, weather, disclaimer). Add the successful-route fixture screenshot the audit asked for.
 - **Journey home:** one origin/destination summary, distinct "Choose starting point" and "Open home in Maps", edit-home grouped with the address; Copy address and Retry map kept in the detail group; no-home → Set home + return.
 - **Settings index:** full-row buttons with icon tiles and one accessible name, 14px descriptions, Done/Back only; search and anchors unchanged; TT-21 placement preserved and re-tested.
-- **Data & devices:** order = save/sync/backup state → Back up / Restore → connect another device (sync) → Cloud backups → storage & advanced (expandable; draft problems surfaced automatically); attendance analysis moves to PGCE Term stats with a link back; mobile values left-aligned under labels, two-column only ≥640px; "Offline" when offline.
+- **Data & devices:** order = save/sync/backup state → Back up / Restore → connect another device (sync) → storage & advanced (expandable; draft problems surfaced automatically); attendance analysis moves to PGCE Term stats with a link back; mobile values left-aligned under labels, two-column only ≥640px; "Offline" when offline.
 - **Reminders:** groups = device status (**"Blocked on this device"** with recovery steps when denied), session reminders, leave alerts, attendance prompts, key dates, quiet hours; wrapping 44px chips; timezone label; "Configure" opens existing values.
 - **Find:** labelled field, scope chips (all six types kept), grouped results, "what is indexed" note; keyboard contract unchanged; no recent-search tracking.
 
 Gate: travel state-by-state comparison (nine states) in both themes; Data & devices relocation navigation test; blocked-permission fixture; all suites green.
 
-### V4 — PGCE and admin analytics (Pass 60) — V-08, V-10
+### V4 — PGCE and admin analytics (Pass 61) — V-08, V-10
 
 - **PGCE:** four sections with consistent icons and category colours (teal/indigo/violet/blue as identity, not warnings), desktop two-column, destination-named links instead of "View all", Set up / Open placement by state, attendance analysis hosted here; every record editor reachable in ≤2 steps; no invented percentages.
 - **Admin:** navy rail with shared type/spacing/icon language, headline cards keeping the legacy fixture values, a separate v2 card with the non-comparability warning, source/period/partial-day beside numbers, mobile stacked cards + report selector; charts keep zero baselines, units, ticks, legend, data table, keyboard/tooltip; reporting-window control only where the metric supports it; all six pages + Lock retained; no contract, retention or telemetry change.
 
 Gate: `admin-a1…a5` green unchanged; PGCE empty and populated fixtures; count badges from real records.
 
-### V5 — Validate, capture and archive (Pass 61)
+### V5 — Validate, capture and archive (Pass 62)
 
 Normal build + both validate gates; captures at 320/390/768/1024/1440 light/dark, reduced motion, 200% text, keyboard-only runs, focus after route/modal transitions, scroll reachability under the nav/FAB, permission failures, map failure, stale data, unsaved edits, offline. A designer/developer review of the screenshots, not only assertions. Then the audit's **required archive step**: move `VISUAL_UI_AUDIT.md`, `designs/`, before/after captures and evidence to `archive/enhancements/2026-09-10-visual-ui/` with a README of completed IDs and results, relative links intact, linked from PLAN.md; production source, permanent tests, runbooks and any unfinished work stay put.
 

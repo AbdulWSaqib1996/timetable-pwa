@@ -1116,3 +1116,17 @@ Automated checks + results: `npm run validate` AND `VERCEL=1 npm run validate` g
 Known limits: V1 changes shared rules only; per-screen hierarchy (Today hero, task cards, session detail sections) is V2; badges keep their emoji until V2's per-screen pass; the measurement test covers 390px (the matrix at 320–1440 is V5).
 
 Released 10 September 2026: merge `debeb5e`, CI run 34521503742 success, `deploy.sh verify` six PASS. No worker change.
+
+### Pass 58 — Cloud backup providers removed (owner instruction) — 10 September 2026
+
+Work items: the owner asked (10 Sep) to "remove the Google Cloud and iCloud backup options and keep just a standard backup save option and restore". Branch `remove-cloud-backups`, client only; no `shared/` or worker change.
+
+Behaviour before → after:
+- **Settings → Data & devices** had a "Cloud backups" section (session passphrase, scope preview, Google Drive appdata card with connect/list/restore/retention/auto-backup, iCloud file card) → the section is gone. **Backup** (encrypted file Back up sheet with scope + preview + passphrase, Restore sheet with unlock + impact preview) and **Sync between devices** are unchanged and are the only data-movement paths.
+- **Code removed:** `src/lib/cloudBackup/` (types, snapshot, google, icloud, installation, session), `src/components/CloudBackupsSection.tsx`, `src/hooks/useAutoCloudBackup.ts`, `CloudBackupSettings` + `settings.cloudBackups`, the Google client id and `googleClientId()` in `src/lib/config.ts`, the R5b CSS block, `tests/cloud-backups.spec.ts`, `GOOGLE_DRIVE_SETUP.md`, `.env.example` (its only entry was the Google id; the `.gitignore` exception went with it) and the `VITE_GOOGLE_OAUTH_CLIENT_ID` build env in `.github/workflows/deploy.yml`. The GitHub Actions repository variable of the same name was deleted. No Google script or endpoint is referenced anywhere in the app.
+- **Compatibility:** a settings row written before this pass may still carry a `cloudBackups` object and backup history entries with `kind: 'cloud'`; both are ignored (the coverage row no longer labels them "(cloud)"). `shared/merge.js` keeps `cloudBackups` in its device-local list so an old device's row never leaks through sync — leaving it avoids a worker redeploy for a no-op.
+- **Docs:** the visual audit plan's preservation register marks Cloud backups as removed and the remaining batches renumber to V2–V5 → Passes 59–62; the app-audit plan records NF-09 as withdrawn (do not rebuild without a new explicit go-ahead).
+
+Automated checks + results: `tests/backup-only.spec.ts` (Data & devices shows Backup + Sync, no cloud anchor/heading/copy, old `kind:'cloud'` history tolerated, no `accounts.google.com`/`googleapis.com` request, Settings search no longer matches "google drive"). `npm run validate` AND `VERCEL=1 npm run validate` green — **161 unit and 118 browser tests** (six cloud tests removed, one added). Both hosting bases rebuilt.
+
+Known limits: the Google Cloud project `my-timetable-backups-260910` and its OAuth client still exist on the owner's account (harmless; delete from the Console if unwanted). Any Vercel environment variable `VITE_GOOGLE_OAUTH_CLIENT_ID` is now unused. A local `.env.local` holding the id is git-ignored and inert.

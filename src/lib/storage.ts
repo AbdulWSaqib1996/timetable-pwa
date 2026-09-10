@@ -202,6 +202,7 @@ interface BackupBookkeeping {
   lastBackupAt?: number
   lastNudgeAt?: number
   /** bounded history of successful GENERATIONS with their explicit scope (FA-06) */
+  /** kind 'cloud' only appears in history written before Pass 58 (cloud backups removed) */
   history?: { at: number; profiles: string[]; all: boolean; kind: 'file' | 'cloud' }[]
 }
 
