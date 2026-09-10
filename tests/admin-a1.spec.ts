@@ -43,7 +43,7 @@ test('Lock clears everything and a late response cannot repopulate the page', as
   await page.getByLabel('Owner key').fill('test-key')
   await page.getByRole('button', { name: 'Unlock' }).click()
   await expect(page.getByText('Active tokens — last 7 days')).toBeVisible()
-  await page.getByRole('button', { name: '🔒 Lock' }).click()
+  await page.getByRole('button', { name: 'Lock workspace' }).click()
   await expect(page.getByLabel('Owner key')).toBeVisible()
   expect(await page.evaluate(() => document.activeElement?.id)).toBe('owner-key')
   await expect(page.getByText('Active tokens — last 7 days')).toHaveCount(0)
@@ -51,7 +51,7 @@ test('Lock clears everything and a late response cannot repopulate the page', as
   delayMs = 1500
   await page.getByLabel('Owner key').fill('test-key')
   await page.getByRole('button', { name: 'Unlock' }).click()
-  await page.getByRole('button', { name: '🔒 Lock' }).click()
+  await page.getByRole('button', { name: 'Lock workspace' }).click()
   await page.waitForTimeout(2000)
   await expect(page.getByLabel('Owner key')).toBeVisible()
   await expect(page.getByText('Active tokens — last 7 days')).toHaveCount(0)

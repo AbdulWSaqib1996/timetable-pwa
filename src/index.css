@@ -5105,3 +5105,87 @@ select.date-input {
   flex-direction: row;
   margin-bottom: 0;
 }
+
+/* ---------- V4: PGCE section cards (Pass 61) ---------- */
+.pgce-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+@media (min-width: 1024px) {
+  .pgce-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .page-pgce .pgce-section {
+    margin-bottom: 0;
+  }
+}
+.pgce-section-head {
+  justify-content: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.pgce-section-head h2 {
+  font-size: 18px;
+  line-height: 24px;
+}
+.pgce-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.pgce-section--placement .pgce-tile {
+  background: var(--saved-bg);
+  color: var(--saved-text);
+}
+.pgce-section--evidence .pgce-tile {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pgce-section--development .pgce-tile {
+  background: var(--development-bg);
+  color: var(--development-text);
+}
+.pgce-section--documents .pgce-tile {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+.pgce-count {
+  margin: 0 0 0 auto;
+  background: var(--bg);
+  color: var(--text-supporting);
+  border: 1px solid var(--border);
+}
+.pgce-section .filter-hint {
+  font-size: 14px;
+  line-height: 20px;
+}
+.pgce-section .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+.pgce-section .btn-today-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 0;
+}
+.pgce-section .btn-today-reset svg {
+  width: 18px;
+  height: 18px;
+}
+.pgce-privacy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+}
