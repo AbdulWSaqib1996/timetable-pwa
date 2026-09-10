@@ -1114,3 +1114,5 @@ Behaviour before → after:
 Automated checks + results: `npm run validate` AND `VERCEL=1 npm run validate` green — **161 unit and 124 browser tests**. Legacy tests updated only for renamed accessible names ("Add task/subtask/block", "Term stats", "Course setup") and the nudge's new home. Both hosting bases rebuilt; before/after captures reuse the audit's `evidence/before-*.png` against `visual-ui-audit-2026-09-10/evidence/v1-*.png`.
 
 Known limits: V1 changes shared rules only; per-screen hierarchy (Today hero, task cards, session detail sections) is V2; badges keep their emoji until V2's per-screen pass; the measurement test covers 390px (the matrix at 320–1440 is V5).
+
+Released 10 September 2026: merge `debeb5e`, CI run 34521503742 success, `deploy.sh verify` six PASS. No worker change.
