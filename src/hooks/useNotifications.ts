@@ -7,7 +7,6 @@ import {
 } from '../lib/campus'
 import { DEFAULT_PUSH_BASE } from '../lib/config'
 import { sessionKey } from '../lib/diff'
-import { localTodayISO } from '../lib/filters'
 import {
   daysUntil,
   formatRemaining,
@@ -18,8 +17,11 @@ import {
 } from '../lib/format'
 import { leavePlanFor } from '../lib/journeyPlanner'
 import { showReminder } from '../lib/notify'
-import { reportAttendanceMarks, reportLocation } from '../lib/push'
+import { ATTENDANCE_REPORT_VERSION, reportAttendanceMarks, reportLocation, subscriptionFingerprint } from '../lib/push'
 import { alreadyAtDestination } from '../../shared/travel-state.js'
+import { utcToZonedParts } from '../../shared/calendar-time.js'
+import { courseZone } from '../lib/course'
+import { useCourseClock } from './useCourseClock'
 import { loadNotified, saveNotified } from '../lib/storage'
 import { cachedRouteMinutes, tflRoute } from '../lib/tfl'
 import type { TflDisruption } from '../lib/tfl'
@@ -174,16 +176,20 @@ export function useNotifications({
       })
     const check = () => {
       if (Notification.permission !== 'granted') return
-      const now = new Date()
+      // The COURSE clock (FA-04): sessions, leave alerts, attendance windows and
+      // quiet hours all read course wall time, exactly as Today does — a device
+      // in another zone reminds on course time, never its own.
+      const wall = utcToZonedParts(Date.now(), courseZone())
+      const hour = Number(wall.hhmm.slice(0, 2))
       // Quiet hours: skip without marking anything notified, so alerts still
       // relevant afterwards fire on the first check outside the window.
       const { from: qFrom, to: qTo } = quietRef.current
       if (typeof qFrom === 'number' && typeof qTo === 'number' && qFrom !== qTo) {
-        const h = now.getHours()
+        const h = hour
         if (qFrom < qTo ? h >= qFrom && h < qTo : h >= qFrom || h < qTo) return
       }
-      const today = localTodayISO()
-      const nowMins = now.getHours() * 60 + now.getMinutes()
+      const today = wall.dateISO
+      const nowMins = hour * 60 + Number(wall.hhmm.slice(3, 5))
       const notified = loadNotified()
       let dirty = false
       const { coords: here, travelMode: mode, locationEnabled: locEnabled } = travelRef.current
@@ -298,7 +304,6 @@ export function useNotifications({
       }
       // Key-date reminders: N days before each deadline (one notification per offset).
       if (kdDays.length > 0) {
-        const today = localTodayISO()
         for (const kd of keyDatesRef.current) {
           if (kd.dateISO < today || metaRef.current[sessionKey(kd)]?.status === 'done') continue
           const days = daysUntil(kd.dateISO, today)
@@ -324,37 +329,122 @@ export function useNotifications({
   }, [metaReady, offsetsKey, leaveKey, kdDaysKey, attendancePrompts])
 
   // The push worker cannot see attendance marks, so it is told which of
-  // today's sessions are already answered (keys only) whenever that set
-  // changes — then its background "did you attend?" push stays silent for
-  // them (owner request, 9 Sep 2026).
+  // today's sessions are already answered (keys only) as an authoritative
+  // per-profile/course-day snapshot (FA-01/02/03). An acknowledgement is
+  // recorded ONLY for an accepted 2xx and is keyed by server origin +
+  // endpoint fingerprint + profile + course day + protocol version, so a
+  // new subscription, server, profile or day is reported afresh; failures
+  // stay pending (bounded backoff, online/foreground retry); a late reply
+  // for a superseded identity is ignored.
   const marksOn = settings?.pushEnabled === true && attendancePrompts
   const pushBase = settings?.pushServerBase ?? DEFAULT_PUSH_BASE
+  const courseToday = useCourseClock().todayISO
+  const inflightRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!marksOn || !metaReady) return
-    const today = localTodayISO()
-    const keys = exportRef.current
-      .filter((s) => s.dateISO === today && !s.isKeyDate && !s.isSelfStudy)
-      .map((s) => sessionKey(s))
-      .filter((k) => metaMap[k]?.attended || metaMap[k]?.absent)
-      .sort()
-    let last: { day: string; keys: string[] } | null = null
-    try {
-      last = JSON.parse(localStorage.getItem('timetable.marks-reported.v1') ?? 'null')
-    } catch {
-      /* ignore */
+    if (!marksOn || !metaReady || !profileId) return
+    let cancelled = false
+    let retry: ReturnType<typeof setTimeout> | null = null
+    const run = async (attempt = 0) => {
+      const day = courseToday
+      const keys = exportRef.current
+        .filter((s) => s.dateISO === day && !s.isKeyDate && !s.isSelfStudy)
+        .map((s) => sessionKey(s))
+        .filter((k) => metaRef.current[k]?.attended || metaRef.current[k]?.absent)
+        .sort()
+      const snapshot = JSON.stringify(keys)
+      const fp = await subscriptionFingerprint()
+      if (cancelled) return
+      if (!fp) {
+        writeAttendancePending({ profileId, day, status: 'unavailable', reason: 'no push subscription on this device', at: Date.now() })
+        return
+      }
+      const identity = `${new URL(pushBase).origin}|${fp}|${profileId}|${day}|v${ATTENDANCE_REPORT_VERSION}`
+      const acks = readAttendanceAcks()
+      if (acks[identity]?.snapshot === snapshot) {
+        clearAttendancePending()
+        return
+      }
+      if (inflightRef.current === identity) return
+      inflightRef.current = identity
+      const rev = (acks[identity]?.rev ?? 0) + 1
+      const result = await reportAttendanceMarks(pushBase, { profileId, day, rev, keys })
+      if (inflightRef.current === identity) inflightRef.current = null
+      if (cancelled) return
+      if (result.status === 'accepted') {
+        writeAttendanceAcks({ ...acks, [identity]: { snapshot, rev } })
+        clearAttendancePending()
+      } else if (result.status === 'stale') {
+        writeAttendanceAcks({ ...acks, [identity]: { snapshot: null, rev: result.serverRev } })
+        retry = setTimeout(() => void run(attempt), 1000)
+      } else if (result.status === 'retryable') {
+        writeAttendancePending({ profileId, day, status: 'retryable', reason: result.reason, at: Date.now() })
+        if (attempt < 3) retry = setTimeout(() => void run(attempt + 1), Math.min(result.retryAfterMs * 2 ** attempt, 5 * 60_000))
+      } else {
+        writeAttendancePending({ profileId, day, status: result.status, reason: result.status === 'configuration' ? result.reason : 'no push subscription on this device', at: Date.now() })
+      }
     }
-    if (last && last.day === today && JSON.stringify(last.keys) === JSON.stringify(keys)) return
-    const t = setTimeout(() => {
-      void reportAttendanceMarks(pushBase, keys)
-        .then(() => {
-          try {
-            localStorage.setItem('timetable.marks-reported.v1', JSON.stringify({ day: today, keys }))
-          } catch {
-            /* ignore */
-          }
-        })
-        .catch(() => {})
-    }, 1500)
-    return () => clearTimeout(t)
-  }, [marksOn, metaReady, metaMap, pushBase])
+    const debounce = setTimeout(() => void run(), 1500)
+    const onWake = () => {
+      if (document.visibilityState === 'visible') void run()
+    }
+    window.addEventListener('online', onWake)
+    document.addEventListener('visibilitychange', onWake)
+    return () => {
+      cancelled = true
+      clearTimeout(debounce)
+      if (retry) clearTimeout(retry)
+      window.removeEventListener('online', onWake)
+      document.removeEventListener('visibilitychange', onWake)
+    }
+  }, [marksOn, metaReady, metaMap, pushBase, profileId, courseToday])
+}
+
+/* ---------- attendance-report bookkeeping (identity-scoped, FA-01/02) ---------- */
+const ACK_KEY = 'timetable.marks-ack.v2'
+const PENDING_KEY = 'timetable.marks-pending.v2'
+type AckMap = Record<string, { snapshot: string | null; rev: number }>
+export interface AttendancePending {
+  profileId: string
+  day: string
+  status: 'unavailable' | 'retryable' | 'configuration'
+  reason: string
+  at: number
+}
+function readAttendanceAcks(): AckMap {
+  try {
+    return (JSON.parse(localStorage.getItem(ACK_KEY) ?? '{}') as AckMap) ?? {}
+  } catch {
+    return {}
+  }
+}
+function writeAttendanceAcks(acks: AckMap): void {
+  // Bounded: keep the 20 most recent identities.
+  const entries = Object.entries(acks).slice(-20)
+  try {
+    localStorage.setItem(ACK_KEY, JSON.stringify(Object.fromEntries(entries)))
+  } catch {
+    /* ignore */
+  }
+}
+function writeAttendancePending(p: AttendancePending): void {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(p))
+  } catch {
+    /* ignore */
+  }
+}
+function clearAttendancePending(): void {
+  try {
+    localStorage.removeItem(PENDING_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+/** For Settings: an unacknowledged report, if any (never claims delivery). */
+export function attendanceReportPending(): AttendancePending | null {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null') as AttendancePending | null
+  } catch {
+    return null
+  }
 }

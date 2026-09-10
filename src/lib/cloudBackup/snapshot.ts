@@ -3,7 +3,7 @@ import { backupSummary, validateBackup } from '../backup'
 import type { BackupSummary } from '../backup'
 import { exportBackup } from '../storage'
 import type { ExportScope } from '../storage'
-import type { ProfileStore } from '../../types'
+import type { ProfileStore, Settings } from '../../types'
 import { deviceLabel, installationId, newBackupId } from './installation'
 import type { SnapshotMeta } from './types'
 import { CloudBackupError } from './types'
@@ -23,16 +23,17 @@ export async function sha256Hex(text: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+/** Typed projection: removes ONLY the optional credential/bookkeeping keys; every required Settings key survives. */
+export function stripSettingsForCloud(settings: Settings): Settings {
+  // Destructure the denylisted optional keys away; the rest is still a Settings.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { groupToken, groupMemberId, cloudBackups, ...rest } = settings
+  return rest
+}
+
 export function stripForCloud(json: string): string {
   const data = JSON.parse(json) as { store: ProfileStore }
-  data.store = {
-    ...data.store,
-    profiles: data.store.profiles.map((p) => {
-      const settings = { ...p.settings } as Record<string, unknown>
-      for (const key of CLOUD_ARCHIVE_SETTINGS_DENYLIST) delete settings[key]
-      return { ...p, settings: settings as unknown as typeof p.settings }
-    }),
-  }
+  data.store = { ...data.store, profiles: data.store.profiles.map((p) => ({ ...p, settings: stripSettingsForCloud(p.settings) })) }
   return JSON.stringify(data)
 }
 

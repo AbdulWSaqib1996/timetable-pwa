@@ -10,7 +10,7 @@ import { prepareSnapshot } from '../lib/cloudBackup/snapshot'
 import type { ProgressStep, RemoteSnapshot } from '../lib/cloudBackup/types'
 import { CloudBackupError } from '../lib/cloudBackup/types'
 import { readAttachments } from '../lib/attachments'
-import { exportBackup, markBackedUp } from '../lib/storage'
+import { exportBackup } from '../lib/storage'
 import { telemetryTrack } from '../lib/telemetry'
 import type { ProfileStore, Settings } from '../types'
 import { Card, Field } from './ui'
@@ -143,7 +143,6 @@ export function CloudBackupsSection({ settings, store, onUpdateSettings, onResto
       const snap = await googleProvider.upload(prepared.envelopeText, prepared.meta, setStep)
       const current = settings.cloudBackups ?? {}
       onUpdateSettings({ cloudBackups: { ...current, google: { ...current.google, lastBackupAt: Date.now(), lastBackupId: snap.backupId } } })
-      markBackedUp({ profiles: scope === 'active' && active ? [active.id] : store.profiles.map((p) => p.id), all: scope === 'all', kind: 'cloud' })
       telemetryTrack('export_prepared')
       let pruned = 0
       if (cb.google?.prune) pruned = await pruneGoogleSnapshots(10, mine).catch(() => 0)
@@ -203,7 +202,6 @@ export function CloudBackupsSection({ settings, store, onUpdateSettings, onResto
       if (outcome === 'cancelled') setIcloudMsg('Share cancelled — nothing was saved.')
       else {
         onUpdateSettings({ cloudBackups: { ...current, icloud: { lastExportAt: Date.now(), lastOutcome: outcome } } })
-        markBackedUp({ profiles: scope === 'active' && active ? [active.id] : store.profiles.map((p) => p.id), all: scope === 'all', kind: 'file' })
         telemetryTrack('export_prepared')
         setIcloudMsg(
           outcome === 'shared'

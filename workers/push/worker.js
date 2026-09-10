@@ -267,6 +267,64 @@ async function fetchNoticeRows(sheetId, gid) {
 }
 
 /* ---------- quiet hours ---------- */
+/* ---------- attendance answers reported by the app (FA-03) ----------
+ * record.attendance = { [profileId]: { [dayISO]: { rev, keys: [...] } } } —
+ * an authoritative snapshot per profile and course day with a revision
+ * guard. Legacy `record.marks` (a flat union keyed by session key, whose
+ * keys start with the course date) is migrated into the subscription's own
+ * profile when that profile is unambiguous, else expired. Days older than
+ * two days are dropped on every write. Already-delivered prompts stay
+ * suppressed by the existing `sent:` keys, so clearing an answer can never
+ * cause a second notification for the same session. */
+const ATTENDANCE_DAY_RE = /^\d{4}-\d{2}-\d{2}$/
+const ATTENDANCE_KEEP_DAYS = 2
+
+function attendanceDayISO(ms) {
+  return new Date(ms).toISOString().slice(0, 10)
+}
+
+function attendanceKeepDay(day, nowMs) {
+  const cutoff = attendanceDayISO(nowMs - ATTENDANCE_KEEP_DAYS * 86400 * 1000)
+  return day >= cutoff
+}
+
+/** Migrate + prune; returns a fresh object (never mutates the stored one). */
+export function normalizeAttendance(record, nowMs = Date.now()) {
+  const out = {}
+  for (const [pid, days] of Object.entries(record?.attendance ?? {})) {
+    for (const [day, snap] of Object.entries(days ?? {})) {
+      if (!ATTENDANCE_DAY_RE.test(day) || !attendanceKeepDay(day, nowMs) || !snap || !Array.isArray(snap.keys)) continue
+      ;(out[pid] ??= {})[day] = { rev: Number.isInteger(snap.rev) ? snap.rev : 0, keys: [...new Set(snap.keys.filter((k) => typeof k === 'string'))].sort() }
+    }
+  }
+  const legacyProfile = record?.config?.profileId
+  for (const [key, at] of Object.entries(record?.marks ?? {})) {
+    if (typeof legacyProfile !== 'string' || nowMs - Number(at) >= ATTENDANCE_KEEP_DAYS * 86400 * 1000) continue
+    const day = key.slice(0, 10)
+    if (!ATTENDANCE_DAY_RE.test(day) || !attendanceKeepDay(day, nowMs)) continue
+    const snap = ((out[legacyProfile] ??= {})[day] ??= { rev: 0, keys: [] })
+    if (!snap.keys.includes(key)) snap.keys = [...snap.keys, key].sort()
+  }
+  return out
+}
+
+/** Apply one report. Returns { status: 'applied' | 'unchanged' | 'stale', rev, attendance }. */
+export function applyAttendanceReport(record, report, nowMs = Date.now()) {
+  const attendance = normalizeAttendance(record, nowMs)
+  const days = (attendance[report.profileId] ??= {})
+  const current = days[report.day]
+  const keys = [...new Set(report.keys)].sort()
+  if (current && report.rev < current.rev) return { status: 'stale', rev: current.rev, attendance }
+  if (current && report.rev === current.rev && JSON.stringify(current.keys) === JSON.stringify(keys)) return { status: 'unchanged', rev: current.rev, attendance }
+  days[report.day] = { rev: report.rev, keys }
+  return { status: 'applied', rev: report.rev, attendance }
+}
+
+/** Session keys answered for a profile on a course day (with legacy migration). */
+export function attendanceMarksFor(record, profileId, day, nowMs = Date.now()) {
+  return new Set(normalizeAttendance(record, nowMs)[profileId]?.[day]?.keys ?? [])
+}
+
 function inQuietHours(hour, from, to) {
   if (typeof from !== 'number' || typeof to !== 'number' || from === to) return false
   return from < to ? hour >= from && hour < to : hour >= from || hour < to
@@ -816,6 +874,7 @@ async function runScheduled(env) {
     // key, so the notification's ✓ Attended action logs it without opening the app.
     if (config.attendancePrompts === true) {
       const sessions = filterForConfig(await getSheet(config.sheetId, config.gid), config)
+      const answered = attendanceMarksFor(record, config.profileId, now.dateISO)
       for (const s of sessions) {
         if (s.dateISO !== now.dateISO || s.isSelfStudy) continue
         if (s.isOptional && config.remindOptional === false) continue
@@ -825,7 +884,7 @@ async function runScheduled(env) {
         if (since >= 0 && since < CRON_MINUTES) {
           const sKey = eventKey(s)
           // Already answered in the app (reported via /attendance): stay silent.
-          if (record.marks && record.marks[sKey]) continue
+          if (answered.has(sKey)) continue
           due.push({
             dedupe: `att|${s.dateISO}|${s.end}|${s.title}`,
             key: sKey,
@@ -1654,24 +1713,26 @@ export default {
       return json({ ok: true })
     }
     if (request.method === 'POST' && url.pathname === '/attendance') {
-      // Keys of today's sessions already marked attended/absent (no values,
-      // no notes) so the end-of-session prompt is not sent for them.
+      // Authoritative snapshot of ONE profile's answered sessions on ONE course
+      // day (keys only, no values/notes) with a revision guard (FA-03).
       const body = await request.json().catch(() => null)
-      if (!body?.endpoint || !Array.isArray(body.keys) || body.keys.length > 300 || !body.keys.every((k) => typeof k === 'string' && k.length <= 200)) {
-        return json({ error: 'invalid attendance report' }, 400)
-      }
+      const valid =
+        body?.v === 2 && body.endpoint && typeof body.profileId === 'string' && /^[\w-]{1,100}$/.test(body.profileId) &&
+        typeof body.day === 'string' && ATTENDANCE_DAY_RE.test(body.day) && Number.isInteger(body.rev) && body.rev >= 0 &&
+        Array.isArray(body.keys) && body.keys.length <= 300 && body.keys.every((k) => typeof k === 'string' && k.length <= 200 && k.startsWith(body.day))
+      if (!valid) return json({ error: 'invalid attendance report' }, 400)
       const subKey = await endpointKey(body.endpoint)
       const record = await env.PUSH.get(subKey, 'json')
       if (!record) return json({ error: 'unknown subscription' }, 404)
-      const now = Date.now()
-      const marks = {}
-      for (const [k, at] of Object.entries(record.marks ?? {})) if (now - at < 2 * 86400 * 1000) marks[k] = at
-      for (const k of body.keys) marks[k] = now
-      const unchanged = JSON.stringify(Object.keys(marks).sort()) === JSON.stringify(Object.keys(record.marks ?? {}).sort())
-      if (unchanged) return json({ ok: true, skipped: true })
-      record.marks = marks
+      const result = applyAttendanceReport(record, body)
+      if (result.status === 'stale') return json({ error: 'stale report', rev: result.rev }, 409)
+      const before = JSON.stringify(record.attendance ?? {})
+      const after = JSON.stringify(result.attendance)
+      if (result.status === 'unchanged' && before === after && !record.marks) return json({ ok: true, skipped: true, rev: result.rev })
+      record.attendance = result.attendance
+      delete record.marks // migrated
       await env.PUSH.put(subKey, JSON.stringify(record))
-      return json({ ok: true })
+      return json({ ok: true, rev: result.rev })
     }
     if (request.method === 'POST' && url.pathname === '/unsubscribe') {
       const body = await request.json().catch(() => null)
