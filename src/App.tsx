@@ -77,7 +77,7 @@ import { PlacementPage } from './features/pgce/PlacementPage'
 import { TaskEditSheet } from './components/TaskEditSheet'
 import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
 import type { Notice } from './lib/notices'
-import { loadSyncState, pushSync, syncPullApply } from './lib/sync'
+import { SyncBusyError, loadSyncState, pushSync, syncPullApply } from './lib/sync'
 import { downloadFile } from './lib/files'
 import { useNotifications } from './hooks/useNotifications'
 import { useTimetableData } from './hooks/useTimetableData'
@@ -106,6 +106,9 @@ import type {
 } from './types'
 
 type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek'
+
+/** How often a visible device pulls the other devices' changes (10 Sep 2026). */
+const SYNC_POLL_MS = 3 * 60_000
 
 /** Initial store: saved profiles, plus a profile imported from a #setup= share link if present. */
 function initStore(): ProfileStore | null {
@@ -457,24 +460,49 @@ export default function App() {
   // Cross-device sync (opt-in): on start — and again when the tab comes back into
   // view — merge in a newer state parked by another device; after local edits,
   // park this device's state (debounced, encrypted).
+  // Two open devices must converge on their own (owner report, 10 Sep 2026):
+  // pull on start, on a regular timer while visible, when the tab is shown,
+  // focused or comes back online — throttled so a home network with two
+  // devices stays under the sync server's per-IP limit — and back off when
+  // the server says it is busy.
+  const lastPullRef = useRef(0)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pullSyncNow = (reason: 'start' | 'timer' | 'visible' | 'focus' | 'online' | 'closed' | 'retry' | 'edit') => {
+    if (!loadSyncState()) return
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+    const minGap = reason === 'start' || reason === 'retry' || reason === 'edit' ? 0 : reason === 'timer' ? 60_000 : 20_000
+    if (Date.now() - lastPullRef.current < minGap) return
+    lastPullRef.current = Date.now()
+    const base = settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE
+    void syncPullApply(base).catch((error) => {
+      if (error instanceof SyncBusyError) {
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = setTimeout(() => pullRef.current('retry'), error.retryAfterMs)
+      }
+    })
+  }
+  const pullRef = useRef(pullSyncNow)
+  pullRef.current = pullSyncNow
   useEffect(() => {
-    const pull = () => {
-      const base = settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE
-      void syncPullApply(base)
-        .then((applied) => {
-          if (applied) window.location.reload()
-        })
-        .catch(() => {})
-    }
-    pull()
-    let lastPull = Date.now()
+    pullRef.current('start')
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') pullRef.current('timer')
+    }, SYNC_POLL_MS)
     const onVisible = () => {
-      if (document.visibilityState !== 'visible' || Date.now() - lastPull < 60_000) return
-      lastPull = Date.now()
-      pull()
+      if (document.visibilityState === 'visible') pullRef.current('visible')
     }
+    const onFocus = () => pullRef.current('focus')
+    const onOnline = () => pullRef.current('online')
     document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('online', onOnline)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('online', onOnline)
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+    }
   }, [])
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -482,7 +510,8 @@ export default function App() {
       if (!loadSyncState()) return
       setSyncStatus('Changes saved on this device. Sync queued…')
       clearTimeout(timer)
-      timer = setTimeout(() => { void syncPullApply(settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE).catch(() => {}) }, 2000)
+      // Through the same retry-aware path as every other pull (busy server → back off, then retry).
+      timer = setTimeout(() => pullRef.current('edit'), 2000)
     }
     window.addEventListener(DATA_CHANGED_EVENT, changed)
     return () => { clearTimeout(timer); window.removeEventListener(DATA_CHANGED_EVENT, changed) }
@@ -502,7 +531,8 @@ export default function App() {
   const detailOpen = route.name === 'session'
   useEffect(() => {
     if (openSheet === 'none' && !detailOpen && externalRefreshPending.current) window.dispatchEvent(new Event(SYNC_APPLIED_EVENT))
-    if (openSheet === 'none' && !detailOpen) void syncPullApply(settingsRef.current?.pushServerBase ?? DEFAULT_PUSH_BASE).catch(() => {})
+    if (openSheet === 'none' && !detailOpen) pullRef.current('closed')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openSheet, detailOpen])
 
   // Keep the push worker's copy of placement details and admin-summary counts
