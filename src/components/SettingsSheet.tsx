@@ -28,7 +28,7 @@ import type { SourceStatus } from '../../shared/refresh.js'
 import type { PlacementExceptionRec } from '../lib/admin'
 import { placementBlocks as computePlacementBlocks } from '../lib/placement'
 import { WHATSNEW } from '../lib/changelog'
-import { IconAlert, IconBack, IconBell, IconCalendar, IconChart, IconChevronRight, IconClose, IconHelp, IconPin, IconSchedule, IconShield, IconSun, PageHeader, StatusMessage } from './ui'
+import { IconAlert, IconBack, IconBell, IconCalendar, IconChart, IconCheck, IconChevronRight, IconClose, IconDownload, IconHelp, IconPin, IconSchedule, IconShield, IconSun, IconUser, PageHeader, StatusMessage } from './ui'
 import { useOnline } from '../hooks/useOnline'
 import { BackupSheet, RestoreSheet } from './BackupSheets'
 import { useAttention } from '../lib/attention'
@@ -403,7 +403,7 @@ export function SettingsSheet({
         saveSyncState(next)
         setSyncState(next)
       }
-      setSyncMsg('Synced. ✓')
+      setSyncMsg('Synced.')
     } catch {
       setSyncMsg('Could not reach the sync server.')
     } finally {
@@ -446,7 +446,7 @@ export function SettingsSheet({
       if (enable) {
         await subscribePush(base, settings, store.activeId, { force: true })
         onUpdateSettings({ pushServerBase: base, pushEnabled: true })
-        setPushMessage('Background push enabled on this device. ✓')
+        setPushMessage('Background push enabled on this device.')
       } else {
         await unsubscribePush(settings.pushServerBase ?? base)
         onUpdateSettings({ pushEnabled: false })
@@ -735,7 +735,10 @@ export function SettingsSheet({
         <>
 
         <section className="filter-section" id="profiles">
-          <h3 tabIndex={-1}>Timetables</h3>
+          <div className="section-head">
+            <h3 tabIndex={-1}>Timetables</h3>
+            <span className="notif-state">{store.profiles.length} on this device</span>
+          </div>
           <div className="chip-grid">
             {store.profiles.map((p) => (
               <button
@@ -868,7 +871,12 @@ export function SettingsSheet({
 
 
         <section className="filter-section" id="specialisms">
-          <h3 tabIndex={-1}>Specialisms</h3>
+          <div className="section-head">
+            <h3 tabIndex={-1}>Specialisms</h3>
+            <span className={`notif-state${(settings.mySpecialisms ?? []).length > 0 ? '' : ' off'}`}>
+              {(settings.mySpecialisms ?? []).length > 0 ? `${(settings.mySpecialisms ?? []).length} chosen` : 'all shown'}
+            </span>
+          </div>
           <p className="filter-hint">
             {(settings.mySpecialisms ?? []).length > 0
               ? `Showing: ${(settings.mySpecialisms ?? []).join(', ')}`
@@ -912,7 +920,7 @@ export function SettingsSheet({
               : 'Find common free slots with coursemates by sharing a code.'}
           </p>
           <button type="button" className="btn-secondary" onClick={onOpenGroup}>
-            👥 {settings.groupCode ? 'Open study group' : 'Set up a study group'}
+            <IconUser /> {settings.groupCode ? 'Open study group' : 'Set up a study group'}
           </button>
         </section>
 
@@ -1071,7 +1079,7 @@ export function SettingsSheet({
             Ask “did you attend?” when each session ends
           </label>
           <p className="filter-hint">
-            Answer with ✓ Attended or ✗ Absent on the notification, or tap it to answer in the app
+            Answer with Attended or Absent on the notification, or tap it to answer in the app
             (a card on Today offers the same two answers for a session that just ended). A session
             you have already answered is never asked. Works in the background too when push is enabled.
           </p>
@@ -1216,7 +1224,7 @@ export function SettingsSheet({
                     disabled={pushBusy || !pushBase.trim() || settings.pushEnabled}
                     onClick={() => void handlePush(true)}
                   >
-                    {pushBusy ? 'Working…' : settings.pushEnabled ? 'Enabled ✓' : 'Enable on this device'}
+                    {pushBusy ? 'Working…' : settings.pushEnabled ? 'Enabled' : 'Enable on this device'}
                   </button>
                   {settings.pushEnabled && (
                     <button type="button" className="btn-secondary" disabled={pushBusy} onClick={() => void handlePush(false)}>
@@ -1330,7 +1338,7 @@ export function SettingsSheet({
               <ul className="check-list">
                 {checkRows.map((r) => (
                   <li key={r.label} className={r.ok ? 'check-ok' : 'check-bad'}>
-                    {r.ok ? '✓' : '✗'} {r.label}
+                    {r.ok ? <IconCheck size={16} /> : <IconAlert size={16} />} {r.label}
                     {r.detail ? ` — ${r.detail}` : ''}
                   </li>
                 ))}
@@ -1346,7 +1354,12 @@ export function SettingsSheet({
         <>
 
         <section className="filter-section" id="travel-mode">
-          <h3 tabIndex={-1}>Travel times</h3>
+          <div className="section-head">
+            <h3 tabIndex={-1}>Travel times</h3>
+            <span className={`notif-state${settings.locationEnabled ? '' : ' off'}`}>
+              {settings.locationEnabled ? 'location on' : 'location off'} · {settings.travelMode === 'transit' ? 'public transport' : settings.travelMode === 'driving' ? 'driving' : 'walking'}
+            </span>
+          </div>
           <label className="toggle-row">
             <input
               type="checkbox"
@@ -1375,14 +1388,21 @@ export function SettingsSheet({
             ))}
           </div>
           <p className="filter-hint">
-            Shows an estimated journey from where you are to each session's UCL building, on the
-            timetable cards and in session details (rooms are matched against the Bloomsbury
-            campus). Estimates are approximate — the Directions link gives the exact route. Your
-            location and destination are sent to TfL for transit routes; map areas are requested from
-            OpenStreetMap. Background leave alerts additionally store your last app-open location
-            in the push worker.
+            Shows an estimated journey from where you are to each session's building on the timetable cards and in session details.
+            Estimates are approximate — Directions gives the exact route.
           </p>
-          <h3 className="subheading" id="home-address" tabIndex={-1}>Home</h3>
+          <details className="settings-more">
+            <summary>What is sent, and where</summary>
+            <p className="filter-hint">
+              Rooms are matched against the Bloomsbury campus. Your location and destination are sent to TfL for transit routes; map
+              areas are requested from OpenStreetMap. Background leave alerts additionally store your last app-open location in the
+              push worker.
+            </p>
+          </details>
+          <div className="section-head section-head--sub">
+            <h3 className="subheading" id="home-address" tabIndex={-1}>Home</h3>
+            <span className={`notif-state${settings.homeLat != null ? '' : ' off'}`}>{settings.homeLat != null ? 'set' : 'not set'}</span>
+          </div>
           <div className="feed-row">
             <input
               type="text"
@@ -1393,19 +1413,23 @@ export function SettingsSheet({
               onBlur={saveHomeAddress}
             />
           </div>
-          {homeGeoStatus === 'working' && <p className="filter-hint">📍 Locating home…</p>}
+          {homeGeoStatus === 'working' && <p className="filter-hint">Locating home…</p>}
           {homeGeoStatus === 'fail' && (
             <p className="filter-hint">Couldn't locate that address — try adding the postcode.</p>
           )}
           {(homeGeoStatus === 'ok' || (homeGeoStatus === null && settings.homeLat != null)) && (
-            <p className="filter-hint">📍 Home set — a "🏠 Head home" card shows whenever you're away from home.</p>
+            <p className="filter-hint">Home set — the Journey home row on Today shows the route whenever you're away from home.</p>
           )}
           <p className="filter-hint">
-            The card shows the live journey home — time, TfL route and arrival estimate — any time
-            you're out (it hides itself when you're home). Address lookup sends the postcode to
-            postcodes.io or the address to OpenStreetMap Nominatim. Home coordinates are used in
-            TfL and map requests. Saved home settings are included in encrypted sync and backups.
+            The Journey home row on Today shows the live route, time and arrival estimate whenever you're out.
           </p>
+          <details className="settings-more">
+            <summary>What is sent, and where</summary>
+            <p className="filter-hint">
+              Address lookup sends the postcode to postcodes.io or the address to OpenStreetMap Nominatim. Home coordinates are used
+              in TfL and map requests. Saved home settings are included in encrypted sync and backups.
+            </p>
+          </details>
         </section>
 
 
@@ -1453,7 +1477,10 @@ export function SettingsSheet({
         <>
 
         <section className="filter-section" id="calendar-feed">
-          <h3 tabIndex={-1}>Calendar feed (stays in sync)</h3>
+          <div className="section-head">
+            <h3 tabIndex={-1}>Calendar feed (stays in sync)</h3>
+            <span className={`notif-state${feedUrl ? '' : ' off'}`}>{feedUrl ? 'available' : settings.demo ? 'needs a real sheet' : 'not set'}</span>
+          </div>
           {settings.demo ? (
             <p className="filter-hint">Load a real sheet to use the calendar feed.</p>
           ) : (
@@ -1477,7 +1504,7 @@ export function SettingsSheet({
                   <p className="settings-url">{feedUrl}</p>
                   {feedCopiedUrl && feedCopiedUrl !== feedUrl && (
                     <p className="filter-hint feed-stale">
-                      ⚠ Your feed URL has changed since you last copied it (filters or placement
+                      <IconAlert size={16} /> Your feed URL has changed since you last copied it (filters or placement
                       details changed) — re-copy it and update the subscription in your calendar app.
                     </p>
                   )}
@@ -1492,12 +1519,15 @@ export function SettingsSheet({
 
 
         <section className="filter-section" id="calendar-export">
-          <h3 tabIndex={-1}>Calendar export</h3>
+          <div className="section-head">
+            <h3 tabIndex={-1}>Calendar export</h3>
+            <span className="notif-state">{courseSessions.length} sessions{keyDates.length > 0 ? ` · ${keyDates.length} key dates` : ''}</span>
+          </div>
           <p className="filter-hint">
             Downloads your timetable — your groups and specialisms, all dates, regardless of
             display filters ({courseSessions.length} sessions
             {keyDates.length > 0 ? ` + ${keyDates.length} key dates` : ''}) as an .ics file you can
-            import into Google, Apple or Outlook calendars. Key dates export as all-day 📌 events.
+            import into Google, Apple or Outlook calendars. Key dates export as all-day events.
           </p>
           <label className="toggle-row">
             <input
@@ -1787,7 +1817,10 @@ export function SettingsSheet({
         <>
 
         <section className="filter-section" id="theme">
-          <h3 tabIndex={-1}>Theme</h3>
+          <div className="section-head">
+            <h3 tabIndex={-1}>Theme</h3>
+            <span className="notif-state">{settings.theme === 'dark' ? 'Dark' : settings.theme === 'light' ? 'Light' : 'System'}</span>
+          </div>
           <div className="chip-grid">
             {(
               [
@@ -1810,7 +1843,10 @@ export function SettingsSheet({
         </section>
 
         <section className="filter-section" id="density">
-          <h3 tabIndex={-1}>Density</h3>
+          <div className="section-head">
+            <h3 tabIndex={-1}>Density</h3>
+            <span className="notif-state">{settings.density === 'compact' ? 'Compact' : 'Comfortable'}</span>
+          </div>
           <div className="chip-grid">
             {(
               [
@@ -1852,7 +1888,7 @@ export function SettingsSheet({
               and can receive background push.
             </p>
             <button type="button" className="btn-secondary" onClick={onInstall}>
-              📲 Install
+              <IconDownload /> Install
             </button>
           </section>
         )}
@@ -1870,7 +1906,7 @@ export function SettingsSheet({
             target="_blank"
             rel="noopener noreferrer"
           >
-            ☕ Support on Ko-fi ↗
+            Support on Ko-fi ↗
           </a>
           <label className="toggle-row">
             <input
@@ -1880,17 +1916,23 @@ export function SettingsSheet({
             />
             Share anonymous usage counts
           </label>
+          <details className="settings-more">
+            <summary>What the anonymous counts contain</summary>
+            <p className="filter-hint">
+              The app keeps coarse local counters — opens and feature names with counts, by UTC day — and sends them to its own
+              server as small batches: a random token (a pseudonymous identifier created on this device), whether the app runs
+              installed, the platform type, the build id and which settings are switched on (yes/no only). No location, name,
+              timetable content or notes are ever included.
+            </p>
+          </details>
           <p className="filter-hint">
-            The app keeps coarse local counters — opens and feature names with counts, by UTC day —
-            and sends them to its own server as small batches: a random token (a pseudonymous
-            identifier created on this device), whether the app runs installed, the platform type,
-            the build id and which settings are switched on (yes/no only). No location, name,
-            timetable content or notes are ever included. Switching this off clears anything not yet
-            sent and stops collection; batches already delivered cannot be unsent.
+            Switching this off clears anything not yet sent and stops collection; batches already delivered cannot be unsent.
+          </p>
+          <p className="filter-hint">
             {settings.usagePing !== false && telemetry &&
               ` Status: ${
                 telemetry.openSegments + telemetry.claimedSegments === 0
-                  ? 'nothing waiting to send ✓'
+                  ? 'nothing waiting to send'
                   : `${telemetry.openSegments + telemetry.claimedSegments} day batch(es) queued — they send on the next open or within 15 minutes.`
               }`}
           </p>

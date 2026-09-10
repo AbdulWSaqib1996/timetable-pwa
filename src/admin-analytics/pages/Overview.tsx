@@ -71,7 +71,7 @@ export function Overview({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
         </div>
         <div>
           <div className="card section-gap">
-            <div className="card-head">
+            <div className="card-head card-head--start">
               <span className="kpi-tile kpi-tile--attention" aria-hidden="true">
                 <IconShield />
               </span>
@@ -98,7 +98,7 @@ export function Overview({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
             </p>
           </div>
           <div className="card kpi--v2">
-            <div className="card-head">
+            <div className="card-head card-head--start">
               <span className="kpi-tile kpi-tile--v2" aria-hidden="true">
                 <IconChart />
               </span>

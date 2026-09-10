@@ -1,4 +1,4 @@
-# Visual UI audit — development plan (batches V0–V5 → PLAN.md Passes 56–57 and 59–62; Pass 58 is the owner-requested cloud backup removal)
+# Visual UI audit — development plan (batches V0–V5 → PLAN.md Passes 56–57, 59–61 and 63; Pass 58 is the owner-requested cloud backup removal; Pass 62 is the gap closure after the owner's check — see GAP_AUDIT_2026-09-10.md)
 
 **Source:** [VISUAL_UI_AUDIT.md](VISUAL_UI_AUDIT.md) (10 September 2026) with its `designs/` and `evidence/`, plus the carry-forward defects FA-01–07 in [../project-audit-2026-09-10/PROJECT_AUDIT_2026-09-10.md](../project-audit-2026-09-10/PROJECT_AUDIT_2026-09-10.md). **Owner instruction (10 Sep 2026):** *no functionality may be lost — e.g. the map and the train/TfL view.* Section 1 is therefore a preservation register that every batch is gated on, before any visual work is judged.
 
@@ -87,7 +87,7 @@ Gate: travel state-by-state comparison (nine states) in both themes; Data & devi
 
 Gate: `admin-a1…a5` green unchanged; PGCE empty and populated fixtures; count badges from real records.
 
-### V5 — Validate, capture and archive (Pass 62)
+### V5 — Validate, capture and archive (Pass 63)
 
 Normal build + both validate gates; captures at 320/390/768/1024/1440 light/dark, reduced motion, 200% text, keyboard-only runs, focus after route/modal transitions, scroll reachability under the nav/FAB, permission failures, map failure, stale data, unsaved edits, offline. A designer/developer review of the screenshots, not only assertions. Then the audit's **required archive step**: move `VISUAL_UI_AUDIT.md`, `designs/`, before/after captures and evidence to `archive/enhancements/2026-09-10-visual-ui/` with a README of completed IDs and results, relative links intact, linked from PLAN.md; production source, permanent tests, runbooks and any unfinished work stay put.
 

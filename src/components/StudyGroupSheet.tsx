@@ -370,9 +370,9 @@ export function StudyGroupSheet({ settings, sessions, todayISO, onUpdateSettings
                           <span className="filter-hint">
                             {' '}by {memberName(p.by)} ·{' '}
                             {accepted
-                              ? 'everyone accepted 🎉'
+                              ? 'everyone accepted'
                               : current
-                                  .map((m) => `${m.name} ${p.responses[m.memberId!] === 'yes' ? '✓' : p.responses[m.memberId!] === 'no' ? '✗' : '…'}`)
+                                  .map((m) => `${m.name} ${p.responses[m.memberId!] === 'yes' ? '(yes)' : p.responses[m.memberId!] === 'no' ? '(no)' : '…'}`)
                                   .join(', ')}
                           </span>
                         </span>

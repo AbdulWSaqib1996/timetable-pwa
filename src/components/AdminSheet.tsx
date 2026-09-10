@@ -8,7 +8,7 @@ import { BinderPreviewSheet } from './BinderPreviewSheet'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import { RecordEditSheet } from './RecordEditSheet'
 import type { RecordKind } from './RecordEditSheet'
-import { IconClose, IconEdit, IconPrint, StatusMessage } from './ui'
+import { IconClose, IconEdit, IconNote, IconPlus, IconPrint, StatusMessage } from './ui'
 import { WALLET_FILE_CAP, addWalletFile, deleteWalletFile, getWalletFiles } from '../lib/wallet'
 import type { WalletFile } from '../lib/wallet'
 import type { MetaMap, Session } from '../types'
@@ -130,9 +130,9 @@ function ReflectionsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFil
                 <button type="button" className="btn-icon" aria-label="Delete reflection" onClick={() => onUpdate((prev) => ({ ...prev, reflections: prev.reflections.filter((x) => x.id !== r.id) }))}><IconClose /></button>
               </span>
             </div>
-            {r.wentWell && <p>👍 {r.wentWell}</p>}
-            {r.challenges && <p>⚠ {r.challenges}</p>}
-            {r.focus && <p>🎯 {r.focus}</p>}
+            {r.wentWell && <p><strong>Went well:</strong> {r.wentWell}</p>}
+            {r.challenges && <p><strong>Challenges:</strong> {r.challenges}</p>}
+            {r.focus && <p><strong>Focus:</strong> {r.focus}</p>}
           </li>
         ))}
       </ul>
@@ -153,7 +153,7 @@ function TargetsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
   return (
     <>
       <p className="filter-hint">
-        Targets set with your mentor. Tap the status to move ○ open → ◐ in progress → ✓ met; met
+        Targets set with your mentor. Tap the status to move open → in progress → met; met
         targets are evidence.
       </p>
       <div className="admin-form">
@@ -178,7 +178,7 @@ function TargetsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
           <li key={t.id} className={`admin-item${t.status === 'met' ? ' done' : ''}`}>
             <div className="admin-item-head">
               <button type="button" className="status-cycle" onClick={() => onUpdate((prev) => ({ ...prev, targets: prev.targets.map((x) => (x.id === t.id ? cycle(x) : x)) }))}>
-                {t.status === 'met' ? '✓ met' : t.status === 'progress' ? '◐ in progress' : '○ open'}
+                {t.status === 'met' ? 'met' : t.status === 'progress' ? 'in progress' : 'open'}
               </button>
               <span className="journal-tags">
                 {t.standards.map((ts) => (
@@ -332,8 +332,8 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFi
               </span>
             </div>
             {o.observer && <p className="admin-dates">observed by {o.observer}{o.focus ? ` · focus: ${o.focus}` : ''}</p>}
-            {o.strengths && <p>👍 {o.strengths}</p>}
-            {o.development && <p>🎯 {o.development}</p>}
+            {o.strengths && <p><strong>Strengths:</strong> {o.strengths}</p>}
+            {o.development && <p><strong>Development:</strong> {o.development}</p>}
           </li>
         ))}
       </ul>
@@ -466,7 +466,7 @@ function WalletTab({ profileId }: { profileId: string }) {
         stored on this device (max {WALLET_FILE_CAP / 1024 / 1024}MB each) and included in backups.
       </p>
       <label className="btn-secondary btn-file">
-        📎 Add a document
+        <IconPlus /> Add a document
         <input
           type="file"
           hidden
@@ -496,7 +496,7 @@ function WalletTab({ profileId }: { profileId: string }) {
                   setTimeout(() => URL.revokeObjectURL(url), 60_000)
                 }}
               >
-                📄 {f.name}
+                <IconNote size={16} /> {f.name}
               </button>
               <span className="journal-tags">
                 <span className="admin-dates">{sizeLabel(f.size)}</span>
@@ -553,20 +553,20 @@ function Overview({ admin, sessions, metaMap, keyDates, placementTargetDays, tod
   ).length
 
   const rows: { label: string; value: string; warn?: boolean }[] = [
-    { label: '🏫 School days logged', value: `${daysDone}${placementTargetDays ? ` / ${placementTargetDays}` : ''}` },
-    { label: '✗ Absences recorded', value: `${absent}`, warn: absent > 0 },
+    { label: 'School days logged', value: `${daysDone}${placementTargetDays ? ` / ${placementTargetDays}` : ''}` },
+    { label: 'Absences recorded', value: `${absent}`, warn: absent > 0 },
     {
-      label: '📔 Evidence coverage',
-      value: gaps.length === 0 ? 'all 8 standards ✓' : `${8 - gaps.length}/8 standards`,
+      label: 'Evidence coverage',
+      value: gaps.length === 0 ? 'all 8 standards' : `${8 - gaps.length}/8 standards`,
       warn: gaps.length > 0,
     },
-    { label: '🎯 Open targets', value: `${openTargets}`, warn: openTargets > 0 },
-    { label: '☐ Mentor actions to do', value: `${openActions}`, warn: openActions > 0 },
-    { label: '✍️ Reflection streak', value: `${streak} week${streak === 1 ? '' : 's'}` },
-    { label: '👀 Observations logged', value: `${admin.observations.length}` },
-    { label: '🍎 Lessons taught', value: `${admin.lessons.length}` },
-    { label: '📚 Audits secure', value: auditSubjects > 0 ? `${secureAudits}/${auditSubjects} subjects` : 'none logged' },
-    { label: '📌 Deadlines due in 14d', value: `${dueSoon}`, warn: dueSoon > 0 },
+    { label: 'Open targets', value: `${openTargets}`, warn: openTargets > 0 },
+    { label: 'Mentor actions to do', value: `${openActions}`, warn: openActions > 0 },
+    { label: 'Reflection streak', value: `${streak} week${streak === 1 ? '' : 's'}` },
+    { label: 'Observations logged', value: `${admin.observations.length}` },
+    { label: 'Lessons taught', value: `${admin.lessons.length}` },
+    { label: 'Audits secure', value: auditSubjects > 0 ? `${secureAudits}/${auditSubjects} subjects` : 'none logged' },
+    { label: 'Deadlines due in 14d', value: `${dueSoon}`, warn: dueSoon > 0 },
   ]
   return (
     <>
@@ -580,7 +580,7 @@ function Overview({ admin, sessions, metaMap, keyDates, placementTargetDays, tod
       </ul>
       {gaps.length > 0 && (
         <p className="filter-hint admin-gaps">
-          ⚠ No evidence yet against {gaps.join(', ')} — tag a note, reflection or lesson evaluation
+          No evidence yet against {gaps.join(', ')} — tag a note, reflection or lesson evaluation
           to close the gap.
         </p>
       )}
@@ -616,7 +616,7 @@ export function AdminSheet(props: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-header">
-          <h2>🎓 My PGCE file</h2>
+          <h2>My PGCE file</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
             <IconClose />
           </button>

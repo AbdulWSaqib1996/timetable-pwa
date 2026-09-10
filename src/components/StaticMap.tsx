@@ -54,7 +54,10 @@ export function StaticMap({ lat, lng, label, address }: Props) {
         />
       ))}
       <span className="map-pin" aria-hidden="true">
-        📍
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--accent)" stroke="#fff" strokeWidth="1.5">
+          <path d="M12 22s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 15.8 12 22 12 22z" />
+          <circle cx="12" cy="10.5" r="2.5" fill="#fff" stroke="none" />
+        </svg>
       </span>
       <span className="map-attrib">© OpenStreetMap</span>
     </a>

@@ -6,7 +6,7 @@ import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords } from '../l
 import { geocodeAddress } from '../lib/geocode'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import type { Coords, TravelMode } from '../lib/campus'
-import { formatRemaining, googleCalendarUrl, isPlacementSession } from '../lib/format'
+import { formatRemaining, googleCalendarUrl, isPlacementSession, sessionKindLabel } from '../lib/format'
 import { parseLocation } from '../lib/location'
 import { sessionKey } from '../lib/diff'
 import { trackUse } from '../lib/usage'
@@ -23,7 +23,7 @@ import type { OriginOption } from '../lib/origins'
 import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
-import { IconAlert, IconBook, IconCamera, IconCheck, IconClose, IconPin, IconSchool, SegmentedControl } from './ui'
+import { IconAlert, IconBook, IconCalendar, IconCamera, IconCheck, IconClock, IconClose, IconPin, IconSchool, SegmentedControl } from './ui'
 import { CopyButton } from './CopyButton'
 import { RouteMap } from './RouteMap'
 import { StaticMap } from './StaticMap'
@@ -248,17 +248,12 @@ export function SessionDetail({
         : loc.raw
           ? [{ label: 'Location', value: loc.raw }]
           : []
+  // Identity (date, time, place) now lives in the identity card above the
+  // details list (V-06 → gap closure); the list keeps the remaining facts.
   const rows: { label: string; value: string }[] = [
-    {
-      label: isTask ? 'Due' : 'Date',
-      value: formatLongDate(session.dateISO) + (isTask && session.start ? ` · ${session.start}` : ''),
-    },
-    {
-      label: 'Time',
-      value: !isTask && session.start ? (session.end ? `${session.start} – ${session.end}` : session.start) : '',
-    },
+    ...(isTask ? [{ label: 'Due', value: formatLongDate(session.dateISO) + (session.start ? ` · ${session.start}` : '') }] : []),
     { label: 'Duration', value: !isTask ? duration ?? '' : '' },
-    ...locationRows,
+    ...(loc.building && loc.room ? [{ label: 'Room name', value: loc.roomName ?? '' }] : locationRows),
     { label: 'Tutor', value: session.tutor === 'Self Study' ? '' : session.tutor },
     { label: 'Subject', value: session.subject !== session.title ? session.subject : '' },
     { label: 'Groups', value: session.groups },
@@ -278,10 +273,49 @@ export function SessionDetail({
 
   const overview = (
     <div className="detail-tabpanel" role="tabpanel" aria-label="Overview" hidden={tab !== 'overview'}>
+      {!isTask && (
+        <div className="ui-card detail-identity">
+          <span className="badge badge-kind">{sessionKindLabel(session)}</span>
+          <ul className="today-hero-facts" aria-label="When and where">
+            <li className="today-fact">
+              <IconCalendar />
+              <span>{formatLongDate(session.dateISO)}</span>
+            </li>
+            {session.start && (
+              <li className="today-fact">
+                <IconClock />
+                <span className="today-hero-time">
+                  {session.start}
+                  {session.end && session.end !== session.start ? `–${session.end}` : ''}
+                </span>
+              </li>
+            )}
+            {(loc.building || loc.raw) && (
+              <li className="today-fact today-fact-room">
+                <IconPin />
+                <span>
+                  {loc.building ? (
+                    <>
+                      <span className="today-hero-building">{loc.building}</span>
+                      {loc.room ? ' · ' : ''}
+                      {loc.room && <span className="today-hero-room-name">Room {loc.room}</span>}
+                    </>
+                  ) : loc.note === 'tbc' ? (
+                    'Room TBC — check nearer the time'
+                  ) : loc.note === 'booking-ref' ? (
+                    `Room not in the sheet yet (booking ref ${loc.raw})`
+                  ) : (
+                    loc.raw
+                  )}
+                </span>
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
       {session.isSpecialism && session.specialismName && (
         <span className="badge badge-specialism">Specialism · {session.specialismName}</span>
       )}
-      {session.isSelfStudy && <span className="badge badge-selfstudy">Self study</span>}
       {session.isOptional && <span className="badge badge-optional">Optional</span>}
       <dl className="detail-list">
         {rows.map(({ label, value }) => (
@@ -363,12 +397,12 @@ export function SessionDetail({
                   })
                 }}
               />
-              {geoStatus === 'working' && <p className="filter-hint">📍 Locating the school…</p>}
+              {geoStatus === 'working' && <p className="filter-hint">Locating the school…</p>}
               {geoStatus === 'fail' && (
                 <p className="filter-hint">Couldn't locate that address — try adding the postcode.</p>
               )}
               {(geoStatus === 'ok' || (geoStatus === null && schoolCoords)) && (
-                <p className="filter-hint">📍 Located — Travel & map now points at the school.</p>
+                <p className="filter-hint">Located — Travel & map now points at the school.</p>
               )}
               <input
                 type="text"
@@ -493,7 +527,7 @@ export function SessionDetail({
               title="Flag this record for the evidence review queue"
               onClick={() => onMeta({ reviewLater: meta?.reviewLater ? undefined : true })}
             >
-              {meta?.reviewLater ? '✓ Flagged: review later' : 'Review later'}
+              {meta?.reviewLater ? 'Flagged: review later' : 'Review later'}
             </button>
             <p className="filter-hint">{photos.length} photos available on this device.{(meta?.photos ?? 0) > photos.length ? ` ${(meta?.photos ?? 0) - photos.length} more recorded elsewhere; import a backup from that device to view them.` : ''}</p>
             <div className="photo-grid">
@@ -596,8 +630,8 @@ export function SessionDetail({
         ) : !origin ? (
           <span className="filter-hint">
             {locationEnabled
-              ? 'Waiting for a device fix — or pick a saved origin above. Address and directions work below.'
-              : 'Pick an origin above (location is off) — address and directions work below.'}
+              ? 'Waiting for a device fix — or choose a saved starting point below. The address and directions still work.'
+              : 'Location is off — choose a saved starting point below. The address and directions still work.'}
           </span>
         ) : journey.status === 'loading' ? (
           <span className="filter-hint">Planning the journey…</span>

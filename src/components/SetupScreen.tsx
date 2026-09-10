@@ -7,6 +7,7 @@ import { parseSheetUrl } from '../lib/sheetUrl'
 import { sessionInMembership } from '../../shared/membership.js'
 import type { Session } from '../types'
 import { activeCourse } from '../lib/course'
+import { IconBell, IconDownload, IconPin, IconRefresh, IconSchedule, IconSchool } from './ui'
 
 export interface SetupResult {
   url: string
@@ -25,13 +26,13 @@ interface Props {
   onCancel?: () => void
 }
 
-const FEATURES: { icon: string; title: string; text: string }[] = [
-  { icon: '🔄', title: 'Always up to date', text: 'Reads the sheet directly — edits appear on the next refresh, no re-import.' },
-  { icon: '📅', title: 'Day, week & month views', text: 'A clean agenda with your filters, clash warnings and free-slot finder.' },
-  { icon: '🔔', title: 'Smart reminders', text: 'Session, deadline and “time to leave” alerts — even with the app closed.' },
-  { icon: '🚇', title: 'Live travel times', text: 'TfL routes, departures and disruption warnings to every session.' },
-  { icon: '🏫', title: 'Placement-aware', text: 'School-experience blocks, day counting and directions to your school.' },
-  { icon: '📲', title: 'Installs like an app', text: 'Install it for offline access to saved timetables. Optional online features use external services.' },
+const FEATURES: { icon: JSX.Element; title: string; text: string }[] = [
+  { icon: <IconRefresh />, title: 'Always up to date', text: 'Reads the sheet directly — edits appear on the next refresh, no re-import.' },
+  { icon: <IconSchedule size={20} />, title: 'Day, week & month views', text: 'A clean agenda with your filters, clash warnings and free-slot finder.' },
+  { icon: <IconBell />, title: 'Smart reminders', text: 'Session, deadline and “time to leave” alerts — even with the app closed.' },
+  { icon: <IconPin size={20} />, title: 'Live travel times', text: 'TfL routes, departures and disruption warnings to every session.' },
+  { icon: <IconSchool />, title: 'Placement-aware', text: 'School-experience blocks, day counting and directions to your school.' },
+  { icon: <IconDownload />, title: 'Installs like an app', text: 'Install it for offline access to saved timetables. Optional online features use external services.' },
 ]
 
 interface Draft {
@@ -320,7 +321,7 @@ export function SetupScreen({ defaultName, onComplete, onDemo, onCancel }: Props
               Got a share link from a coursemate instead? Just open it — everything configures
               itself. ·{' '}
               <a href="https://ko-fi.com/awsaqib" target="_blank" rel="noopener noreferrer">
-                Support the app ☕
+                Support the app
               </a>
             </p>
           </>

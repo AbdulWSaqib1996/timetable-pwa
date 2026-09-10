@@ -141,7 +141,7 @@ export function SharedPhotosSheet({ profileId, profileName, sessions, onMeta, on
                     Photo · {Math.round(e.item.blob.size / 1024)} KB · shared {new Date(e.item.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <span className="change-meta">
-                    {e.status === 'pending' ? 'waiting' : e.status === 'saving' ? 'saving…' : e.status === 'saved' ? '✓ attached' : `failed: ${e.error} — kept in the inbox`}
+                    {e.status === 'pending' ? 'waiting' : e.status === 'saving' ? 'saving…' : e.status === 'saved' ? 'attached' : `failed: ${e.error} — kept in the inbox`}
                   </span>
                 </span>
                 {e.status !== 'saved' && (

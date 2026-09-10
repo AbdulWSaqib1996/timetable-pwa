@@ -1,6 +1,6 @@
 import { shortenRoom } from '../lib/format'
 import type { Session } from '../types'
-import { Card, Dialog, IconClose } from './ui'
+import { Card, Dialog, IconAlert, IconCheck, IconClose } from './ui'
 
 export type AttendanceAnswer = 'attended' | 'absent'
 
@@ -32,10 +32,10 @@ export function AttendancePromptSheet({ session, onAnswer, onOpen, onClose }: Co
       </p>
       <div className="modal-actions attendance-prompt-actions">
         <button type="button" className="btn-primary" onClick={() => onAnswer(session, 'attended')}>
-          ✓ Attended
+          <IconCheck /> Attended
         </button>
         <button type="button" className="btn-secondary" onClick={() => onAnswer(session, 'absent')}>
-          ✗ Absent
+          <IconAlert /> Absent
         </button>
         <button type="button" className="btn-ghost" onClick={() => onOpen(session)}>
           Open session
@@ -63,10 +63,10 @@ export function AttendancePromptCard({ session, onAnswer }: CommonProps) {
         </p>
         <div className="btn-row">
           <button type="button" className="btn-primary" onClick={() => onAnswer(session, 'attended')}>
-            ✓ Attended
+            <IconCheck /> Attended
           </button>
           <button type="button" className="btn-secondary" onClick={() => onAnswer(session, 'absent')}>
-            ✗ Absent
+            <IconAlert /> Absent
           </button>
         </div>
       </section>

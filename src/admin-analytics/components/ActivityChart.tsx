@@ -78,10 +78,10 @@ export function ActivityChart({ daily }: Props) {
       </div>
       </div>
       <p className="support" aria-hidden="true">
-        <span className="legend-dot" style={{ background: 'var(--success)', marginLeft: 0 }} />
-        new tokens
-        <span className="legend-dot" style={{ background: 'var(--accent)' }} />
-        returning
+        <span className="legend-dot" style={{ background: '#6fbfa5', marginLeft: 0 }} />
+        new tokens (light teal)
+        <span className="legend-dot" style={{ background: 'var(--success)' }} />
+        returning (dark teal)
       </p>
       <p className="chart-readout" role="status">
         {sel

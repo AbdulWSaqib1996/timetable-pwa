@@ -385,7 +385,7 @@ export function StatusMessage({
       <span>{children}</span>
       {onDismiss && (
         <button type="button" className="btn-icon" aria-label="Dismiss" onClick={onDismiss}>
-          ✕
+          <IconClose />
         </button>
       )}
     </div>

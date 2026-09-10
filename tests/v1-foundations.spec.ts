@@ -33,7 +33,7 @@ async function seed(page: Page, opts: { profiles?: { id: string; name: string; s
 }
 
 // Metadata classes the audit allows at 12–13 px (brief labels, dense calendar labels).
-const METADATA = ['change-meta', 'kd-chip', 'badge', 'today-hero-label', 'week-strip-dow', 'week-strip-num', 'session-end', 'room-chip', 'free-gap', 'week-badge', 'bell-badge', 'search-count', 'filter-count', 'month-cell', 'week-event', 'chip-small', 'kd-status', 'nav-item', 'attention-dot', 'day-header', 'month-dow', 'month-keydate', 'plan-week-day', 'find-result-head', 'find-result-kind', 'find-result-date', 'week-group', 'session-end']
+const METADATA = ['change-meta', 'kd-chip', 'badge', 'today-hero-label', 'week-strip-dow', 'week-strip-num', 'session-end', 'room-chip', 'free-gap', 'week-badge', 'bell-badge', 'search-count', 'filter-count', 'month-cell', 'week-event', 'chip-small', 'kd-status', 'nav-item', 'attention-dot', 'day-header', 'month-dow', 'month-keydate', 'plan-week-day', 'find-result-head', 'find-result-kind', 'find-result-date', 'week-group', 'session-end', 'shell-profile', 'session-panel-kicker', 'stat-small', 'subject-count-nums']
 
 async function walk(page: Page) {
   return page.evaluate((metadata) => {
@@ -72,7 +72,7 @@ async function walk(page: Page) {
   }, METADATA)
 }
 
-const SCREENS = ['today', 'schedule', 'tasks', 'pgce', 'settings', 'settings/data', 'settings/reminders', 'settings/travel', 'find']
+const SCREENS = ['today', 'schedule', 'tasks', 'pgce', 'settings', 'settings/timetable', 'settings/data', 'settings/reminders', 'settings/travel', 'settings/calendars', 'settings/appearance', 'settings/help', 'find', 'home']
 
 test('V-01/V-03: on every primary screen at 390px no ordinary control is under 44px and no ordinary text is under 14px', async ({ page }) => {
   test.setTimeout(120_000)

@@ -1181,3 +1181,19 @@ Automated checks + results: new `tests/v4-pgce-admin.spec.ts` (4): PGCE empty (t
 Known limits: the admin pages other than Overview keep their existing card content (they inherit the new type, badge and notice styles); the adoption table and reliability charts are untouched beyond palette; PGCE record sheets (AdminSheet, journal, binder) are not restyled here.
 
 Released 10 September 2026: merge `e0232a1`, CI run 34528741406 success, `deploy.sh verify` six PASS. No worker change.
+
+### Pass 62 — Gap closure after the owner's check of V0–V4 — 10 September 2026
+
+Work items: the owner reported that not every change the visual audit asked for was visible ("settings once you drill into them are unchanged, the map detail view is unchanged"). A scripted sweep captured 68 screens (every route, every Settings sub-page, session detail overview/travel, journey home, every reachable sheet, all admin pages at two widths) and ran the V1 measurement walk on each; the findings and their status are in `visual-ui-audit-2026-09-10/GAP_AUDIT_2026-09-10.md`. Branch `visual-gaps`, client only; no `shared/` or worker change.
+
+Behaviour before → after (G1–G7 in the gap audit):
+- **Settings sub-pages** (My timetable, Travel & home, Connected calendars, Appearance, Help & privacy) — flat 14px headings, long paragraphs and emoji copy → card sections with 18px headings and 14px copy, the current state beside each heading (timetables on this device, specialisms chosen, location on/off + mode, home set, feed availability, export counts, theme, density), the long "what is sent" copy behind a 44px disclosure, emoji removed, Study group with a line icon.
+- **Session detail** — Overview now opens with an identity card (kind badge, calendar/clock/pin rows); the details list keeps Duration, Room name, Tutor, Subject, Groups.
+- **Travel & journey home copy** — "pick a saved origin above" → "choose a saved starting point below" (the control follows the status); `audit-r2` TT-17 updated.
+- **Emoji removed across the learner app** — PGCE file (overview rows, title, target statuses, Add a document), evidence journal (kind markers become badges, photo counts in words), task editor status chips, Filters, Month view pins, Agenda break/placement rows, Setup feature tiles, backup/journey warnings, attendance quick-answer buttons (`Attended` / `Absent` with icons), the static-map pin (SVG). Weather glyphs stay as forecast data. `notifications-quick`, `phase-five` and `admin-a4` use the new names.
+- **Measured follow-ups** — 44px urgent chip and week label, 13px kicker/profile line, 16px note/caption/placement inputs, 13px Term-stats captions; admin table headers 14px, sort controls 36px, Refresh 44px, brand sub-line 13px, picker label 14px, chart legend matching the bar colours, context-card heads left-aligned.
+- **Deployment note** for the owner's observation: the live main bundle already carried the V3 travel panel; a device that had the app open keeps the previous service-worker build until the app is closed and reopened.
+
+Automated checks + results: new `tests/gap-closure.spec.ts` (3): sub-page cards/headings/state/disclosure/no emoji, identity card + travel wording, a whole-app emoji scan across nine routes and six sheets. `tests/v1-foundations.spec.ts` now measures 14 screens. `npm run validate` AND `VERCEL=1 npm run validate` green — **161 unit and 138 browser tests**.
+
+Known limits: admin table sort controls stay at 36px by design (compact table headers); the What's new list keeps its wording without emoji; the audit's V5 (matrix captures + archive) follows as Pass 63.

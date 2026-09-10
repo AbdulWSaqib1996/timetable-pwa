@@ -3,6 +3,7 @@ import type { Itinerary } from '../../shared/journey.js'
 import { formatRemaining } from '../lib/format'
 import { tflLineColor, tflModeIcon } from '../lib/tfl'
 import type { TflDepartures, TflDisruption } from '../lib/tfl'
+import { IconAlert, IconClock } from './ui'
 
 interface Props {
   itinerary: Itinerary
@@ -78,10 +79,10 @@ export function ItinerarySteps({ itinerary, legDeps, disruptions, showTimes = fa
                   {leg.from} → {leg.to}
                 </span>
               )}
-              {times && <span className="route-step-deps">🕓 {times}</span>}
+              {times && <span className="route-step-deps"><IconClock size={14} /> {times}</span>}
               {legDeps[i] && (
                 <span className="route-step-deps">
-                  🕐 {legDeps[i].mins.map((m) => (m === 0 ? 'due' : `${m}m`)).join(', ')} · {legDeps[i].stop}
+                  <IconClock size={14} /> {legDeps[i].mins.map((m) => (m === 0 ? 'due' : `${m}m`)).join(', ')} · {legDeps[i].stop}
                   {legDeps[i].towards ? ` towards ${legDeps[i].towards}` : ''}
                   <span className="route-live"> · live</span>
                 </span>
@@ -89,12 +90,12 @@ export function ItinerarySteps({ itinerary, legDeps, disruptions, showTimes = fa
               {/* Disruptions sit WITH the leg they affect (P6-03). */}
               {leg.disruptions.map((d, j) => (
                 <span className="route-warning route-leg-warning" key={`d${j}`}>
-                  ⚠ {d}
+                  <IconAlert size={14} /> {d}
                 </span>
               ))}
               {lineWarnings.map((d) => (
                 <span className="route-warning route-leg-warning" key={`l${d.line}`}>
-                  ⚠ {d.line}: {d.status}
+                  <IconAlert size={14} /> {d.line}: {d.status}
                 </span>
               ))}
             </span>
