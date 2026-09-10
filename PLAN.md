@@ -1197,3 +1197,5 @@ Behaviour before → after (G1–G7 in the gap audit):
 Automated checks + results: new `tests/gap-closure.spec.ts` (3): sub-page cards/headings/state/disclosure/no emoji, identity card + travel wording, a whole-app emoji scan across nine routes and six sheets. `tests/v1-foundations.spec.ts` now measures 14 screens. `npm run validate` AND `VERCEL=1 npm run validate` green — **161 unit and 138 browser tests**.
 
 Known limits: admin table sort controls stay at 36px by design (compact table headers); the What's new list keeps its wording without emoji; the audit's V5 (matrix captures + archive) follows as Pass 63.
+
+Released 10 September 2026: merge `017c0bf`, CI run 34533058288 success, `deploy.sh verify` six PASS. No worker change.
