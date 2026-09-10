@@ -1238,3 +1238,5 @@ Behaviour before → after (`src/lib/sync.ts`):
 Automated checks + results: `tests/sync-devices.spec.ts` gains two tests — (1) device B with its own profile id and its own note adopts device A's profile, sees A's mark in its active timetable without a reload, keeps its note, deletes its old keys, and A ends with one profile carrying B's note; (2) a device already holding the same real sheet twice folds to the earliest id with a tombstone and merged records. `npm run validate` AND `VERCEL=1 npm run validate` green — **161 unit and 140 browser tests**.
 
 Known limits: two different real sheets stay separate profiles by design; a timetable set up from the same sheet but a different tab (gid) is treated as a different timetable.
+
+Released 10 September 2026: merge `023264c`, CI run 34536830361 success, `deploy.sh verify` six PASS. No worker change.
