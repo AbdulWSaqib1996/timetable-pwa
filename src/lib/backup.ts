@@ -6,7 +6,7 @@ import { prepareWallet, type WalletExport } from './wallet'
 import { restoreWithRecovery } from './recovery'
 import { deviceSettings } from '../../shared/merge.js'
 export interface Backup {
-  version: number; store: ProfileStore; meta?: Record<string, MetaMap>; admin?: Record<string, unknown>
+  version: number; exportedAt?: string; store: ProfileStore; meta?: Record<string, MetaMap>; admin?: Record<string, unknown>
   cache?: Record<string, CachedData>; changes?: Record<string, SessionChange[]>; photos?: PhotoExport[]; wallet?: WalletExport[]
 }
 export function validateBackup(text: string): Backup {
@@ -56,14 +56,76 @@ export function backupSummary(data: Backup): BackupSummary {
     wallet: data.wallet?.length ?? 0,
   }
 }
+export type SectionEffect = 'replace' | 'replace-with-empty' | 'keep-absent'
+export interface RestoreImpact {
+  exportedAt: string | null
+  version: number
+  profiles: {
+    id: string
+    name: string
+    status: 'new' | 'existing'
+    sections: Record<'meta' | 'admin' | 'cache' | 'changes', SectionEffect>
+    attachments: { incoming: number; alreadyPresent: number }
+    /** local records edited after the backup was created would be replaced */
+    newerLocalEdits: boolean
+  }[]
+  /** profiles on this device that the backup does not mention — kept untouched */
+  unrelatedKept: string[]
+}
+
+/**
+ * What a restore will actually do to THIS device (FA-07): per profile, which
+ * sections the file replaces, which it replaces with an explicitly empty set,
+ * and which it does not mention (kept). Attachments merge by identity.
+ * Computed for the preview and re-validated inside the recovery lock.
+ */
+export function restoreImpact(data: Backup, local: ProfileStore | null, localMeta: (pid: string) => MetaMap, localAdmin: (pid: string) => Record<string, unknown[]> | null, existingAttachmentUids: Set<string>): RestoreImpact {
+  const exportedAt = typeof data.exportedAt === 'string' ? data.exportedAt : null
+  const exportedMs = exportedAt ? Date.parse(exportedAt) : NaN
+  const effect = (group: 'meta' | 'admin' | 'cache' | 'changes', pid: string): SectionEffect => {
+    const section = (data[group] as Record<string, unknown> | undefined)?.[pid]
+    if (section === undefined) return 'keep-absent'
+    const empty = Array.isArray(section) ? section.length === 0 : section && typeof section === 'object' ? Object.values(section as Record<string, unknown>).every((v) => (Array.isArray(v) ? v.length === 0 : !v)) : false
+    return empty ? 'replace-with-empty' : 'replace'
+  }
+  const profiles = data.store.profiles.map((p) => {
+    const mine = local?.profiles.find((x) => x.id === p.id)
+    const attachments = [...(data.photos ?? []), ...(data.wallet ?? [])].filter((f) => f.owner.split('|')[0] === p.id)
+    const alreadyPresent = attachments.filter((f) => f.uid && existingAttachmentUids.has(f.uid)).length
+    let newerLocalEdits = false
+    if (mine && Number.isFinite(exportedMs)) {
+      const metaAts = Object.values(localMeta(p.id)).map((m) => m.at ?? 0)
+      const adminAts = Object.values(localAdmin(p.id) ?? {}).flatMap((rows) => (Array.isArray(rows) ? rows.map((r) => Number((r as { at?: number }).at) || 0) : []))
+      newerLocalEdits = [...metaAts, ...adminAts].some((at) => at > exportedMs)
+    }
+    return {
+      id: p.id,
+      name: p.name,
+      status: mine ? ('existing' as const) : ('new' as const),
+      sections: { meta: effect('meta', p.id), admin: effect('admin', p.id), cache: effect('cache', p.id), changes: effect('changes', p.id) },
+      attachments: { incoming: attachments.length, alreadyPresent },
+      newerLocalEdits,
+    }
+  })
+  const incoming = new Set(data.store.profiles.map((p) => p.id))
+  return { exportedAt, version: data.version, profiles, unrelatedKept: (local?.profiles ?? []).filter((p) => !incoming.has(p.id)).map((p) => p.name) }
+}
+
 export function backupPreview(data: Backup): string {
   const records = Object.values(data.meta ?? {}).reduce((n, m) => n + Object.keys(m).length, 0)
   const events = Object.values(data.cache ?? {}).reduce((n,c) => n + c.sessions.length + (c.keyDates?.length ?? 0), 0)
   return `Restore ${data.store.profiles.length} profile(s): ${data.store.profiles.map(p => p.name).join(', ')}\n${records} session records, ${events} cached events, ${data.photos?.length ?? 0} photos, ${data.wallet?.length ?? 0} wallet files.\nMatching profiles and records will be replaced. Other profiles stay on this device. Attachments are merged without duplicates.\n${data.version < 4 ? 'This older backup has no complete event history. ' : ''}Export a current backup first if you want a separate undo copy.`
 }
-export async function restoreBackup(data: Backup): Promise<void> {
+export async function restoreBackup(data: Backup, expected?: RestoreImpact): Promise<void> {
   await restoreWithRecovery(async () => {
     const local = JSON.parse(localStorage.getItem('timetable.store.v2') ?? 'null') as ProfileStore | null
+    // The previewed plan must still hold inside the lock (FA-07): same
+    // profiles, same section effects, same unrelated profiles kept.
+    if (expected) {
+      const now = restoreImpact(data, local, () => ({}), () => null, new Set())
+      const shape = (i: RestoreImpact) => JSON.stringify({ p: i.profiles.map((p) => [p.id, p.status, p.sections]), u: i.unrelatedKept })
+      assert(shape(now) === shape(expected), 'This device changed while the preview was open. Reopen the backup to see the current effect.')
+    }
     const incoming = new Set(data.store.profiles.map(p => p.id))
     // Device-local settings (push, location, theme, reminders, cloud-backup
     // bookkeeping…) belong to THIS device: a restore brings records back, it

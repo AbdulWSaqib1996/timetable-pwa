@@ -82,3 +82,79 @@ test('provider errors and redirects fail without leaking response bodies or chan
   const res=await f.call('/test-device',{subscription:f.A.subscription})
   assert.equal(res.status,502);assert.doesNotMatch(await res.text(),/sensitive-provider-detail|127\.0/)
 })
+
+// ---------- FA-03: attendance answers are authoritative per profile and course day ----------
+import { applyAttendanceReport, attendanceMarksFor, normalizeAttendance } from '../../workers/push/worker.js'
+
+test('attendance report: mark, clear, stale revision, unrelated profile and old-day expiry', () => {
+  const now = Date.parse('2026-09-07T16:40:00Z')
+  const rec = { config: { profileId: 'a' } }
+  const k = '2026-09-07|14:30|maths 1'
+  let r = applyAttendanceReport(rec, { profileId: 'a', day: '2026-09-07', rev: 1, keys: [k] }, now)
+  assert.equal(r.status, 'applied')
+  rec.attendance = r.attendance
+  assert.ok(attendanceMarksFor(rec, 'a', '2026-09-07', now).has(k))
+  assert.equal(attendanceMarksFor(rec, 'b', '2026-09-07', now).size, 0)
+  // Clearing the answer makes the session promptable again (reversible).
+  r = applyAttendanceReport(rec, { profileId: 'a', day: '2026-09-07', rev: 2, keys: [] }, now)
+  assert.equal(r.status, 'applied')
+  rec.attendance = r.attendance
+  assert.equal(attendanceMarksFor(rec, 'a', '2026-09-07', now).size, 0)
+  // A stale snapshot (older revision) is rejected and changes nothing.
+  r = applyAttendanceReport(rec, { profileId: 'a', day: '2026-09-07', rev: 1, keys: [k] }, now)
+  assert.equal(r.status, 'stale')
+  assert.equal(r.rev, 2)
+  // Same revision, same keys → unchanged (no write needed).
+  r = applyAttendanceReport(rec, { profileId: 'a', day: '2026-09-07', rev: 2, keys: [] }, now)
+  assert.equal(r.status, 'unchanged')
+  // Another profile's marks are kept independently.
+  r = applyAttendanceReport(rec, { profileId: 'b', day: '2026-09-07', rev: 1, keys: ['2026-09-07|09:00|ps1'] }, now)
+  rec.attendance = r.attendance
+  assert.ok(attendanceMarksFor(rec, 'b', '2026-09-07', now).has('2026-09-07|09:00|ps1'))
+  assert.equal(attendanceMarksFor(rec, 'a', '2026-09-07', now).size, 0)
+  // Old days expire on normalisation (two-day retention).
+  rec.attendance.a['2026-09-01'] = { rev: 1, keys: ['2026-09-01|09:00|old'] }
+  assert.equal(normalizeAttendance(rec, now).a['2026-09-01'], undefined)
+})
+
+test('attendance report: legacy union-style marks migrate into the subscription profile by their key date, else expire', () => {
+  const now = Date.parse('2026-09-07T16:40:00Z')
+  const rec = { config: { profileId: 'a' }, marks: { '2026-09-07|14:30|maths 1': now - 3600_000, '2026-09-01|09:00|old': now - 6 * 86400_000 } }
+  const a = normalizeAttendance(rec, now)
+  assert.deepEqual(a.a['2026-09-07'], { rev: 0, keys: ['2026-09-07|14:30|maths 1'] })
+  assert.equal(a.a['2026-09-01'], undefined)
+  // No profile on the subscription → nothing can be attributed; the legacy marks expire.
+  assert.deepEqual(normalizeAttendance({ marks: rec.marks }, now), {})
+})
+
+test('/attendance endpoint: validates the snapshot contract, rejects stale reports with 409, skips unchanged writes, migrates legacy marks', async (t) => {
+  const f = await fixture(t)
+  const key = await subKey(f.A.subscription.endpoint)
+  const rec = JSON.parse(f.data.get(key))
+  rec.config.profileId = 'a'
+  // The endpoint runs on the real clock and keeps two days: use today's course date.
+  const day = new Date().toISOString().slice(0, 10)
+  rec.marks = { [`${day}|09:00|ps1`]: Date.now() - 60_000 }
+  f.data.set(key, JSON.stringify(rec))
+  const good = { v: 2, endpoint: f.A.subscription.endpoint, profileId: 'a', day, rev: 1, keys: [`${day}|14:30|maths 1`] }
+  assert.equal((await f.call('/attendance', { ...good, v: 1 })).status, 400) // old contract
+  assert.equal((await f.call('/attendance', { ...good, keys: ['1999-01-01|09:00|x'] })).status, 400) // key outside the day
+  assert.equal((await f.call('/attendance', { ...good, endpoint: 'https://fcm.googleapis.com/fcm/send/unknown' })).status, 404)
+  let res = await f.call('/attendance', good)
+  assert.equal(res.status, 200)
+  assert.deepEqual(await res.json(), { ok: true, rev: 1 })
+  let stored = JSON.parse(f.data.get(key))
+  assert.equal(stored.marks, undefined) // migrated
+  assert.deepEqual(stored.attendance.a[day].keys, [`${day}|14:30|maths 1`]) // the snapshot is authoritative
+  const writes = f.writes.length
+  res = await f.call('/attendance', good)
+  assert.deepEqual(await res.json(), { ok: true, skipped: true, rev: 1 })
+  assert.equal(f.writes.length, writes) // unchanged → no KV write
+  res = await f.call('/attendance', { ...good, rev: 0, keys: [] })
+  assert.equal(res.status, 409)
+  assert.equal((await res.json()).rev, 1)
+  res = await f.call('/attendance', { ...good, rev: 2, keys: [] })
+  assert.equal(res.status, 200)
+  stored = JSON.parse(f.data.get(key))
+  assert.deepEqual(stored.attendance.a[day].keys, [])
+})

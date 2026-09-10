@@ -32,7 +32,8 @@ import { WHATSNEW } from '../lib/changelog'
 import { IconBack, PageHeader } from './ui'
 import { BackupSheet, RestoreSheet } from './BackupSheets'
 import { CloudBackupsSection } from './CloudBackupsSection'
-import { lastBackupAt } from '../lib/storage'
+import { backupCoverage, lastBackupAt } from '../lib/storage'
+import { attendanceReportPending } from '../hooks/useNotifications'
 import { listDrafts } from '../lib/draftIndex'
 import { hasPendingSaves, persistenceFailure } from '../lib/persistence'
 import { readAttachments } from '../lib/attachments'
@@ -938,7 +939,7 @@ export function SettingsSheet({
             ))}
           </ul>
           <h3 className="subheading" id="quiet-hours" tabIndex={-1}>Quiet hours</h3>
-          <p className="filter-hint">No notifications during these hours (in-app and push).</p>
+          <p className="filter-hint">No notifications during these hours (in-app and push), in course time ({courseZone()}) — the same clock as your sessions.</p>
           <div className="chip-grid">
             {(
               [
@@ -1025,6 +1026,15 @@ export function SettingsSheet({
             (a card on Today offers the same two answers for a session that just ended). A session
             you have already answered is never asked. Works in the background too when push is enabled.
           </p>
+          {(() => {
+            const pending = attendanceReportPending()
+            return pending ? (
+              <p className="filter-hint" role="status">
+                Attendance answers for {pending.day} have not been confirmed by the push server yet ({pending.reason}); the app keeps
+                retrying, and a background prompt for an already-answered session is possible until it succeeds.
+              </p>
+            ) : null
+          })()}
         </section>
 
 
@@ -1513,6 +1523,20 @@ export function SettingsSheet({
                 {lastBackupAt()
                   ? `${new Date(lastBackupAt()!).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} — generated here; only you can confirm the file was kept`
                   : 'never on this device'}
+              </span>
+            </li>
+            <li>
+              <span>Backup coverage by timetable</span>
+              <span className="notif-state">
+                {(() => {
+                  const coverage = backupCoverage(store.profiles.map((p) => p.id))
+                  return store.profiles
+                    .map((p) => {
+                      const c = coverage[p.id]
+                      return `${p.name}: ${c === null ? 'not yet included' : c === 'unknown' ? 'scope unknown (older backup)' : `included ${new Date(c.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${c.kind === 'cloud' ? ' (cloud)' : ''}`}`
+                    })
+                    .join(' · ')
+                })()}
               </span>
             </li>
             <li>

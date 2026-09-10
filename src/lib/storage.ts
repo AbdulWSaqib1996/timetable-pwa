@@ -188,23 +188,61 @@ export async function exportBackup(scope: ExportScope = {}): Promise<string> {
 }
 
 /** Validate and restore with a durable undo journal. Errors are shown by the caller. */
-export async function importBackup(text: string): Promise<boolean> {
+export async function importBackup(text: string, expected?: import('./backup').RestoreImpact): Promise<boolean> {
   const { validateBackup, restoreBackup } = await import('./backup')
-  await restoreBackup(validateBackup(text))
+  await restoreBackup(validateBackup(text), expected)
   return true
 }
 
 /* ---------- backup nudge bookkeeping ---------- */
 const BACKUP_KEY = 'timetable.backup.v1'
 
-/** When a backup file was last GENERATED on this device (never proof it was kept). */
-export function lastBackupAt(): number | null {
-  return readJSON<{ lastBackupAt?: number }>(BACKUP_KEY)?.lastBackupAt ?? null
+interface BackupBookkeeping {
+  /** legacy single timestamp — scope unknown */
+  lastBackupAt?: number
+  lastNudgeAt?: number
+  /** bounded history of successful GENERATIONS with their explicit scope (FA-06) */
+  history?: { at: number; profiles: string[]; all: boolean; kind: 'file' | 'cloud' }[]
 }
 
-export function markBackedUp(): void {
-  const state = readJSON<{ lastBackupAt?: number; lastNudgeAt?: number }>(BACKUP_KEY) ?? {}
-  writeJSON(BACKUP_KEY, { ...state, lastBackupAt: Date.now() })
+/** When a backup file was last GENERATED on this device (never proof it was kept). */
+export function lastBackupAt(): number | null {
+  const state = readJSON<BackupBookkeeping>(BACKUP_KEY)
+  const fromHistory = state?.history?.[0]?.at
+  return fromHistory ?? state?.lastBackupAt ?? null
+}
+
+/**
+ * Record a successful backup GENERATION with its exact scope. A scoped export
+ * covers only the profiles it included; a new profile is not covered by an
+ * earlier "everything" export because it did not exist in it.
+ */
+export function markBackedUp(scope: { profiles: string[]; all: boolean; kind?: 'file' | 'cloud' }): void {
+  const state = readJSON<BackupBookkeeping>(BACKUP_KEY) ?? {}
+  const entry = { at: Date.now(), profiles: [...scope.profiles], all: scope.all, kind: scope.kind ?? 'file' }
+  writeJSON(BACKUP_KEY, { ...state, lastBackupAt: entry.at, history: [entry, ...(state.history ?? [])].slice(0, 20) })
+  try {
+    window.dispatchEvent(new Event(BACKUP_GENERATED_EVENT))
+  } catch {
+    /* non-browser */
+  }
+}
+export const BACKUP_GENERATED_EVENT = 'timetable-backup-generated'
+
+export type BackupCoverage = { at: number; kind: 'file' | 'cloud' } | 'unknown' | null
+
+/**
+ * Per-profile coverage: the newest generation that included the profile;
+ * `'unknown'` when only a legacy (scope-less) timestamp exists; null never.
+ */
+export function backupCoverage(profileIds: string[]): Record<string, BackupCoverage> {
+  const state = readJSON<BackupBookkeeping>(BACKUP_KEY) ?? {}
+  const out: Record<string, BackupCoverage> = {}
+  for (const pid of profileIds) {
+    const hit = (state.history ?? []).find((h) => h.profiles.includes(pid))
+    out[pid] = hit ? { at: hit.at, kind: hit.kind } : state.lastBackupAt ? 'unknown' : null
+  }
+  return out
 }
 
 export function snoozeBackupNudge(): void {
@@ -212,15 +250,24 @@ export function snoozeBackupNudge(): void {
   writeJSON(BACKUP_KEY, { ...state, lastNudgeAt: Date.now() })
 }
 
-/** Show the nudge when there's meaningful local data and no backup for 30 days. */
-export function shouldNudgeBackup(hasData: boolean): boolean {
+/**
+ * Show the nudge when there's meaningful local data and ANY profile has not
+ * been included in a generated backup for 30 days (a legacy scope-less
+ * timestamp counts as unknown, not as coverage). Snoozed for a week.
+ */
+export function shouldNudgeBackup(hasData: boolean, profileIds: string[] = []): boolean {
   if (!hasData) return false
-  const state = readJSON<{ lastBackupAt?: number; lastNudgeAt?: number }>(BACKUP_KEY) ?? {}
+  const state = readJSON<BackupBookkeeping>(BACKUP_KEY) ?? {}
   const month = 30 * 24 * 3600 * 1000
   const week = 7 * 24 * 3600 * 1000
-  if (state.lastBackupAt && Date.now() - state.lastBackupAt < month) return false
   if (state.lastNudgeAt && Date.now() - state.lastNudgeAt < week) return false
-  return true
+  const coverage = backupCoverage(profileIds)
+  const uncovered = profileIds.filter((pid) => {
+    const c = coverage[pid]
+    return !(c && c !== 'unknown' && Date.now() - c.at < month)
+  })
+  if (profileIds.length === 0) return !(state.lastBackupAt && Date.now() - state.lastBackupAt < month)
+  return uncovered.length > 0
 }
 
 /** Reminder bookkeeping: sessionKey → timestamp notified. */

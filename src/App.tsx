@@ -2,7 +2,7 @@ import { SyncNotice } from './components/SyncNotice'
 import { DATA_CHANGED_EVENT } from './lib/persistence'
 import { SYNC_APPLIED_EVENT, setSyncStatus } from './lib/sync'
 import { reportPersistenceFailure } from './lib/persistence'
-import { markBackedUp } from './lib/storage'
+import { BACKUP_GENERATED_EVENT, markBackedUp } from './lib/storage'
 import { PersistenceNotice } from './components/PersistenceNotice'
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
@@ -70,6 +70,8 @@ import { FindPage } from './features/find/FindPage'
 import type { FindResult } from './features/find/FindPage'
 import { PlanWeekSheet } from './components/PlanWeekSheet'
 import { AttendancePromptSheet } from './components/AttendancePrompt'
+import { SharedPhotosSheet } from './components/SharedPhotosSheet'
+import { listSharedPhotos } from './lib/shareTarget'
 import type { BusyInterval, PlanPrefill } from './components/PlanWeekSheet'
 import type { BlockPrefill } from './components/WorkPlanSection'
 import { toMins } from '../shared/intervals.js'
@@ -439,9 +441,13 @@ export default function App() {
 
   // Monthly backup nudge: notes/attendance/photos exist only on this device.
   useEffect(() => {
-    setShowBackupNudge(shouldNudgeBackup(Object.keys(metaMap).length > 0))
+    const evaluate = () => setShowBackupNudge(shouldNudgeBackup(Object.keys(metaMap).length > 0, (store?.profiles ?? []).map((p) => p.id)))
+    evaluate()
+    // A generated backup (file or cloud, any scope) re-evaluates coverage at once.
+    window.addEventListener(BACKUP_GENERATED_EVENT, evaluate)
+    return () => window.removeEventListener(BACKUP_GENERATED_EVENT, evaluate)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active?.id, Object.keys(metaMap).length > 0])
+  }, [active?.id, Object.keys(metaMap).length > 0, store?.profiles.length])
 
   // Cohort notices: a Date/Message/Link tab rendered as dismissible banners.
   useEffect(() => {
@@ -976,36 +982,22 @@ export default function App() {
       history.replaceState(null, '', window.location.pathname)
     }
   }, [])
+  // Shared photos wait in a durable inbox (FA-05): the sheet opens when the
+  // share-target landed here AND whenever pending items exist at launch, so
+  // an interrupted intake is never lost. Nothing is attached automatically.
+  const [sharedInbox, setSharedInbox] = useState(false)
   useEffect(() => {
-    if (!pendingShare || !active || courseSessions.length === 0) return
-    setPendingShare(false)
-    void (async () => {
-      const { getAndClearSharedPhotos } = await import('./lib/shareTarget')
-      const blobs = await getAndClearSharedPhotos()
-      if (blobs.length === 0) return
-      const now = new Date()
-      const nowMins = now.getHours() * 60 + now.getMinutes()
-      // Today's latest already-started session; else the most recent past session.
-      const started = courseSessions.filter((s) => {
-        if (s.isKeyDate || s.isSelfStudy) return false
-        if (s.dateISO < todayISO) return true
-        if (s.dateISO !== todayISO || !s.start) return false
-        const m = s.start.match(/^(\d{1,2}):(\d{2})$/)
-        return m !== null && Number(m[1]) * 60 + Number(m[2]) <= nowMins
-      })
-      const target = started[started.length - 1]
-      if (!target) return
-      const { addPhoto, compressImage } = await import('./lib/photos')
-      const key = sessionKey(target)
-      for (const blob of blobs) {
-        await addPhoto(active.id, key, await compressImage(new File([blob], 'shared.jpg', { type: blob.type || 'image/jpeg' })))
-        telemetryTrack('evidence_photo_saved')
-      }
-      handleMeta(target, { photos: (metaMap[key]?.photos ?? 0) + blobs.length })
-      openSession(target)
-    })()
+    if (!active || sessions === null) return
+    if (pendingShare) {
+      setPendingShare(false)
+      setSharedInbox(true)
+      return
+    }
+    void listSharedPhotos().then((items) => {
+      if (items.length > 0) setSharedInbox(true)
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingShare, active?.id, courseSessions.length])
+  }, [pendingShare, active?.id, sessions === null])
 
   const { coords, coordsAt, tubeStatus, locationEnabled, travelMode } = useTravel(settings, courseSessions, todayISO)
 
@@ -1222,7 +1214,7 @@ export default function App() {
               type="button"
               className="btn-secondary"
               onClick={() => {
-                void exportBackup().then((json) => { downloadFile('my-timetable-backup.json', json, 'application/json'); markBackedUp() }).catch(error => reportPersistenceFailure('Backup export failed: ' + String(error)))
+                void exportBackup().then((json) => { downloadFile('my-timetable-backup.json', json, 'application/json'); markBackedUp({ profiles: (store?.profiles ?? []).map((p) => p.id), all: true }) }).catch(error => reportPersistenceFailure('Backup export failed: ' + String(error)))
                 setShowBackupNudge(false)
               }}
             >
@@ -1672,6 +1664,17 @@ export default function App() {
           todayISO={todayISO}
           onUpdateSettings={updateSettings}
           onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {sharedInbox && active && (
+        <SharedPhotosSheet
+          profileId={active.id}
+          profileName={active.name}
+          sessions={courseSessions}
+          onMeta={handleMeta}
+          onOpenSession={openSession}
+          onClose={() => setSharedInbox(false)}
         />
       )}
 

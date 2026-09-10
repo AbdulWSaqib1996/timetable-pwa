@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { MIN_PASSPHRASE_LENGTH, isEnvelope, openBackup, sealBackup } from '../../shared/backupEnvelope.js'
-import { backupSummary, validateBackup } from '../lib/backup'
-import type { BackupSummary } from '../lib/backup'
+import { backupSummary, restoreImpact, validateBackup } from '../lib/backup'
+import type { BackupSummary, RestoreImpact } from '../lib/backup'
+import { readAttachments, attachmentUid } from '../lib/attachments'
+import { loadAdminFile } from '../lib/admin'
+import { loadMeta, loadStore } from '../lib/storage'
 import { downloadFile } from '../lib/files'
 import { reportPersistenceFailure } from '../lib/persistence'
 import { exportBackup, importBackup, markBackedUp } from '../lib/storage'
@@ -78,7 +81,7 @@ export function BackupSheet({ store, onClose }: { store: ProfileStore; onClose: 
       const name = `my-timetable-backup-${stamp}${scope === 'active' && active ? `-${active.name.replace(/[^\w-]+/g, '_').slice(0, 30)}` : ''}${encrypt ? '.encrypted' : ''}.json`
       const text = encrypt ? await sealBackup(json, pass) : json
       downloadFile(name, text, 'application/json')
-      markBackedUp()
+      markBackedUp({ profiles: scope === 'active' && active ? [active.id] : store.profiles.map((p) => p.id), all: scope === 'all' })
       setDone({ name, size: sizeOf(text), encrypted: encrypt })
     } catch (e) {
       reportPersistenceFailure('Backup export failed: ' + String(e))
@@ -169,6 +172,7 @@ export function RestoreSheet({ text, passphrase, onClose, onRestored }: { text: 
   const [pass, setPass] = useState(passphrase ?? '')
   const [plain, setPlain] = useState<string | null>(encrypted ? null : text)
   const [summary, setSummary] = useState<BackupSummary | null>(null)
+  const [impact, setImpact] = useState<RestoreImpact | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
 
@@ -180,12 +184,25 @@ export function RestoreSheet({ text, passphrase, onClose, onRestored }: { text: 
   }, [])
   useEffect(() => {
     if (plain === null) return
+    let live = true
     try {
-      setSummary(backupSummary(validateBackup(plain)))
+      const data = validateBackup(plain)
+      setSummary(backupSummary(data))
       setError(null)
+      // Impact plan (FA-07): computed against THIS device's data.
+      void (async () => {
+        const uids = new Set<string>()
+        for (const kind of ['photos', 'wallet'] as const) for (const a of await readAttachments(kind).catch(() => [])) uids.add(await attachmentUid(a))
+        if (!live) return
+        setImpact(restoreImpact(data, loadStore(), loadMeta, (pid) => loadAdminFile(pid) as unknown as Record<string, unknown[]>, uids))
+      })()
     } catch (e) {
       setSummary(null)
+      setImpact(null)
       setError('This file is not a usable backup: ' + String(e))
+    }
+    return () => {
+      live = false
     }
   }, [plain])
 
@@ -212,7 +229,7 @@ export function RestoreSheet({ text, passphrase, onClose, onRestored }: { text: 
     setWorking(true)
     setError(null)
     try {
-      await importBackup(plain)
+      await importBackup(plain, impact ?? undefined)
       onRestored()
     } catch (e) {
       setError('Restore did not finish: ' + String(e))
@@ -251,6 +268,33 @@ export function RestoreSheet({ text, passphrase, onClose, onRestored }: { text: 
             {summary.version < 4 ? ' This older backup has no complete event history.' : ''}
           </p>
           <SummaryList summary={summary} />
+          {impact && (
+            <ul className="notif-overview restore-impact" aria-label="What restoring will do">
+              {impact.profiles.map((p) => {
+                const word = (e: string) => (e === 'replace' ? 'replaced' : e === 'replace-with-empty' ? 'replaced with an empty set' : 'not in the file — kept as it is')
+                return (
+                  <li key={p.id}>
+                    <span>
+                      {p.name} ({p.status === 'new' ? 'new on this device' : 'existing'})
+                    </span>
+                    <span className={`notif-state${p.newerLocalEdits ? ' warn' : ''}`}>
+                      session records {word(p.sections.meta)} · PGCE/tasks {word(p.sections.admin)} · cached timetable {word(p.sections.cache)} · change history {word(p.sections.changes)} ·{' '}
+                      {p.attachments.incoming} attachment{p.attachments.incoming === 1 ? '' : 's'} merge ({p.attachments.alreadyPresent} already here)
+                      {p.newerLocalEdits ? ' · ⚠ this device has edits newer than the backup that would be replaced' : ''}
+                    </span>
+                  </li>
+                )
+              })}
+              <li>
+                <span>Other timetables on this device</span>
+                <span className="notif-state">{impact.unrelatedKept.length === 0 ? 'none' : `${impact.unrelatedKept.join(', ')} — untouched`}</span>
+              </li>
+              <li>
+                <span>Backup created</span>
+                <span className="notif-state">{impact.exportedAt ? new Date(impact.exportedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'unknown (older format)'} · version {impact.version}</span>
+              </li>
+            </ul>
+          )}
           <p className="filter-hint">Export a current backup first if you want a separate undo copy.</p>
         </>
       ) : null}

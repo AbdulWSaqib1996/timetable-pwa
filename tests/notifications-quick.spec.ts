@@ -147,3 +147,24 @@ test('a tapped "did you attend?" notification opens the quick answer sheet (queu
   await expect(page.getByRole('dialog', { name: 'Did you attend Maths 1?' })).toHaveCount(0)
   await expect(page.locator('.detail-page')).toBeVisible()
 })
+
+// FA-04: the same instant on a device set to New York must behave exactly as
+// London does — course wall time drives the windows, not the device zone.
+test.describe('device in America/New_York', () => {
+  test.use({ timezoneId: 'America/New_York' })
+  test('attendance prompt and Today card agree on the course clock', async ({ page }) => {
+    await seed(page, { clock: '2026-09-07T15:40:00Z', settings: { attendancePrompts: true } })
+    await page.goto('./#/today')
+    await expect(page.getByRole('region', { name: 'Attendance prompt' })).toContainText('Maths 1')
+    await page.clock.runFor(35_000)
+    await expect.poll(() => received(page)).toContain('Did you attend Maths 1?')
+  })
+  test('quiet hours use course time: 22:00 London is quiet even though it is 17:00 in New York', async ({ page }) => {
+    // 21:10Z = 22:10 London → inside 21:00–07:00 quiet hours; 17:10 New York would not be.
+    await seed(page, { clock: '2026-09-07T21:10:00Z', settings: { attendancePrompts: true, quietFrom: 21, quietTo: 7, reminderOffsets: [60] } })
+    await page.goto('./#/today')
+    await page.clock.runFor(35_000)
+    await page.waitForTimeout(300)
+    expect(await received(page)).toEqual([])
+  })
+})
