@@ -127,7 +127,8 @@ test('journey home: entry on Today, full-width screen, no-home state', async ({ 
   await shot(page, 'home-entry-390')
   await homeRow.getByRole('button', { name: 'View journey' }).click()
   await expect(page.locator('.journey-home-page')).toBeVisible()
-  await expect(page.getByText('1 Example Street', { exact: false })).toBeVisible()
+  // The address is in the destination card; when tiles fail the map fallback repeats it, so target the card.
+  await expect(page.locator('.journey-home-page .today-hero-building', { hasText: '1 Example Street' })).toBeVisible()
   await noHorizontalOverflow(page, 'journey-home@390')
   await shot(page, 'home-route-390')
   await page.setViewportSize({ width: 320, height: 700 })
