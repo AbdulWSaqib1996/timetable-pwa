@@ -4,6 +4,7 @@ import type { LegacyStats, StatsV2 } from '../lib/client'
 import { buildCsv, downloadCsv } from '../lib/csv'
 import type { CsvRow } from '../lib/csv'
 import { Kpi, StatePanel } from '../components/bits'
+import { IconAlert, IconLock } from '../components/icons'
 
 /**
  * Return visits (§4.4): the existing data ships as RETURN FREQUENCY with an
@@ -125,7 +126,9 @@ export function Reliability({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 |
         <div className="alertbox" role="alert">
           <strong>Open issues</strong>
           {issues.map((i) => (
-            <div key={i}>⚠ {i}</div>
+            <div key={i}>
+              <IconAlert size={16} /> {i}
+            </div>
           ))}
         </div>
       ) : (
@@ -327,7 +330,7 @@ export function DataAccess({ legacy, v2, onLock }: { legacy: LegacyStats; v2: St
             credential expiry. Change the key any time with wrangler (`statskey` in KV).
           </p>
           <button type="button" onClick={onLock}>
-            🔒 Lock now
+            <IconLock /> Lock now
           </button>
         </div>
         <div className="card">

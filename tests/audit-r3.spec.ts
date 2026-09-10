@@ -282,7 +282,9 @@ test('TT-20: PGCE shows four section cards, one dominant action each, record typ
   const cards = page.locator('.pgce-section')
   await expect(cards).toHaveCount(4)
   for (let i = 0; i < 4; i++) await expect(cards.nth(i).locator('.btn-primary')).toHaveCount(1)
-  await expect(page.getByRole('button', { name: 'View all →' })).toHaveCount(4)
+  // V4: destination-named links replaced the four vague "View all" controls.
+  await expect(page.getByRole('button', { name: /View all/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'All development records →' })).toBeVisible()
   // Every record type stays one tap away, now inside Development's menu.
   const trigger = page.getByRole('button', { name: /Add or open a record/ })
   await trigger.click()

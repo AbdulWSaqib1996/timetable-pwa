@@ -1,7 +1,8 @@
 import { ACTION_CATALOGUE } from '../../../shared/analytics-contracts.js'
 import type { LegacyStats, StatsV2 } from '../lib/client'
 import { ActivityChart } from '../components/ActivityChart'
-import { CompletenessWarnings, Kpi } from '../components/bits'
+import { CompletenessWarnings, Kpi, Notice } from '../components/bits'
+import { IconArrowRight, IconChart, IconShield } from '../components/icons'
 
 const SETUP_LABELS: Record<string, string> = {
   push: 'Background push',
@@ -13,10 +14,12 @@ const SETUP_LABELS: Record<string, string> = {
 }
 
 /**
- * Overview (§4.2): three primary metrics with explicit windows, the daily
- * chart, context, top adoption and today's setup coverage. Legacy
- * receipt-day data is the labelled primary source until v2 accumulates;
- * fixed-window cards say their windows on the card.
+ * Overview (§4.2 → V4): the two measurement sources are named once in a
+ * notice, then three headline cards from the legacy receipt-day dataset
+ * (fixed windows stated on the card), the daily chart with its dataset
+ * badge, a context card, a separate v2 card that warns against direct
+ * comparison, top adoption and today's setup coverage. Windows are fixed
+ * by the metrics, so there is no date picker to mislead.
  */
 export function Overview({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | null }) {
   const daily = [...legacy.daily].reverse()
@@ -27,14 +30,27 @@ export function Overview({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
     .sort((a, b) => b[1].devices - a[1].devices)
     .slice(0, 5)
   const known = legacy.setup.known ?? {}
+  const v2Active = v2?.metrics.activeTokens7?.value
 
   return (
     <>
       <CompletenessWarnings legacy={legacy} />
+      <Notice>
+        <strong>Two measurement sources are in use.</strong> Overview uses the legacy receipt-day dataset. The newer event dataset is
+        shown separately below and must not be compared directly.
+      </Notice>
       <div className="kpis">
-        <Kpi value={legacy.activeLast7Days} label="Active tokens — last 7 days" support="fixed UTC window incl. partial today · legacy receipt-day" />
-        <Kpi value={today.active} label="Active today" support="current UTC date — always partial until the day closes" />
         <Kpi
+          icon={<IconChart />}
+          tone="legacy"
+          value={legacy.activeLast7Days}
+          label="Active tokens — last 7 days"
+          support="fixed UTC window incl. partial today · legacy receipt-day"
+        />
+        <Kpi icon={<IconChart />} tone="legacy" value={today.active} label="Active today" support="current UTC date — always partial until the day closes" />
+        <Kpi
+          icon={<IconChart />}
+          tone="legacy"
           value={today.active > 0 ? `${today.installed}/${today.active}` : '—'}
           label="Standalone reports today"
           support="self-reported display mode, not confirmed installs"
@@ -42,13 +58,25 @@ export function Overview({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
       </div>
       <div className="two-col">
         <div className="card">
-          <h2>Daily active tokens ({legacy.windowDays} days, UTC)</h2>
-          <p className="support">Legacy receipt-day series — a use can be counted on the day its report arrived.</p>
+          <div className="card-head">
+            <div>
+              <h2>Daily active tokens</h2>
+              <p className="support">
+                {legacy.windowDays} days · counts by report receipt date (UTC)
+              </p>
+            </div>
+            <span className="badge ok">Legacy dataset</span>
+          </div>
           <ActivityChart daily={daily} />
         </div>
         <div>
           <div className="card section-gap">
-            <h2>Context</h2>
+            <div className="card-head">
+              <span className="kpi-tile kpi-tile--attention" aria-hidden="true">
+                <IconShield />
+              </span>
+              <h2>Collection needs context</h2>
+            </div>
             <p>
               <strong>{legacy.activeLast30Days}</strong> active in the fixed last 30 days
             </p>
@@ -60,17 +88,34 @@ export function Overview({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
               <span className="support">(first-seen ledger, currently no expiry)</span>
             </p>
             <p className="support">
-              Tokens are anonymous browsers, not people — one person with two devices counts twice.
+              Tokens are anonymous browsers, not people — one person with two devices counts twice. Offline failures are unobserved:
+              a recent accepted batch does not prove every client is reporting.
+            </p>
+            <p className="support">
+              <a href="#reliability" className="inline-link">
+                <IconArrowRight /> Review reliability
+              </a>
             </p>
           </div>
-          <div className="card">
-            <h2>v2 event-day collection</h2>
+          <div className="card kpi--v2">
+            <div className="card-head">
+              <span className="kpi-tile kpi-tile--v2" aria-hidden="true">
+                <IconChart />
+              </span>
+              <h2>New event dataset</h2>
+            </div>
             {v2 ? (
-              <p className="support">
-                {v2.observedThrough
-                  ? `Observed through ${v2.observedThrough} · ${String(v2.metrics.activeTokens7?.value ?? '—')} active tokens (7d) under the v2 contract.`
-                  : 'No v2 observations yet — clients report under the new contract as they update. Nothing is backdated.'}
-              </p>
+              v2.observedThrough ? (
+                <>
+                  <p className="kpi-inline-value">{String(v2Active ?? '—')}</p>
+                  <p className="support">Active tokens over 7 days · v2 event dataset · observed through {v2.observedThrough}</p>
+                  <p className="support">
+                    <strong>Different collection contract.</strong> Do not compare directly with the legacy total above.
+                  </p>
+                </>
+              ) : (
+                <p className="support">No v2 observations yet — clients report under the new contract as they update. Nothing is backdated.</p>
+              )
             ) : (
               <p className="support">v2 aggregate unavailable — the snapshot job has not published yet.</p>
             )}

@@ -6,14 +6,16 @@ import { StatePanel, StatusStrip } from './components/bits'
 import { Overview } from './pages/Overview'
 import { Adoption } from './pages/Adoption'
 import { DataAccess, Releases, Reliability, Returning } from './pages/others'
+import { IconAdoption, IconChart, IconEye, IconEyeOff, IconKey, IconLock, IconMonitor, IconMoon, IconReturn, IconShield, IconSun, IconTag } from './components/icons'
 
+// Line icons (V4) share the learner app's stroke language; labels are unchanged.
 const SECTIONS = [
-  { id: 'overview', label: 'Overview', icon: '📈' },
-  { id: 'adoption', label: 'Feature adoption', icon: '🧩' },
-  { id: 'returning', label: 'Return visits', icon: '🔁' },
-  { id: 'reliability', label: 'Reliability', icon: '🛡️' },
-  { id: 'releases', label: 'Releases', icon: '🏷️' },
-  { id: 'access', label: 'Data & access', icon: '🔐' },
+  { id: 'overview', label: 'Overview', icon: <IconChart /> },
+  { id: 'adoption', label: 'Feature adoption', icon: <IconAdoption /> },
+  { id: 'returning', label: 'Return visits', icon: <IconReturn /> },
+  { id: 'reliability', label: 'Reliability', icon: <IconShield /> },
+  { id: 'releases', label: 'Releases', icon: <IconTag /> },
+  { id: 'access', label: 'Data & access', icon: <IconKey /> },
 ] as const
 
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -141,7 +143,8 @@ export function AdminApp() {
       onClick={() => setTheme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system')}
       aria-label={`Theme: ${theme}. Activate to change.`}
     >
-      {theme === 'system' ? '🖥 System' : theme === 'light' ? '☀️ Light' : '🌙 Dark'}
+      {theme === 'system' ? <IconMonitor /> : theme === 'light' ? <IconSun /> : <IconMoon />}
+      {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
     </button>
   )
 
@@ -149,7 +152,10 @@ export function AdminApp() {
     return (
       <main className="lock-wrap">
         <form className="card lock-card" onSubmit={unlock}>
-          <h1>My Timetable — Admin workspace</h1>
+          <p className="admin-brand lock-brand">
+            <IconChart size={22} /> Timetable Admin <span className="sub">Owner workspace</span>
+          </p>
+          <h1>Unlock the admin workspace</h1>
           <p className="support">
             Aggregate usage from your own push worker. Anonymous browser tokens, no third parties,
             all dates UTC.
@@ -168,7 +174,8 @@ export function AdminApp() {
               autoFocus
             />
             <button type="button" onClick={() => setReveal((v) => !v)} aria-pressed={reveal} aria-label="Show key while typing">
-              {reveal ? '🙈 Hide' : '👁 Show'}
+              {reveal ? <IconEyeOff /> : <IconEye />}
+              {reveal ? 'Hide' : 'Show'}
             </button>
           </div>
           <p className="support">
@@ -244,7 +251,7 @@ export function AdminApp() {
     <div className="admin-shell">
       <header className="admin-mobile-head">
         <div className="admin-brand">
-          My Timetable <span className="sub">Admin workspace</span>
+          <IconChart size={22} /> Timetable Admin <span className="sub">Owner workspace</span>
         </div>
         <label htmlFor="section-picker">Section</label>
         <select id="section-picker" value={section} onChange={(e) => (window.location.hash = `#${e.target.value}`)}>
@@ -257,16 +264,19 @@ export function AdminApp() {
       </header>
       <aside className="admin-rail">
         <div className="admin-brand">
-          My Timetable <span className="sub">Admin workspace</span>
+          <IconChart size={22} /> Timetable Admin <span className="sub">Owner workspace</span>
         </div>
         {nav}
+        <button type="button" className="admin-rail-lock" onClick={() => lock()}>
+          <IconLock /> Lock workspace
+        </button>
       </aside>
       <main className="admin-main">
         <div className="admin-topbar">
           <h1>{current.label}</h1>
           {themeButton}
-          <button type="button" onClick={() => lock()}>
-            🔒 Lock
+          <button type="button" className="admin-topbar-lock" onClick={() => lock()}>
+            <IconLock /> Lock workspace
           </button>
         </div>
         {data.status === 'ready' && (
