@@ -1148,4 +1148,4 @@ Automated checks + results: new `tests/v2-daily-use.spec.ts` (6): the Today stat
 
 Known limits: the Today hero's left colour is the accent, not the subject colour (cards keep subject colour); the compact/comfortable density toggle is the existing Appearance setting rather than a calendar-local control; the group threshold is a constant (100px) rather than a measured glyph width; the 320–1440 matrix and dark captures are V5.
 
-Released 10 September 2026: merge `eebc41e`, CI run 34524980635 success, `deploy.sh verify` six PASS. No worker change.
+Released 10 September 2026: merge `eebc41e`; Vercel deployed and `deploy.sh verify` six PASS. CI run 34524980635 FAILED on a pre-existing test fragility (`phase-four-visual` journey-home address matched twice once the map-tile fallback appeared) plus one flaky `phase-three` retry; fixed the locator in the next commit — CI run 34525364799 success. No worker change.
