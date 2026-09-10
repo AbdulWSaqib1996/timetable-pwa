@@ -32,6 +32,25 @@ export interface Session {
 
 export type DateRange = 'today' | 'week' | 'all'
 
+export interface CloudBackupSettings {
+  google?: {
+    /** only a completed, verified upload sets these */
+    lastBackupAt?: number
+    lastBackupId?: string
+    /** "Back up when I use the app" — foreground, at most once per 24 h, needs a live sign-in and unlocked key */
+    autoBackup?: boolean
+    lastAutoAt?: number
+    /** keep only this installation's latest ten snapshots */
+    prune?: boolean
+    restores?: { at: number; backupId: string; createdAt: string }[]
+  }
+  icloud?: {
+    /** last time an archive was handed to the share sheet or downloaded — NOT a confirmed cloud backup */
+    lastExportAt?: number
+    lastOutcome?: 'shared' | 'downloaded'
+  }
+}
+
 /** 'day' is the legacy stored value (treated as week); 'list' is the accessible agenda alternative (R3). */
 export type ViewMode = 'day' | 'week' | 'month' | 'list'
 
@@ -140,6 +159,8 @@ export interface Settings {
   groupToken?: string
   /** saved default origin id for the journey home (NF-06 groundwork) */
   defaultOriginHome?: string
+  /** cloud backup bookkeeping (R5b / NF-09) — device-local; never carries a token */
+  cloudBackups?: CloudBackupSettings
   /** versioned course configuration (P7-01); absent = UCL Primary PGCE built-in */
   courseConfig?: import('../shared/course.js').CourseConfig
   /** study-group working hours (minutes from midnight) and minimum meeting length */

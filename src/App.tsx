@@ -65,6 +65,7 @@ import { availableOrigins } from './lib/origins'
 import { busyCommitmentSessions, commitmentToSession, remindableCommitmentSessions } from './lib/commitments'
 import { isPlanSession, planBlockSessions, planIdOf } from './lib/planProjection'
 import { useFindIndex } from './hooks/useFindIndex'
+import { useAutoCloudBackup } from './hooks/useAutoCloudBackup'
 import { FindPage } from './features/find/FindPage'
 import type { FindResult } from './features/find/FindPage'
 import { PlanWeekSheet } from './components/PlanWeekSheet'
@@ -1013,6 +1014,8 @@ export default function App() {
     () => (settings ? availableOrigins(settings, coords, coordsAt) : []),
     [settings, coords, coordsAt]
   )
+
+  useAutoCloudBackup(settings, updateSettings)
 
   useNotifications({
     metaReady,
