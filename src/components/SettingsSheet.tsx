@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { attendanceSummary, isCompleted, isEligibleSession } from '../../shared/eligibility.js'
 import { sessionKey } from '../lib/diff'
 import { isPlacementSession, placementTag } from '../lib/format'
 import { downloadICS } from '../lib/ics'
@@ -29,7 +28,8 @@ import type { SourceStatus } from '../../shared/refresh.js'
 import type { PlacementExceptionRec } from '../lib/admin'
 import { placementBlocks as computePlacementBlocks } from '../lib/placement'
 import { WHATSNEW } from '../lib/changelog'
-import { IconBack, IconChart, IconClose, PageHeader } from './ui'
+import { IconAlert, IconBack, IconBell, IconCalendar, IconChart, IconChevronRight, IconClose, IconHelp, IconPin, IconSchedule, IconShield, IconSun, PageHeader, StatusMessage } from './ui'
+import { useOnline } from '../hooks/useOnline'
 import { BackupSheet, RestoreSheet } from './BackupSheets'
 import { useAttention } from '../lib/attention'
 import { snoozeBackupNudge } from '../lib/storage'
@@ -139,7 +139,9 @@ const SEARCH_ENTRIES: { section: SettingsSection; anchor: SettingsAnchor; title:
   { section: 'timetable', anchor: 'key-dates-source', title: 'Key dates source', keywords: ['key dates', 'deadline', 'submission', 'source', 'sheet', 'tab'] },
   { section: 'timetable', anchor: 'notices', title: 'Notices (cohort broadcasts)', keywords: ['notice', 'broadcast', 'announcement', 'cohort', 'banner'] },
   { section: 'timetable', anchor: 'specialisms', title: 'Specialisms', keywords: ['specialism', 'group', 'subject', 'choose', 'filter'] },
-  { section: 'reminders', anchor: 'session-reminders', title: 'Session reminders', keywords: ['reminder', 'notification', 'notify', 'session', 'attend', 'attendance', 'prompt', 'minutes before'] },
+  { section: 'reminders', anchor: 'notification-status', title: 'Notification status', keywords: ['notification', 'permission', 'blocked', 'allowed', 'status', 'push', 'device'] },
+  { section: 'reminders', anchor: 'attendance-prompts', title: 'Attendance prompts', keywords: ['attend', 'attendance', 'prompt', 'did you attend', 'ask', 'notification'] },
+  { section: 'reminders', anchor: 'session-reminders', title: 'Session reminders', keywords: ['reminder', 'notification', 'notify', 'session', 'minutes before'] },
   { section: 'reminders', anchor: 'key-date-reminders', title: 'Key-date reminders', keywords: ['key date', 'deadline', 'reminder', 'notification', 'days before', 'submission'] },
   { section: 'reminders', anchor: 'quiet-hours', title: 'Quiet hours', keywords: ['quiet', 'night', 'silence', 'do not disturb', 'notification', 'sleep'] },
   { section: 'reminders', anchor: 'leave-alerts', title: 'Leave alerts', keywords: ['leave', 'set off', 'travel', 'alert', 'notification', 'head start'] },
@@ -151,6 +153,7 @@ const SEARCH_ENTRIES: { section: SettingsSection; anchor: SettingsAnchor; title:
   { section: 'data', anchor: 'data-health', title: 'Data health', keywords: ['saved', 'storage', 'health', 'device', 'data', 'quota', 'space'] },
   { section: 'data', anchor: 'backup', title: 'Backup', keywords: ['backup', 'export', 'import', 'restore', 'file', 'device', 'json'] },
   { section: 'data', anchor: 'sync', title: 'Sync between devices', keywords: ['sync', 'device', 'devices', 'phone', 'laptop', 'code', 'encrypted'] },
+  { section: 'data', anchor: 'data-advanced', title: 'Storage & advanced', keywords: ['storage', 'quota', 'space', 'drafts', 'sources', 'photos', 'documents', 'advanced'] },
   { section: 'appearance', anchor: 'theme', title: 'Theme', keywords: ['theme', 'dark', 'light', 'appearance', 'colour', 'color', 'system'] },
   { section: 'appearance', anchor: 'density', title: 'Density', keywords: ['density', 'compact', 'comfortable', 'spacing', 'appearance', 'size'] },
   { section: 'help', anchor: 'whats-new', title: "What's new", keywords: ['new', 'changelog', 'version', 'update', 'release'] },
@@ -188,6 +191,8 @@ export type SettingsAnchor =
   | 'notices'
   | 'specialisms'
   | 'key-date-reminders'
+  | 'notification-status'
+  | 'attendance-prompts'
   | 'session-reminders'
   | 'quiet-hours'
   | 'leave-alerts'
@@ -197,6 +202,7 @@ export type SettingsAnchor =
   | 'calendar-feed'
   | 'calendar-export'
   | 'data-health'
+  | 'data-advanced'
   | 'backup'
   | 'sync'
   | 'theme'
@@ -223,7 +229,6 @@ export function SettingsSheet({
   courseSessions,
   keyDates,
   metaMap,
-  todayISO,
   placementBlocks,
   onInstall,
   onUpdateSettings,
@@ -239,6 +244,7 @@ export function SettingsSheet({
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE)
   const [searchQuery, setSearchQuery] = useState('')
   const attention = useAttention()
+  const online = useOnline()
   const searchResults = searchSettings(searchQuery)
   // Section links (TT-21) and search results open a section through the
   // existing settings navigation, then focus the target heading once it has
@@ -487,45 +493,6 @@ export function SettingsSheet({
     })().catch((error) => window.alert('Could not read that file: ' + String(error)))
   }
 
-  // Attendance insights over eligible completed sessions — the same shared
-  // definition Stats and the binder use (P3-06). The CSV keeps one row per
-  // eligible completed session so its totals match the summary exactly.
-  const attendance = attendanceSummary(courseSessions, (s) => metaMap[sessionKey(s)], todayISO)
-  const pastSessions = courseSessions.filter(
-    (s) => isEligibleSession(s) && isCompleted(s, todayISO)
-  )
-  const bySubject = new Map<string, { attended: number; total: number }>()
-  for (const s of pastSessions) {
-    const key = s.subject || s.title
-    const entry = bySubject.get(key) ?? { attended: 0, total: 0 }
-    entry.total++
-    if (metaMap[sessionKey(s)]?.attended) entry.attended++
-    bySubject.set(key, entry)
-  }
-  const subjectRows = [...bySubject.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 8)
-
-  function downloadAttendanceCSV() {
-    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
-    const rows = ['Date,Start,Title,Subject,Room,Attended,Absent,Reason,Note']
-    for (const s of pastSessions) {
-      const m = metaMap[sessionKey(s)]
-      rows.push(
-        [
-          s.dateISO,
-          s.start,
-          esc(s.title),
-          esc(s.subject || s.title),
-          esc(s.room),
-          m?.attended ? 'yes' : 'no',
-          m?.absent ? 'yes' : 'no',
-          esc(m?.absentReason ?? ''),
-          esc(m?.note ?? ''),
-        ].join(',')
-      )
-    }
-    downloadFile('attendance.csv', rows.join('\r\n'), 'text/csv;charset=utf-8')
-  }
-
   // Placement day log: one row per school day per block with provenance
   // (P5-03) — planned vs logged, exception kind, inferred/corrected flags.
   function downloadPlacementLog() {
@@ -648,20 +615,24 @@ export function SettingsSheet({
     onUpdateSettings({ locationEnabled: enabled })
   }
 
-  const notifBlocked = typeof Notification !== 'undefined' && Notification.permission === 'denied'
+  const notifSupported = typeof Notification !== 'undefined'
+  const notifBlocked = notifSupported && Notification.permission === 'denied'
+  const notifGranted = notifSupported && Notification.permission === 'granted'
   const feedUrl = !settings.demo
     ? buildFeedUrl(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE, settings, activeProfile?.name)
     : null
 
-  const CATEGORIES: { id: SettingsSection; title: string; hint: string }[] = [
-    { id: 'timetable', title: 'My timetable', hint: 'Profiles, sources, notices, specialisms, study group' },
-    { id: 'reminders', title: 'Reminders', hint: 'Notification offsets, quiet hours, background push' },
-    { id: 'travel', title: 'Travel & home', hint: 'Location, mode, home address, placements' },
-    { id: 'calendars', title: 'Connected calendars', hint: 'Subscribed feed, .ics export, what they contain' },
-    { id: 'data', title: 'Data & devices', hint: 'Save state, sync, backup, exports, storage' },
-    { id: 'appearance', title: 'Appearance', hint: 'Theme and density' },
-    { id: 'help', title: 'Help & privacy', hint: 'What’s new, install, usage ping, support' },
+  const CATEGORIES: { id: SettingsSection; title: string; hint: string; icon: JSX.Element; tone: string }[] = [
+    { id: 'timetable', title: 'My timetable', hint: 'Profiles, sources, notices, specialisms, study group', icon: <IconSchedule size={20} />, tone: 'info' },
+    { id: 'reminders', title: 'Reminders', hint: 'Notification offsets, quiet hours, background push', icon: <IconBell />, tone: 'attention' },
+    { id: 'travel', title: 'Travel & home', hint: 'Location, mode, home address, placements', icon: <IconPin size={20} />, tone: 'saved' },
+    { id: 'calendars', title: 'Connected calendars', hint: 'Subscribed feed, .ics export, what they contain', icon: <IconCalendar />, tone: 'info' },
+    { id: 'data', title: 'Data & devices', hint: 'Save state, sync, backup, exports, storage', icon: <IconShield />, tone: 'info' },
+    { id: 'appearance', title: 'Appearance', hint: 'Theme and density', icon: <IconSun />, tone: 'development' },
+    { id: 'help', title: 'Help & privacy', hint: 'What’s new, install, usage ping, support', icon: <IconHelp />, tone: 'saved' },
   ]
+  // "Saved on this device" renders only from real persistence state (V3).
+  const saveState = hasPendingSaves() ? 'pending' : persistenceFailure() ? 'failed' : 'saved'
 
   if (!section) {
     return (
@@ -715,16 +686,39 @@ export function SettingsSheet({
             ))}
           </ul>
         )}
-        <ul className="settings-index">
+        <ul className="settings-index settings-index--tiles">
           {CATEGORIES.map((c) => (
             <li key={c.id}>
               <button type="button" className="settings-index-row" onClick={() => onOpenSection(c.id)}>
-                <span className="settings-index-title">{c.title}</span>
-                <span className="filter-hint">{c.hint}</span>
+                <span className={`settings-index-icon settings-index-icon--${c.tone}`} aria-hidden="true">
+                  {c.icon}
+                </span>
+                <span className="settings-index-text">
+                  <span className="settings-index-title">{c.title}</span>
+                  <span className="settings-index-hint">{c.hint}</span>
+                </span>
+                <span className="settings-index-chevron" aria-hidden="true">
+                  <IconChevronRight />
+                </span>
               </button>
             </li>
           ))}
         </ul>
+        {saveState === 'saved' ? (
+          <StatusMessage tone="success">
+            <span>
+              <strong>Saved on this device</strong> — your settings apply automatically.
+            </span>
+          </StatusMessage>
+        ) : saveState === 'pending' ? (
+          <StatusMessage tone="info">
+            <span>Changes are waiting to save — keep this tab open.</span>
+          </StatusMessage>
+        ) : (
+          <StatusMessage tone="danger">
+            <span>Last save failed: {persistenceFailure()}</span>
+          </StatusMessage>
+        )}
       </div>
     )
   }
@@ -926,65 +920,63 @@ export function SettingsSheet({
       )}
       {section === 'reminders' && (
         <>
-
-        <section className="filter-section">
-          <h3>Notifications at a glance</h3>
-          <ul className="notif-overview">
-            {(
-              [
-                ['Session reminders', (settings.reminderOffsets ?? []).length > 0 ? (settings.reminderOffsets ?? []).map((m) => (m >= 60 ? `${m / 60}h` : `${m}m`)).join(', ') + ' before' : 'off'],
-                ['“Did you attend?” prompts', settings.attendancePrompts ? 'at each session’s end' : 'off'],
-                ['Leave alerts', (settings.leaveAlertOffsets ?? []).length > 0 && settings.locationEnabled ? 'on' : 'off'],
-                ['Key-date reminders', (settings.keyDateReminderDays ?? []).length > 0 ? (settings.keyDateReminderDays ?? []).join('/') + ' days before' : 'off'],
-                ['Morning briefing (07:00) & week ahead (Sun)', settings.pushEnabled ? (settings.morningBriefing !== false ? 'on' : 'off') : 'needs background push'],
-                ['Timetable changes & cohort notices', settings.pushEnabled ? (settings.changeAlerts !== false ? 'on' : 'off') : 'needs background push'],
-              ] as const
-            ).map(([label, state]) => (
-              <li key={label}>
-                <span>{label}</span>
-                <span className={`notif-state${state === 'off' ? ' off' : ''}`}>{state}</span>
-              </li>
-            ))}
-          </ul>
-          <h3 className="subheading" id="quiet-hours" tabIndex={-1}>Quiet hours</h3>
-          <p className="filter-hint">No notifications during these hours (in-app and push), in course time ({courseZone()}) — the same clock as your sessions.</p>
-          <div className="chip-grid">
-            {(
-              [
-                { label: 'Off', from: undefined, to: undefined },
-                { label: '21:00–07:00', from: 21, to: 7 },
-                { label: '22:00–07:00', from: 22, to: 7 },
-                { label: '23:00–08:00', from: 23, to: 8 },
-              ] as const
-            ).map(({ label, from, to }) => {
-              const on = settings.quietFrom === from && settings.quietTo === to
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  className={`chip${on ? ' chip-on' : ''}`}
-                  aria-pressed={on}
-                  onClick={() => {
-                    onUpdateSettings({ quietFrom: from, quietTo: to })
-                    if (settings.pushEnabled) {
-                      void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
-                        ...settings,
-                        quietFrom: from,
-                        quietTo: to,
-                      }, store.activeId).catch(() => {})
-                    }
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
+        {/* V3: grouped by decision — device status, session reminders, leave alerts,
+            attendance prompts, key dates, quiet hours, background push — with each
+            group's current state beside its heading. Nothing here asks for permission
+            merely by rendering. */}
+        <section className="filter-section" id="notification-status">
+          <div className="section-head">
+            <h3 tabIndex={-1}>Notification status</h3>
+            <span className={`notif-state${notifBlocked ? ' warn' : notifSupported ? '' : ' off'}`}>
+              {notifBlocked ? 'Blocked on this device' : !notifSupported ? 'Not supported' : notifGranted ? 'Allowed on this device' : 'Not asked yet'}
+            </span>
           </div>
+          {notifBlocked ? (
+            <div className="setup-error notif-blocked" role="status">
+              <p className="notif-blocked-title">
+                <IconAlert size={18} /> Blocked on this device
+              </p>
+              <p>Reminders cannot show until notifications are allowed for this app again. To recover:</p>
+              <ol className="ios-install-steps">
+                {needsIosInstall() ? (
+                  <>
+                    <li>Open the iPhone/iPad <strong>Settings</strong> app, then <strong>Notifications</strong>.</li>
+                    <li>Find <strong>My Timetable</strong> (it must be installed on the Home Screen) and turn <strong>Allow Notifications</strong> on.</li>
+                    <li>Return here — the status updates on the next open.</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Open your browser's site settings for this app (the lock or tune icon by the address bar).</li>
+                    <li>Set <strong>Notifications</strong> to <strong>Allow</strong>.</li>
+                    <li>Reload My Timetable — your chosen reminder timings are kept.</li>
+                  </>
+                )}
+              </ol>
+            </div>
+          ) : !notifSupported ? (
+            <p className="filter-hint">This browser cannot show notifications. Subscribe to the calendar feed under Connected calendars for reminders in your calendar app.</p>
+          ) : notifGranted ? (
+            <p className="filter-hint">This device can show reminders while the app is open{settings.pushEnabled ? ' and in the background through push' : ''}.</p>
+          ) : (
+            <p className="filter-hint">Nothing has been asked yet — turning on a reminder below asks once for permission.</p>
+          )}
+          {!settings.demo && (
+            <p className="filter-hint">
+              Background push: <strong>{settings.pushEnabled ? 'on' : 'off'}</strong>.{' '}
+              <button type="button" className="travel-link" onClick={() => focusAnchor('background-push')}>
+                Check reminders →
+              </button>
+            </p>
+          )}
         </section>
 
-
         <section className="filter-section" id="session-reminders">
-          <h3 tabIndex={-1}>Session reminders</h3>
+          <div className="section-head">
+            <h3 tabIndex={-1}>Session reminders</h3>
+            <span className={`notif-state${(settings.reminderOffsets ?? []).length > 0 ? '' : ' off'}`}>
+              {(settings.reminderOffsets ?? []).length > 0 ? (settings.reminderOffsets ?? []).map((m) => (m >= 60 ? `${m / 60}h` : `${m}m`)).join(', ') + ' before' : 'off'}
+            </span>
+          </div>
           <p className="filter-hint">
             Pick as many as you like — e.g. 1 hour and 15 min gives two notifications before each
             session. Select none to turn reminders off.
@@ -1009,6 +1001,55 @@ export function SettingsSheet({
                 ? 'Reminders are off.'
                 : `Notifying ${(settings.reminderOffsets ?? []).map((m) => (m >= 60 ? `${m / 60}h` : `${m}m`)).join(', ')} before each session, while the app is open (or installed and running). For guaranteed alerts anywhere, subscribe to the calendar feed below and use your calendar app’s own reminders.`}
           </p>
+        </section>
+
+        <section className="filter-section" id="leave-alerts">
+          <div className="section-head">
+            <h3 tabIndex={-1}>Leave alerts</h3>
+            <span className={`notif-state${(settings.leaveAlertOffsets ?? []).length > 0 && settings.locationEnabled ? '' : ' off'}`}>
+              {(settings.leaveAlertOffsets ?? []).length > 0 && settings.locationEnabled ? 'on' : 'off'}
+            </span>
+          </div>
+          <p className="filter-hint">
+            Notifies you when it's time to set off: session start minus your live travel estimate,
+            with the head start you pick (e.g. "10 min" alerts 10 minutes before you need to leave).
+            Nothing is sent when you are already at the session's location.
+          </p>
+          {settings.locationEnabled ? (
+            <div className="chip-grid">
+              {(
+                [
+                  { value: 0, label: 'When it’s time to leave' },
+                  { value: 5, label: '5 min head start' },
+                  { value: 10, label: '10 min' },
+                  { value: 15, label: '15 min' },
+                  { value: 30, label: '30 min' },
+                ] as const
+              ).map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`chip${(settings.leaveAlertOffsets ?? []).includes(value) ? ' chip-on' : ''}`}
+                  aria-pressed={(settings.leaveAlertOffsets ?? []).includes(value)}
+                  onClick={() => void toggleOffset('leaveAlertOffsets', value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="filter-hint">Turn on travel times under Travel &amp; home first — leave alerts need your location.</p>
+          )}
+          {settings.locationEnabled && (settings.leaveAlertOffsets ?? []).length === 0 && (
+            <p className="filter-hint">Leave alerts are off.</p>
+          )}
+        </section>
+
+        <section className="filter-section" id="attendance-prompts">
+          <div className="section-head">
+            <h3 tabIndex={-1}>Attendance prompts</h3>
+            <span className={`notif-state${settings.attendancePrompts ? '' : ' off'}`}>{settings.attendancePrompts ? 'at each session’s end' : 'off'}</span>
+          </div>
           <label className="toggle-row">
             <input
               type="checkbox"
@@ -1045,9 +1086,13 @@ export function SettingsSheet({
           })()}
         </section>
 
-
         <section className="filter-section" id="key-date-reminders" aria-labelledby="key-date-reminders-heading">
-          <h3 id="key-date-reminders-heading" tabIndex={-1}>Key-date reminders</h3>
+          <div className="section-head">
+            <h3 id="key-date-reminders-heading" tabIndex={-1}>Key-date reminders</h3>
+            <span className={`notif-state${(settings.keyDateReminderDays ?? []).length > 0 ? '' : ' off'}`}>
+              {(settings.keyDateReminderDays ?? []).length > 0 ? (settings.keyDateReminderDays ?? []).join('/') + ' days before' : 'off'}
+            </span>
+          </div>
           {settings.keyDatesSheetId ? (
             <>
               <p className="filter-hint">
@@ -1086,50 +1131,56 @@ export function SettingsSheet({
           )}
         </section>
 
-
-        <section className="filter-section" id="leave-alerts">
-          <h3 tabIndex={-1}>Leave alerts</h3>
-          <p className="filter-hint">
-            Notifies you when it's time to set off: session start minus your live travel estimate,
-            with the head start you pick (e.g. "10 min" alerts 10 minutes before you need to leave).
-            Nothing is sent when you are already at the session's location.
-          </p>
-          {settings.locationEnabled ? (
-            <div className="chip-grid">
-              {(
-                [
-                  { value: 0, label: 'When it’s time to leave' },
-                  { value: 5, label: '5 min head start' },
-                  { value: 10, label: '10 min' },
-                  { value: 15, label: '15 min' },
-                  { value: 30, label: '30 min' },
-                ] as const
-              ).map(({ value, label }) => (
+        <section className="filter-section" id="quiet-hours">
+          <div className="section-head">
+            <h3 tabIndex={-1}>Quiet hours</h3>
+            <span className={`notif-state${settings.quietFrom != null ? '' : ' off'}`}>
+              {settings.quietFrom != null && settings.quietTo != null ? `${String(settings.quietFrom).padStart(2, '0')}:00–${String(settings.quietTo).padStart(2, '0')}:00` : 'off'}
+            </span>
+          </div>
+          <p className="filter-hint">No notifications during these hours (in-app and push), in course time ({courseZone()}) — the same clock as your sessions.</p>
+          <div className="chip-grid">
+            {(
+              [
+                { label: 'Off', from: undefined, to: undefined },
+                { label: '21:00–07:00', from: 21, to: 7 },
+                { label: '22:00–07:00', from: 22, to: 7 },
+                { label: '23:00–08:00', from: 23, to: 8 },
+              ] as const
+            ).map(({ label, from, to }) => {
+              const on = settings.quietFrom === from && settings.quietTo === to
+              return (
                 <button
-                  key={value}
+                  key={label}
                   type="button"
-                  className={`chip${(settings.leaveAlertOffsets ?? []).includes(value) ? ' chip-on' : ''}`}
-                  aria-pressed={(settings.leaveAlertOffsets ?? []).includes(value)}
-                  onClick={() => void toggleOffset('leaveAlertOffsets', value)}
+                  className={`chip${on ? ' chip-on' : ''}`}
+                  aria-pressed={on}
+                  onClick={() => {
+                    onUpdateSettings({ quietFrom: from, quietTo: to })
+                    if (settings.pushEnabled) {
+                      void subscribePush(settings.pushServerBase ?? DEFAULT_PUSH_BASE, {
+                        ...settings,
+                        quietFrom: from,
+                        quietTo: to,
+                      }, store.activeId).catch(() => {})
+                    }
+                  }}
                 >
                   {label}
                 </button>
-              ))}
-            </div>
-          ) : (
-            <p className="filter-hint">Enable travel times above first — leave alerts need your location.</p>
-          )}
-          {settings.locationEnabled && (settings.leaveAlertOffsets ?? []).length === 0 && (
-            <p className="filter-hint">Leave alerts are off.</p>
-          )}
+              )
+            })}
+          </div>
         </section>
-
 
         {!settings.demo && (
           <section className="filter-section" id="background-push">
-            <h3 tabIndex={-1}>Background push (works with the app closed)</h3>
+            <div className="section-head">
+              <h3 tabIndex={-1}>Background push (works with the app closed)</h3>
+              <span className={`notif-state${settings.pushEnabled ? '' : ' off'}`}>{settings.pushEnabled ? 'on' : 'off'}</span>
+            </div>
             <p className="filter-hint">
-              Session and key-date reminders arrive even when the app isn't open. The push server is
+              Session and key-date reminders, the morning briefing and change alerts arrive even when the app isn't open. The push server is
               already deployed — just tap Enable (the URL below only needs changing for a different
               deployment).
             </p>
@@ -1263,7 +1314,7 @@ export function SettingsSheet({
                   })
                 }}
               >
-                {checkBusy ? 'Checking…' : '🩺 Run self-check'}
+                {checkBusy ? 'Checking…' : 'Run self-check'}
               </button>
               <button
                 type="button"
@@ -1485,9 +1536,13 @@ export function SettingsSheet({
       )}
       {section === 'data' && (
         <>
+        {/* V3 order: save/sync/backup state → Back up / Restore → sync → storage & advanced. */}
         <section className="filter-section" id="data-health">
-          <h3 tabIndex={-1}>Data health</h3>
-          <ul className="notif-overview" aria-label="Data health">
+          <div className="section-head">
+            <h3 tabIndex={-1}>Your data</h3>
+            {!online && <span className="notif-state warn">Offline</span>}
+          </div>
+          <ul className="notif-overview data-health" aria-label="Data health">
             <li>
               <span>Saved on this device</span>
               <span className={`notif-state${hasPendingSaves() || persistenceFailure() ? ' warn' : ''}`}>
@@ -1509,22 +1564,16 @@ export function SettingsSheet({
             {syncState && (
               <li>
                 <span>Sync status</span>
-                <span className={`notif-state${syncDetail.failed || syncDetail.busy ? ' warn' : ''}`} aria-live="polite">
-                  {syncDetail.message
-                    ? `${syncDetail.message}${syncDetail.at ? ` (${new Date(syncDetail.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})` : ''}`
-                    : 'no sync attempt yet this session'}
-                  {' · '}checks every 3 minutes while open, and when the app is shown, focused or back online
+                <span className={`notif-state${!online || syncDetail.failed || syncDetail.busy ? ' warn' : ''}`} aria-live="polite">
+                  {!online
+                    ? 'Offline — sync resumes when the connection returns'
+                    : syncDetail.message
+                      ? `${syncDetail.message}${syncDetail.at ? ` (${new Date(syncDetail.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})` : ''}`
+                      : 'no sync attempt yet this session'}
+                  {online ? ' · checks every 3 minutes while open, and when the app is shown, focused or back online' : ''}
                 </span>
               </li>
             )}
-            <li>
-              <span>Photos & documents</span>
-              <span className="notif-state">
-                {localFiles
-                  ? `${localFiles.photos} photo${localFiles.photos === 1 ? '' : 's'}, ${localFiles.wallet} document${localFiles.wallet === 1 ? '' : 's'} on this device only — not part of sync; move them with a backup`
-                  : 'on this device only — not part of sync'}
-              </span>
-            </li>
             <li>
               <span>Last backup generated</span>
               <span className={`notif-state${lastBackupAt() ? '' : ' warn'}`}>
@@ -1547,74 +1596,69 @@ export function SettingsSheet({
                 })()}
               </span>
             </li>
-            <li>
-              <span>Recoverable drafts</span>
-              <span className="notif-state">
-                {(() => {
-                  const n = listDrafts(store.activeId).length
-                  return n === 0 ? 'none' : `${n} unsaved draft${n === 1 ? '' : 's'} kept on this device — reopen the record to continue`
-                })()}
-              </span>
-            </li>
-            {sources.map((src) => (
-              <li key={src.id}>
-                <span>{src.label} source</span>
-                <span className={`notif-state${src.status !== 'ok' ? ' warn' : ''}`}>
-                  {src.status === 'ok'
-                    ? `updated ${src.lastSuccessAt ? new Date(src.lastSuccessAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'this session'}`
-                    : src.status === 'stale'
-                      ? 'showing last saved rows'
-                      : 'not loading'}
+            {/* Draft problems surface automatically; the rest of the detail is expandable. */}
+            {listDrafts(store.activeId).length > 0 && (
+              <li className="data-drafts-notice">
+                <span>Recoverable drafts</span>
+                <span className="notif-state warn">
+                  {(() => {
+                    const n = listDrafts(store.activeId).length
+                    return `${n} unsaved draft${n === 1 ? '' : 's'} kept on this device — reopen the record to continue`
+                  })()}
                 </span>
               </li>
-            ))}
-            <li>
-              <span>Storage</span>
-              <span className="notif-state">{storageEstimate ?? '…'}</span>
-            </li>
-          </ul>
-          <p className="filter-hint">
-            A downloaded backup is only safe once you can see the file where you saved it — the
-            download prompt alone is not proof it was kept.
-          </p>
-        </section>
-
-        {attendance.eligible > 0 && (
-          <section className="filter-section">
-            <h3>Attendance</h3>
-            <p className="attendance-headline" aria-label={`${attendance.attendedPct}% attended`}>
-              {attendance.attendedPct}%
-            </p>
-            <p className="filter-hint">
-              {attendance.sentence} Unrecorded sessions are not absences.
-            </p>
-            {subjectRows.length > 0 && (
-              <ul className="attendance-list">
-                {subjectRows.map(([subject, { attended, total }]) => (
-                  <li key={subject}>
-                    <span className="attendance-subject">{subject}</span>
-                    <span className="attendance-count">
-                      {attended}/{total} · {Math.round((attended / total) * 100)}%
+            )}
+            <li className="data-advanced-item">
+              <details className="data-advanced" id="data-advanced">
+                <summary>
+                  <h3 tabIndex={-1}>Storage &amp; advanced</h3>
+                </summary>
+                <ul className="notif-overview" aria-label="Storage and advanced detail">
+                  <li>
+                    <span>Photos &amp; documents</span>
+                    <span className="notif-state">
+                      {localFiles
+                        ? `${localFiles.photos} photo${localFiles.photos === 1 ? '' : 's'}, ${localFiles.wallet} document${localFiles.wallet === 1 ? '' : 's'} on this device only — not part of sync; move them with a backup`
+                        : 'on this device only — not part of sync'}
                     </span>
                   </li>
-                ))}
-              </ul>
-            )}
-            <div className="btn-row">
-              <button type="button" className="btn-secondary" onClick={onOpenStats}>
-                <IconChart />
-                Term stats
-              </button>
-              <button type="button" className="btn-secondary" onClick={downloadAttendanceCSV}>
-                Export attendance CSV
-              </button>
-            </div>
-          </section>
-        )}
-
+                  <li>
+                    <span>Recoverable drafts</span>
+                    <span className="notif-state">
+                      {(() => {
+                        const n = listDrafts(store.activeId).length
+                        return n === 0 ? 'none' : `${n} unsaved draft${n === 1 ? '' : 's'} kept on this device — reopen the record to continue`
+                      })()}
+                    </span>
+                  </li>
+                  {sources.map((src) => (
+                    <li key={src.id}>
+                      <span>{src.label} source</span>
+                      <span className={`notif-state${src.status !== 'ok' ? ' warn' : ''}`}>
+                        {src.status === 'ok'
+                          ? `updated ${src.lastSuccessAt ? new Date(src.lastSuccessAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'this session'}`
+                          : src.status === 'stale'
+                            ? 'showing last saved rows'
+                            : 'not loading'}
+                      </span>
+                    </li>
+                  ))}
+                  <li>
+                    <span>Storage</span>
+                    <span className="notif-state">{storageEstimate ?? '…'}</span>
+                  </li>
+                </ul>
+                <p className="filter-hint">
+                  A downloaded backup is only safe once you can see the file where you saved it — the
+                  download prompt alone is not proof it was kept.
+                </p>
+              </details>
+            </li>
+          </ul>
+        </section>
 
         <section className="filter-section" id="backup">
-          <h3 tabIndex={-1}>Backup</h3>
+          <h3 tabIndex={-1}>Back up &amp; restore</h3>
           <p className="filter-hint">
             Everything lives on this device only. Generate a backup (timetables, filters, notes,
             attendance, photos and documents) and restore it on a new device or after clearing browser
@@ -1655,8 +1699,6 @@ export function SettingsSheet({
             />
           </div>
         </section>
-
-
 
         <section className="filter-section" id="sync">
           <h3 tabIndex={-1}>Sync between devices</h3>
@@ -1726,6 +1768,17 @@ export function SettingsSheet({
             </>
           )}
           {syncMsg && <p className="filter-hint">{syncMsg}</p>}
+        </section>
+
+        <section className="filter-section" id="attendance-analysis">
+          <h3>Attendance analysis</h3>
+          <p className="filter-hint">
+            The attendance percentage, the per-subject breakdown and the CSV export now live in Term stats, next to the rest of your term.
+          </p>
+          <button type="button" className="btn-secondary" onClick={onOpenStats}>
+            <IconChart />
+            Term stats
+          </button>
         </section>
 
         </>

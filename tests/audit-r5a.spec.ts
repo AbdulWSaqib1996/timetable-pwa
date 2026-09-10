@@ -220,10 +220,14 @@ test('NF-08: a session detail can flag a record for review; the flag survives wi
 test('attendance percentage is shown again, always next to its honest denominator (Settings and Term stats)', async ({ page }) => {
   await seed(page, { profiles: [{ id: 'a', name: 'Profile A', settings: DEMO }] })
   await page.goto('./#/settings/data')
-  await expect(page.getByText(/^\d+%$/).first()).toBeVisible()
-  await expect(page.getByText(/\d+% attended — \d+ of \d+ eligible completed sessions; \d+ absent, \d+ unrecorded\./)).toBeVisible()
+  // V3: the analysis relocated to Term stats; Data & devices keeps a one-tap link to it.
+  await expect(page.locator('#attendance-analysis')).toContainText('now live in Term stats')
+  await expect(page.locator('#data-health').getByText(/^\d+%$/)).toHaveCount(0)
   await page.getByRole('button', { name: 'Term stats' }).click()
   const stats = page.getByRole('dialog')
   await expect(stats.getByText(/^\d+%$/).first()).toBeVisible()
   await expect(stats.getByText(/attended — \d+ of \d+ eligible completed sessions/).first()).toBeVisible()
+  await expect(stats.getByText(/\d+% attended — \d+ of \d+ eligible completed sessions; \d+ absent, \d+ unrecorded\./)).toBeVisible()
+  await expect(stats.getByRole('list', { name: 'Attendance by subject' })).toBeVisible()
+  await expect(stats.getByRole('button', { name: 'Export attendance CSV' })).toBeVisible()
 })

@@ -1,10 +1,11 @@
-import { attendanceSummary, placementDaySummary } from '../../shared/eligibility.js'
+import { attendanceSummary, isCompleted, isEligibleSession, placementDaySummary } from '../../shared/eligibility.js'
 import { useModalA11y } from '../lib/a11y'
 import { matchBuilding } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
 import { baseSubject, isPlacementSession, shortenRoom, toMinutes } from '../lib/format'
 import type { MetaMap, Session } from '../types'
-import { IconClose } from './ui'
+import { downloadFile } from '../lib/files'
+import { IconClose, IconDownload } from './ui'
 
 interface Props {
   sessions: Session[]
@@ -207,6 +208,32 @@ export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placeme
       oneOffs: all.filter((e) => !isSubjectish(e)).length,
     }
   })()
+  // Attendance analysis (relocated here from Data & devices in V3): the same
+  // shared definition of eligible completed sessions, one CSV row per session
+  // so the export totals match the headline exactly.
+  const eligiblePast = sessions.filter((s) => isEligibleSession(s) && isCompleted(s, todayISO))
+  const attendanceBySubject = (() => {
+    const map = new Map<string, { attended: number; total: number }>()
+    for (const s of eligiblePast) {
+      const key = s.subject || s.title
+      const entry = map.get(key) ?? { attended: 0, total: 0 }
+      entry.total++
+      if (metaMap[sessionKey(s)]?.attended) entry.attended++
+      map.set(key, entry)
+    }
+    return [...map.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 8)
+  })()
+  function downloadAttendanceCSV() {
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const rows = ['Date,Start,Title,Subject,Room,Attended,Absent,Reason,Note']
+    for (const s of eligiblePast) {
+      const m = metaMap[sessionKey(s)]
+      rows.push(
+        [s.dateISO, s.start, esc(s.title), esc(s.subject || s.title), esc(s.room), m?.attended ? 'yes' : 'no', m?.absent ? 'yes' : 'no', esc(m?.absentReason ?? ''), esc(m?.note ?? '')].join(',')
+      )
+    }
+    downloadFile('attendance.csv', rows.join('\r\n'), 'text/csv;charset=utf-8')
+  }
   const tiles = buildTiles(stats)
   if (adminCounts?.lessons) tiles.push({ big: `${adminCounts.lessons}`, small: 'lessons taught (logged)' })
   if (adminCounts?.observations) tiles.push({ big: `${adminCounts.observations}`, small: 'observations received' })
@@ -235,8 +262,33 @@ export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placeme
             </div>
           ))}
         </div>
-        <p className="filter-hint">{stats.attendance.sentence} Unrecorded days aren’t absences —
-          they just haven’t been marked yet.</p>
+        <section className="stats-attendance" aria-labelledby="stats-attendance-heading">
+          <h3 className="subheading" id="stats-attendance-heading">Attendance</h3>
+          {stats.attendance.eligible > 0 && (
+            <p className="attendance-headline" aria-label={`${stats.attendance.attendedPct}% attended`}>
+              {stats.attendance.attendedPct}%
+            </p>
+          )}
+          <p className="filter-hint">{stats.attendance.sentence} Unrecorded days aren’t absences —
+            they just haven’t been marked yet.</p>
+          {attendanceBySubject.length > 0 && (
+            <ul className="attendance-list" aria-label="Attendance by subject">
+              {attendanceBySubject.map(([subject, { attended, total }]) => (
+                <li key={subject}>
+                  <span className="attendance-subject">{subject}</span>
+                  <span className="attendance-count">
+                    {attended}/{total} · {Math.round((attended / total) * 100)}%
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {eligiblePast.length > 0 && (
+            <button type="button" className="btn-secondary" onClick={downloadAttendanceCSV}>
+              <IconDownload /> Export attendance CSV
+            </button>
+          )}
+        </section>
         {stats.placementBlocks.length > 0 && (
           <p className="filter-hint">
             Placement blocks:{' '}
@@ -274,7 +326,7 @@ export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placeme
         )}
         <div className="modal-actions">
           <button type="button" className="btn-primary" onClick={() => void shareStatsImage(tiles)}>
-            📸 Share as image
+            Share as image
           </button>
           <button type="button" className="btn-ghost" onClick={onClose}>
             Close
