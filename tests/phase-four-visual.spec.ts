@@ -162,7 +162,7 @@ test('dark theme override beats the OS preference in both directions', async ({ 
   await page.goto('./#/today')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
-  expect(bg).toBe('rgb(17, 23, 34)') // #111722 dark canvas despite a light OS
+  expect(bg).toBe('rgb(18, 27, 41)') // --bg #121b29 (V1 dark canvas) despite a light OS
   await shot(page, 'today-dark-390')
 })
 

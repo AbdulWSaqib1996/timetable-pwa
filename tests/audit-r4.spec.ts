@@ -145,7 +145,7 @@ test('NF-03: Plan week suggests non-overlapping gaps with reasons; a suggestion 
   await expect(task.getByText(/Prefilled from Plan week/)).toBeVisible()
   await expect(task.getByLabel('Starts')).toHaveValue(from)
   await task.getByPlaceholder('Study block…').fill('Essay reading')
-  await task.getByRole('button', { name: '＋ Add block' }).click()
+  await task.getByRole('button', { name: 'Add block' }).click()
   await task.getByRole('button', { name: 'Close' }).click()
   expect((await adminOf(page, 'd')).plans.filter((p: { title: string }) => p.title === 'Essay reading')).toHaveLength(1)
   await expect(page.getByText(/Added study block “Essay reading”/)).toBeVisible()

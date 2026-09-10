@@ -3,7 +3,7 @@ import { needsScheduling, validatePlanChild } from '../../shared/planValidation.
 import { newAdminId } from '../lib/admin'
 import type { PlanChildRec } from '../lib/admin'
 import { formatRemaining } from '../lib/format'
-import { Field } from './ui'
+import { Field, IconClose, IconEdit } from './ui'
 
 export interface BlockPrefill {
   dateISO: string
@@ -176,10 +176,10 @@ export function WorkPlanSection({ parentId, children_, busyCheck, onSave, onDele
                 </label>
               )}
               <button type="button" className="btn-icon" aria-label={`Edit ${c.kind} “${c.title}”`} onClick={() => startEdit(c)}>
-                ✎
+                <IconEdit />
               </button>
               <button type="button" className="btn-icon" aria-label={`Remove ${c.kind}`} onClick={() => onDelete(c.id)}>
-                ✕
+                <IconClose />
               </button>
             </li>
           )
@@ -247,7 +247,7 @@ export function WorkPlanSection({ parentId, children_, busyCheck, onSave, onDele
         )}
         <div className="btn-row">
           <button type="button" className="btn-secondary" disabled={!title.trim()} onClick={submit}>
-            {editingId ? `Save ${kindLabel}` : `＋ Add ${kindLabel}`}
+            {editingId ? `Save ${kindLabel}` : `Add ${kindLabel}`}
           </button>
           {editingId && (
             <button type="button" className="btn-ghost" onClick={cancelEdit}>

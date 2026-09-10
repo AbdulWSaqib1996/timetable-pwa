@@ -9,7 +9,7 @@ import { downloadFile } from '../lib/files'
 import { reportPersistenceFailure } from '../lib/persistence'
 import { exportBackup, importBackup, markBackedUp } from '../lib/storage'
 import type { ProfileStore } from '../types'
-import { Dialog, Field, StatusMessage } from './ui'
+import { Dialog, Field, IconClose, StatusMessage } from './ui'
 
 const sizeOf = (text: string) => {
   const bytes = new Blob([text]).size
@@ -96,7 +96,7 @@ export function BackupSheet({ store, onClose }: { store: ProfileStore; onClose: 
       <div className="sheet-header">
         <h2>Back up</h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
       <Field label="What to include">
@@ -242,7 +242,7 @@ export function RestoreSheet({ text, passphrase, onClose, onRestored }: { text: 
       <div className="sheet-header">
         <h2>Restore backup</h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
       {plain === null ? (

@@ -2,10 +2,12 @@ import { SyncNotice } from './components/SyncNotice'
 import { DATA_CHANGED_EVENT } from './lib/persistence'
 import { SYNC_APPLIED_EVENT, setSyncStatus } from './lib/sync'
 import { reportPersistenceFailure } from './lib/persistence'
-import { BACKUP_GENERATED_EVENT, markBackedUp } from './lib/storage'
+import { BACKUP_GENERATED_EVENT } from './lib/storage'
 import { PersistenceNotice } from './components/PersistenceNotice'
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
+import { IconPlus } from './components/ui'
+import { clearAttention, setAttention } from './lib/attention'
 import { SessionDetail } from './components/SessionDetail'
 import { SetupScreen } from './components/SetupScreen'
 import type { SetupResult } from './components/SetupScreen'
@@ -81,14 +83,12 @@ import { TaskEditSheet } from './components/TaskEditSheet'
 import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
 import type { Notice } from './lib/notices'
 import { SyncBusyError, loadSyncState, pushSync, syncPullApply } from './lib/sync'
-import { downloadFile } from './lib/files'
 import { useNotifications } from './hooks/useNotifications'
 import { useTimetableData } from './hooks/useTimetableData'
 import { useTravel } from './hooks/useTravel'
 import { activeCourse, setActiveCourse } from './lib/course'
 import {
   clearProfileData,
-  exportBackup,
   loadStore,
   loadMeta,
   newProfileId,
@@ -97,7 +97,6 @@ import {
   saveMeta,
   saveStore,
   shouldNudgeBackup,
-  snoozeBackupNudge,
 } from './lib/storage'
 import type {
   Filters,
@@ -535,6 +534,13 @@ export default function App() {
     window.addEventListener(SYNC_APPLIED_EVENT, applied)
     return () => window.removeEventListener(SYNC_APPLIED_EVENT, applied)
   }, [setMetaMap])
+  // V-04: the routine backup prompt is an attention item on Settings / Data &
+  // devices, not a banner above every page heading. Save failures stay global.
+  useEffect(() => {
+    if (showBackupNudge) setAttention({ key: 'backup', message: 'Notes, attendance and photos live only on this device — a timetable has not been backed up recently.', section: 'data' })
+    else clearAttention('backup')
+  }, [showBackupNudge])
+
   const detailOpen = route.name === 'session'
   useEffect(() => {
     if (openSheet === 'none' && !detailOpen && externalRefreshPending.current) window.dispatchEvent(new Event(SYNC_APPLIED_EVENT))
@@ -1206,33 +1212,6 @@ export default function App() {
           )
         })()}
 
-      {showBackupNudge && (
-        <div className="backup-banner">
-          <span>💾 Your notes, attendance and photos live only on this device.</span>
-          <span className="backup-actions">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                void exportBackup().then((json) => { downloadFile('my-timetable-backup.json', json, 'application/json'); markBackedUp({ profiles: (store?.profiles ?? []).map((p) => p.id), all: true }) }).catch(error => reportPersistenceFailure('Backup export failed: ' + String(error)))
-                setShowBackupNudge(false)
-              }}
-            >
-              Back up now
-            </button>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => {
-                snoozeBackupNudge()
-                setShowBackupNudge(false)
-              }}
-            >
-              Later
-            </button>
-          </span>
-        </div>
-      )}
 
       {route.name === 'today' && sessions !== null && travelMode === 'transit' && tubeStatus.length > 0 && (
         <details className="tfl-banner">
@@ -1736,7 +1715,7 @@ export default function App() {
           title="Add a personal deadline"
           onClick={() => setTaskEdit({ task: null })}
         >
-          ＋
+          <IconPlus size={24} />
         </button>
       )}
 

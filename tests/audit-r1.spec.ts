@@ -166,7 +166,7 @@ test('TT-10: an impossible study block cannot be saved; the error names the fiel
   await page.getByLabel('Add to plan', { exact: true }).fill('Invalid interval')
   await page.getByLabel('Starts', { exact: true }).fill('18:00')
   await page.getByLabel('Ends', { exact: true }).fill('17:00')
-  await page.getByRole('button', { name: '＋ Add block' }).click()
+  await page.getByRole('button', { name: 'Add block' }).click()
   await expect(page.getByRole('alert')).toContainText(/end after it starts|real date/)
   const plans = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.audit')!).plans)
   expect(plans.length).toBe(0)

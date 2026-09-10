@@ -6,7 +6,7 @@ import { useDraft } from '../hooks/useDraft'
 import type { PlanChildRec } from '../lib/admin'
 import { WorkPlanSection } from './WorkPlanSection'
 import type { BlockPrefill } from './WorkPlanSection'
-import { Dialog, Field, StatusMessage } from './ui'
+import { Dialog, Field, IconClose, StatusMessage } from './ui'
 
 interface TaskFields {
   title: string
@@ -147,7 +147,7 @@ export function TaskEditSheet({
       <div className="sheet-header">
         <h2>{task ? 'Edit task' : 'Add task'}</h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
 

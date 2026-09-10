@@ -4,6 +4,7 @@ import { matchBuilding } from '../lib/campus'
 import { sessionKey } from '../lib/diff'
 import { baseSubject, isPlacementSession, shortenRoom, toMinutes } from '../lib/format'
 import type { MetaMap, Session } from '../types'
+import { IconClose } from './ui'
 
 interface Props {
   sessions: Session[]
@@ -223,7 +224,7 @@ export function StatsSheet({ sessions, metaMap, todayISO, keyDates = [], placeme
         <div className="sheet-header">
           <h2>Term so far</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-            ✕
+            <IconClose />
           </button>
         </div>
         <div className="stats-grid">

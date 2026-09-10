@@ -8,7 +8,7 @@ import { BinderPreviewSheet } from './BinderPreviewSheet'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import { RecordEditSheet } from './RecordEditSheet'
 import type { RecordKind } from './RecordEditSheet'
-import { StatusMessage } from './ui'
+import { IconClose, IconEdit, IconPrint, StatusMessage } from './ui'
 import { WALLET_FILE_CAP, addWalletFile, deleteWalletFile, getWalletFiles } from '../lib/wallet'
 import type { WalletFile } from '../lib/wallet'
 import type { MetaMap, Session } from '../types'
@@ -126,8 +126,8 @@ function ReflectionsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFil
                 {r.standards.map((ts) => (
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
-                <button type="button" className="btn-icon" aria-label="Edit reflection" onClick={() => onEdit('reflection', r.id)}>✎</button>
-                <button type="button" className="btn-icon" aria-label="Delete reflection" onClick={() => onUpdate((prev) => ({ ...prev, reflections: prev.reflections.filter((x) => x.id !== r.id) }))}>✕</button>
+                <button type="button" className="btn-icon" aria-label="Edit reflection" onClick={() => onEdit('reflection', r.id)}><IconEdit /></button>
+                <button type="button" className="btn-icon" aria-label="Delete reflection" onClick={() => onUpdate((prev) => ({ ...prev, reflections: prev.reflections.filter((x) => x.id !== r.id) }))}><IconClose /></button>
               </span>
             </div>
             {r.wentWell && <p>👍 {r.wentWell}</p>}
@@ -184,8 +184,8 @@ function TargetsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
                 {t.standards.map((ts) => (
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
-                <button type="button" className="btn-icon" aria-label="Edit target" onClick={() => onEdit('target', t.id)}>✎</button>
-                <button type="button" className="btn-icon" aria-label="Delete target" onClick={() => onUpdate((prev) => ({ ...prev, targets: prev.targets.filter((x) => x.id !== t.id) }))}>✕</button>
+                <button type="button" className="btn-icon" aria-label="Edit target" onClick={() => onEdit('target', t.id)}><IconEdit /></button>
+                <button type="button" className="btn-icon" aria-label="Delete target" onClick={() => onUpdate((prev) => ({ ...prev, targets: prev.targets.filter((x) => x.id !== t.id) }))}><IconClose /></button>
               </span>
             </div>
             <p>{t.text}</p>
@@ -241,8 +241,8 @@ function MeetingsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; 
             <div className="admin-item-head">
               <strong>{fmt(m.dateISO)}</strong>
               <span className="journal-tags">
-                <button type="button" className="btn-icon" aria-label="Edit meeting" onClick={() => onEdit('meeting', m.id)}>✎</button>
-                <button type="button" className="btn-icon" aria-label="Delete meeting" onClick={() => onUpdate((prev) => ({ ...prev, meetings: prev.meetings.filter((x) => x.id !== m.id) }))}>✕</button>
+                <button type="button" className="btn-icon" aria-label="Edit meeting" onClick={() => onEdit('meeting', m.id)}><IconEdit /></button>
+                <button type="button" className="btn-icon" aria-label="Delete meeting" onClick={() => onUpdate((prev) => ({ ...prev, meetings: prev.meetings.filter((x) => x.id !== m.id) }))}><IconClose /></button>
               </span>
             </div>
             {m.discussed && <p>{m.discussed}</p>}
@@ -327,8 +327,8 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFi
             <div className="admin-item-head">
               <strong>{fmt(o.dateISO)} · {o.subject || 'Lesson'}</strong>
               <span className="journal-tags">
-                <button type="button" className="btn-icon" aria-label="Edit observation" onClick={() => onEdit('observation', o.id)}>✎</button>
-                <button type="button" className="btn-icon" aria-label="Delete observation" onClick={() => onUpdate((prev) => ({ ...prev, observations: prev.observations.filter((x) => x.id !== o.id) }))}>✕</button>
+                <button type="button" className="btn-icon" aria-label="Edit observation" onClick={() => onEdit('observation', o.id)}><IconEdit /></button>
+                <button type="button" className="btn-icon" aria-label="Delete observation" onClick={() => onUpdate((prev) => ({ ...prev, observations: prev.observations.filter((x) => x.id !== o.id) }))}><IconClose /></button>
               </span>
             </div>
             {o.observer && <p className="admin-dates">observed by {o.observer}{o.focus ? ` · focus: ${o.focus}` : ''}</p>}
@@ -385,8 +385,8 @@ function LessonsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
                 {l.standards.map((ts) => (
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
-                <button type="button" className="btn-icon" aria-label="Edit lesson" onClick={() => onEdit('lesson', l.id)}>✎</button>
-                <button type="button" className="btn-icon" aria-label="Delete lesson" onClick={() => onUpdate((prev) => ({ ...prev, lessons: prev.lessons.filter((x) => x.id !== l.id) }))}>✕</button>
+                <button type="button" className="btn-icon" aria-label="Edit lesson" onClick={() => onEdit('lesson', l.id)}><IconEdit /></button>
+                <button type="button" className="btn-icon" aria-label="Delete lesson" onClick={() => onUpdate((prev) => ({ ...prev, lessons: prev.lessons.filter((x) => x.id !== l.id) }))}><IconClose /></button>
               </span>
             </div>
             {l.evaluation && <p>{l.evaluation}</p>}
@@ -442,8 +442,8 @@ function AuditsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; to
             {[...entries].sort((a, b) => a.dateISO.localeCompare(b.dateISO)).map((e) => (
               <p key={e.id}>
                 {e.stage} ({fmt(e.dateISO)}){e.note ? `: ${e.note}` : ''}{' '}
-                <button type="button" className="btn-icon" aria-label="Edit audit entry" onClick={() => onEdit('audit', e.id)}>✎</button>
-                <button type="button" className="btn-icon" aria-label="Delete audit entry" onClick={() => onUpdate((prev) => ({ ...prev, audits: prev.audits.filter((x) => x.id !== e.id) }))}>✕</button>
+                <button type="button" className="btn-icon" aria-label="Edit audit entry" onClick={() => onEdit('audit', e.id)}><IconEdit /></button>
+                <button type="button" className="btn-icon" aria-label="Delete audit entry" onClick={() => onUpdate((prev) => ({ ...prev, audits: prev.audits.filter((x) => x.id !== e.id) }))}><IconClose /></button>
               </p>
             ))}
           </li>
@@ -508,7 +508,7 @@ function WalletTab({ profileId }: { profileId: string }) {
                     if (window.confirm(`Delete "${f.name}" from the wallet?`)) void deleteWalletFile(f.id).then(reload)
                   }}
                 >
-                  ✕
+                  <IconClose />
                 </button>
               </span>
             </div>
@@ -618,7 +618,7 @@ export function AdminSheet(props: Props) {
         <div className="sheet-header">
           <h2>🎓 My PGCE file</h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-            ✕
+            <IconClose />
           </button>
         </div>
         <div className="chip-grid admin-tabs">
@@ -713,7 +713,7 @@ export function AdminSheet(props: Props) {
             className="btn-primary"
             onClick={() => setBinderPreview(true)}
           >
-            🖨 Export binder (preview first)
+            <IconPrint /> Export binder (preview first)
           </button>
           <button type="button" className="btn-ghost" onClick={onClose}>
             Close

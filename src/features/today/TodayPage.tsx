@@ -10,7 +10,7 @@ import { parseLocation, shortBuildingName } from '../../lib/location'
 import { freshnessLabel } from '../../../shared/travel-state.js'
 import { cachedRouteInfo } from '../../lib/tfl'
 import { TRAVEL_MODE_PHRASE } from '../../lib/campus'
-import { Card, EmptyState, IconBell, IconRefresh, PageHeader, SettingsAction } from '../../components/ui'
+import { Card, EmptyState, IconBell, IconClose, IconRefresh, PageHeader, SettingsAction } from '../../components/ui'
 import { AttendancePromptCard } from '../../components/AttendancePrompt'
 import type { AttendanceAnswer } from '../../components/AttendancePrompt'
 import type { MetaMap, Session, SessionChange, Settings } from '../../types'
@@ -449,7 +449,7 @@ export function TodayPage({
             </button>
             {homePromoted && (
               <button type="button" className="btn-icon" aria-label="Dismiss for today" onClick={dismissHome}>
-                ✕
+                <IconClose />
               </button>
             )}
           </div>

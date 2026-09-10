@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { Route } from '../lib/router'
 import { activeCourse } from '../lib/course'
 import { IconPGCE, IconSchedule, IconSettings, IconTasks, IconToday } from './ui'
+import { useAttention } from '../lib/attention'
 
 interface Props {
   route: Route
@@ -56,6 +57,7 @@ export function AppShell({ route, onNavigate, hideNav, profileName, children }: 
     mq.addEventListener('change', onChange)
     return () => mq.removeEventListener('change', onChange)
   }, [])
+  const attention = useAttention()
   const mainRef = useRef<HTMLElement | null>(null)
   const firstRender = useRef(true)
   const [announce, setAnnounce] = useState('')
@@ -129,6 +131,7 @@ export function AppShell({ route, onNavigate, hideNav, profileName, children }: 
           >
             <IconSettings size={20} />
             <span>Settings</span>
+            {attention.length > 0 && <span className="attention-dot" aria-label={`${attention.length} item${attention.length === 1 ? '' : 's'} need attention`} role="img" />}
           </button>
         </aside>
       )}

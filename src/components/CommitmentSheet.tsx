@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { newAdminId } from '../lib/admin'
 import type { CommitmentRec } from '../lib/admin'
 import { useDraft } from '../hooks/useDraft'
-import { Dialog, Field, StatusMessage } from './ui'
+import { Dialog, Field, IconClose, StatusMessage } from './ui'
 
 interface Fields {
   title: string
@@ -93,7 +93,7 @@ export function CommitmentSheet({ profileId, commitment, defaultDateISO, default
       <div className="sheet-header">
         <h2>{commitment ? 'Edit personal event' : 'Add personal event'}</h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
 

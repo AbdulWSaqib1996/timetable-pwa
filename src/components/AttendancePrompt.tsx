@@ -1,6 +1,6 @@
 import { shortenRoom } from '../lib/format'
 import type { Session } from '../types'
-import { Card, Dialog } from './ui'
+import { Card, Dialog, IconClose } from './ui'
 
 export type AttendanceAnswer = 'attended' | 'absent'
 
@@ -22,7 +22,7 @@ export function AttendancePromptSheet({ session, onAnswer, onOpen, onClose }: Co
       <div className="sheet-header">
         <h2>Did you attend {session.title}?</h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
       <p className="filter-hint">

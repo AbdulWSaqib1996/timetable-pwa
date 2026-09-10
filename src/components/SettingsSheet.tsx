@@ -29,9 +29,11 @@ import type { SourceStatus } from '../../shared/refresh.js'
 import type { PlacementExceptionRec } from '../lib/admin'
 import { placementBlocks as computePlacementBlocks } from '../lib/placement'
 import { WHATSNEW } from '../lib/changelog'
-import { IconBack, PageHeader } from './ui'
+import { IconBack, IconChart, IconClose, PageHeader } from './ui'
 import { BackupSheet, RestoreSheet } from './BackupSheets'
 import { CloudBackupsSection } from './CloudBackupsSection'
+import { useAttention } from '../lib/attention'
+import { snoozeBackupNudge } from '../lib/storage'
 import { backupCoverage, lastBackupAt } from '../lib/storage'
 import { attendanceReportPending } from '../hooks/useNotifications'
 import { listDrafts } from '../lib/draftIndex'
@@ -239,6 +241,7 @@ export function SettingsSheet({
 }: Props) {
   const [feedBase, setFeedBase] = useState(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE)
   const [searchQuery, setSearchQuery] = useState('')
+  const attention = useAttention()
   const searchResults = searchSettings(searchQuery)
   // Section links (TT-21) and search results open a section through the
   // existing settings navigation, then focus the target heading once it has
@@ -675,6 +678,14 @@ export function SettingsSheet({
             </button>
           }
         />
+        {attention.map((a) => (
+          <p key={a.key} className="setup-error settings-attention" role="status">
+            {a.message}{' '}
+            <button type="button" className="travel-link" onClick={() => openAt('data', 'backup')}>
+              Open Data & devices →
+            </button>
+          </p>
+        ))}
         {store.profiles.length > 1 && (
           <p className="filter-hint settings-profile-line">
             Showing settings for <strong>{activeProfile?.name}</strong>.{' '}
@@ -774,7 +785,7 @@ export function SettingsSheet({
                       onUpdateSettings({ extraTabs: (settings.extraTabs ?? []).filter((_, j) => j !== i) })
                     }
                   >
-                    ✕
+                    <IconClose />
                   </button>
                 </div>
               ))}
@@ -898,7 +909,7 @@ export function SettingsSheet({
             course without touching your personal data.
           </p>
           <button type="button" className="btn-secondary" onClick={onOpenCourse}>
-            🎓 Course setup
+            Course setup
           </button>
         </section>
 
@@ -1299,9 +1310,9 @@ export function SettingsSheet({
           <div className="chip-grid">
             {(
               [
-                { value: 'walking', label: '🚶 Walking' },
-                { value: 'transit', label: '🚌 Public transport' },
-                { value: 'driving', label: '🚗 Driving' },
+                { value: 'walking', label: 'Walking' },
+                { value: 'transit', label: 'Public transport' },
+                { value: 'driving', label: 'Driving' },
               ] as const
             ).map(({ value, label }) => (
               <button
@@ -1594,7 +1605,8 @@ export function SettingsSheet({
             )}
             <div className="btn-row">
               <button type="button" className="btn-secondary" onClick={onOpenStats}>
-                📊 Term stats
+                <IconChart />
+                Term stats
               </button>
               <button type="button" className="btn-secondary" onClick={downloadAttendanceCSV}>
                 Export attendance CSV
@@ -1615,6 +1627,16 @@ export function SettingsSheet({
           {backupOpen && <BackupSheet store={store} onClose={() => setBackupOpen(false)} />}
           {restoreText !== null && (
             <RestoreSheet text={restoreText.text} passphrase={restoreText.passphrase} onClose={() => setRestoreText(null)} onRestored={() => window.location.reload()} />
+          )}
+          {attention.some((a) => a.key === 'backup') && (
+            <p className="setup-error" role="status">
+              Notes, attendance and photos live only on this device, and a timetable has not been included in a backup recently.
+              Generate one below, or{' '}
+              <button type="button" className="travel-link" onClick={() => { snoozeBackupNudge(); window.dispatchEvent(new Event('timetable-backup-generated')) }}>
+                remind me in a week
+              </button>
+              .
+            </p>
           )}
           <div className="btn-row">
             <button type="button" className="btn-primary" onClick={() => setBackupOpen(true)}>
@@ -1727,8 +1749,8 @@ export function SettingsSheet({
             {(
               [
                 { value: 'system', label: 'System' },
-                { value: 'light', label: '☀️ Light' },
-                { value: 'dark', label: '🌙 Dark' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
               ] as const
             ).map(({ value, label }) => (
               <button

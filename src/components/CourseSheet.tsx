@@ -4,6 +4,7 @@ import { UCL_PGCE_CONFIG, sanitizeTemplate, validateCourseConfig } from '../../s
 import type { CourseBuilding, CourseConfig } from '../../shared/course.js'
 import { useModalA11y } from '../lib/a11y'
 import type { Settings } from '../types'
+import { IconClose } from './ui'
 
 interface Props {
   settings: Settings
@@ -95,7 +96,7 @@ export function CourseSheet({ settings, onUpdateSettings, onClose }: Props) {
       <div ref={dialogRef} className="modal-card sheet" role="dialog" aria-modal="true" aria-label="Course setup" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">
           <h2>Course setup</h2>
-          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">✕</button>
+          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close"><IconClose /></button>
         </div>
 
         {mode === 'view' && (
@@ -191,7 +192,7 @@ export function CourseSheet({ settings, onUpdateSettings, onClose }: Props) {
                   <input type="text" aria-label={`Building ${i + 1} keywords`} placeholder="keywords, comma-separated" value={b.keywords.join(', ')} onChange={(e) => patchBuilding(i, { keywords: e.target.value.split(',').map((k) => k.trim()).filter(Boolean) })} />
                   <input type="number" aria-label={`Building ${i + 1} latitude`} step="any" placeholder="lat" value={b.lat} onChange={(e) => patchBuilding(i, { lat: Number(e.target.value) })} />
                   <input type="number" aria-label={`Building ${i + 1} longitude`} step="any" placeholder="lng" value={b.lng} onChange={(e) => patchBuilding(i, { lng: Number(e.target.value) })} />
-                  <button type="button" className="btn-icon" aria-label={`Remove building ${i + 1}`} onClick={() => setDraft((d) => ({ ...d, buildings: d.buildings.filter((_, j) => j !== i) }))}>✕</button>
+                  <button type="button" className="btn-icon" aria-label={`Remove building ${i + 1}`} onClick={() => setDraft((d) => ({ ...d, buildings: d.buildings.filter((_, j) => j !== i) }))}><IconClose /></button>
                 </div>
               ))}
               <button type="button" className="btn-secondary" onClick={() => setDraft((d) => ({ ...d, buildings: [...d.buildings, { name: '', keywords: [], lat: d.campus.lat, lng: d.campus.lng }] }))}>

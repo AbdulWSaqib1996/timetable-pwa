@@ -3,7 +3,7 @@ import { newAdminId } from '../lib/admin'
 import type { MeetingAction } from '../lib/admin'
 import { useDraft } from '../hooks/useDraft'
 import { TEACHERS_STANDARDS } from '../lib/standards'
-import { Dialog, Field, StatusMessage } from './ui'
+import { Dialog, Field, IconClose, StatusMessage } from './ui'
 
 /**
  * One schema-driven editor for every PGCE record type (P5-02): reflections,
@@ -165,7 +165,7 @@ export function RecordEditSheet({ profileId, kind, record, latest, onSave, onDel
       <div className="sheet-header">
         <h2>Edit {schema.title}</h2>
         <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
-          ✕
+          <IconClose />
         </button>
       </div>
 
@@ -263,7 +263,7 @@ export function RecordEditSheet({ profileId, kind, record, latest, onSave, onDel
                       aria-label="Remove action"
                       onClick={() => set('actions', actions.filter((x) => x.id !== a.id))}
                     >
-                      ✕
+                      <IconClose />
                     </button>
                   </div>
                 ))}
