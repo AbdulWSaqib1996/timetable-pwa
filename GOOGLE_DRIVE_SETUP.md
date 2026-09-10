@@ -31,6 +31,8 @@ short-lived access token in memory; there is **no client secret** anywhere.
    - Authorised redirect URIs: none (the token model uses a popup, not a redirect).
 3. Copy the **Client ID** (ends in `.apps.googleusercontent.com`). It is a public identifier.
 
+**Done 10 September 2026:** client id `36473996504-3b6j3dasv2aj23lloo7j5kh8l6oli770.apps.googleusercontent.com` — now the app's built-in default in `src/lib/config.ts`; the variables below are only needed to override it (e.g. a different project for a fork).
+
 ## Deployment variables
 
 | Where | Variable | Value |

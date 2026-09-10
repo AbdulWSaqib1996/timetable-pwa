@@ -77,7 +77,7 @@ async function seed(page: Page, opts: { configured?: boolean; gis?: 'ok' | 'canc
   await page.addInitScript(
     ({ configured, gis, settings, installation }) => {
       localStorage.setItem('timetable.whatsnew.v1', '99')
-      if (configured) localStorage.setItem('timetable.dev.google-client-id', 'test-client.apps.googleusercontent.com')
+      localStorage.setItem('timetable.dev.google-client-id', configured ? 'test-client.apps.googleusercontent.com' : 'off')
       localStorage.setItem('timetable.installation.v1', installation)
       // navigator.share is absent in headless Chromium already; keep it that way explicitly.
       Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
