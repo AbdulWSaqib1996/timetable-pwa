@@ -1130,3 +1130,5 @@ Behaviour before → after:
 Automated checks + results: `tests/backup-only.spec.ts` (Data & devices shows Backup + Sync, no cloud anchor/heading/copy, old `kind:'cloud'` history tolerated, no `accounts.google.com`/`googleapis.com` request, Settings search no longer matches "google drive"). `npm run validate` AND `VERCEL=1 npm run validate` green — **161 unit and 118 browser tests** (six cloud tests removed, one added). Both hosting bases rebuilt.
 
 Known limits: the Google Cloud project `my-timetable-backups-260910` and its OAuth client still exist on the owner's account (harmless; delete from the Console if unwanted). Any Vercel environment variable `VITE_GOOGLE_OAUTH_CLIENT_ID` is now unused. A local `.env.local` holding the id is git-ignored and inert.
+
+Released 10 September 2026: merge `89c6eaf`, CI run 34522377654 success, `deploy.sh verify` six PASS. No worker change.
