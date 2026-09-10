@@ -1059,3 +1059,5 @@ Known limitations / deferred: no real Google end-to-end run yet (needs the Conso
 Rollback: the section, hook and adapters are additive; the restore device-settings carry-over stands on its own.
 
 Worker versions + hosted commit statuses: recorded after deployment below.
+
+R5b release verification (10 September 2026): workers deployed FIRST (`shared/merge.js` device-settings list) — push worker `319c7f21-2282-4257-b1c6-4b4def1b779d`, feed worker `a4937796-82f7-4636-b777-53dba2129f1d`; the deploy script's regression pass was green. Released commit `74dd34e` (merge `e41a90c`); GitHub Actions run 34516363312 concluded **success** (the workflow now passes `VITE_GOOGLE_OAUTH_CLIENT_ID` from repository variables; unset today, so the Google card is live in its disabled, explanatory state). `./scripts/deploy.sh verify` all six PASS. The Cloud backups section ships inside the code-split Settings chunk on both hosts.
