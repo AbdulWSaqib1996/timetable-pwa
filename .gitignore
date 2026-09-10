@@ -12,5 +12,3 @@ playwright-report/
 # Local Wrangler build/cache state
 .wrangler/
 
-# Committed example only — real values live in .env.local / hosting env vars
-!.env.example

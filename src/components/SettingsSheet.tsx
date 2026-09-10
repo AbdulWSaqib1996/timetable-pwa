@@ -31,7 +31,6 @@ import { placementBlocks as computePlacementBlocks } from '../lib/placement'
 import { WHATSNEW } from '../lib/changelog'
 import { IconBack, IconChart, IconClose, PageHeader } from './ui'
 import { BackupSheet, RestoreSheet } from './BackupSheets'
-import { CloudBackupsSection } from './CloudBackupsSection'
 import { useAttention } from '../lib/attention'
 import { snoozeBackupNudge } from '../lib/storage'
 import { backupCoverage, lastBackupAt } from '../lib/storage'
@@ -152,7 +151,6 @@ const SEARCH_ENTRIES: { section: SettingsSection; anchor: SettingsAnchor; title:
   { section: 'data', anchor: 'data-health', title: 'Data health', keywords: ['saved', 'storage', 'health', 'device', 'data', 'quota', 'space'] },
   { section: 'data', anchor: 'backup', title: 'Backup', keywords: ['backup', 'export', 'import', 'restore', 'file', 'device', 'json'] },
   { section: 'data', anchor: 'sync', title: 'Sync between devices', keywords: ['sync', 'device', 'devices', 'phone', 'laptop', 'code', 'encrypted'] },
-  { section: 'data', anchor: 'cloud-backups', title: 'Cloud backups', keywords: ['cloud', 'google', 'drive', 'icloud', 'backup', 'snapshot', 'restore', 'passphrase'] },
   { section: 'appearance', anchor: 'theme', title: 'Theme', keywords: ['theme', 'dark', 'light', 'appearance', 'colour', 'color', 'system'] },
   { section: 'appearance', anchor: 'density', title: 'Density', keywords: ['density', 'compact', 'comfortable', 'spacing', 'appearance', 'size'] },
   { section: 'help', anchor: 'whats-new', title: "What's new", keywords: ['new', 'changelog', 'version', 'update', 'release'] },
@@ -200,7 +198,6 @@ export type SettingsAnchor =
   | 'calendar-export'
   | 'data-health'
   | 'backup'
-  | 'cloud-backups'
   | 'sync'
   | 'theme'
   | 'density'
@@ -1544,7 +1541,7 @@ export function SettingsSheet({
                   return store.profiles
                     .map((p) => {
                       const c = coverage[p.id]
-                      return `${p.name}: ${c === null ? 'not yet included' : c === 'unknown' ? 'scope unknown (older backup)' : `included ${new Date(c.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${c.kind === 'cloud' ? ' (cloud)' : ''}`}`
+                      return `${p.name}: ${c === null ? 'not yet included' : c === 'unknown' ? 'scope unknown (older backup)' : `included ${new Date(c.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}`
                     })
                     .join(' · ')
                 })()}
@@ -1659,13 +1656,6 @@ export function SettingsSheet({
           </div>
         </section>
 
-
-        <CloudBackupsSection
-          settings={settings}
-          store={store}
-          onUpdateSettings={onUpdateSettings}
-          onRestore={(text, passphrase) => setRestoreText({ text, passphrase })}
-        />
 
 
         <section className="filter-section" id="sync">

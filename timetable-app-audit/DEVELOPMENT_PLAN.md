@@ -176,6 +176,8 @@ freshness. NF-07 checklists only if the owner asks (P3, optional).
 | R6 | 55 | L (worker + client) | Unbounded expansion / duplicate reminders | Shared bounded helper; worker-first deploy; creation gated on verified worker |
 
 Order is strict R1 → R2 → R3 (TT-21 may go early) → R4 → R5a → R5b → R6, as the audit's dependency notes require.
+
+> **10 Sep 2026 — NF-09 withdrawn.** R5b shipped (Pass 54b) and was then removed on the owner's instruction (Pass 58): the Google Drive and iCloud providers, their Settings section, hook, tests and setup notes are gone; the standard Back up / Restore (R5a, encrypted envelope) is the only backup path. Do not rebuild NF-09 without a new explicit go-ahead.
 Each pass is releasable on its own; nothing in a later batch is pulled forward.
 
 ## 4. Decisions recorded (change any before its batch)
