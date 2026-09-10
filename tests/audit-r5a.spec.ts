@@ -174,7 +174,7 @@ test('NF-05: scoped export keeps owner ids, the passphrase envelope round-trips,
     admin.tasks = []
     localStorage.setItem('timetable.admin.v1.a', JSON.stringify(admin))
   })
-  await page.locator('input[type="file"]').setInputFiles({ name: 'backup.encrypted.json', mimeType: 'application/json', buffer: Buffer.from(sealedText) })
+  await page.locator('#backup input[type="file"]').setInputFiles({ name: 'backup.encrypted.json', mimeType: 'application/json', buffer: Buffer.from(sealedText) })
   const restore = page.getByRole('dialog', { name: 'Restore backup' })
   await expect(restore.getByText(/This backup is encrypted/)).toBeVisible()
   await restore.getByLabel('Passphrase').fill('wrong passphrase 123')

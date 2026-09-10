@@ -25,7 +25,7 @@ export function mergeAdmin(a, b) {
   }
   return out
 }
-export const deviceSettings = ['pushEnabled','locationEnabled','bgLeaveAlerts','theme','activeView','reminderOffsets','attendancePrompts','quietFrom','quietTo','usagePing','groupMemberId','groupToken']
+export const deviceSettings = ['pushEnabled','locationEnabled','bgLeaveAlerts','theme','activeView','reminderOffsets','attendancePrompts','quietFrom','quietTo','usagePing','groupMemberId','groupToken','cloudBackups']
 export function syncSettings(settings) {
   return Object.fromEntries(Object.entries(settings).filter(([key]) => !deviceSettings.includes(key)))
 }

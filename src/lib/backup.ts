@@ -4,6 +4,7 @@ import { readAttachments } from './attachments'
 import { preparePhotos, type PhotoExport } from './photos'
 import { prepareWallet, type WalletExport } from './wallet'
 import { restoreWithRecovery } from './recovery'
+import { deviceSettings } from '../../shared/merge.js'
 export interface Backup {
   version: number; store: ProfileStore; meta?: Record<string, MetaMap>; admin?: Record<string, unknown>
   cache?: Record<string, CachedData>; changes?: Record<string, SessionChange[]>; photos?: PhotoExport[]; wallet?: WalletExport[]
@@ -64,7 +65,18 @@ export async function restoreBackup(data: Backup): Promise<void> {
   await restoreWithRecovery(async () => {
     const local = JSON.parse(localStorage.getItem('timetable.store.v2') ?? 'null') as ProfileStore | null
     const incoming = new Set(data.store.profiles.map(p => p.id))
-    const profiles = [...(local?.profiles ?? []).filter(p => !incoming.has(p.id)), ...data.store.profiles]
+    // Device-local settings (push, location, theme, reminders, cloud-backup
+    // bookkeeping…) belong to THIS device: a restore brings records back, it
+    // must not flip this device's own switches (R5b).
+    const restored = data.store.profiles.map(p => {
+      const mine = local?.profiles.find(x => x.id === p.id)
+      if (!mine) return p
+      const settings = { ...p.settings } as Record<string, unknown>
+      const own = mine.settings as unknown as Record<string, unknown>
+      for (const key of deviceSettings) { delete settings[key]; if (key in own) settings[key] = own[key] }
+      return { ...p, settings: settings as unknown as typeof p.settings }
+    })
+    const profiles = [...(local?.profiles ?? []).filter(p => !incoming.has(p.id)), ...restored]
     const deletedProfiles = {...local?.deletedProfiles,...data.store.deletedProfiles}
     for (const p of data.store.profiles) delete deletedProfiles[p.id]
     const metadata: Record<string,string|null> = { 'timetable.store.v2': JSON.stringify({ ...local, ...data.store, deletedProfiles, profiles }) }

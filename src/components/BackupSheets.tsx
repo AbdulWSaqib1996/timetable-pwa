@@ -164,14 +164,20 @@ export function BackupSheet({ store, onClose }: { store: ProfileStore; onClose: 
  * validated and previewed before Restore commits it through the recovery
  * journal. Other profiles on the device are never deleted by a restore.
  */
-export function RestoreSheet({ text, onClose, onRestored }: { text: string; onClose: () => void; onRestored: () => void }) {
+export function RestoreSheet({ text, passphrase, onClose, onRestored }: { text: string; /** a passphrase already unlocked this session (cloud restore) */ passphrase?: string; onClose: () => void; onRestored: () => void }) {
   const encrypted = isEnvelope(text)
-  const [pass, setPass] = useState('')
+  const [pass, setPass] = useState(passphrase ?? '')
   const [plain, setPlain] = useState<string | null>(encrypted ? null : text)
   const [summary, setSummary] = useState<BackupSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
 
+  // A session-unlocked passphrase opens the archive straight away; a wrong one
+  // simply leaves the prompt on screen.
+  useEffect(() => {
+    if (encrypted && passphrase && plain === null) void unlock()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => {
     if (plain === null) return
     try {

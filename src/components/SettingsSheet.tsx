@@ -31,6 +31,7 @@ import { placementBlocks as computePlacementBlocks } from '../lib/placement'
 import { WHATSNEW } from '../lib/changelog'
 import { IconBack, PageHeader } from './ui'
 import { BackupSheet, RestoreSheet } from './BackupSheets'
+import { CloudBackupsSection } from './CloudBackupsSection'
 import { lastBackupAt } from '../lib/storage'
 import { listDrafts } from '../lib/draftIndex'
 import { hasPendingSaves, persistenceFailure } from '../lib/persistence'
@@ -148,6 +149,7 @@ const SEARCH_ENTRIES: { section: SettingsSection; anchor: SettingsAnchor; title:
   { section: 'data', anchor: 'data-health', title: 'Data health', keywords: ['saved', 'storage', 'health', 'device', 'data', 'quota', 'space'] },
   { section: 'data', anchor: 'backup', title: 'Backup', keywords: ['backup', 'export', 'import', 'restore', 'file', 'device', 'json'] },
   { section: 'data', anchor: 'sync', title: 'Sync between devices', keywords: ['sync', 'device', 'devices', 'phone', 'laptop', 'code', 'encrypted'] },
+  { section: 'data', anchor: 'cloud-backups', title: 'Cloud backups', keywords: ['cloud', 'google', 'drive', 'icloud', 'backup', 'snapshot', 'restore', 'passphrase'] },
   { section: 'appearance', anchor: 'theme', title: 'Theme', keywords: ['theme', 'dark', 'light', 'appearance', 'colour', 'color', 'system'] },
   { section: 'appearance', anchor: 'density', title: 'Density', keywords: ['density', 'compact', 'comfortable', 'spacing', 'appearance', 'size'] },
   { section: 'help', anchor: 'whats-new', title: "What's new", keywords: ['new', 'changelog', 'version', 'update', 'release'] },
@@ -195,6 +197,7 @@ export type SettingsAnchor =
   | 'calendar-export'
   | 'data-health'
   | 'backup'
+  | 'cloud-backups'
   | 'sync'
   | 'theme'
   | 'density'
@@ -291,7 +294,7 @@ export function SettingsSheet({
   const [homeGeoStatus, setHomeGeoStatus] = useState<'working' | 'ok' | 'fail' | null>(null)
   const [storageEstimate, setStorageEstimate] = useState<string | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
-  const [restoreText, setRestoreText] = useState<string | null>(null)
+  const [restoreText, setRestoreText] = useState<{ text: string; passphrase?: string } | null>(null)
   const [localFiles, setLocalFiles] = useState<{ photos: number; wallet: number } | null>(null)
   useEffect(() => {
     if (section !== 'data') return
@@ -479,7 +482,7 @@ export function SettingsSheet({
       if (file.size > 50 * 1024 * 1024) throw new Error('Backup exceeds the 50 MB limit.')
       // Plain or encrypted — the restore sheet unlocks, validates and
       // previews before anything is committed (R5a).
-      setRestoreText(await file.text())
+      setRestoreText({ text: await file.text() })
     })().catch((error) => window.alert('Could not read that file: ' + String(error)))
   }
 
@@ -1587,7 +1590,7 @@ export function SettingsSheet({
           </p>
           {backupOpen && <BackupSheet store={store} onClose={() => setBackupOpen(false)} />}
           {restoreText !== null && (
-            <RestoreSheet text={restoreText} onClose={() => setRestoreText(null)} onRestored={() => window.location.reload()} />
+            <RestoreSheet text={restoreText.text} passphrase={restoreText.passphrase} onClose={() => setRestoreText(null)} onRestored={() => window.location.reload()} />
           )}
           <div className="btn-row">
             <button type="button" className="btn-primary" onClick={() => setBackupOpen(true)}>
@@ -1609,6 +1612,14 @@ export function SettingsSheet({
             />
           </div>
         </section>
+
+
+        <CloudBackupsSection
+          settings={settings}
+          store={store}
+          onUpdateSettings={onUpdateSettings}
+          onRestore={(text, passphrase) => setRestoreText({ text, passphrase })}
+        />
 
 
         <section className="filter-section" id="sync">

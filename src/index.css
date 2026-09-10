@@ -4100,3 +4100,60 @@ body {
 .attendance-prompt-actions {
   flex-wrap: wrap;
 }
+
+/* ---------- R5b: cloud backups ---------- */
+.cloud-card {
+  margin: 12px 0;
+}
+
+.cloud-state {
+  text-align: right;
+}
+
+.cloud-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cloud-progress .done {
+  color: var(--text);
+}
+
+.cloud-progress .current {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cloud-snapshots {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cloud-snapshots li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.cloud-snapshots .change-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cloud-file-label {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
