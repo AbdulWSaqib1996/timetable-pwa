@@ -217,7 +217,7 @@ test('source failure keeps a usable page: error banner, no blank screen', async 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('./#/today')
   await expect(page.locator('.banner-error')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Open Schedule' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'See the week' })).toBeVisible()
   await shot(page, 'today-source-failure-390')
 })
 

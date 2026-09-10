@@ -23,7 +23,7 @@ import type { OriginOption } from '../lib/origins'
 import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
-import { IconClose, SegmentedControl } from './ui'
+import { IconAlert, IconCamera, IconCheck, IconClose, IconSchool, SegmentedControl } from './ui'
 import { CopyButton } from './CopyButton'
 import { RouteMap } from './RouteMap'
 import { StaticMap } from './StaticMap'
@@ -311,7 +311,8 @@ export function SessionDetail({
                 aria-pressed={(meta?.status ?? 'todo') === status}
                 onClick={() => onMeta({ status })}
               >
-                {status === 'todo' ? 'To do' : status === 'doing' ? 'In progress' : '✓ Done'}
+                {status === 'done' && <IconCheck />}
+                {status === 'todo' ? 'To do' : status === 'doing' ? 'In progress' : 'Done'}
               </button>
             ))}
           </div>
@@ -331,7 +332,9 @@ export function SessionDetail({
         <>
           {isPlacementSession(session) && onPlacementInfo && (
             <section className="detail-notes placement-details">
-              <h3 className="subheading">🏫 Placement details</h3>
+              <h3 className="subheading detail-section-title">
+                <IconSchool /> Placement details
+              </h3>
               <input
                 type="text"
                 className="placement-input"
@@ -383,11 +386,23 @@ export function SessionDetail({
               <p className="filter-hint">Shared across all sessions of this placement block; saved on this device.</p>
             </section>
           )}
-          <section className="detail-notes">
-            <div className="chip-grid attendance-chips">
+          <section className="detail-notes detail-section" aria-labelledby="detail-attendance-heading">
+            <h3 className="subheading detail-section-title" id="detail-attendance-heading">
+              <IconCheck /> Attendance
+            </h3>
+            <p className="detail-state">
+              {meta?.attended
+                ? 'Recorded as attended'
+                : meta?.absent
+                  ? `Recorded as absent${meta.absentReason ? ` · ${meta.absentReason}` : ''}`
+                  : session.isSelfStudy
+                    ? 'Self study — attendance is not recorded'
+                    : 'Not recorded'}
+            </p>
+            <div className="attendance-choice" role="group" aria-label="Attendance">
               <button
                 type="button"
-                className={`chip${meta?.attended ? ' chip-on' : ''}`}
+                className={`chip attendance-option${meta?.attended ? ' chip-on' : ''}`}
                 aria-pressed={meta?.attended === true}
                 onClick={() =>
                   onMeta(
@@ -397,11 +412,12 @@ export function SessionDetail({
                   )
                 }
               >
-                ✓ Attended
+                <IconCheck />
+                Attended
               </button>
               <button
                 type="button"
-                className={`chip${meta?.absent ? ' chip-on chip-absent' : ''}`}
+                className={`chip attendance-option${meta?.absent ? ' chip-on chip-absent' : ''}`}
                 aria-pressed={meta?.absent === true}
                 onClick={() =>
                   onMeta(
@@ -411,11 +427,9 @@ export function SessionDetail({
                   )
                 }
               >
-                ✗ Absent
+                <IconAlert />
+                Absent
               </button>
-              {!meta?.attended && !meta?.absent && !session.isSelfStudy && (
-                <span className="badge">Unrecorded</span>
-              )}
               {meta?.absent && (
                 <select
                   className="absent-reason"
@@ -431,6 +445,16 @@ export function SessionDetail({
                 </select>
               )}
             </div>
+          </section>
+          <section className="detail-notes detail-section" aria-labelledby="detail-notes-heading">
+            <h3 className="subheading detail-section-title" id="detail-notes-heading">
+              <IconCamera /> Notes &amp; evidence
+            </h3>
+            <p className="detail-state">
+              {meta?.at
+                ? `Last saved on this device ${new Date(meta.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                : 'Nothing recorded yet — notes, standards and photos save on this device as you add them.'}
+            </p>
             <textarea
               className="note-input"
               placeholder="Notes for this session (saved on this device)…"
@@ -501,7 +525,7 @@ export function SessionDetail({
                 </span>
               ))}
               <label className="photo-add">
-                📷 Add photo
+                <IconCamera /> Add photo
                 <input
                   type="file"
                   accept="image/*"

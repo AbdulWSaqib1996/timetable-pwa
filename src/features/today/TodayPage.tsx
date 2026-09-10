@@ -5,12 +5,26 @@ import { useCourseClock } from '../../hooks/useCourseClock'
 import { estimateTravel, estimateTravelToCoords } from '../../lib/campus'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey } from '../../lib/diff'
-import { daysUntil, formatRemaining, isPlacementSession, placementTag, toMinutes } from '../../lib/format'
+import { daysUntil, formatRemaining, isPlacementSession, placementTag, sessionKindLabel, toMinutes } from '../../lib/format'
 import { parseLocation, shortBuildingName } from '../../lib/location'
 import { freshnessLabel } from '../../../shared/travel-state.js'
 import { cachedRouteInfo } from '../../lib/tfl'
 import { TRAVEL_MODE_PHRASE } from '../../lib/campus'
-import { Card, EmptyState, IconBell, IconClose, IconRefresh, PageHeader, SettingsAction } from '../../components/ui'
+import {
+  Card,
+  EmptyState,
+  IconBell,
+  IconBook,
+  IconChevronRight,
+  IconClock,
+  IconClose,
+  IconHome,
+  IconNote,
+  IconPin,
+  IconRefresh,
+  PageHeader,
+  SettingsAction,
+} from '../../components/ui'
 import { AttendancePromptCard } from '../../components/AttendancePrompt'
 import type { AttendanceAnswer } from '../../components/AttendancePrompt'
 import type { MetaMap, Session, SessionChange, Settings } from '../../types'
@@ -68,9 +82,29 @@ function roomLines(s: Session): { room: string | null; building: string | null }
 }
 
 /**
- * Today (P4-02): date header, at most one urgent item, next/current session
- * hero with a prominent room, the rest of the day with meaningful gaps, the
- * journey-home entry, and a restrained tomorrow preview.
+ * V2: a long sheet title such as "PS1 - Exploring Professionalism - Introduction
+ * to PS and Teacher Identity" is shown as a heading plus a subtitle. Nothing is
+ * deleted: the separator stays in the DOM (visually hidden) so the accessible
+ * name and the copied text remain the full title.
+ */
+export function splitTitle(title: string): { head: string; sep: string; tail: string } | null {
+  // Greedy head: split at the LAST separator, so "PS1 - Exploring Professionalism -
+  // Introduction…" keeps the module name with its theme in the heading.
+  const m = title.match(/^(.{3,})(\s+[-–—:]\s+)(.{3,})$/)
+  return m ? { head: m[1], sep: m[2], tail: m[3] } : null
+}
+
+const locationLine = (s: Session): string | null => {
+  const loc = roomLines(s)
+  const parts = [loc.building, loc.room].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
+
+/**
+ * Today (P4-02 → V2): date header, at most one urgent item, the attendance
+ * quick answer, next/current session hero with labelled time and place, the
+ * rest of the day as readable cards, an explicit finished-day state with a
+ * next action, the journey-home row and a restrained tomorrow preview.
  */
 export function TodayPage({
   profileName,
@@ -174,6 +208,11 @@ export function TodayPage({
   const nextDay = courseSessions.find((s) => s.dateISO > todayISO && !s.isKeyDate)
   const nextDaySessions = nextDay ? courseSessions.filter((s) => s.dateISO === nextDay.dateISO && !s.isKeyDate) : []
   const tomorrowISO = addDaysISO(todayISO, 1)
+  const nextDayLine = nextDay
+    ? nextDay.dateISO === tomorrowISO
+      ? `Tomorrow: ${nextDaySessions.length} session${nextDaySessions.length === 1 ? '' : 's'}, first at ${nextDaySessions[0]?.start} — ${nextDaySessions[0]?.title}.`
+      : `Next sessions: ${longDate(nextDay.dateISO)} (${nextDaySessions.length}).`
+    : 'No upcoming sessions found in this timetable.'
 
   const heroTravel = hero
     ? isPlacementSession(hero) &&
@@ -200,6 +239,7 @@ export function TodayPage({
       ? `Up next · in ${formatRemaining(heroStart - nowMins)}`
       : 'Up next'
   const heroRoom = hero ? roomLines(hero) : { room: null, building: null }
+  const heroSplit = hero ? splitTitle(hero.title) : null
 
   const homeSet = settings.homeLat != null && settings.homeLng != null
   // "Ready to head home?" can be dismissed for the day; the manual action stays.
@@ -234,6 +274,38 @@ export function TodayPage({
       }
     }
     if (minutes !== null) homeSummary = `≈ ${formatRemaining(minutes)} ${TRAVEL_MODE_PHRASE[travelMode]} (${basis})`
+  }
+
+  /** One readable card per later/other session: time, title, place, kind. */
+  const row = (s: Session, extra?: string) => {
+    const place = locationLine(s)
+    return (
+      <button key={s.id} type="button" className="today-row" onClick={() => onSelect(s)}>
+        <span className="today-row-time">
+          <span className="today-row-start">{s.start || '—'}</span>
+          {s.end && s.end !== s.start && <span className="today-row-end">{s.end}</span>}
+        </span>
+        <span className="today-row-body">
+          <span className="today-row-title">{s.title}</span>
+          {place && (
+            <span className="today-row-meta">
+              <IconPin size={14} />
+              <span>{place}</span>
+            </span>
+          )}
+          <span className="today-row-kind">
+            <IconBook size={14} />
+            <span>
+              {sessionKindLabel(s)}
+              {extra ? ` · ${extra}` : ''}
+            </span>
+          </span>
+        </span>
+        <span className="today-row-chevron" aria-hidden="true">
+          <IconChevronRight />
+        </span>
+      </button>
+    )
   }
 
   return (
@@ -274,19 +346,44 @@ export function TodayPage({
 
       {hero && (
         <section className="today-hero" aria-label={current ? 'Current session' : 'Next session'}>
-          <span className="today-hero-label">{heroLabel}</span>
-          <span className="today-hero-time">
-            {hero.start}
-            {hero.end && hero.end !== hero.start ? `–${hero.end}` : ''}
-            {hero.subject && hero.subject !== hero.title ? ` · ${hero.subject}` : ''}
-          </span>
-          <h2 className="today-hero-title">{hero.title}</h2>
-          {(heroRoom.room || heroRoom.building) && (
-            <div className="today-hero-room">
-              {heroRoom.room && <span className="today-hero-room-name">{heroRoom.room}</span>}
-              {heroRoom.building && <span className="today-hero-building">{heroRoom.building}</span>}
-            </div>
-          )}
+          <div className="today-hero-top">
+            <span className="today-hero-label">
+              <IconClock size={14} />
+              {heroLabel}
+            </span>
+            <span className="badge badge-kind">{sessionKindLabel(hero)}</span>
+          </div>
+          <h2 className="today-hero-title">
+            {heroSplit ? (
+              <>
+                <span className="today-hero-head">{heroSplit.head}</span>
+                <span className="visually-hidden">{heroSplit.sep}</span>
+                <span className="today-hero-sub">{heroSplit.tail}</span>
+              </>
+            ) : (
+              hero.title
+            )}
+          </h2>
+          {hero.subject && hero.subject !== hero.title && !heroSplit && <p className="today-hero-subject">{hero.subject}</p>}
+          <ul className="today-hero-facts" aria-label="When and where">
+            <li className="today-fact">
+              <IconClock />
+              <span className="today-hero-time">
+                {hero.start}
+                {hero.end && hero.end !== hero.start ? `–${hero.end}` : ''}
+              </span>
+            </li>
+            {(heroRoom.room || heroRoom.building) && (
+              <li className="today-fact today-fact-room">
+                <IconPin />
+                <span>
+                  {heroRoom.building && <span className="today-hero-building">{heroRoom.building}</span>}
+                  {heroRoom.building && heroRoom.room ? ' · ' : ''}
+                  {heroRoom.room && <span className="today-hero-room-name">{heroRoom.room}</span>}
+                </span>
+              </li>
+            )}
+          </ul>
           <div className="today-hero-actions">
             <button type="button" className="btn-primary" onClick={() => onSelect(hero)}>
               Session details
@@ -310,17 +407,7 @@ export function TodayPage({
             {clashCount > 1 && <span className="today-clash"> · {clashCount} at the same time</span>}
           </h3>
           <div className="today-rest">
-            {alsoNow.map((s) => (
-              <button key={s.id} type="button" className="today-row" onClick={() => onSelect(s)}>
-                <span className="today-row-time">{s.start}</span>
-                <span className="today-row-body">
-                  <span className="today-row-title">{s.title}</span>
-                  <span className="today-row-meta">
-                    {[roomLines(s).room, s.end ? `ends ${s.end}` : '', s.isFreeTime ? 'free — not a clash' : ''].filter(Boolean).join(' · ')}
-                  </span>
-                </span>
-              </button>
-            ))}
+            {alsoNow.map((s) => row(s, [s.end ? `ends ${s.end}` : '', s.isFreeTime ? 'free — not a clash' : ''].filter(Boolean).join(' · ') || undefined))}
           </div>
         </section>
       )}
@@ -328,20 +415,14 @@ export function TodayPage({
       {todays.length === 0 && (
         <EmptyState
           title="Nothing on today"
-          hint={
-            nextDay
-              ? nextDay.dateISO === tomorrowISO
-                ? `Tomorrow: ${nextDaySessions.length} session${nextDaySessions.length === 1 ? '' : 's'}, first at ${nextDaySessions[0]?.start}.`
-                : `Next sessions: ${longDate(nextDay.dateISO)}.`
-              : 'No upcoming sessions found in this timetable.'
-          }
+          hint={nextDayLine}
           action={
             <div className="btn-row">
               <button type="button" className="btn-secondary" onClick={onOpenSchedule}>
-                Open Schedule
+                See the week
               </button>
               <button type="button" className="btn-secondary" onClick={onOpenTasks}>
-                Open Tasks
+                See deadlines
               </button>
             </div>
           }
@@ -350,13 +431,27 @@ export function TodayPage({
 
       {dayFinished && !homePromoted && (
         <Card tone="accent" className="today-finished">
-          <p className="today-finished-title">That's the day done 🎉</p>
+          <p className="today-finished-title">That's the day done</p>
+          <p className="filter-hint">{nextDayLine}</p>
+          <div className="btn-row">
+            <button type="button" className="btn-secondary" onClick={onOpenSchedule}>
+              See the week
+            </button>
+            <button type="button" className="btn-secondary" onClick={onOpenTasks}>
+              See deadlines
+            </button>
+          </div>
         </Card>
       )}
 
       {rest.length > 0 && (
         <section aria-label="Rest of today">
-          <h3 className="subheading">Rest of today</h3>
+          <div className="today-section-head">
+            <h3 className="subheading">Rest of today</h3>
+            <button type="button" className="travel-link" onClick={onOpenSchedule}>
+              View day →
+            </button>
+          </div>
           <div className="today-rest">
             {rest.map((s, i) => {
               const prev = i === 0 ? hero : rest[i - 1]
@@ -364,21 +459,14 @@ export function TodayPage({
                 prev && toMinutes(prev.end) !== null && toMinutes(s.start) !== null
                   ? toMinutes(s.start)! - toMinutes(prev.end)!
                   : 0
-              const loc = roomLines(s)
               return (
                 <div key={s.id}>
-                  {gap >= 30 && <div className="free-gap">☕ {formatRemaining(gap)} break</div>}
-                  <button type="button" className="today-row" onClick={() => onSelect(s)}>
-                    <span className="today-row-time">{s.start}</span>
-                    <span className="today-row-body">
-                      <span className="today-row-title">{s.title}</span>
-                      <span className="today-row-meta">
-                        {[loc.room, loc.building, s.end ? `ends ${s.end}` : '']
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </span>
-                    </span>
-                  </button>
+                  {gap >= 30 && (
+                    <div className="free-gap">
+                      <IconClock size={14} /> {formatRemaining(gap)} break
+                    </div>
+                  )}
+                  {row(s)}
                 </div>
               )
             })}
@@ -389,16 +477,7 @@ export function TodayPage({
       {untimed.length > 0 && (
         <section aria-label="Today, no set time">
           <h3 className="subheading">Today, no set time</h3>
-          <div className="today-rest">
-            {untimed.map((s) => (
-              <button key={s.id} type="button" className="today-row" onClick={() => onSelect(s)}>
-                <span className="today-row-time">—</span>
-                <span className="today-row-body">
-                  <span className="today-row-title">{s.title}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+          <div className="today-rest">{untimed.map((s) => row(s))}</div>
         </section>
       )}
 
@@ -407,25 +486,15 @@ export function TodayPage({
           <button type="button" className="travel-link" aria-expanded={showFinished} onClick={() => setShowFinished((v) => !v)}>
             {showFinished ? 'Hide finished sessions' : `Show ${finished.length} finished session${finished.length === 1 ? '' : 's'}`}
           </button>
-          {showFinished && (
-            <div className="today-rest">
-              {finished.map((s) => (
-                <button key={s.id} type="button" className="today-row" onClick={() => onSelect(s)}>
-                  <span className="today-row-time">{s.start}</span>
-                  <span className="today-row-body">
-                    <span className="today-row-title">{s.title}</span>
-                    <span className="today-row-meta">{s.end ? `ended ${s.end}` : ''}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          {showFinished && <div className="today-rest today-rest-finished">{finished.map((s) => row(s, s.end ? `ended ${s.end}` : undefined))}</div>}
         </section>
       )}
 
       {nextDeadline && (
         <button type="button" className="keydate-strip" onClick={onOpenTasks}>
-          <span className="keydate-title">📌 {nextDeadline.title}</span>
+          <span className="keydate-title">
+            <IconNote size={14} /> {nextDeadline.title}
+          </span>
           <span className={`kd-chip${daysUntil(nextDeadline.dateISO, todayISO) <= 7 ? ' urgent' : ''}`}>
             {(() => {
               const days = daysUntil(nextDeadline.dateISO, todayISO)
@@ -437,6 +506,9 @@ export function TodayPage({
 
       {homeSet && (
         <Card tone={homePromoted ? 'accent' : 'default'} className="home-row">
+          <span className="home-row-icon" aria-hidden="true">
+            <IconHome />
+          </span>
           <div className="home-row-text">
             <span className="home-row-title">{homePromoted ? 'Ready to head home?' : 'Journey home'}</span>
             <span className="filter-hint">
@@ -456,13 +528,7 @@ export function TodayPage({
         </Card>
       )}
 
-      {todays.length > 0 && nextDay && (
-        <p className="filter-hint today-tomorrow">
-          {nextDay.dateISO === tomorrowISO
-            ? `Tomorrow: ${nextDaySessions.length} session${nextDaySessions.length === 1 ? '' : 's'}, first at ${nextDaySessions[0]?.start} — ${nextDaySessions[0]?.title}.`
-            : `Next sessions: ${longDate(nextDay.dateISO)} (${nextDaySessions.length}).`}
-        </p>
-      )}
+      {todays.length > 0 && nextDay && !dayFinished && <p className="filter-hint today-tomorrow">{nextDayLine}</p>}
     </div>
   )
 }

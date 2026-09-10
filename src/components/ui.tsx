@@ -122,6 +122,82 @@ export const IconSchool = ({ size = 20 }: IconProps) => (
   </svg>
 )
 
+/* V2 (visual audit): labelled time/place/kind icons for cards and detail. */
+export const IconClock = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+)
+export const IconPin = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M12 21s-6-5.4-6-10a6 6 0 0 1 12 0c0 4.6-6 10-6 10z" />
+    <circle cx="12" cy="11" r="2.2" />
+  </svg>
+)
+export const IconBook = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M3 5.5A2.5 2.5 0 0 1 5.5 3H12v16H5.5A2.5 2.5 0 0 0 3 21z" />
+    <path d="M21 5.5A2.5 2.5 0 0 0 18.5 3H12v16h6.5a2.5 2.5 0 0 1 2.5 2z" />
+  </svg>
+)
+export const IconCheck = ({ size = 18 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M5 12.5l4.5 4.5L19 7" />
+  </svg>
+)
+export const IconAlert = ({ size = 18 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M12 3l10 18H2z" />
+    <path d="M12 10v5M12 18h.01" />
+  </svg>
+)
+export const IconChevronRight = ({ size = 18 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M9 6l6 6-6 6" />
+  </svg>
+)
+export const IconChevronLeft = ({ size = 18 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M15 6l-6 6 6 6" />
+  </svg>
+)
+export const IconArrowRight = ({ size = 18 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M4 12h16M13 5l7 7-7 7" />
+  </svg>
+)
+export const IconCamera = ({ size = 18 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </svg>
+)
+export const IconShare = ({ size = 20 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M12 3v12M7 8l5-5 5 5" />
+    <path d="M5 13v7h14v-7" />
+  </svg>
+)
+export const IconPinTack = ({ size = 20 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" />
+    <path d="M12 14v7" />
+  </svg>
+)
+export const IconUser = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21a8 8 0 0 1 16 0" />
+  </svg>
+)
+export const IconNote = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M6 3h9l4 4v14H6z" />
+    <path d="M9 12h6M9 16h6" />
+  </svg>
+)
+
 /* ---------- primitives ---------- */
 
 export function PageHeader({

@@ -26,6 +26,17 @@ async function seed(page: Page, { profiles, admin = {}, width = 390 }: Seed) {
   await page.setViewportSize({ width, height: 900 })
 }
 
+/** Plan week: a toolbar button on wide screens, a More-menu item on mobile (V2). */
+async function openPlanWeek(page: Page) {
+  const more = page.getByRole('button', { name: /^More/ })
+  if (await more.count()) {
+    await more.click()
+    await page.getByRole('menuitem', { name: 'Plan week' }).click()
+  } else {
+    await page.getByRole('button', { name: 'Plan week' }).click()
+  }
+}
+
 const adminOf = (page: Page, id: string) => page.evaluate((pid) => JSON.parse(localStorage.getItem(`timetable.admin.v1.${pid}`)!), id)
 
 const TASK = { id: 'essay', title: 'Big essay', dueISO: '2026-09-30', status: 'todo', notes: 'Discuss phonics and reading fluency', at: 1 }
@@ -103,7 +114,7 @@ test('NF-03: Plan week suggests non-overlapping gaps with reasons; a suggestion 
     },
   })
   await page.goto('./#/schedule')
-  await page.getByRole('button', { name: 'Plan week' }).click()
+  await openPlanWeek(page)
   const sheet = page.getByRole('dialog', { name: 'Plan week' })
   await expect(sheet).toBeVisible()
   await expect(sheet.getByText(/Week of Mon 7 Sept/)).toBeVisible()
@@ -138,7 +149,7 @@ test('NF-03: Plan week suggests non-overlapping gaps with reasons; a suggestion 
   expect((await adminOf(page, 'd')).commitments).toHaveLength(2)
 
   // Block for a task: prefilled work-plan form; Add saves; Undo removes it.
-  await page.getByRole('button', { name: 'Plan week' }).click()
+  await openPlanWeek(page)
   await sheet.getByLabel('Plan as').selectOption('essay')
   await suggestions.first().click()
   const task = page.getByRole('dialog', { name: 'Edit task' })

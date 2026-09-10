@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EmptyState, IconPlus, PageHeader, SettingsAction, StatusMessage } from '../../components/ui'
+import { EmptyState, IconChevronRight, IconPlus, PageHeader, SettingsAction, StatusMessage } from '../../components/ui'
 import type { Meeting, TaskRecord } from '../../lib/admin'
 import { sessionKey } from '../../lib/diff'
 import { daysUntil } from '../../lib/format'
@@ -39,16 +39,28 @@ function formatDate(dateISO: string): string {
   })
 }
 
-const STATUS_LABEL: Record<string, string> = { todo: '○ to do', doing: '◐ in progress', done: '✓ done' }
+function weekday(dateISO: string): string {
+  const [y, m, d] = dateISO.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long' })
+}
+
+/** The due badge text (V2): plain words, the full date stays in the meta line. */
+export function dueBadge(days: number, status: SessionMeta['status']): string {
+  if (status === 'done') return 'Completed'
+  if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`
+  if (days === 0) return 'Due today'
+  if (days === 1) return 'Due tomorrow'
+  return `Due in ${days} days`
+}
 
 /**
- * Tasks destination (P4-07 + P5-01; R3 / TT-20): Overdue / Today / Upcoming /
- * Completed over imported deadlines AND editable personal task records, plus
- * open mentor actions projected as linked work (completion updates the
- * meeting record — there is exactly one owner). Overdue is derived, never a
- * copied record. Order: overdue oldest first, today by due time, upcoming by
- * due date, completed newest completion first (falling back to the due date
- * when no completion date is known — no invented timestamp).
+ * Tasks destination (P4-07 + P5-01; R3 / TT-20; V2 cards): Overdue / Today /
+ * Upcoming / Completed over imported deadlines AND editable personal task
+ * records, plus open mentor actions projected as linked work (completion
+ * updates the meeting record — there is exactly one owner). Overdue is
+ * derived, never a copied record. Order: overdue oldest first, today by due
+ * time, upcoming by due date, completed newest completion first (falling back
+ * to the due date when no completion date is known — no invented timestamp).
  */
 export function TasksPage({
   profileName,
@@ -83,7 +95,8 @@ export function TasksPage({
   const sorted = [...keyDates].sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
   const outstandingAll = sorted.filter((k) => statusOf(k) !== 'done')
   const completedAll = sorted.filter((k) => statusOf(k) === 'done')
-  const overdue = outstandingAll.filter((k) => k.dateISO < todayISO && matches(k))
+  const overdueAll = outstandingAll.filter((k) => k.dateISO < todayISO)
+  const overdue = overdueAll.filter(matches)
   const dueToday = outstandingAll.filter((k) => k.dateISO === todayISO && matches(k))
   const upcoming = outstandingAll.filter((k) => k.dateISO > todayISO && matches(k))
   const completed = completedAll
@@ -100,40 +113,37 @@ export function TasksPage({
     const status = statusOf(k)
     const record = recordOf(k)
     const note = noteOf(k)
+    const overdueNow = status !== 'done' && days < 0
+    const soon = status !== 'done' && days >= 0 && days <= 7
+    const dueLine =
+      status === 'done' && record?.completedISO
+        ? `Completed ${formatDate(record.completedISO)} · due ${formatDate(k.dateISO)}`
+        : `Due ${formatDate(k.dateISO)}${k.start ? ` · ${k.start}` : ''}`
     return (
-      <li key={k.id} className={status === 'done' ? 'kd-done' : ''}>
+      <li key={k.id} className={`task-card${status === 'done' ? ' kd-done' : ''}${overdueNow ? ' task-card-overdue' : ''}`}>
         <div className="keydate-line">
           <button
             type="button"
             className="keydate-row"
+            aria-label={`${k.title}, ${dueBadge(days, status).toLowerCase()}, ${dueLine.toLowerCase()}. Open`}
             onClick={() => (record ? onEditTask(record) : onSelect(k))}
           >
-            <span className={`kd-chip${days <= 7 && days >= 0 && status !== 'done' ? ' urgent' : ''}${status === 'done' ? ' kd-chip-done' : ''}`}>
-              {status === 'done'
-                ? 'Completed'
-                : days < 0
-                  ? `${Math.abs(days)}d overdue`
-                  : days === 0
-                    ? 'Today'
-                    : days === 1
-                      ? 'Tomorrow'
-                      : `in ${days}d`}
+            <span className="task-card-top">
+              <span className={`kd-chip${overdueNow ? ' kd-chip-overdue' : soon ? ' urgent' : ''}${status === 'done' ? ' kd-chip-done' : ''}`}>
+                {dueBadge(days, status)}
+                {soon && days > 1 ? ` · ${weekday(k.dateISO)}` : ''}
+              </span>
+              <span className="badge badge-source">{record ? 'Your task' : 'Key date'}</span>
             </span>
-            <div className="change-body">
-              <span className="change-title">
-                {record && '👤 '}
-                {k.title}
-                {note && ' 📝'}
-              </span>
-              <span className="change-meta">
-                {status === 'done' && record?.completedISO
-                  ? `Completed ${formatDate(record.completedISO)} · due ${formatDate(k.dateISO)}`
-                  : `${formatDate(k.dateISO)}${k.start ? ` · ${k.start}` : ''}`}
-                {status !== 'done' && ` · ${STATUS_LABEL[status ?? 'todo']}`}
-                {!record && configured && ' · from the key-dates sheet'}
-                {note && ` — ${note}`}
-              </span>
-            </div>
+            <span className="change-title task-card-title">{k.title}</span>
+            <span className="change-meta">
+              {dueLine}
+              {status === 'doing' && ' · in progress'}
+              {note && ` — ${note}`}
+            </span>
+            <span className="task-card-open" aria-hidden="true">
+              Open <IconChevronRight size={16} />
+            </span>
           </button>
           <span className="kd-actions">
             <select
@@ -146,9 +156,9 @@ export function TasksPage({
                 else onSetStatus(k, next)
               }}
             >
-              <option value="todo">○ To do</option>
-              <option value="doing">◐ In progress</option>
-              <option value="done">✓ Done</option>
+              <option value="todo">To do</option>
+              <option value="doing">In progress</option>
+              <option value="done">Done</option>
             </select>
           </span>
         </div>
@@ -201,6 +211,11 @@ export function TasksPage({
 
       {(keyDates.length > 0 || openActions.length > 0 || needle) && (
         <div className="task-summary">
+          {overdueAll.length > 0 && (
+            <span className="kd-chip kd-chip-overdue" aria-label={`${overdueAll.length} overdue`}>
+              {overdueAll.length} overdue
+            </span>
+          )}
           <span className="kd-chip" aria-label={`${outstandingAll.length} outstanding`}>
             {outstandingAll.length} outstanding
           </span>
@@ -243,7 +258,7 @@ export function TasksPage({
           <p className={`workload-line${nextFortnight >= 3 ? ' heavy' : ''}`}>
             {nextFortnight === 0
               ? 'Nothing due in the next 14 days.'
-              : `${nextFortnight} due in the next 14 days${nextFortnight >= 3 ? ' — busy stretch ahead' : ''}. Change a task with its status control; open a row for details.`}
+              : `${nextFortnight} due in the next 14 days${nextFortnight >= 3 ? ' — busy stretch ahead' : ''}.`}
           </p>
           <ul className="keydates-list">{upcoming.map(row)}</ul>
         </section>
@@ -257,7 +272,7 @@ export function TasksPage({
           </p>
           <ul className="keydates-list">
             {openActions.map(({ meeting, action }) => (
-              <li key={`${meeting.id}:${action.id}`}>
+              <li key={`${meeting.id}:${action.id}`} className="task-card">
                 <div className="keydate-line">
                   <label className="keydate-line mentor-action-row">
                     <input
@@ -268,7 +283,7 @@ export function TasksPage({
                     />
                     <div className="change-body">
                       <span className="change-title">{action.text}</span>
-                      <span className="change-meta">Meeting {formatDate(meeting.dateISO)}</span>
+                      <span className="change-meta">Mentor action · meeting {formatDate(meeting.dateISO)}</span>
                     </div>
                   </label>
                   <span className="kd-actions">
@@ -289,7 +304,10 @@ export function TasksPage({
 
       {completed.length > 0 && (
         <details className="completed-tasks" open={!!needle || undefined}>
-          <summary>Completed ({completed.length}) — kept for your records, never re-notified</summary>
+          <summary>
+            Completed ({completed.length})
+            <span className="completed-tasks-hint"> — kept for your records, never re-notified</span>
+          </summary>
           <ul className="keydates-list">{completed.map(row)}</ul>
         </details>
       )}
