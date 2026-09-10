@@ -1,0 +1,294 @@
+
+> timetable-pwa@0.1.0 test:e2e
+> playwright test
+
+[WebServer] (node:44305) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 108 tests using 6 workers
+
+(node:44337) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44336) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44335) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44333) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44338) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44334) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘    1 tests/audit-r1.spec.ts:43:1 › TT-01/02/04: desktop calendar has real width and shows personal events and weekend deadlines (5.4s)
+  ✘    2 tests/admin-a1.spec.ts:11:1 › legacy key/cache are purged, nothing loads before unlock, and no credential travels in a URL (5.4s)
+(node:44417) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘    4 tests/admin-a2.spec.ts:57:1 › batches carry observed UTC days, a valid envelope and nothing private (10.3s)
+(node:44472) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘    9 tests/admin-a2.spec.ts:87:1 › a failed send retries the SAME immutable batchId; the ack finally clears it (10.0s)
+(node:44568) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   10 tests/admin-a2.spec.ts:110:1 › switching the usage toggle off clears pending counters and stops collection (10.0s)
+(node:44672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   11 tests/audit-r2.spec.ts:55:1 › TT-11: a planned departure that passes while the page is open fetches exactly one leave-now alternative (5.5s)
+  ✘    5 tests/admin-a4.spec.ts:42:1 › route views and task create/complete fire exactly once at their success points, content-free (37.7s)
+  ✘    6 tests/admin-a5.spec.ts:18:1 › reliability: sources carry denominators and thresholds; a stale aggregate is an open issue, never healthy (37.7s)
+  ✘    8 tests/audit-r1.spec.ts:63:1 › TT-04: three same-day deadlines expose all three through an accessible "+1 more" (31.7s)
+  ✘    7 tests/admin-a1.spec.ts:35:1 › Lock clears everything and a late response cannot repopulate the page (31.7s)
+  ✘    3 tests/admin-a3.spec.ts:22:1 › no page-wide horizontal overflow at 320/390/768/1440 across every section (37.7s)
+
+
+  1) tests/admin-a1.spec.ts:11:1 › legacy key/cache are purged, nothing loads before unlock, and no credential travels in a URL 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByLabel('Owner key')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByLabel('Owner key')
+
+
+      22 |   })
+      23 |   await page.goto('./analytics.html')
+    > 24 |   await expect(page.getByLabel('Owner key')).toBeVisible()
+         |                                              ^
+      25 |   expect(legacyCalls.length, 'a stats request fired before unlock').toBe(0)
+      26 |   const legacy = await page.evaluate(() => [localStorage.getItem('tt.statskey'), localStorage.getItem('tt.statscache')])
+      27 |   expect(legacy).toEqual([null, null])
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a1.spec.ts:24:46
+
+    Error Context: test-results/admin-a1-legacy-key-cache--96edc-credential-travels-in-a-URL/error-context.md
+
+  2) tests/admin-a2.spec.ts:57:1 › batches carry observed UTC days, a valid envelope and nothing private 
+
+    Error: expect(received).toBeGreaterThan(expected)
+
+    Expected: > 0
+    Received:   0
+
+    Call Log:
+    - Timeout 10000ms exceeded while waiting on the predicate
+
+      60 |   await seedRealProfile(page)
+      61 |   await page.goto('./#/today')
+    > 62 |   await expect.poll(() => bodies.length, { timeout: 10000 }).toBeGreaterThan(0)
+         |                                                              ^
+      63 |   const first = bodies[0]
+      64 |   expect(first.schemaVersion).toBe(2)
+      65 |   expect(String(first.batchId)).toMatch(/^[0-9a-f]{16,32}$/)
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a2.spec.ts:62:62
+
+    Error Context: test-results/admin-a2-batches-carry-obs-2b7b2-nvelope-and-nothing-private/error-context.md
+
+  3) tests/admin-a2.spec.ts:87:1 › a failed send retries the SAME immutable batchId; the ack finally clears it 
+
+    Error: expect(received).toBeGreaterThan(expected)
+
+    Expected: > 0
+    Received:   0
+
+    Call Log:
+    - Timeout 10000ms exceeded while waiting on the predicate
+
+      91 |   await seedRealProfile(page)
+      92 |   await page.goto('./#/today')
+    > 93 |   await expect.poll(() => bodies.length, { timeout: 10000 }).toBeGreaterThan(0)
+         |                                                              ^
+      94 |   const failedId = bodies[0].batchId
+      95 |   // The server said 500: the claimed batch stays frozen. A fresh app start
+      96 |   // resends the SAME batch — the server's dedupe makes replays harmless.
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a2.spec.ts:93:62
+
+    Error Context: test-results/admin-a2-a-failed-send-ret-22d21-d-the-ack-finally-clears-it/error-context.md
+
+  4) tests/admin-a2.spec.ts:110:1 › switching the usage toggle off clears pending counters and stops collection 
+
+    Error: expect(received).toBeGreaterThan(expected)
+
+    Expected: > 0
+    Received:   0
+
+    Call Log:
+    - Timeout 10000ms exceeded while waiting on the predicate
+
+      114 |   await seedRealProfile(page)
+      115 |   await page.goto('./#/session/whatever') // records a 'detail' use
+    > 116 |   await expect.poll(() => bodies.length, { timeout: 10000 }).toBeGreaterThan(0)
+          |                                                              ^
+      117 |   // Opt out via the real Settings toggle.
+      118 |   await page.goto('./#/settings/help')
+      119 |   await page.getByLabel('Share anonymous usage counts').uncheck()
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a2.spec.ts:116:62
+
+    Error Context: test-results/admin-a2-switching-the-usa-89915-unters-and-stops-collection/error-context.md
+
+  5) tests/audit-r1.spec.ts:43:1 › TT-01/02/04: desktop calendar has real width and shows personal events and weekend deadlines 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('.week-grid')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('.week-grid')
+
+
+      45 |   await page.goto('./#/schedule')
+      46 |   const grid = page.locator('.week-grid')
+    > 47 |   await expect(grid).toBeVisible()
+         |                      ^
+      48 |   // POSITIVE width assertion, not just "no overflow": 1440 − 200 rail − 2×24 padding ≈ 1192.
+      49 |   const width = await grid.evaluate((el) => el.getBoundingClientRect().width)
+      50 |   expect(width).toBeGreaterThan(1100)
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/audit-r1.spec.ts:47:22
+
+    Error Context: test-results/audit-r1-TT-01-02-04-deskt-0cf16-vents-and-weekend-deadlines/error-context.md
+
+  6) tests/admin-a1.spec.ts:35:1 › Lock clears everything and a late response cannot repopulate the page 
+
+    Test was interrupted.
+
+    Error: locator.fill: Test ended.
+    Call log:
+      - waiting for getByLabel('Owner key')
+
+
+      41 |   })
+      42 |   await page.goto('./analytics.html')
+    > 43 |   await page.getByLabel('Owner key').fill('test-key')
+         |                                      ^
+      44 |   await page.getByRole('button', { name: 'Unlock' }).click()
+      45 |   await expect(page.getByText('Active tokens — last 7 days')).toBeVisible()
+      46 |   await page.getByRole('button', { name: '🔒 Lock' }).click()
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a1.spec.ts:43:38
+
+    Error Context: test-results/admin-a1-Lock-clears-every-5bb91--cannot-repopulate-the-page/error-context.md
+
+  7) tests/admin-a3.spec.ts:22:1 › no page-wide horizontal overflow at 320/390/768/1440 across every section 
+
+    Test was interrupted.
+
+    Error: locator.fill: Test ended.
+    Call log:
+      - waiting for getByLabel('Owner key')
+
+
+      12 | async function unlock(page: Page) {
+      13 |   await page.goto('./analytics.html')
+    > 14 |   await page.getByLabel('Owner key').fill('test-key')
+         |                                      ^
+      15 |   await page.getByRole('button', { name: 'Unlock' }).click()
+      16 |   await expect(page.getByText('Active tokens — last 7 days')).toBeVisible()
+      17 | }
+        at unlock (/Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a3.spec.ts:14:38)
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a3.spec.ts:24:3
+
+    Error Context: test-results/admin-a3-no-page-wide-hori-5411b-8-1440-across-every-section/error-context.md
+
+  8) tests/admin-a4.spec.ts:42:1 › route views and task create/complete fire exactly once at their success points, content-free 
+
+    Test was interrupted.
+
+    Error: locator.click: Test ended.
+    Call log:
+      - waiting for getByRole('button', { name: /Add task/ })
+
+
+      57 |   await page.waitForTimeout(300)
+      58 |   // Create a task through the real UI; the event fires on successful save.
+    > 59 |   await page.getByRole('button', { name: /Add task/ }).click()
+         |                                                        ^
+      60 |   await page.getByLabel('Title').fill('Fixture task — private text that must never leave')
+      61 |   await page.locator('input[type="date"]').first().fill('2026-09-30')
+      62 |   await page.getByRole('button', { name: 'Save task' }).click()
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a4.spec.ts:59:56
+
+    Error Context: test-results/admin-a4-route-views-and-t-15b23-success-points-content-free/error-context.md
+
+  9) tests/admin-a5.spec.ts:18:1 › reliability: sources carry denominators and thresholds; a stale aggregate is an open issue, never healthy 
+
+    Test was interrupted.
+
+    Error: locator.fill: Test ended.
+    Call log:
+      - waiting for getByLabel('Owner key')
+
+
+      12 | async function unlockAt(page: Page, section: string) {
+      13 |   await page.goto(`./analytics.html#${section}`)
+    > 14 |   await page.getByLabel('Owner key').fill('test-key')
+         |                                      ^
+      15 |   await page.getByRole('button', { name: 'Unlock' }).click()
+      16 | }
+      17 |
+        at unlockAt (/Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a5.spec.ts:14:38)
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/admin-a5.spec.ts:21:3
+
+    Error Context: test-results/admin-a5-reliability-sourc-8d818-an-open-issue-never-healthy/error-context.md
+
+  10) tests/audit-r1.spec.ts:63:1 › TT-04: three same-day deadlines expose all three through an accessible "+1 more" 
+
+    Test was interrupted.
+
+    Error: locator.click: Test ended.
+    Call log:
+      - waiting for locator('.week-view').getByRole('button', { name: /next week/i })
+
+
+      65 |   await page.goto('./#/schedule')
+      66 |   // Move to the week of 14 Sep.
+    > 67 |   await page.locator('.week-view').getByRole('button', { name: /next week/i }).click()
+         |                                                                                ^
+      68 |   const more = page.getByRole('button', { name: /1 more deadlines on 2026-09-14/ })
+      69 |   await expect(more).toBeVisible()
+      70 |   const third = page.locator('.week-keydate[title="Monday deadline three"]')
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/audit-r1.spec.ts:67:80
+
+    Error Context: test-results/audit-r1-TT-04-three-same--87702-rough-an-accessible-1-more-/error-context.md
+
+  11) tests/audit-r2.spec.ts:55:1 › TT-11: a planned departure that passes while the page is open fetches exactly one leave-now alternative 
+
+    Test was interrupted.
+
+    Error: locator.click: Test ended.
+    Call log:
+      - waiting for locator('.day-list .session-card').first()
+
+
+      48 | async function openTodaysSessionTravel(page: Page) {
+      49 |   await page.goto('./#/schedule')
+    > 50 |   await page.locator('.day-list .session-card').first().click()
+         |                                                         ^
+      51 |   await page.getByRole('tab', { name: 'Travel & map' }).click()
+      52 |   await page.getByLabel('Journey origin').selectOption('campus')
+      53 | }
+        at openTodaysSessionTravel (/Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/audit-r2.spec.ts:50:57)
+        at /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/visual-ui-audit-2026-09-10/runtime/tests/audit-r2.spec.ts:64:3
+
+    Error Context: test-results/audit-r2-TT-11-a-planned-d-769f1-y-one-leave-now-alternative/error-context.md
+
+  5 failed
+    tests/admin-a1.spec.ts:11:1 › legacy key/cache are purged, nothing loads before unlock, and no credential travels in a URL 
+    tests/admin-a2.spec.ts:57:1 › batches carry observed UTC days, a valid envelope and nothing private 
+    tests/admin-a2.spec.ts:87:1 › a failed send retries the SAME immutable batchId; the ack finally clears it 
+    tests/admin-a2.spec.ts:110:1 › switching the usage toggle off clears pending counters and stops collection 
+    tests/audit-r1.spec.ts:43:1 › TT-01/02/04: desktop calendar has real width and shows personal events and weekend deadlines 
+  6 interrupted
+    tests/admin-a1.spec.ts:35:1 › Lock clears everything and a late response cannot repopulate the page 
+    tests/admin-a3.spec.ts:22:1 › no page-wide horizontal overflow at 320/390/768/1440 across every section 
+    tests/admin-a4.spec.ts:42:1 › route views and task create/complete fire exactly once at their success points, content-free 
+    tests/admin-a5.spec.ts:18:1 › reliability: sources carry denominators and thresholds; a stale aggregate is an open issue, never healthy 
+    tests/audit-r1.spec.ts:63:1 › TT-04: three same-day deadlines expose all three through an accessible "+1 more" 
+    tests/audit-r2.spec.ts:55:1 › TT-11: a planned departure that passes while the page is open fetches exactly one leave-now alternative 
+  97 did not run

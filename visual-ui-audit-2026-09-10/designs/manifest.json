@@ -1,0 +1,17 @@
+{
+  "today": "Today",
+  "schedule": "Mobile schedule",
+  "schedule-desktop": "Desktop calendar",
+  "session": "Session details",
+  "travel": "Travel & map",
+  "home": "Journey home",
+  "tasks": "Tasks & deadlines",
+  "pgce": "PGCE file",
+  "pgce-desktop": "Desktop PGCE",
+  "settings": "Settings",
+  "settings-data": "Data & devices",
+  "settings-reminders": "Reminders",
+  "find": "Find",
+  "admin": "Admin overview",
+  "admin-mobile": "Mobile admin"
+}

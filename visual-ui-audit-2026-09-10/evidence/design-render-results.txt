@@ -1,0 +1,17 @@
+[
+  { name: 'today', overflow: 0, height: 964 },
+  { name: 'schedule', overflow: 0, height: 955 },
+  { name: 'schedule-desktop', overflow: 0, height: 903 },
+  { name: 'session', overflow: 0, height: 986 },
+  { name: 'travel', overflow: 0, height: 1034 },
+  { name: 'home', overflow: 0, height: 900 },
+  { name: 'tasks', overflow: 0, height: 927 },
+  { name: 'pgce', overflow: 0, height: 1047 },
+  { name: 'pgce-desktop', overflow: 0, height: 900 },
+  { name: 'settings', overflow: 0, height: 968 },
+  { name: 'settings-data', overflow: 0, height: 1094 },
+  { name: 'settings-reminders', overflow: 0, height: 981 },
+  { name: 'find', overflow: 0, height: 900 },
+  { name: 'admin', overflow: 0, height: 933 },
+  { name: 'admin-mobile', overflow: 0, height: 932 }
+]

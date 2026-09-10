@@ -1,0 +1,726 @@
+[
+  {
+    "name": "today",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "1 overdue task · View tasks",
+        "height": 38
+      },
+      {
+        "text": "View journey",
+        "height": 38
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Rest of today",
+        "size": "13px"
+      },
+      {
+        "text": "Live route, departures and map",
+        "size": "12px"
+      },
+      {
+        "text": "Tomorrow: 3 sessions, first at 09:00 — PS2 - Exploring Professionalism - Aims and Values i",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "schedule",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "Week",
+        "height": 27
+      },
+      {
+        "text": "Month",
+        "height": 27
+      },
+      {
+        "text": "List",
+        "height": 27
+      },
+      {
+        "text": "🏫",
+        "height": 39
+      },
+      {
+        "text": "Plan week",
+        "height": 33
+      },
+      {
+        "text": "Filters",
+        "height": 33
+      },
+      {
+        "text": "‹",
+        "height": 36
+      },
+      {
+        "text": "›",
+        "height": 36
+      },
+      {
+        "text": "＋",
+        "height": 32
+      }
+    ],
+    "smallText": [
+      {
+        "text": "3 sessions",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "tasks",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Overdue",
+        "size": "13px"
+      },
+      {
+        "text": "1 overdue deadline still outstanding.",
+        "size": "13px"
+      },
+      {
+        "text": "Upcoming",
+        "size": "13px"
+      },
+      {
+        "text": "1 due in the next 14 days. Change a task with its status control; open a row for details.",
+        "size": "13px"
+      }
+    ]
+  },
+  {
+    "name": "pgce",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Placement blocks from your timetable appear here — school details, mentor and logged days.",
+        "size": "12px"
+      },
+      {
+        "text": "Add your first reflection, or tag a session note against the Teachers’ Standards — everyth",
+        "size": "12px"
+      },
+      {
+        "text": "Targets, mentor meetings, observations, lessons and audits live here — add the first one f",
+        "size": "12px"
+      },
+      {
+        "text": "Keep DBS letters, certificates and school documents in the wallet — stored on this device.",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "settings",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "Done",
+        "height": 32
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Profiles, sources, notices, specialisms, study group",
+        "size": "12px"
+      },
+      {
+        "text": "Notification offsets, quiet hours, background push",
+        "size": "12px"
+      },
+      {
+        "text": "Location, mode, home address, placements",
+        "size": "12px"
+      },
+      {
+        "text": "Subscribed feed, .ics export, what they contain",
+        "size": "12px"
+      },
+      {
+        "text": "Save state, sync, backup, exports, storage",
+        "size": "12px"
+      },
+      {
+        "text": "Theme and density",
+        "size": "12px"
+      },
+      {
+        "text": "What’s new, install, usage ping, support",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "settings-data",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "Settings",
+        "height": 34
+      }
+    ],
+    "smallText": [
+      {
+        "text": "A downloaded backup is only safe once you can see the file where you saved it — the downlo",
+        "size": "12px"
+      },
+      {
+        "text": "0% attended — 0 of 5 eligible completed sessions; 0 absent, 5 unrecorded. Unrecorded sessi",
+        "size": "12px"
+      },
+      {
+        "text": "Everything lives on this device only. Generate a backup (timetables, filters, notes, atten",
+        "size": "12px"
+      },
+      {
+        "text": "Keeps your timetables, filters, notes and attendance the same on your phone and laptop via",
+        "size": "12px"
+      },
+      {
+        "text": "Connecting brings in the synced timetables and merges notes/attendance with this device's ",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "settings-reminders",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "Settings",
+        "height": 34
+      },
+      {
+        "text": "Off",
+        "height": 31
+      },
+      {
+        "text": "21:00–07:00",
+        "height": 31
+      },
+      {
+        "text": "22:00–07:00",
+        "height": 31
+      },
+      {
+        "text": "23:00–08:00",
+        "height": 31
+      },
+      {
+        "text": "5 min",
+        "height": 31
+      },
+      {
+        "text": "10 min",
+        "height": 31
+      },
+      {
+        "text": "15 min",
+        "height": 31
+      },
+      {
+        "text": "30 min",
+        "height": 31
+      },
+      {
+        "text": "1 hour",
+        "height": 31
+      },
+      {
+        "text": "2 hours",
+        "height": 31
+      }
+    ],
+    "smallText": [
+      {
+        "text": "No notifications during these hours (in-app and push).",
+        "size": "12px"
+      },
+      {
+        "text": "Pick as many as you like — e.g. 1 hour and 15 min gives two notifications before each sess",
+        "size": "12px"
+      },
+      {
+        "text": "Notifications are blocked for this site — allow them in your browser settings.",
+        "size": "12px"
+      },
+      {
+        "text": "Answer with ✓ Attended or ✗ Absent on the notification, or tap it to answer in the app (a ",
+        "size": "12px"
+      },
+      {
+        "text": "These need a connected submissions/key-dates tab — none is connected for this timetable ye",
+        "size": "12px"
+      },
+      {
+        "text": "Notifies you when it's time to set off: session start minus your live travel estimate, wit",
+        "size": "12px"
+      },
+      {
+        "text": "Leave alerts are off.",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "find",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "Back",
+        "height": 34
+      },
+      {
+        "text": "Timetable",
+        "height": 31
+      },
+      {
+        "text": "Personal",
+        "height": 31
+      },
+      {
+        "text": "Task",
+        "height": 31
+      },
+      {
+        "text": "Work plan",
+        "height": 31
+      },
+      {
+        "text": "PGCE file",
+        "height": 31
+      },
+      {
+        "text": "Document",
+        "height": 31
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Titles, rooms, tutors, subjects and file names are searched on this device only. Nothing i",
+        "size": "12px"
+      },
+      {
+        "text": "Type to search. Use ↓ to move into the results and Enter to open one.",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "session",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "‹ Back",
+        "height": 32
+      },
+      {
+        "text": "✓ Attended",
+        "height": 32
+      },
+      {
+        "text": "✗ Absent",
+        "height": 32
+      },
+      {
+        "text": "TS1",
+        "height": 24
+      },
+      {
+        "text": "TS2",
+        "height": 24
+      },
+      {
+        "text": "TS3",
+        "height": 24
+      },
+      {
+        "text": "TS4",
+        "height": 24
+      },
+      {
+        "text": "TS5",
+        "height": 24
+      },
+      {
+        "text": "TS6",
+        "height": 24
+      },
+      {
+        "text": "TS7",
+        "height": 24
+      },
+      {
+        "text": "TS8",
+        "height": 24
+      },
+      {
+        "text": "Review later",
+        "height": 24
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Tag notes/photos against the Teachers' Standards — they build your evidence journal.",
+        "size": "12px"
+      },
+      {
+        "text": "0 photos available on this device.",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "travel",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "‹ Back",
+        "height": 32
+      },
+      {
+        "text": "On time",
+        "height": 24
+      },
+      {
+        "text": "5 min",
+        "height": 24
+      },
+      {
+        "text": "10 min",
+        "height": 24
+      },
+      {
+        "text": "15 min",
+        "height": 24
+      },
+      {
+        "text": "20 min",
+        "height": 24
+      },
+      {
+        "text": "Copy address",
+        "height": 15
+      },
+      {
+        "text": "Retry map",
+        "height": 38
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Waiting for a device fix — or pick a saved origin above. Address and directions work below",
+        "size": "12px"
+      },
+      {
+        "text": "Map could not load — IOE - Bedford Way (20) - A5.03",
+        "size": "12px"
+      },
+      {
+        "text": "The pin marks the approximate building centre — entrances and step-free access aren't veri",
+        "size": "12px"
+      },
+      {
+        "text": "Opens navigation outside My Timetable",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "home",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "‹ Back",
+        "height": 32
+      },
+      {
+        "text": "Copy address",
+        "height": 15
+      },
+      {
+        "text": "Retry map",
+        "height": 38
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Pick a saved origin above for a route — no location permission needed. The address, map an",
+        "size": "12px"
+      },
+      {
+        "text": "Waiting for a device fix — or pick a saved origin above.",
+        "size": "12px"
+      },
+      {
+        "text": "Map could not load — 1 Example Street, London N1",
+        "size": "12px"
+      },
+      {
+        "text": "Opens navigation outside My Timetable",
+        "size": "12px"
+      }
+    ]
+  },
+  {
+    "name": "schedule-desktop",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      },
+      {
+        "text": "Week",
+        "height": 27
+      },
+      {
+        "text": "Month",
+        "height": 27
+      },
+      {
+        "text": "List",
+        "height": 27
+      },
+      {
+        "text": "🏫",
+        "height": 39
+      },
+      {
+        "text": "Plan week",
+        "height": 33
+      },
+      {
+        "text": "Filters",
+        "height": 33
+      },
+      {
+        "text": "‹",
+        "height": 36
+      },
+      {
+        "text": "7 Sept – 13 Sept · this week",
+        "height": 18
+      },
+      {
+        "text": "›",
+        "height": 36
+      },
+      {
+        "text": "📸",
+        "height": 36
+      },
+      {
+        "text": "Show all seven days",
+        "height": 21
+      },
+      {
+        "text": "📌 Reading log",
+        "height": 17
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Show all seven days",
+        "size": "12px"
+      },
+      {
+        "text": "09:00PS1 - Exploring Professionalism - Introduction to PS and Teacher Identity",
+        "size": "11px"
+      },
+      {
+        "text": "11:30English 1",
+        "size": "11px"
+      },
+      {
+        "text": "14:30Maths 1",
+        "size": "11px"
+      },
+      {
+        "text": "09:00PS2 - Exploring Professionalism - Aims and Values in Primary Education",
+        "size": "11px"
+      },
+      {
+        "text": "11:30Self Study",
+        "size": "11px"
+      },
+      {
+        "text": "14:30EYFS Pathway 1",
+        "size": "11px"
+      },
+      {
+        "text": "09:00PSHE 1",
+        "size": "11px"
+      },
+      {
+        "text": "11:30Science 1",
+        "size": "11px"
+      },
+      {
+        "text": "14:30Maths Subject knowledge - Number (optional)",
+        "size": "11px"
+      },
+      {
+        "text": "09:00Specialism 1 - Art & Design",
+        "size": "11px"
+      },
+      {
+        "text": "09:00Specialism 1 - Music",
+        "size": "11px"
+      },
+      {
+        "text": "09:00Specialism 1 - Computing",
+        "size": "11px"
+      },
+      {
+        "text": "11:30Specialism 1 - Science",
+        "size": "11px"
+      },
+      {
+        "text": "10:00L&T 1",
+        "size": "11px"
+      },
+      {
+        "text": "11:30L&T 1",
+        "size": "11px"
+      }
+    ]
+  },
+  {
+    "name": "pgce-desktop",
+    "overflow": 0,
+    "smallButtons": [
+      {
+        "text": "Back up now",
+        "height": 38
+      },
+      {
+        "text": "Later",
+        "height": 28
+      }
+    ],
+    "smallText": [
+      {
+        "text": "Placement blocks from your timetable appear here — school details, mentor and logged days.",
+        "size": "12px"
+      },
+      {
+        "text": "Add your first reflection, or tag a session note against the Teachers’ Standards — everyth",
+        "size": "12px"
+      },
+      {
+        "text": "Targets, mentor meetings, observations, lessons and audits live here — add the first one f",
+        "size": "12px"
+      },
+      {
+        "text": "Keep DBS letters, certificates and school documents in the wallet — stored on this device.",
+        "size": "12px"
+      }
+    ]
+  }
+]

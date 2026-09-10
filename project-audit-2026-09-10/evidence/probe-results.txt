@@ -1,0 +1,2 @@
+CONFIRMED: reportAttendanceMarks resolves after HTTP 500
+Empty authoritative report: 200 {"ok":true,"skipped":true} retained marks: [ '2026-09-10|09:00|demo' ]

@@ -1,0 +1,12 @@
+import {build} from './runtime/node_modules/esbuild/lib/main.js';
+import worker from './runtime/workers/push/worker.js';
+await build({entryPoints:['./src/lib/push.ts'],bundle:true,platform:'node',format:'esm',outfile:'../push-probe-bundle.mjs'});
+Object.defineProperty(globalThis,'navigator',{configurable:true,value:{serviceWorker:{ready:Promise.resolve({pushManager:{getSubscription:async()=>({endpoint:'https://push.invalid/a'})}})}}});
+globalThis.fetch=async()=>new Response('server failure',{status:500});
+const {reportAttendanceMarks}=await import('./push-probe-bundle.mjs');
+await reportAttendanceMarks('https://worker.invalid',['2026-09-10|09:00|demo']);
+console.log('CONFIRMED: reportAttendanceMarks resolves after HTTP 500');
+let record={marks:{'2026-09-10|09:00|demo':Date.now()}};
+const env={PUSH:{get:async()=>record,put:async(k,v)=>{record=JSON.parse(v)}}};
+const result=await worker.fetch(new Request('https://worker.invalid/attendance',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({endpoint:'https://push.invalid/a',keys:[]})}),env);
+console.log('Empty authoritative report:',result.status,await result.text(),'retained marks:',Object.keys(record.marks));

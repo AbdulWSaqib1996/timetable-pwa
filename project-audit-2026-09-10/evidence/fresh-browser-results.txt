@@ -1,0 +1,16 @@
+
+> timetable-pwa@0.1.0 test:e2e
+> playwright test tests/fresh-audit.spec.ts
+
+[WebServer] (node:20898) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 3 tests using 1 worker
+
+(node:20916) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/fresh-audit.spec.ts:11:1 › Current UI evidence (4.4s)
+  ✓  2 tests/fresh-audit.spec.ts:23:2 › foreign device zone › reproduces missing foreground prompt while course-clock card is present (223ms)
+  ✓  3 tests/fresh-audit.spec.ts:29:1 › invalid backup export correctly stays disabled (310ms)
+
+  3 passed (6.8s)
