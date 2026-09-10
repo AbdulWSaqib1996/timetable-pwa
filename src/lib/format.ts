@@ -106,3 +106,19 @@ export function weekNumber(dateISO: string, termStartISO: string): number | null
   const diff = Math.floor((toDate(dateISO).getTime() - termMonday.getTime()) / (7 * 86_400_000))
   return diff >= 0 ? diff + 1 : null
 }
+
+/**
+ * V2 (visual audit): the kind of record a card represents, as a short label
+ * shown next to a book icon. Derived from canonical flags/ids only — never
+ * guessed from the title. Text always identifies the kind; colour is extra.
+ */
+export function sessionKindLabel(s: Session): string {
+  if (s.isKeyDate) return 'Key date'
+  if (s.id.startsWith('cmt-')) return s.isFreeTime ? 'Personal · free time' : 'Personal'
+  if (s.id.startsWith('plan-')) return s.isFreeTime ? 'Study block · done' : 'Study block'
+  if (s.isSelfStudy) return 'Self study'
+  if (isPlacementSession(s)) return 'Placement'
+  if (s.isSpecialism) return s.specialismName ? `Specialism · ${s.specialismName}` : 'Specialism'
+  if (s.isOptional) return 'Optional session'
+  return 'Course session'
+}

@@ -314,7 +314,7 @@ test('personal commitments: created on a day, marked Personal, block day-finishe
   await page.getByLabel('Ends').fill('19:00')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.locator('.day-list .session-card', { hasText: 'Dentist' })).toBeVisible()
-  await expect(page.locator('.badge-personal').first()).toBeVisible()
+  await expect(page.locator('.day-list .session-card', { hasText: 'Dentist' }).locator('.session-kind')).toContainText('Personal')
 
   // A later personal commitment prevents the "day finished" claim on Today
   // (demo sessions end 16:30; the dentist is at 18:00).

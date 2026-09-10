@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { addDaysISO, mondayOfISO } from '../../shared/calendar-time.js'
 import { assignLanesByComponent } from '../../shared/intervals.js'
 import type { Coords, TravelMode } from '../lib/campus'
-import { isPlacementSession, placementTag, subjectColor, toMinutes as toMins, weekNumber } from '../lib/format'
+import { isPlacementSession, placementTag, sessionKindLabel, subjectColor, toMinutes as toMins, weekNumber } from '../lib/format'
+import { parseLocation, shortBuildingName } from '../lib/location'
 import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import { shareWeekImage } from '../lib/weekImage'
 import type { Session } from '../types'
 import { SessionCard } from './SessionCard'
+import { Dialog, IconChevronLeft, IconChevronRight, IconClose, IconShare } from './ui'
 
 interface Props {
   sessions: Session[]
-  /** merged key dates (sheet + personal) shown as 📌 pins on their day */
+  /** merged key dates (sheet + personal) shown as pins on their day */
   keyDates?: Session[]
   todayISO: string
   /** the single selected date shared with Day/Month (defaults to today) */
@@ -52,18 +54,43 @@ function toMinutes(time: string): number | null {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null
 }
 
-/** Assign overlapping sessions to side-by-side lanes within a day column. */
+type Timed = { session: Session; start: number; end: number }
+type Component = { items: Timed[]; start: number; end: number; lanes: number; placed: { session: Session; lane: number; lanes: number }[] }
+
 /**
- * Lanes per CONNECTED overlap component (R2 / TT-14): a three-way morning
- * clash uses three lanes; an isolated afternoon lesson keeps full width.
- * Numeric minutes, never lexical time strings.
+ * Connected overlap components (R2 / TT-14 → V2): the same sweep the shared
+ * lane assignment uses, so a component is exactly the set of records that
+ * would share lanes. `lanes` is the component's maximum concurrency.
  */
-function assignLanes(daySessions: Session[]): { session: Session; lane: number; lanes: number }[] {
-  const items = daySessions.map((session) => {
+function componentsOf(daySessions: Session[]): Component[] {
+  const items: Timed[] = daySessions.map((session) => {
     const start = toMinutes(session.start) ?? 0
-    return { session, start, end: toMinutes(session.end) ?? start + 60 }
+    return { session, start, end: Math.max(toMinutes(session.end) ?? start + 60, start + 1) }
   })
-  return assignLanesByComponent(items).map(({ item, lane, lanes }) => ({ session: item.session, lane, lanes }))
+  const sorted = [...items].sort((a, b) => a.start - b.start || a.end - b.end)
+  const out: Component[] = []
+  let current: Timed[] = []
+  let currentEnd = -Infinity
+  const flush = () => {
+    if (current.length === 0) return
+    const placed = assignLanesByComponent(current).map(({ item, lane, lanes }) => ({ session: (item as Timed).session, lane, lanes }))
+    out.push({
+      items: current,
+      start: Math.min(...current.map((x) => x.start)),
+      end: Math.max(...current.map((x) => x.end)),
+      lanes: placed[0]?.lanes ?? 1,
+      placed,
+    })
+    current = []
+    currentEnd = -Infinity
+  }
+  for (const x of sorted) {
+    if (current.length > 0 && x.start >= currentEnd) flush()
+    current.push(x)
+    currentEnd = Math.max(currentEnd, x.end)
+  }
+  flush()
+  return out
 }
 
 function useIsNarrow(): boolean {
@@ -77,11 +104,31 @@ function useIsNarrow(): boolean {
   return narrow
 }
 
-const HOUR_PX = 56
+/** Appearance → Density drives the grid's hour height (comfortable 68px, compact 56px). */
+function useCompactDensity(): boolean {
+  const read = () => document.documentElement.getAttribute('data-density') === 'compact'
+  const [compact, setCompact] = useState(read)
+  useEffect(() => {
+    const obs = new MutationObserver(() => setCompact(read()))
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-density'] })
+    return () => obs.disconnect()
+  }, [])
+  return compact
+}
+
+const HOUR_PX_COMFORTABLE = 68
+const HOUR_PX_COMPACT = 56
+const HOURS_COL_PX = 52
+/** Below this measured lane width, overlapping records are grouped (V-09). */
+export const MIN_LANE_PX = 100
+
+const hhmmRange = (s: Session) => `${s.start}${s.end && s.end !== s.start ? `–${s.end}` : ''}`
 
 export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavigate, onSelect, termStartISO, coords, travelMode, placements }: Props) {
   const weekStart = mondayOfISO(anchorISO)
   const isNarrow = useIsNarrow()
+  const compact = useCompactDensity()
+  const hourPx = compact ? HOUR_PX_COMPACT : HOUR_PX_COMFORTABLE
   const wkNum = termStartISO ? weekNumber(weekStart, termStartISO) : null
 
   const [weatherReady, setWeatherReady] = useState(false)
@@ -138,13 +185,51 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
     return { minHour: min, maxHour: max }
   }, [byDay])
 
+  // Measured column width decides whether a component's lanes stay readable
+  // (V-09): grouping is a measurement, never a guess from the viewport.
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [gridWidth, setGridWidth] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const el = gridRef.current
+    if (!el) return
+    setGridWidth(el.getBoundingClientRect().width)
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) setGridWidth(entry.contentRect.width)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [isNarrow])
+  const columnWidth = gridWidth === null ? null : (gridWidth - HOURS_COL_PX) / Math.max(1, weekDays.length)
+
+  const [group, setGroup] = useState<{ dateISO: string; items: Session[] } | null>(null)
+  // A grouped selection follows identity: if the week changes, the dialog closes.
+  useEffect(() => setGroup(null), [weekStart])
+
+  // Legend from the canonical subjects actually visible this week — never a
+  // guess from titles; self study and placements have their own fixed keys.
+  const legend = useMemo(() => {
+    const seen = new Map<string, { label: string; color: string; className?: string }>()
+    for (const list of byDay.values()) {
+      for (const s of list) {
+        if (s.isSelfStudy) seen.set('self-study', { label: 'Self study', color: 'var(--text-muted)' })
+        else if (isPlacementSession(s)) seen.set('placement', { label: 'Placement', color: 'var(--saved-text)' })
+        else {
+          const key = (s.subject || s.title).trim()
+          const color = subjectColor(s)
+          if (color && !seen.has(key)) seen.set(key, { label: key, color })
+        }
+      }
+    }
+    return [...seen.values()]
+  }, [byDay])
+
   const isCurrentWeek = weekStart === mondayOf(todayISO)
   const weekLabel = `${fromISO(weekStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${fromISO(addDays(weekStart, 6)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
 
   const nav = (
     <div className="week-nav">
       <button type="button" className="btn-icon" onClick={() => onNavigate(addDaysISO(anchorISO, -7))} aria-label="Previous week">
-        ‹
+        <IconChevronLeft />
       </button>
       <button
         type="button"
@@ -157,7 +242,7 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
         {isCurrentWeek && <span className="week-current"> · this week</span>}
       </button>
       <button type="button" className="btn-icon" onClick={() => onNavigate(addDaysISO(anchorISO, 7))} aria-label="Next week">
-        ›
+        <IconChevronRight />
       </button>
       <button
         type="button"
@@ -174,7 +259,7 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
         aria-label="Share week as image"
         title="Share week as image"
       >
-        📸
+        <IconShare />
       </button>
     </div>
   )
@@ -218,7 +303,14 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
   }
 
   const hours = Array.from({ length: maxHour - minHour }, (_, i) => minHour + i)
-  const gridHeight = (maxHour - minHour) * HOUR_PX
+  const gridHeight = (maxHour - minHour) * hourPx
+  const eventPlace = (s: Session): string | null => {
+    if (s.isSelfStudy || !s.room) return null
+    const loc = parseLocation(s.room)
+    if (loc.building && loc.room) return `${shortBuildingName(loc)} · ${loc.room}`
+    if (loc.note) return 'Room TBC'
+    return s.room
+  }
 
   return (
     <div className="week-view">
@@ -228,11 +320,13 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
           {showWeekend ? 'Hide empty weekend' : 'Show all seven days'}
         </button>
       </p>
-      <div className="week-grid" style={{ gridTemplateColumns: `48px repeat(${weekDays.length}, 1fr)` }}>
+      <div ref={gridRef} className={`week-grid${compact ? ' week-grid--compact' : ''}`} style={{ gridTemplateColumns: `${HOURS_COL_PX}px repeat(${weekDays.length}, minmax(0, 1fr))` }}>
         <div />
         {weekDays.map((dateISO) => (
           <div key={dateISO} className={`week-col-head${dateISO === todayISO ? ' today' : ''}${dateISO === anchorISO && anchorISO !== todayISO ? ' selected' : ''}`}>
-            {fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
+            <span className="week-col-head-day">
+              {fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'short' })} <strong>{fromISO(dateISO).getDate()}</strong>
+            </span>
             {(() => {
               const pins = keyDatesByDay.get(dateISO) ?? []
               const open = expandedPins === dateISO
@@ -241,7 +335,7 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
                 <>
                   {shown.map((kd) => (
                     <button key={kd.id} type="button" className="week-keydate" title={kd.title} onClick={() => onSelect(kd)}>
-                      📌 {kd.title.length > 18 ? kd.title.slice(0, 18) + '…' : kd.title}
+                      {kd.title.length > 18 ? kd.title.slice(0, 18) + '…' : kd.title}
                     </button>
                   ))}
                   {pins.length > 2 && (
@@ -262,7 +356,7 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
         ))}
         <div className="week-hours" style={{ height: gridHeight }}>
           {hours.map((h) => (
-            <div key={h} className="week-hour" style={{ top: (h - minHour) * HOUR_PX }}>
+            <div key={h} className="week-hour" style={{ top: (h - minHour) * hourPx }}>
               {String(h).padStart(2, '0')}:00
             </div>
           ))}
@@ -270,43 +364,112 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
         {weekDays.map((dateISO) => (
           <div key={dateISO} className={`week-col${dateISO === todayISO ? ' today' : ''}`} style={{ height: gridHeight }}>
             {hours.map((h) => (
-              <div key={h} className="week-hour-line" style={{ top: (h - minHour) * HOUR_PX }} />
+              <div key={h} className="week-hour-line" style={{ top: (h - minHour) * hourPx }} />
             ))}
-            {assignLanes(byDay.get(dateISO) ?? []).map(({ session, lane, lanes }) => {
-              const start = toMinutes(session.start) ?? minHour * 60
-              const end = toMinutes(session.end) ?? start + 60
-              const top = ((start - minHour * 60) / 60) * HOUR_PX
-              const height = Math.max(24, ((end - start) / 60) * HOUR_PX - 2)
-              const placement = !session.isKeyDate && isPlacementSession(session)
-              const color = placement ? '#0ca678' : subjectColor(session)
-              const school = placement ? placements?.[placementTag(session.title)]?.school : undefined
-              return (
-                <button
-                  key={session.id}
-                  type="button"
-                  className={`week-event${session.isSelfStudy ? ' self-study' : ''}${placement ? ' placement' : ''}`}
-                  style={{
-                    top,
-                    height,
-                    left: `calc(${(lane / lanes) * 100}% + 1px)`,
-                    width: `calc(${100 / lanes}% - 3px)`,
-                    ...(color ? { borderLeftColor: color } : {}),
-                  }}
-                  onClick={() => onSelect(session)}
-                  title={school ? `${session.title} · ${school}` : session.title}
-                >
-                  <span className="week-event-time">{session.start}</span>
-                  <span className="week-event-title">
-                    {placement ? '🏫 ' : ''}
-                    {session.title}
-                  </span>
-                  {school && height > 56 && <span className="week-event-school">{school}</span>}
-                </button>
-              )
+            {componentsOf(byDay.get(dateISO) ?? []).flatMap((component) => {
+              const laneWidth = columnWidth === null ? Infinity : columnWidth / component.lanes
+              if (component.lanes >= 2 && laneWidth < MIN_LANE_PX) {
+                // Unreadable lanes → one honest group covering the component's
+                // real time span. The count is exact; every record stays
+                // reachable from the dialog it opens (V-09).
+                const n = component.items.length
+                const top = ((component.start - minHour * 60) / 60) * hourPx
+                const height = Math.max(40, ((component.end - component.start) / 60) * hourPx - 2)
+                const titles = component.items.map((x) => x.session.title)
+                const kind = component.lanes === n ? 'parallel' : 'overlapping'
+                const range = `${String(Math.floor(component.start / 60)).padStart(2, '0')}:${String(component.start % 60).padStart(2, '0')}–${String(Math.floor(component.end / 60)).padStart(2, '0')}:${String(component.end % 60).padStart(2, '0')}`
+                return [
+                  <button
+                    key={`group-${dateISO}-${component.start}`}
+                    type="button"
+                    className="week-group"
+                    style={{ top, height }}
+                    aria-haspopup="dialog"
+                    aria-label={`${n} ${kind} sessions, ${range}: ${titles.join('; ')}. Opens a list`}
+                    onClick={() => setGroup({ dateISO, items: component.items.map((x) => x.session) })}
+                  >
+                    <span className="week-event-time">{range}</span>
+                    <span className="week-group-count">
+                      {n} {kind} sessions
+                    </span>
+                    <span className="week-group-titles">{titles.join(' · ')}</span>
+                  </button>,
+                ]
+              }
+              return component.placed.map(({ session, lane, lanes }) => {
+                const start = toMinutes(session.start) ?? minHour * 60
+                const end = toMinutes(session.end) ?? start + 60
+                const top = ((start - minHour * 60) / 60) * hourPx
+                const height = Math.max(24, ((end - start) / 60) * hourPx - 2)
+                const placement = !session.isKeyDate && isPlacementSession(session)
+                const color = placement ? 'var(--saved-text)' : subjectColor(session)
+                const school = placement ? placements?.[placementTag(session.title)]?.school : undefined
+                const place = eventPlace(session)
+                return (
+                  <button
+                    key={session.id}
+                    type="button"
+                    className={`week-event${session.isSelfStudy ? ' self-study' : ''}${placement ? ' placement' : ''}`}
+                    style={{
+                      top,
+                      height,
+                      left: `calc(${(lane / lanes) * 100}% + 1px)`,
+                      width: `calc(${100 / lanes}% - 3px)`,
+                      ...(color ? { borderLeftColor: color } : {}),
+                    }}
+                    onClick={() => onSelect(session)}
+                    title={school ? `${session.title} · ${school}` : session.title}
+                  >
+                    <span className="week-event-time">{height >= 40 ? hhmmRange(session) : session.start}</span>
+                    <span className="week-event-title">{session.title}</span>
+                    {height >= 64 && (school || place) && <span className="week-event-meta">{school ?? place}</span>}
+                    {height >= 88 && !school && <span className="week-event-meta">{sessionKindLabel(session)}</span>}
+                  </button>
+                )
+              })
             })}
           </div>
         ))}
       </div>
+      {legend.length > 0 && (
+        <ul className="week-legend" aria-label="Colour key">
+          {legend.map((item) => (
+            <li key={item.label}>
+              <span className="week-legend-swatch" style={{ background: item.color }} aria-hidden="true" />
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="filter-hint week-grid-note">Grouped sessions open a list of every option. All events keep their real start and end times.</p>
+      {group && (
+        <Dialog label={`${group.items.length} sessions on ${fromISO(group.dateISO).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}`} onClose={() => setGroup(null)}>
+          <div className="sheet-header">
+            <h2>
+              {group.items.length} sessions · {fromISO(group.dateISO).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </h2>
+            <button type="button" className="btn-icon" onClick={() => setGroup(null)} aria-label="Close">
+              <IconClose />
+            </button>
+          </div>
+          <p className="filter-hint">These sessions overlap, so the calendar shows them as one group. Each keeps its own record.</p>
+          <div className="day-sessions week-group-list">
+            {group.items.map((s) => (
+              <SessionCard
+                key={s.id}
+                session={s}
+                coords={coords}
+                travelMode={travelMode}
+                weather={weatherFor(s)}
+                onSelect={(picked) => {
+                  setGroup(null)
+                  onSelect(picked)
+                }}
+              />
+            ))}
+          </div>
+        </Dialog>
+      )}
     </div>
   )
 }

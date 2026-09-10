@@ -3,11 +3,12 @@ import { addDaysISO, mondayOfISO } from '../../../shared/calendar-time.js'
 import { AgendaView } from '../../components/AgendaView'
 import { MonthView } from '../../components/MonthView'
 import { WeekView } from '../../components/WeekView'
-import { IconClose, IconSchool, IconSearch, PageHeader, SegmentedControl, SettingsAction, StatusMessage } from '../../components/ui'
+import { IconClose, IconPlus, IconSchool, IconSearch, PageHeader, QuickMenu, SegmentedControl, SettingsAction, StatusMessage } from '../../components/ui'
 import type { PlanChildRec } from '../../lib/admin'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey as panelKey } from '../../lib/diff'
 import { getFilters } from '../../lib/filters'
+import { formatRemaining, toMinutes } from '../../lib/format'
 import { trackUse } from '../../lib/usage'
 import type { Filters, MetaMap, Session, SessionMeta, Settings, ViewMode } from '../../types'
 import { DayList } from './DayList'
@@ -159,16 +160,30 @@ export function SchedulePage({
     [scheduleSessions, anchorISO]
   )
 
+  // Day summary (V2): a count and the scheduled hours — a sum of real
+  // durations, never a workload estimate. Key dates and free time don't count.
+  const dayTimed = daySessions.filter((s) => !s.isKeyDate && !s.isFreeTime)
+  const dayMinutes = dayTimed.reduce((sum, s) => {
+    const a = toMinutes(s.start)
+    const b = toMinutes(s.end)
+    return a !== null && b !== null && b > a ? sum + (b - a) : sum
+  }, 0)
+  const daySummary =
+    dayTimed.length === 0
+      ? daySessions.length === 0
+        ? 'No sessions'
+        : `${daySessions.length} item${daySessions.length === 1 ? '' : 's'}`
+      : `${dayTimed.length} session${dayTimed.length === 1 ? '' : 's'}${dayMinutes > 0 ? ` · ${formatRemaining(dayMinutes)} scheduled` : ''}`
   const dayHeading = (
     <div className="day-list-heading">
-      <h2>
-        {longDay(anchorISO)}
-        {anchorISO === todayISO && <span className="badge badge-today">Today</span>}
-      </h2>
+      <div className="day-list-heading-text">
+        <h2>
+          {longDay(anchorISO)}
+          {anchorISO === todayISO && <span className="badge badge-today">Today</span>}
+        </h2>
+        <p className="day-summary">{daySummary}</p>
+      </div>
       <span className="day-heading-actions">
-        <span className="filter-hint">
-          {daySessions.length === 0 ? 'No sessions' : `${daySessions.length} session${daySessions.length === 1 ? '' : 's'}`}
-        </span>
         <button
           type="button"
           className="btn-icon"
@@ -176,7 +191,7 @@ export function SchedulePage({
           title="Add a personal event on this day"
           onClick={() => onAddPersonal(anchorISO)}
         >
-          ＋
+          <IconPlus />
         </button>
       </span>
     </div>
@@ -260,13 +275,27 @@ export function SchedulePage({
             <IconSchool />
             <span>Placements</span>
           </button>
-          <button type="button" className="btn-filters" onClick={onPlanWeek} title="Suggested gaps this week">
-            Plan week
-          </button>
           <button type="button" className="btn-filters" onClick={onOpenFilters}>
             Filters
             {activeCount > 0 && <span className="filter-count">{activeCount}</span>}
           </button>
+          {wide ? (
+            <button type="button" className="btn-filters" onClick={onPlanWeek} title="Suggested gaps this week">
+              Plan week
+            </button>
+          ) : (
+            // Mobile (V2): secondary functions live in a labelled More menu —
+            // grouped, never removed.
+            <QuickMenu
+              label="More"
+              tone="secondary"
+              items={[
+                { label: 'Plan week', onSelect: onPlanWeek },
+                { label: 'Search everything', onSelect: onFindAnything },
+                { label: 'Add a personal event', onSelect: () => onAddPersonal(anchorISO) },
+              ]}
+            />
+          )}
         </div>
       </div>
 

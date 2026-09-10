@@ -4303,3 +4303,474 @@ select.date-input {
 .restore-impact {
   margin: 4px 0 8px;
 }
+
+/* ---------- V2: daily use — Today, Schedule, Tasks, Session detail (Pass 59) ---------- */
+/* Today: the FAB must never cover the last actionable row. */
+.page-today {
+  padding-bottom: 72px;
+}
+.today-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.today-hero-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.badge-kind {
+  margin: 0;
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+.today-hero-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 22px;
+  line-height: 28px;
+}
+.today-hero-sub,
+.today-hero-subject {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--text-supporting);
+}
+.today-hero-facts {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.today-fact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--text);
+}
+.today-fact svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-supporting);
+  flex-shrink: 0;
+}
+.today-fact .today-hero-time {
+  font-size: 16px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.today-fact .today-hero-room-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.today-fact .today-hero-building {
+  font-size: 16px;
+  color: var(--text);
+}
+.today-row {
+  align-items: flex-start;
+  border-left: 4px solid var(--accent);
+}
+.today-row-time {
+  display: flex;
+  flex-direction: column;
+  min-width: 48px;
+}
+.today-row-start {
+  font-weight: 700;
+  font-size: 16px;
+}
+.today-row-end {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-supporting);
+}
+.today-row-title {
+  font-size: 16px;
+}
+.today-row-meta,
+.today-row-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-supporting);
+}
+.today-row-kind {
+  color: var(--saved-text);
+}
+.today-row-meta svg,
+.today-row-kind svg {
+  flex-shrink: 0;
+}
+.today-row-chevron {
+  display: flex;
+  margin-left: auto;
+  align-self: center;
+  color: var(--text-muted);
+}
+.today-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.free-gap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.today-finished .btn-row {
+  margin-top: 8px;
+}
+.home-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--saved-bg);
+  color: var(--saved-text);
+  flex-shrink: 0;
+}
+.home-row-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.home-row-text {
+  flex: 1;
+  min-width: 0;
+}
+.keydate-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Session cards: time column, title, labelled place and kind lines. */
+.session-card {
+  align-items: stretch;
+}
+.session-start {
+  font-size: 16px;
+  font-weight: 700;
+}
+.session-end {
+  font-size: 13px;
+  color: var(--text-supporting);
+}
+.session-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.session-meta {
+  color: var(--text-supporting);
+}
+.session-loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.session-loc-tbc {
+  color: var(--error-text);
+}
+.session-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--saved-text);
+}
+.session-card.self-study .session-kind {
+  color: var(--text-supporting);
+}
+.session-card.key-date .session-kind,
+.session-card.key-date .session-loc {
+  color: rgba(255, 255, 255, 0.88);
+}
+.session-chevron {
+  display: flex;
+}
+.session-card .badge {
+  margin-right: 6px;
+}
+
+/* Mobile Schedule: day summary, keyboard strip, More menu. */
+.day-list-heading {
+  align-items: flex-start;
+}
+.day-list-heading-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.day-list-heading h2 {
+  font-size: 18px;
+  line-height: 24px;
+}
+.day-summary {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-supporting);
+}
+.week-strip-day {
+  min-height: var(--control-min);
+}
+.week-strip-day:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.filterbar .quick-menu button {
+  min-height: var(--control-min);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.filterbar .quick-menu-list {
+  left: auto;
+  right: 0;
+}
+
+/* Desktop grid: comfortable density, 13px event text, honest overlap groups, legend. */
+.week-col-head {
+  font-size: 14px;
+  color: var(--text-supporting);
+  padding: 10px 4px;
+}
+.week-col-head strong {
+  color: var(--text);
+}
+.week-hour {
+  font-size: 13px;
+}
+.week-event {
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.week-event-time {
+  font-weight: 700;
+}
+.week-event-title {
+  -webkit-line-clamp: 2;
+  font-weight: 500;
+  color: var(--text);
+}
+.week-event-meta {
+  font-size: 12px;
+  color: var(--text-supporting);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.week-group {
+  position: absolute;
+  left: 1px;
+  right: 2px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px dashed var(--accent);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.week-group-count {
+  font-weight: 700;
+  color: var(--accent);
+}
+.week-group-titles {
+  color: var(--text-supporting);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.week-legend {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 14px;
+  color: var(--text-supporting);
+}
+.week-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.week-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.week-grid-note {
+  margin: 6px 0 0;
+}
+.week-group-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Tasks: one card per task, semantic badges, one clear action. */
+.task-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+}
+.task-card-overdue {
+  border-left-color: var(--error-text);
+}
+.task-card.kd-done {
+  opacity: 0.7;
+}
+.task-card .keydate-line {
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.task-card .keydate-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: var(--control-min);
+}
+.task-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.task-card-top .badge {
+  margin: 0;
+}
+.badge-source {
+  background: var(--bg);
+  color: var(--text-supporting);
+  border: 1px solid var(--border);
+}
+.task-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+.task-card .change-meta {
+  font-size: 14px;
+}
+.task-card-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.kd-chip-overdue {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+.keydate-row .kd-chip {
+  margin: 0;
+  min-width: 0;
+}
+.kd-status {
+  font-size: 14px;
+}
+@media (max-width: 380px) {
+  .task-card .kd-actions,
+  .task-card .kd-status {
+    width: 100%;
+  }
+}
+.completed-tasks > summary {
+  color: var(--text-supporting);
+}
+.completed-tasks-hint {
+  font-weight: 400;
+}
+
+/* Session detail: identity → attendance (one grouped 44px choice) → notes & evidence → travel tab. */
+.detail-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+.detail-section-title svg {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+.detail-state {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--text-supporting);
+}
+.attendance-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+.attendance-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1 1 140px;
+  min-height: var(--control-min);
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.attendance-option svg {
+  width: 18px;
+  height: 18px;
+}
+.attendance-option[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.chip-absent[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 2px var(--error-text);
+}
+.detail-tabs .segment {
+  min-height: var(--control-min);
+}
+.photo-add {
+  min-height: var(--control-min);
+  gap: 6px;
+  font-size: 14px;
+}
+.chip svg {
+  width: 18px;
+  height: 18px;
+}

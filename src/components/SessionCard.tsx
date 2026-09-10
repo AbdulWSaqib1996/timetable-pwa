@@ -1,11 +1,12 @@
 import { TRAVEL_MODE_ICON, estimateTravel } from '../lib/campus'
 import type { Coords, TravelMode } from '../lib/campus'
-import { formatRemaining, isPlacementSession, shortenRoom, subjectColor } from '../lib/format'
+import { formatRemaining, isPlacementSession, sessionKindLabel, shortenRoom, subjectColor } from '../lib/format'
 import { parseLocation, shortBuildingName } from '../lib/location'
 import { cachedRouteMinutes } from '../lib/tfl'
 import { weatherEmoji } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
+import { IconBook, IconChevronRight, IconPin } from './ui'
 
 interface Props {
   session: Session
@@ -20,9 +21,15 @@ interface Props {
   onSelect: (session: Session) => void
 }
 
+/**
+ * One session card (V2 hierarchy): time column (start bold, end below), the
+ * full title, a labelled place line, a labelled kind line, then state badges.
+ * Colour on the left edge follows the canonical subject; the text always
+ * identifies the kind on its own.
+ */
 export function SessionCard({ session, meta, coords, travelMode = 'walking', conflict, weather, onSelect }: Props) {
   const placement = !session.isKeyDate && isPlacementSession(session)
-  const color = session.isKeyDate ? null : placement ? '#0ca678' : subjectColor(session)
+  const color = session.isKeyDate ? null : placement ? 'var(--saved-text)' : subjectColor(session)
   const travel =
     coords && session.room && !session.isSelfStudy ? estimateTravel(session.room, coords, travelMode) : null
   // Keep card and detail-sheet times consistent: in transit mode, use the same
@@ -37,6 +44,15 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
       liveBasis = true
     }
   }
+  const loc = !session.isSelfStudy && session.room ? parseLocation(session.room) : null
+  const place = loc
+    ? loc.building && loc.room
+      ? `${shortBuildingName(loc)} · Room ${loc.room}`
+      : loc.note
+        ? 'Room TBC'
+        : shortenRoom(session.room)
+    : null
+  const photos = meta?.photos ?? 0
   return (
     <button
       type="button"
@@ -51,25 +67,12 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
       <div className="session-body">
         <div className="session-title">{session.title}</div>
         <div className="session-meta">
-          {!session.isSelfStudy &&
-            session.room &&
-            (() => {
-              const loc = parseLocation(session.room)
-              if (loc.building && loc.room) {
-                return (
-                  <>
-                    <span>{shortBuildingName(loc)}</span>
-                    <span className="room-chip" title={loc.roomName ?? undefined}>
-                      Rm {loc.room}
-                    </span>
-                  </>
-                )
-              }
-              if (loc.note) {
-                return <span className="room-chip room-chip-tbc">Room TBC</span>
-              }
-              return <span>{shortenRoom(session.room)}</span>
-            })()}
+          {place && (
+            <span className={`session-loc${loc?.note ? ' session-loc-tbc' : ''}`}>
+              <IconPin size={14} />
+              <span>{place}</span>
+            </span>
+          )}
           {session.tutor && session.tutor !== 'Self Study' && <span>{session.tutor}</span>}
           {travelMins != null && (
             <span
@@ -86,33 +89,25 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
             </span>
           )}
         </div>
-        {session.id.startsWith('cmt-') && (
-          <span className="badge badge-personal">
-            👤 Personal{session.isFreeTime ? ' · free' : ''}
-          </span>
-        )}
-        {session.id.startsWith('plan-') && (
-          <span className="badge badge-personal">
-            ⏱ Study block{session.isFreeTime ? ' · done' : ''}
-          </span>
-        )}
-        {session.isKeyDate && <span className="badge badge-keydate">📌 Key date</span>}
-        {conflict && <span className="badge badge-conflict">⚠ Clash</span>}
+        <div className="session-kind">
+          <IconBook size={14} />
+          <span>{sessionKindLabel(session)}</span>
+        </div>
+        {conflict && <span className="badge badge-conflict">Clash</span>}
         {(session.identityCandidates?.length || session.identityWarning) && (
-          <span className="badge badge-conflict">🔗 review</span>
+          <span className="badge badge-conflict">Identity review</span>
         )}
-        {session.isSpecialism && session.specialismName && (
-          <span className="badge badge-specialism">{session.specialismName}</span>
+        {meta?.attended && <span className="badge badge-attended">Attended</span>}
+        {meta?.absent && <span className="badge badge-absent">Absent</span>}
+        {meta?.note && <span className="badge badge-note">Note</span>}
+        {photos > 0 && (
+          <span className="badge badge-note">
+            {photos} photo{photos === 1 ? '' : 's'}
+          </span>
         )}
-        {session.isSelfStudy && <span className="badge badge-selfstudy">Self study</span>}
-        {session.isOptional && <span className="badge badge-optional">Optional</span>}
-        {meta?.attended && <span className="badge badge-attended">✓ attended</span>}
-        {meta?.absent && <span className="badge badge-absent">✗ absent</span>}
-        {meta?.note && <span className="badge badge-note">📝 note</span>}
-        {(meta?.photos ?? 0) > 0 && <span className="badge badge-note">📷 {meta!.photos}</span>}
       </div>
       <span className="session-chevron" aria-hidden="true">
-        ›
+        <IconChevronRight />
       </span>
     </button>
   )

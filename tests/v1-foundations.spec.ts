@@ -33,7 +33,7 @@ async function seed(page: Page, opts: { profiles?: { id: string; name: string; s
 }
 
 // Metadata classes the audit allows at 12–13 px (brief labels, dense calendar labels).
-const METADATA = ['change-meta', 'kd-chip', 'badge', 'today-hero-label', 'week-strip-dow', 'week-strip-num', 'session-end', 'room-chip', 'free-gap', 'week-badge', 'bell-badge', 'search-count', 'filter-count', 'month-cell', 'week-event', 'chip-small', 'kd-status', 'nav-item', 'attention-dot', 'day-header', 'month-dow', 'month-keydate', 'plan-week-day', 'find-result-head', 'find-result-kind', 'find-result-date']
+const METADATA = ['change-meta', 'kd-chip', 'badge', 'today-hero-label', 'week-strip-dow', 'week-strip-num', 'session-end', 'room-chip', 'free-gap', 'week-badge', 'bell-badge', 'search-count', 'filter-count', 'month-cell', 'week-event', 'chip-small', 'kd-status', 'nav-item', 'attention-dot', 'day-header', 'month-dow', 'month-keydate', 'plan-week-day', 'find-result-head', 'find-result-kind', 'find-result-date', 'week-group', 'session-end']
 
 async function walk(page: Page) {
   return page.evaluate((metadata) => {

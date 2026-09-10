@@ -2,7 +2,7 @@ import { estimateTravel } from '../../lib/campus'
 import type { TravelMode } from '../../lib/campus'
 import { parseLocation, shortBuildingName } from '../../lib/location'
 import type { Session, SessionMeta } from '../../types'
-import { IconClose } from '../../components/ui'
+import { IconAlert, IconCheck, IconClose, IconPinTack } from '../../components/ui'
 
 interface Props {
   session: Session
@@ -35,7 +35,7 @@ export function SessionPanel({ session, meta, travelMode, onMeta, onOpenFull, on
         <span className="session-panel-kicker">Selected session</span>
         {onTogglePin && (
           <button type="button" className="btn-icon" aria-pressed={pinned} aria-label={pinned ? 'Unpin panel' : 'Pin panel across weeks'} title={pinned ? 'Unpin' : 'Pin'} onClick={onTogglePin}>
-            📌
+            <IconPinTack />
           </button>
         )}
         <button type="button" className="btn-icon" aria-label="Close panel" onClick={onClose}>
@@ -72,10 +72,10 @@ export function SessionPanel({ session, meta, travelMode, onMeta, onOpenFull, on
         </a>
       )}
       {!session.isKeyDate && !session.isSelfStudy && (
-        <div className="chip-grid attendance-chips">
+        <div className="attendance-choice" role="group" aria-label="Attendance">
           <button
             type="button"
-            className={`chip${meta?.attended ? ' chip-on' : ''}`}
+            className={`chip attendance-option${meta?.attended ? ' chip-on' : ''}`}
             aria-pressed={meta?.attended === true}
             onClick={() =>
               onMeta(
@@ -84,17 +84,19 @@ export function SessionPanel({ session, meta, travelMode, onMeta, onOpenFull, on
               )
             }
           >
-            ✓ Attended
+            <IconCheck />
+            Attended
           </button>
           <button
             type="button"
-            className={`chip${meta?.absent ? ' chip-on chip-absent' : ''}`}
+            className={`chip attendance-option${meta?.absent ? ' chip-on chip-absent' : ''}`}
             aria-pressed={meta?.absent === true}
             onClick={() =>
               onMeta(session, meta?.absent ? { absent: false, absentReason: undefined } : { absent: true, attended: false })
             }
           >
-            ✗ Absent
+            <IconAlert />
+            Absent
           </button>
         </div>
       )}

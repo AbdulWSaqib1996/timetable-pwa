@@ -117,7 +117,8 @@ test('TT-13: editing a reminder-enabled personal event keeps its reminder; the c
 })
 
 test('TT-14: three overlapping morning blocks share lanes; the lone afternoon block keeps full width', async ({ page }) => {
-  await seed(page, { width: 1440 })
+  // 1600px: two lanes stay above V2's 100px readable minimum, so no grouping.
+  await seed(page, { width: 1600 })
   await page.goto('./#/schedule')
   const w = async (title: string) => page.locator('.week-event', { hasText: title }).evaluate((el) => el.getBoundingClientRect().width)
   const morning = await w('Morning A')
@@ -128,7 +129,7 @@ test('TT-14: three overlapping morning blocks share lanes; the lone afternoon bl
 })
 
 test('TT-15: the desktop panel follows identity — closes on week change unless pinned', async ({ page }) => {
-  await seed(page, { width: 1440 })
+  await seed(page, { width: 1600 })
   await page.goto('./#/schedule')
   await page.locator('.week-event', { hasText: 'Morning A' }).click()
   await expect(page.locator('.session-panel')).toContainText('Morning A')

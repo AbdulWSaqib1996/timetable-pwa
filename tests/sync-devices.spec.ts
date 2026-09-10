@@ -68,7 +68,7 @@ test('an attendance mark on device A reaches an open device B within one backgro
 
   // Device A marks Maths 1 attended; the 2 s edit debounce parks it.
   await a.page.locator('.day-list .session-card', { hasText: 'Maths 1' }).click()
-  await a.page.getByRole('button', { name: '✓ Attended' }).click()
+  await a.page.getByRole('button', { name: 'Attended' }).click()
   await a.page.clock.runFor(2_500)
   await expect.poll(() => server.state.remote.revision, { timeout: 15_000 }).toBeGreaterThan(rev0)
   expect((await metaOf(a.page))[MATHS].attended).toBe(true)
@@ -79,12 +79,12 @@ test('an attendance mark on device A reaches an open device B within one backgro
   await expect.poll(async () => (await metaOf(b.page))[MATHS]?.attended, { timeout: 15_000 }).toBe(true)
   // B's detail shows the answer from A without any reload.
   await b.page.locator('.day-list .session-card', { hasText: 'Maths 1' }).click()
-  await expect(b.page.getByRole('button', { name: '✓ Attended' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(b.page.getByRole('button', { name: 'Attended' })).toHaveAttribute('aria-pressed', 'true')
 
   // Busy server: the next exchange gets a 429 (Retry-After is not readable cross-origin, so the
   // client's own 60 s back-off applies); the app retries on its own without any user action.
   server.state.busyOnce = true
-  await b.page.getByRole('button', { name: '✗ Absent' }).click()
+  await b.page.getByRole('button', { name: 'Absent' }).click()
   await b.page.clock.runFor(2_500)
   await expect.poll(() => server.state.busyOnce).toBe(false)
   const before = server.state.remote.revision
