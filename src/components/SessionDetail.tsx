@@ -7,6 +7,7 @@ import { geocodeAddress } from '../lib/geocode'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import type { Coords, TravelMode } from '../lib/campus'
 import { formatRemaining, googleCalendarUrl, isPlacementSession, sessionKindLabel } from '../lib/format'
+import { splitTitle } from '../features/today/TodayPage'
 import { parseLocation } from '../lib/location'
 import { sessionKey } from '../lib/diff'
 import { trackUse } from '../lib/usage'
@@ -23,7 +24,7 @@ import type { OriginOption } from '../lib/origins'
 import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
-import { IconAlert, IconBook, IconCalendar, IconCamera, IconCheck, IconClock, IconClose, IconPin, IconSchool, SegmentedControl } from './ui'
+import { IconAlert, IconBook, IconCalendar, IconCamera, IconCheck, IconChevronLeft, IconClock, IconClose, IconHome, IconNote, IconPin, IconSchool, PageHeader, SegmentedControl } from './ui'
 import { CopyButton } from './CopyButton'
 import { RouteMap } from './RouteMap'
 import { StaticMap } from './StaticMap'
@@ -58,6 +59,8 @@ interface Props {
   }) => void
   onMeta: (patch: Partial<SessionMeta>) => void
   onClose: () => void
+  /** the Journey home screen (V3 design: the return trip is a separate destination) */
+  onOpenHomeJourney?: () => void
 }
 
 function formatLongDate(dateISO: string): string {
@@ -114,8 +117,10 @@ export function SessionDetail({
   onPlacementInfo,
   onMeta,
   onClose,
+  onOpenHomeJourney,
 }: Props) {
   const isTask = session.isKeyDate === true
+  const titleSplit = splitTitle(session.title)
   const [tab, setTab] = useState<'overview' | 'travel'>('overview')
   useEffect(() => {
     if (tab === 'travel') telemetryTrack('journey_session_opened')
@@ -259,60 +264,69 @@ export function SessionDetail({
     { label: 'Groups', value: session.groups },
   ].filter((r) => r.value !== '')
 
-  const conciseLine = [
-    shortDate(session.dateISO),
-    !isTask && session.start
-      ? `${session.start}${session.end && session.end !== session.start ? `–${session.end}` : ''}`
-      : isTask && session.start
-        ? `due ${session.start}`
-        : '',
-    loc.building && loc.room ? `Room ${loc.room}` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ')
 
   const overview = (
     <div className="detail-tabpanel" role="tabpanel" aria-label="Overview" hidden={tab !== 'overview'}>
-      {!isTask && (
-        <div className="ui-card detail-identity">
-          <span className="badge badge-kind">{sessionKindLabel(session)}</span>
-          <ul className="today-hero-facts" aria-label="When and where">
-            <li className="today-fact">
+      {/* Identity hero (design.css .hero): kind tag, title split into heading + subtitle
+          (separator kept for the accessible name), then clock and pin rows. */}
+      <section className={`ui-card hero detail-identity${isTask ? ' detail-identity--task' : ''}`}>
+        <span className={`tag ${isTask ? 'tag--amber' : 'tag--teal'} badge-kind`}>
+          {isTask ? <IconNote size={15} /> : <IconBook size={15} />} {isTask ? 'Key date' : sessionKindLabel(session)}
+        </span>
+        <h2 className="detail-title">
+          {titleSplit ? (
+            <>
+              <span className="detail-title-head">{titleSplit.head}</span>
+              <span className="visually-hidden">{titleSplit.sep}</span>
+              <span className="detail-title-sub">{titleSplit.tail}</span>
+            </>
+          ) : (
+            session.title
+          )}
+        </h2>
+        {!titleSplit && !isTask && session.subject && session.subject !== session.title && <p className="detail-title-sub">{session.subject}</p>}
+        <div className="hero-details">
+          {isTask ? (
+            <div className="hero-detail">
               <IconCalendar />
-              <span>{formatLongDate(session.dateISO)}</span>
-            </li>
-            {session.start && (
-              <li className="today-fact">
-                <IconClock />
-                <span className="today-hero-time">
-                  {session.start}
-                  {session.end && session.end !== session.start ? `–${session.end}` : ''}
-                </span>
-              </li>
-            )}
-            {(loc.building || loc.raw) && (
-              <li className="today-fact today-fact-room">
-                <IconPin />
-                <span>
-                  {loc.building ? (
-                    <>
-                      <span className="today-hero-building">{loc.building}</span>
-                      {loc.room ? ' · ' : ''}
-                      {loc.room && <span className="today-hero-room-name">Room {loc.room}</span>}
-                    </>
-                  ) : loc.note === 'tbc' ? (
-                    'Room TBC — check nearer the time'
-                  ) : loc.note === 'booking-ref' ? (
-                    `Room not in the sheet yet (booking ref ${loc.raw})`
-                  ) : (
-                    loc.raw
-                  )}
-                </span>
-              </li>
-            )}
-          </ul>
+              <span>Due {formatLongDate(session.dateISO)}{session.start ? ` · ${session.start}` : ''}</span>
+            </div>
+          ) : (
+            <>
+              {session.start && (
+                <div className="hero-detail">
+                  <IconClock />
+                  <span className="today-hero-time">
+                    {session.start}
+                    {session.end && session.end !== session.start ? `–${session.end}` : ''}
+                  </span>
+                </div>
+              )}
+              {(loc.building || loc.raw) && (
+                <div className="hero-detail">
+                  <IconPin />
+                  <span>
+                    {loc.building
+                      ? `${loc.building}${loc.room ? ` · Room ${loc.room}` : ''}`
+                      : loc.note === 'tbc'
+                        ? 'Room TBC — check nearer the time'
+                        : loc.note === 'booking-ref'
+                          ? `Room not in the sheet yet (booking ref ${loc.raw})`
+                          : loc.raw}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </section>
+      <section className="ui-card detail-card">
+        <div className="section-title">
+          <span className="ui-tile ui-tile--blue" aria-hidden="true">
+            <IconNote />
+          </span>
+          <h3>Details</h3>
+        </div>
       {session.isSpecialism && session.specialismName && (
         <span className="badge badge-specialism">Specialism · {session.specialismName}</span>
       )}
@@ -335,8 +349,15 @@ export function SessionDetail({
           Add to Google Calendar
         </a>
       )}
+      </section>
       {isTask ? (
-        <section className="detail-notes">
+        <section className="ui-card detail-card">
+          <div className="section-title">
+            <span className="ui-tile ui-tile--amber" aria-hidden="true">
+              <IconCheck />
+            </span>
+            <h3>Status &amp; notes</h3>
+          </div>
           <div className="chip-grid attendance-chips" role="group" aria-label="Task status">
             {(['todo', 'doing', 'done'] as const).map((status) => (
               <button
@@ -366,10 +387,13 @@ export function SessionDetail({
       ) : (
         <>
           {isPlacementSession(session) && onPlacementInfo && (
-            <section className="detail-notes placement-details">
-              <h3 className="subheading detail-section-title">
-                <IconSchool /> Placement details
-              </h3>
+            <section className="ui-card detail-card placement-details">
+              <div className="section-title">
+                <span className="ui-tile ui-tile--teal" aria-hidden="true">
+                  <IconSchool />
+                </span>
+                <h3>Placement details</h3>
+              </div>
               <input
                 type="text"
                 className="placement-input"
@@ -421,10 +445,13 @@ export function SessionDetail({
               <p className="filter-hint">Shared across all sessions of this placement block; saved on this device.</p>
             </section>
           )}
-          <section className="detail-notes detail-section" aria-labelledby="detail-attendance-heading">
-            <h3 className="subheading detail-section-title" id="detail-attendance-heading">
-              <IconCheck /> Attendance
-            </h3>
+          <section className="ui-card detail-card detail-section" aria-labelledby="detail-attendance-heading">
+            <div className="section-title">
+              <span className="ui-tile ui-tile--teal" aria-hidden="true">
+                <IconCheck />
+              </span>
+              <h3 id="detail-attendance-heading">Attendance</h3>
+            </div>
             <p className="detail-state">
               {meta?.attended
                 ? 'Recorded as attended'
@@ -481,10 +508,13 @@ export function SessionDetail({
               )}
             </div>
           </section>
-          <section className="detail-notes detail-section" aria-labelledby="detail-notes-heading">
-            <h3 className="subheading detail-section-title" id="detail-notes-heading">
-              <IconCamera /> Notes &amp; evidence
-            </h3>
+          <section className="ui-card detail-card detail-section" aria-labelledby="detail-notes-heading">
+            <div className="section-title">
+              <span className="ui-tile ui-tile--violet" aria-hidden="true">
+                <IconBook />
+              </span>
+              <h3 id="detail-notes-heading">Notes &amp; evidence</h3>
+            </div>
             <p className="detail-state">
               {meta?.at
                 ? `Last saved on this device ${new Date(meta.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
@@ -576,6 +606,11 @@ export function SessionDetail({
           </section>
         </>
       )}
+      {!isTask && travel && (
+        <button type="button" className="btn-primary btn-wide detail-travel-cta" onClick={() => setTab('travel')}>
+          <IconPin size={18} /> Travel to this session
+        </button>
+      )}
     </div>
   )
 
@@ -615,6 +650,31 @@ export function SessionDetail({
           <CopyButton text={placementInfo?.address || session.room} />
         </div>
       </div>
+      {travel.location && shownItinerary && shownItinerary.legs.some((l) => l.geometry.length >= 2) ? (
+        // Full-route map (P7-03): drawn ONLY from provider geometry; a failed
+        // or geometry-less plan falls back to the destination-only map below.
+        <RouteMap
+          itinerary={shownItinerary}
+          origin={origin?.coords ?? null}
+          destination={travel.location}
+          selectedLeg={selectedLeg}
+          label={travel.building ?? undefined}
+        />
+      ) : travel.location ? (
+        <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} address={placementInfo?.address || session.room} />
+      ) : (
+        <div className="ui-card map-fallback">
+          <p className="filter-hint">
+            No map match for this location — the address and external directions below still work.
+          </p>
+        </div>
+      )}
+      {travel.location && (
+        <p className="filter-hint entrance-note">
+          The pin marks the approximate building centre — entrances and step-free access aren't
+          verified here; check the venue's own access information.
+        </p>
+      )}
       <div className={`travel-summary travel-summary--${tone}`}>
         {travelMode === 'driving' ? (
           travel.minutes !== null ? (
@@ -702,6 +762,16 @@ export function SessionDetail({
         </button>
       )}
       {planable && <OriginSelector options={origins} selectedId={originId} onSelect={setOriginId} selectRef={originSelect} />}
+      <a
+        className="btn-secondary btn-link external-nav btn-wide"
+        href={travel.mapsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => telemetryTrack('navigation_link_opened')}
+      >
+        Open in Google Maps ↗
+      </a>
+      <p className="filter-hint external-nav-caption">Opens navigation outside My Timetable</p>
       {futurePlan && (
         <div className="buffer-row">
           <span className="ui-field-label">Arrive early by</span>
@@ -720,31 +790,6 @@ export function SessionDetail({
           </div>
           <p className="filter-hint">A secondary preference — changing it plans the journey again for the new arrival time.</p>
         </div>
-      )}
-      {travel.location && shownItinerary && shownItinerary.legs.some((l) => l.geometry.length >= 2) ? (
-        // Full-route map (P7-03): drawn ONLY from provider geometry; a failed
-        // or geometry-less plan falls back to the destination-only map below.
-        <RouteMap
-          itinerary={shownItinerary}
-          origin={origin?.coords ?? null}
-          destination={travel.location}
-          selectedLeg={selectedLeg}
-          label={travel.building ?? undefined}
-        />
-      ) : travel.location ? (
-        <StaticMap lat={travel.location.lat} lng={travel.location.lng} label={travel.building ?? undefined} address={placementInfo?.address || session.room} />
-      ) : (
-        <div className="ui-card map-fallback">
-          <p className="filter-hint">
-            No map match for this location — the address and external directions below still work.
-          </p>
-        </div>
-      )}
-      {travel.location && (
-        <p className="filter-hint entrance-note">
-          The pin marks the approximate building centre — entrances and step-free access aren't
-          verified here; check the venue's own access information.
-        </p>
       )}
       {shownItinerary && shownItinerary.legs.length > 0 ? (
         <details className="journey-steps">
@@ -774,31 +819,43 @@ export function SessionDetail({
           time ({journeyWeather.at})
         </p>
       )}
-      <a
-        className="btn-primary btn-link external-nav"
-        href={travel.mapsUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => telemetryTrack('navigation_link_opened')}
-      >
-        Open in Google Maps ↗
-      </a>
-      <p className="filter-hint external-nav-caption">Opens navigation outside My Timetable</p>
+      {onOpenHomeJourney && (
+        <section className="ui-card detail-card return-trip">
+          <div className="section-title">
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconHome />
+            </span>
+            <div>
+              <h3>Planning the return trip?</h3>
+              <p className="filter-hint">Home is a separate destination.</p>
+            </div>
+          </div>
+          <button type="button" className="btn-ghost btn-ghost--left" onClick={onOpenHomeJourney}>
+            View journey home →
+          </button>
+        </section>
+      )}
     </div>
   )
 
+  const pageTitle = isTask ? 'Task details' : tab === 'travel' ? 'Travel to session' : 'Session details'
+  const subtitleLine = `${(titleSplit ? titleSplit.head : session.title).slice(0, 48)} · ${shortDate(session.dateISO)}`
   const body = (
     <>
-      <div className="sheet-header">
-        <h2 className="detail-title">{session.title}</h2>
-        <IdentityReview session={session} profileId={profileId} />
-        {presentation === 'sheet' && (
+      {presentation === 'sheet' ? (
+        <div className="sheet-header">
+          <div>
+            <h2 className="sheet-title">{pageTitle}</h2>
+            <p className="page-subtitle">{subtitleLine}</p>
+          </div>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
             <IconClose />
           </button>
-        )}
-      </div>
-      {conciseLine && <p className="detail-concise">{conciseLine}</p>}
+        </div>
+      ) : (
+        <PageHeader title={pageTitle} subtitle={subtitleLine} />
+      )}
+      <IdentityReview session={session} profileId={profileId} />
       {!isTask && travel && (
         <div className="detail-tabs">
           <SegmentedControl
@@ -828,7 +885,7 @@ export function SessionDetail({
     return (
       <div className="page detail-page">
         <button type="button" className="page-back" onClick={onClose}>
-          ‹ {backLabel}
+          <IconChevronLeft size={18} /> {backLabel}
         </button>
         {body}
       </div>

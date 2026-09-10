@@ -28,7 +28,7 @@ import type { SourceStatus } from '../../shared/refresh.js'
 import type { PlacementExceptionRec } from '../lib/admin'
 import { placementBlocks as computePlacementBlocks } from '../lib/placement'
 import { WHATSNEW } from '../lib/changelog'
-import { IconAlert, IconBack, IconBell, IconCalendar, IconChart, IconCheck, IconChevronRight, IconClose, IconDownload, IconHelp, IconPin, IconSchedule, IconShield, IconSun, IconUser, PageHeader, StatusMessage } from './ui'
+import { IconAlert, IconBack, IconBell, IconBook, IconCalendar, IconChart, IconCheck, IconChevronRight, IconClock, IconClose, IconDownload, IconHelp, IconMoon, IconNote, IconPin, IconSchedule, IconSchool, IconSearch, IconShare, IconShield, IconSun, IconUser, PageHeader, StatusMessage } from './ui'
 import { useOnline } from '../hooks/useOnline'
 import { BackupSheet, RestoreSheet } from './BackupSheets'
 import { useAttention } from '../lib/attention'
@@ -622,14 +622,14 @@ export function SettingsSheet({
     ? buildFeedUrl(settings.icsFeedBase ?? DEFAULT_ICS_FEED_BASE, settings, activeProfile?.name)
     : null
 
-  const CATEGORIES: { id: SettingsSection; title: string; hint: string; icon: JSX.Element; tone: string }[] = [
-    { id: 'timetable', title: 'My timetable', hint: 'Profiles, sources, notices, specialisms, study group', icon: <IconSchedule size={20} />, tone: 'info' },
-    { id: 'reminders', title: 'Reminders', hint: 'Notification offsets, quiet hours, background push', icon: <IconBell />, tone: 'attention' },
-    { id: 'travel', title: 'Travel & home', hint: 'Location, mode, home address, placements', icon: <IconPin size={20} />, tone: 'saved' },
-    { id: 'calendars', title: 'Connected calendars', hint: 'Subscribed feed, .ics export, what they contain', icon: <IconCalendar />, tone: 'info' },
-    { id: 'data', title: 'Data & devices', hint: 'Save state, sync, backup, exports, storage', icon: <IconShield />, tone: 'info' },
-    { id: 'appearance', title: 'Appearance', hint: 'Theme and density', icon: <IconSun />, tone: 'development' },
-    { id: 'help', title: 'Help & privacy', hint: 'What’s new, install, usage ping, support', icon: <IconHelp />, tone: 'saved' },
+  const CATEGORIES: { id: SettingsSection; title: string; hint: string; subtitle: string; icon: JSX.Element; tone: string }[] = [
+    { id: 'timetable', title: 'My timetable', hint: 'Profiles, sources and specialisms', subtitle: 'Where your timetable comes from', icon: <IconSchedule size={20} />, tone: 'info' },
+    { id: 'reminders', title: 'Reminders', hint: 'Session, travel and key-date alerts', subtitle: 'Choose which alerts help you', icon: <IconBell />, tone: 'attention' },
+    { id: 'travel', title: 'Travel & home', hint: 'Home, journeys and travel preferences', subtitle: 'How the app plans your journeys', icon: <IconPin size={20} />, tone: 'saved' },
+    { id: 'calendars', title: 'Connected calendars', hint: 'Calendar feeds and exports', subtitle: 'Your timetable in other calendar apps', icon: <IconCalendar />, tone: 'info' },
+    { id: 'data', title: 'Data & devices', hint: 'Backup, restore and device sync', subtitle: 'Keep a recovery copy of your timetable', icon: <IconShield />, tone: 'info' },
+    { id: 'appearance', title: 'Appearance', hint: 'Theme and reading preferences', subtitle: 'How the app looks', icon: <IconSun />, tone: 'development' },
+    { id: 'help', title: 'Help & privacy', hint: 'Help, installation and privacy choices', subtitle: 'What is new, and what leaves this device', icon: <IconHelp />, tone: 'saved' },
   ]
   // "Saved on this device" renders only from real persistence state (V3).
   const saveState = hasPendingSaves() ? 'pending' : persistenceFailure() ? 'failed' : 'saved'
@@ -639,7 +639,7 @@ export function SettingsSheet({
       <div className="page page-settings">
         <PageHeader
           title="Settings"
-          subtitle={activeProfile?.name}
+          subtitle={`${activeProfile?.name ?? ''} · make the timetable work for you`}
           actions={
             <button type="button" className="btn-ghost" onClick={onClose}>
               Done
@@ -662,7 +662,8 @@ export function SettingsSheet({
             </button>
           </p>
         )}
-        <div className="searchbar settings-search">
+        <div className="searchbar settings-search searchbox">
+          <IconSearch />
           <input
             type="search"
             aria-label="Search settings"
@@ -723,19 +724,23 @@ export function SettingsSheet({
     )
   }
 
-  const title = CATEGORIES.find((c) => c.id === section)?.title ?? 'Settings'
+  const category = CATEGORIES.find((c) => c.id === section)
+  const title = category?.title ?? 'Settings'
   return (
     <div className="page page-settings">
       <button type="button" className="page-back" onClick={onClose}>
         <IconBack size={18} /> Settings
       </button>
-      <PageHeader title={title} />
+      <PageHeader title={title} subtitle={category?.subtitle} />
       <div className="settings-body">
       {section === 'timetable' && (
         <>
 
         <section className="filter-section" id="profiles">
           <div className="section-head">
+            <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconSchedule size={20} />
+            </span>
             <h3 tabIndex={-1}>Timetables</h3>
             <span className="notif-state">{store.profiles.length} on this device</span>
           </div>
@@ -802,7 +807,12 @@ export function SettingsSheet({
 
         {!settings.demo && (
           <section className="filter-section">
-            <h3>Share this setup</h3>
+            <div className="section-head">
+              <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconShare />
+            </span>
+              <h3>Share this setup</h3>
+            </div>
             <p className="filter-hint">
               Sends someone a link that opens the app already configured with this sheet and your
               specialism/group choices.
@@ -816,7 +826,12 @@ export function SettingsSheet({
 
         {!settings.demo && (
           <section className="filter-section" id="key-dates-source">
-            <h3 tabIndex={-1}>Key dates</h3>
+            <div className="section-head">
+              <span className="ui-tile ui-tile--attention" aria-hidden="true">
+              <IconCalendar />
+            </span>
+              <h3 tabIndex={-1}>Key dates</h3>
+            </div>
             <p className="filter-hint">
               Paste the link to the submissions/key-dates tab (open that tab so the URL contains its
               gid). Upcoming deadlines get a countdown strip on the day view.
@@ -848,7 +863,12 @@ export function SettingsSheet({
 
         {!settings.demo && (
           <section className="filter-section" id="notices">
-            <h3 tabIndex={-1}>Notices (cohort broadcasts)</h3>
+            <div className="section-head">
+              <span className="ui-tile ui-tile--attention" aria-hidden="true">
+              <IconBell />
+            </span>
+              <h3 tabIndex={-1}>Notices (cohort broadcasts)</h3>
+            </div>
             <p className="filter-hint">
               A tab with Date / Message / Link columns becomes dismissible announcement banners for
               everyone using that sheet. Background delivery uses the push worker.
@@ -872,6 +892,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="specialisms">
           <div className="section-head">
+            <span className="ui-tile ui-tile--violet" aria-hidden="true">
+              <IconBook size={20} />
+            </span>
             <h3 tabIndex={-1}>Specialisms</h3>
             <span className={`notif-state${(settings.mySpecialisms ?? []).length > 0 ? '' : ' off'}`}>
               {(settings.mySpecialisms ?? []).length > 0 ? `${(settings.mySpecialisms ?? []).length} chosen` : 'all shown'}
@@ -889,7 +912,12 @@ export function SettingsSheet({
 
 
         <section className="filter-section">
-          <h3>Term start (week numbers)</h3>
+          <div className="section-head">
+            <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconCalendar />
+            </span>
+            <h3>Term start (week numbers)</h3>
+          </div>
           <p className="filter-hint">Set the first day of term to show "Wk N" labels on days and weeks.</p>
           <input
             type="date"
@@ -901,7 +929,12 @@ export function SettingsSheet({
 
 
         <section className="filter-section">
-          <h3>Course</h3>
+          <div className="section-head">
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconSchool />
+            </span>
+            <h3>Course</h3>
+          </div>
           <p className="filter-hint">
             {activeCourse().name} · timezone {courseZone()} — campus, buildings, terminology and
             sections come from the course configuration; import a template or set up another
@@ -913,7 +946,12 @@ export function SettingsSheet({
         </section>
 
         <section className="filter-section">
-          <h3>Study group</h3>
+          <div className="section-head">
+            <span className="ui-tile ui-tile--violet" aria-hidden="true">
+              <IconUser size={20} />
+            </span>
+            <h3>Study group</h3>
+          </div>
           <p className="filter-hint">
             {settings.groupCode
               ? `In group ${settings.groupCode} as ${settings.groupName}.`
@@ -934,6 +972,9 @@ export function SettingsSheet({
             merely by rendering. */}
         <section className="filter-section" id="notification-status">
           <div className="section-head">
+            <span className="ui-tile ui-tile--attention" aria-hidden="true">
+              <IconBell />
+            </span>
             <h3 tabIndex={-1}>Notification status</h3>
             <span className={`notif-state${notifBlocked ? ' warn' : notifSupported ? '' : ' off'}`}>
               {notifBlocked ? 'Blocked on this device' : !notifSupported ? 'Not supported' : notifGranted ? 'Allowed on this device' : 'Not asked yet'}
@@ -980,6 +1021,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="session-reminders">
           <div className="section-head">
+            <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconClock size={20} />
+            </span>
             <h3 tabIndex={-1}>Session reminders</h3>
             <span className={`notif-state${(settings.reminderOffsets ?? []).length > 0 ? '' : ' off'}`}>
               {(settings.reminderOffsets ?? []).length > 0 ? (settings.reminderOffsets ?? []).map((m) => (m >= 60 ? `${m / 60}h` : `${m}m`)).join(', ') + ' before' : 'off'}
@@ -1013,6 +1057,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="leave-alerts">
           <div className="section-head">
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconPin size={20} />
+            </span>
             <h3 tabIndex={-1}>Leave alerts</h3>
             <span className={`notif-state${(settings.leaveAlertOffsets ?? []).length > 0 && settings.locationEnabled ? '' : ' off'}`}>
               {(settings.leaveAlertOffsets ?? []).length > 0 && settings.locationEnabled ? 'on' : 'off'}
@@ -1055,6 +1102,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="attendance-prompts">
           <div className="section-head">
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconCheck size={20} />
+            </span>
             <h3 tabIndex={-1}>Attendance prompts</h3>
             <span className={`notif-state${settings.attendancePrompts ? '' : ' off'}`}>{settings.attendancePrompts ? 'at each session’s end' : 'off'}</span>
           </div>
@@ -1096,6 +1146,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="key-date-reminders" aria-labelledby="key-date-reminders-heading">
           <div className="section-head">
+            <span className="ui-tile ui-tile--attention" aria-hidden="true">
+              <IconCalendar />
+            </span>
             <h3 id="key-date-reminders-heading" tabIndex={-1}>Key-date reminders</h3>
             <span className={`notif-state${(settings.keyDateReminderDays ?? []).length > 0 ? '' : ' off'}`}>
               {(settings.keyDateReminderDays ?? []).length > 0 ? (settings.keyDateReminderDays ?? []).join('/') + ' days before' : 'off'}
@@ -1141,6 +1194,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="quiet-hours">
           <div className="section-head">
+            <span className="ui-tile ui-tile--violet" aria-hidden="true">
+              <IconMoon />
+            </span>
             <h3 tabIndex={-1}>Quiet hours</h3>
             <span className={`notif-state${settings.quietFrom != null ? '' : ' off'}`}>
               {settings.quietFrom != null && settings.quietTo != null ? `${String(settings.quietFrom).padStart(2, '0')}:00–${String(settings.quietTo).padStart(2, '0')}:00` : 'off'}
@@ -1184,7 +1240,10 @@ export function SettingsSheet({
         {!settings.demo && (
           <section className="filter-section" id="background-push">
             <div className="section-head">
-              <h3 tabIndex={-1}>Background push (works with the app closed)</h3>
+              <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconBell />
+            </span>
+            <h3 tabIndex={-1}>Background push (works with the app closed)</h3>
               <span className={`notif-state${settings.pushEnabled ? '' : ' off'}`}>{settings.pushEnabled ? 'on' : 'off'}</span>
             </div>
             <p className="filter-hint">
@@ -1355,6 +1414,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="travel-mode">
           <div className="section-head">
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconPin size={20} />
+            </span>
             <h3 tabIndex={-1}>Travel times</h3>
             <span className={`notif-state${settings.locationEnabled ? '' : ' off'}`}>
               {settings.locationEnabled ? 'location on' : 'location off'} · {settings.travelMode === 'transit' ? 'public transport' : settings.travelMode === 'driving' ? 'driving' : 'walking'}
@@ -1435,7 +1497,12 @@ export function SettingsSheet({
 
         {(placementBlocks.length > 0 || Object.keys(settings.placements ?? {}).length > 0) && (
           <section className="filter-section">
-            <h3>Placements</h3>
+            <div className="section-head">
+              <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconSchool />
+            </span>
+              <h3>Placements</h3>
+            </div>
             <p className="filter-hint">
               {placementBlocks.length > 0
                 ? `${placementBlocks.reduce((n, b) => n + b.attended, 0)} school day${
@@ -1478,6 +1545,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="calendar-feed">
           <div className="section-head">
+            <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconCalendar />
+            </span>
             <h3 tabIndex={-1}>Calendar feed (stays in sync)</h3>
             <span className={`notif-state${feedUrl ? '' : ' off'}`}>{feedUrl ? 'available' : settings.demo ? 'needs a real sheet' : 'not set'}</span>
           </div>
@@ -1520,6 +1590,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="calendar-export">
           <div className="section-head">
+            <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconDownload size={20} />
+            </span>
             <h3 tabIndex={-1}>Calendar export</h3>
             <span className="notif-state">{courseSessions.length} sessions{keyDates.length > 0 ? ` · ${keyDates.length} key dates` : ''}</span>
           </div>
@@ -1569,6 +1642,9 @@ export function SettingsSheet({
         {/* V3 order: save/sync/backup state → Back up / Restore → sync → storage & advanced. */}
         <section className="filter-section" id="data-health">
           <div className="section-head">
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconShield />
+            </span>
             <h3 tabIndex={-1}>Your data</h3>
             {!online && <span className="notif-state warn">Offline</span>}
           </div>
@@ -1688,7 +1764,12 @@ export function SettingsSheet({
         </section>
 
         <section className="filter-section" id="backup">
-          <h3 tabIndex={-1}>Back up &amp; restore</h3>
+          <div className="section-head">
+            <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconDownload size={20} />
+            </span>
+            <h3 tabIndex={-1}>Back up &amp; restore</h3>
+          </div>
           <p className="filter-hint">
             Everything lives on this device only. Generate a backup (timetables, filters, notes,
             attendance, photos and documents) and restore it on a new device or after clearing browser
@@ -1731,7 +1812,12 @@ export function SettingsSheet({
         </section>
 
         <section className="filter-section" id="sync">
-          <h3 tabIndex={-1}>Sync between devices</h3>
+          <div className="section-head">
+            <span className="ui-tile ui-tile--blue" aria-hidden="true">
+              <IconUser size={20} />
+            </span>
+            <h3 tabIndex={-1}>Sync between devices</h3>
+          </div>
           <p className="filter-hint">
             Keeps your timetables, filters, notes and attendance the same on your phone and laptop
             via a shared code. Everything is encrypted on this device before it leaves — the server
@@ -1801,7 +1887,12 @@ export function SettingsSheet({
         </section>
 
         <section className="filter-section" id="attendance-analysis">
-          <h3>Attendance analysis</h3>
+          <div className="section-head">
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconChart />
+            </span>
+            <h3>Attendance analysis</h3>
+          </div>
           <p className="filter-hint">
             The attendance percentage, the per-subject breakdown and the CSV export now live in Term stats, next to the rest of your term.
           </p>
@@ -1818,6 +1909,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="theme">
           <div className="section-head">
+            <span className="ui-tile ui-tile--violet" aria-hidden="true">
+              <IconSun />
+            </span>
             <h3 tabIndex={-1}>Theme</h3>
             <span className="notif-state">{settings.theme === 'dark' ? 'Dark' : settings.theme === 'light' ? 'Light' : 'System'}</span>
           </div>
@@ -1844,6 +1938,9 @@ export function SettingsSheet({
 
         <section className="filter-section" id="density">
           <div className="section-head">
+            <span className="ui-tile ui-tile--violet" aria-hidden="true">
+              <IconSun />
+            </span>
             <h3 tabIndex={-1}>Density</h3>
             <span className="notif-state">{settings.density === 'compact' ? 'Compact' : 'Comfortable'}</span>
           </div>
@@ -1872,7 +1969,12 @@ export function SettingsSheet({
       {section === 'help' && (
         <>
         <section className="filter-section" id="whats-new">
-          <h3 tabIndex={-1}>What's new</h3>
+          <div className="section-head">
+            <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconNote size={20} />
+            </span>
+            <h3 tabIndex={-1}>What's new</h3>
+          </div>
           <ul className="whatsnew-list">
             {WHATSNEW.map((n, i) => (
               <li key={i}>{n}</li>
@@ -1882,7 +1984,12 @@ export function SettingsSheet({
 
         {onInstall && (
           <section className="filter-section" id="install">
-            <h3 tabIndex={-1}>Install the app</h3>
+            <div className="section-head">
+              <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconDownload size={20} />
+            </span>
+              <h3 tabIndex={-1}>Install the app</h3>
+            </div>
             <p className="filter-hint">
               Put My Timetable on your Home Screen / desktop — it opens full-screen, works offline
               and can receive background push.
@@ -1895,7 +2002,12 @@ export function SettingsSheet({
 
 
         <section className="filter-section">
-          <h3>Support this app</h3>
+          <div className="section-head">
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconHelp />
+            </span>
+            <h3>Support this app</h3>
+          </div>
           <p className="filter-hint">
             My Timetable is free and runs on free hosting. If it saves you time, you can buy the
             developer a coffee.

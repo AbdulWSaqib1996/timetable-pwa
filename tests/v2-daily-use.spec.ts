@@ -35,7 +35,7 @@ test('Today state contract: before the first session, during one, overlapping, a
   await page.goto('./#/today')
   const hero = page.locator('.today-hero')
   await expect(hero.locator('.today-hero-label')).toContainText('Up next')
-  await expect(hero.getByRole('button', { name: 'Session details' })).toBeVisible()
+  await expect(hero.getByRole('button', { name: 'Open session' })).toBeVisible()
   await expect(hero.getByRole('link', { name: /Directions/ })).toBeVisible()
   await expect(hero.locator('.today-fact')).toHaveCount(2) // time and place, each labelled by an icon
   await expect(hero.locator('.badge-kind')).toHaveText('Course session')
@@ -45,7 +45,7 @@ test('Today state contract: before the first session, during one, overlapping, a
   await expect(rest.locator('.today-row-meta').first()).toContainText('Bedford Way')
   // The full title survives the heading/subtitle split: the hero name equals the detail title.
   const heroTitle = (await hero.locator('.today-hero-title').innerText()).replace(/\s+/g, ' ').trim()
-  await hero.getByRole('button', { name: 'Session details' }).click()
+  await hero.getByRole('button', { name: 'Open session' }).click()
   expect((await page.locator('.detail-title').innerText()).replace(/\s+/g, ' ').trim()).toBe(heroTitle)
   await page.locator('.page-back').click()
   // The FAB never covers the last actionable row.

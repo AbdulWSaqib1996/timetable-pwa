@@ -103,7 +103,7 @@ test('session overview and Travel & map: primary actions work, map area present'
   const hero = page.locator('.today-hero')
   await expect(hero).toBeVisible()
   const heroTitle = await hero.locator('.today-hero-title').innerText()
-  await hero.getByRole('button', { name: 'Session details' }).click()
+  await hero.getByRole('button', { name: 'Open session' }).click()
   await expect(page.locator('.detail-page')).toBeVisible()
   await expect(page.locator('.detail-title')).toHaveText(heroTitle)
   await shot(page, 'session-overview-390')
@@ -173,7 +173,7 @@ test('light theme override under a dark OS stays light', async ({ page }) => {
   await page.goto('./#/today')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
-  expect(bg).toBe('rgb(245, 246, 250)') // #f5f6fa light canvas despite a dark OS
+  expect(bg).toBe('rgb(244, 246, 251)') // --bg #f4f6fb (design.css) light canvas despite a dark OS
 })
 
 test('enlarged content (200% zoom proxy) keeps Today and Schedule reflowing', async ({ page }) => {

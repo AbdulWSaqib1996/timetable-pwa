@@ -8,6 +8,7 @@ import type { PlanChildRec } from '../../lib/admin'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey as panelKey } from '../../lib/diff'
 import { getFilters } from '../../lib/filters'
+import { courseZone } from '../../lib/course'
 import { formatRemaining, toMinutes } from '../../lib/format'
 import { trackUse } from '../../lib/usage'
 import type { Filters, MetaMap, Session, SessionMeta, Settings, ViewMode } from '../../types'
@@ -212,7 +213,7 @@ export function SchedulePage({
     <div className={`page page-schedule${wide ? ' page--wide' : ''}`}>
       <PageHeader
         title="Schedule"
-        subtitle={profileName}
+        subtitle={`${profileName} · ${courseZone() === 'Europe/London' ? 'London time' : courseZone()}`}
         actions={
           <>
             <button
@@ -467,6 +468,11 @@ export function SchedulePage({
                 emptyMessage="No sessions on this day."
                 onSelect={onSelect}
               />
+            )}
+            {!wide && (
+              <button type="button" className="btn-secondary btn-wide schedule-plan-cta" onClick={onPlanWeek}>
+                Plan study time this week
+              </button>
             )}
           </section>
         </>

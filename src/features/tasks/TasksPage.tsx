@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EmptyState, IconChevronRight, IconPlus, PageHeader, SettingsAction, StatusMessage } from '../../components/ui'
+import { EmptyState, IconArrowRight, IconCheck, IconPlus, IconSearch, PageHeader, SettingsAction, StatusMessage } from '../../components/ui'
 import type { Meeting, TaskRecord } from '../../lib/admin'
 import { sessionKey } from '../../lib/diff'
 import { daysUntil } from '../../lib/format'
@@ -141,8 +141,8 @@ export function TasksPage({
               {status === 'doing' && ' · in progress'}
               {note && ` — ${note}`}
             </span>
-            <span className="task-card-open" aria-hidden="true">
-              Open <IconChevronRight size={16} />
+            <span className={`task-card-open${overdueNow ? ' task-card-open--primary' : ''}`} aria-hidden="true">
+              <IconArrowRight size={16} /> {overdueNow ? 'Review task' : 'Open task'}
             </span>
           </button>
           <span className="kd-actions">
@@ -170,7 +170,7 @@ export function TasksPage({
     <div className="page page-tasks">
       <PageHeader
         title="Tasks"
-        subtitle={profileName}
+        subtitle={`${profileName} · your deadlines, with a clear next step`}
         actions={
           <>
             <button type="button" className="btn-primary" onClick={onAddTask}>
@@ -222,11 +222,16 @@ export function TasksPage({
           <span className="kd-chip kd-chip-done" aria-label={`${completedAll.length} completed`}>
             {completedAll.length} completed
           </span>
+        </div>
+      )}
+      {(keyDates.length > 0 || openActions.length > 0 || needle) && (
+        <div className="searchbox">
+          <IconSearch />
           <input
             type="search"
             className="task-search"
             aria-label="Search tasks"
-            placeholder="Search tasks…"
+            placeholder="Search tasks"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -237,7 +242,7 @@ export function TasksPage({
 
       {overdue.length > 0 && (
         <section aria-label="Overdue tasks">
-          <h3 className="subheading">Overdue</h3>
+          <h3 className="subheading">Needs attention</h3>
           <p className="workload-line heavy">
             {overdue.length} overdue deadline{overdue.length === 1 ? '' : 's'} still outstanding.
           </p>
@@ -247,14 +252,14 @@ export function TasksPage({
 
       {dueToday.length > 0 && (
         <section aria-label="Due today">
-          <h3 className="subheading">Today</h3>
+          <h3 className="subheading">Due today</h3>
           <ul className="keydates-list">{dueToday.map(row)}</ul>
         </section>
       )}
 
       {upcoming.length > 0 && (
         <section aria-label="Upcoming tasks">
-          <h3 className="subheading">Upcoming</h3>
+          <h3 className="subheading">Coming up</h3>
           <p className={`workload-line${nextFortnight >= 3 ? ' heavy' : ''}`}>
             {nextFortnight === 0
               ? 'Nothing due in the next 14 days.'
@@ -305,8 +310,13 @@ export function TasksPage({
       {completed.length > 0 && (
         <details className="completed-tasks" open={!!needle || undefined}>
           <summary>
-            Completed ({completed.length})
-            <span className="completed-tasks-hint"> — kept for your records, never re-notified</span>
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconCheck />
+            </span>
+            <span className="completed-tasks-text">
+              Completed ({completed.length})
+              <span className="completed-tasks-hint">kept for your records, never re-notified</span>
+            </span>
           </summary>
           <ul className="keydates-list">{completed.map(row)}</ul>
         </details>

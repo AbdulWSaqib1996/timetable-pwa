@@ -13,6 +13,7 @@ import { TRAVEL_MODE_PHRASE } from '../../lib/campus'
 import {
   Card,
   EmptyState,
+  IconArrowRight,
   IconBell,
   IconBook,
   IconChevronRight,
@@ -314,7 +315,12 @@ export function TodayPage({
   return (
     <div className="page page-today">
       <PageHeader
-        title="Today"
+        title={
+          // Visible greeting (design), accessible page name stays "Today" (audit §3).
+          <span aria-label="Today" role="text">
+            {nowMins < 12 * 60 ? 'Good morning' : nowMins < 18 * 60 ? 'Good afternoon' : 'Good evening'}
+          </span>
+        }
         subtitle={
           <>
             {longDate(todayISO)} · {profileName}
@@ -350,11 +356,11 @@ export function TodayPage({
       {hero && (
         <section className="today-hero" aria-label={current ? 'Current session' : 'Next session'}>
           <div className="today-hero-top">
-            <span className="today-hero-label">
+            <span className="tag tag--indigo today-hero-label">
               <IconClock size={14} />
               {heroLabel}
             </span>
-            <span className="badge badge-kind">{sessionKindLabel(hero)}</span>
+            <span className="tag tag--indigo badge-kind">{sessionKindLabel(hero)}</span>
           </div>
           <h2 className="today-hero-title">
             {heroSplit ? (
@@ -368,7 +374,7 @@ export function TodayPage({
             )}
           </h2>
           {hero.subject && hero.subject !== hero.title && !heroSplit && <p className="today-hero-subject">{hero.subject}</p>}
-          <ul className="today-hero-facts" aria-label="When and where">
+          <ul className="today-hero-facts hero-details" aria-label="When and where">
             <li className="today-fact">
               <IconClock />
               <span className="today-hero-time">
@@ -389,7 +395,7 @@ export function TodayPage({
           </ul>
           <div className="today-hero-actions">
             <button type="button" className="btn-primary" onClick={() => onSelect(hero)}>
-              Session details
+              <IconArrowRight size={18} /> Open session
             </button>
             {heroTravel && (
               <a className="btn-secondary btn-link" href={heroTravel.mapsUrl} target="_blank" rel="noopener noreferrer">
@@ -450,7 +456,7 @@ export function TodayPage({
       {rest.length > 0 && (
         <section aria-label="Rest of today">
           <div className="today-section-head">
-            <h3 className="subheading">Rest of today</h3>
+            <h3 className="subheading">Later today</h3>
             <button type="button" className="travel-link" onClick={onOpenSchedule}>
               View day →
             </button>
@@ -522,8 +528,8 @@ export function TodayPage({
             </span>
           </div>
           <div className="home-row-actions">
-            <button type="button" className="btn-secondary" onClick={onOpenHomeJourney}>
-              View journey
+            <button type="button" className="btn-icon" aria-label="View journey" title="View journey" onClick={onOpenHomeJourney}>
+              <IconChevronRight />
             </button>
             {homePromoted && (
               <button type="button" className="btn-icon" aria-label="Dismiss for today" onClick={dismissHome}>

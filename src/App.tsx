@@ -1519,6 +1519,7 @@ export default function App() {
         <SessionDetail
           session={selected}
           presentation={detailAsSheet ? 'sheet' : 'page'}
+          onOpenHomeJourney={() => navigate({ name: 'homeJourney' })}
           backLabel="Back"
           origins={journeyOrigins}
           arrivalBufferMins={settings.arrivalBufferMins ?? 10}
