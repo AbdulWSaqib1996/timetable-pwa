@@ -194,7 +194,113 @@ async function readRemote(base: string, code: string): Promise<Remote> {
   if (rec.blob && !payload) throw new Error('The sync data could not be decrypted or validated. Local data is unchanged.')
   return { payload: payload ?? undefined, revision:rec.revision, at:rec.at ?? 0, deleted:rec.deleted }
 }
-export function mergePayload(local: SyncPayload, remote: SyncPayload): SyncPayload {
+/** Same real timetable: the same sheet and tab. Demo profiles carry no identity and are never equal here. */
+export function sameTimetable(a: ProfileStore['profiles'][number], b: ProfileStore['profiles'][number]): boolean {
+  return !!a.settings.sheetId && a.settings.sheetId === b.settings.sheetId && (a.settings.gid ?? null) === (b.settings.gid ?? null)
+}
+
+/**
+ * Two devices that set up the SAME timetable independently hold it under two
+ * random profile ids (owner report, 10 Sep 2026: marks made on one device
+ * "did not sync" — they had, into the other device's profile). Before any
+ * merge, a local profile that is the same timetable as a remote one (same
+ * sheet and tab, or both the built-in demo) is re-keyed to the remote id, so
+ * notes, attendance, PGCE records and identity history fold into ONE profile.
+ * The remote id wins because the first device to park state defines it; the
+ * mapping is returned so the caller can keep the active profile.
+ */
+export function unifyProfiles(local: SyncPayload, remote: SyncPayload): { local: SyncPayload; idMap: Record<string, string> } {
+  const idMap: Record<string, string> = {}
+  const taken = new Set<string>()
+  for (const lp of local.store.profiles) {
+    if (remote.store.profiles.some((rp) => rp.id === lp.id)) continue
+    const match = remote.store.profiles.find((rp) => !taken.has(rp.id) && !local.store.profiles.some((x) => x.id === rp.id) && sameTimetable(lp, rp))
+    if (match) {
+      idMap[lp.id] = match.id
+      taken.add(match.id)
+    }
+  }
+  // The built-in demo has no sheet identity: adopt only in the unambiguous
+  // case of exactly one demo profile on each side (several demo profiles on a
+  // device are deliberately distinct — see phase-two).
+  const localDemo = local.store.profiles.filter((p) => p.settings.demo === true && !remote.store.profiles.some((rp) => rp.id === p.id))
+  const remoteDemo = remote.store.profiles.filter((p) => p.settings.demo === true && !local.store.profiles.some((lp) => lp.id === p.id) && !taken.has(p.id))
+  if (localDemo.length === 1 && remoteDemo.length === 1 && local.store.profiles.filter((p) => p.settings.demo === true).length === 1 && remote.store.profiles.filter((p) => p.settings.demo === true).length === 1) {
+    idMap[localDemo[0].id] = remoteDemo[0].id
+  }
+  if (Object.keys(idMap).length === 0) return { local, idMap }
+  const to = (id: string) => idMap[id] ?? id
+  const rekey = <T,>(byId: Record<string, T> | undefined, merge: (a: T, b: T) => T): Record<string, T> => {
+    const out: Record<string, T> = {}
+    for (const [id, value] of Object.entries(byId ?? {})) {
+      const key = to(id)
+      out[key] = out[key] === undefined ? value : merge(out[key], value)
+    }
+    return out
+  }
+  const profiles = new Map<string, ProfileStore['profiles'][number]>()
+  for (const p of local.store.profiles) {
+    const id = to(p.id)
+    const existing = profiles.get(id)
+    profiles.set(id, existing ? { ...existing, ...p, id, settings: { ...existing.settings, ...p.settings } } : { ...p, id })
+  }
+  const store: ProfileStore = {
+    ...local.store,
+    activeId: to(local.store.activeId),
+    profiles: [...profiles.values()].sort((a, b) => a.id.localeCompare(b.id)),
+  }
+  return {
+    idMap,
+    local: {
+      store,
+      meta: rekey(local.meta, (a, b) => mergeRecords(a, b)),
+      admin: rekey(local.admin, (a, b) => mergeAdminFiles(a, b)),
+      identities: rekey(local.identities, (a, b) => [...a, ...b]),
+    },
+  }
+}
+
+/**
+ * Devices that already parked duplicates (before unification shipped) hold
+ * the same timetable under two ids on BOTH sides. After every merge the
+ * later-created copy folds into the earliest id and gets a profile tombstone,
+ * so each device drops the copy on its next exchange. Records are merged,
+ * never discarded.
+ */
+export function dedupeProfiles(payload: SyncPayload, now = Date.now()): { payload: SyncPayload; idMap: Record<string, string> } {
+  const profiles = [...payload.store.profiles].sort((a, b) => a.id.localeCompare(b.id))
+  const idMap: Record<string, string> = {}
+  const survivors: ProfileStore['profiles'] = []
+  for (const p of profiles) {
+    const keeper = survivors.find((k) => sameTimetable(k, p))
+    if (keeper) idMap[p.id] = keeper.id
+    else survivors.push(p)
+  }
+  if (Object.keys(idMap).length === 0) return { payload, idMap }
+  const to = (id: string) => idMap[id] ?? id
+  const fold = <T,>(byId: Record<string, T> | undefined, merge: (a: T, b: T) => T): Record<string, T> => {
+    const out: Record<string, T> = {}
+    for (const id of Object.keys(byId ?? {}).sort()) {
+      const key = to(id)
+      out[key] = out[key] === undefined ? byId![id] : merge(out[key], byId![id])
+    }
+    return out
+  }
+  const deletedProfiles = { ...(payload.store.deletedProfiles ?? {}) }
+  for (const id of Object.keys(idMap)) deletedProfiles[id] = Math.max(deletedProfiles[id] ?? 0, now)
+  return {
+    idMap,
+    payload: {
+      store: { ...payload.store, activeId: to(payload.store.activeId), profiles: survivors, deletedProfiles },
+      meta: fold(payload.meta, (a, b) => mergeRecords(a, b)),
+      admin: fold(payload.admin, (a, b) => mergeAdminFiles(a, b)),
+      identities: fold(payload.identities, (a, b) => [...a, ...b]),
+    },
+  }
+}
+
+export function mergePayload(localIn: SyncPayload, remote: SyncPayload): SyncPayload {
+  const local = unifyProfiles(localIn, remote).local
   const store = mergeStores(local.store, remote.store)
   store.activeId = store.profiles[0]?.id ?? ''
   const identities: Record<string, Session[]> = {}
@@ -206,7 +312,7 @@ export function mergePayload(local: SyncPayload, remote: SyncPayload): SyncPaylo
     meta[p.id] = mergeRecords(local.meta[p.id] ?? {}, remote.meta[p.id] ?? {})
     admin[p.id] = mergeAdminFiles(local.admin?.[p.id] ?? loadAdminFile(''), remote.admin?.[p.id] ?? loadAdminFile(''))
   }
-  return { store, meta, admin, identities }
+  return dedupeProfiles({ store, meta, admin, identities }).payload
 }
 /** Merge before every write; retry revision conflicts. No stale payload is blindly posted. */
 async function exchange(base: string, code: string): Promise<number | null> {
@@ -218,7 +324,7 @@ async function exchange(base: string, code: string): Promise<number | null> {
       if (remote.deleted) throw new Error('This sync code was disconnected. Create or join a new code.')
       const local = collectSyncPayload()
       if (!local) return null
-      const merged = remote.payload ? mergePayload(local, remote.payload) : local
+      const merged = remote.payload ? mergePayload(local, remote.payload) : dedupeProfiles(local).payload
       let at = remote.at
       if (!remote.payload || canonical(merged) !== canonical(remote.payload)) {
         if (new Blob([JSON.stringify(merged)]).size > MAX_SYNC_BYTES) throw new Error('Sync is too large. Export a backup to transfer your data.')
@@ -264,11 +370,17 @@ export async function applySyncPayload(payload: SyncPayload): Promise<void> {
   validatePayload(payload)
   await restoreWithRecovery(async () => {
     const local = collectSyncPayload()
-    const merged = local ? mergePayload(local,payload) : payload
+    const idMap = local ? unifyProfiles(local, payload).idMap : {}
+    const merged = local ? mergePayload(local,payload) : dedupeProfiles(payload).payload
     const localStore = loadStore()
-    const store = { ...merged.store, activeId: merged.store.profiles.some(p => p.id === localStore?.activeId) ? localStore!.activeId : merged.store.activeId,
+    const activeProfile = localStore?.profiles.find((x) => x.id === localStore.activeId)
+    const mapped = localStore ? (idMap[localStore.activeId] ?? localStore.activeId) : merged.store.activeId
+    const wantedActive = merged.store.profiles.some((p) => p.id === mapped)
+      ? mapped
+      : (activeProfile && merged.store.profiles.find((p) => sameTimetable(p, activeProfile))?.id) ?? merged.store.activeId
+    const store = { ...merged.store, activeId: merged.store.profiles.some(p => p.id === wantedActive) ? wantedActive : merged.store.activeId,
       profiles: merged.store.profiles.map(p => {
-        const mine = localStore?.profiles.find(x => x.id === p.id)
+        const mine = localStore?.profiles.find(x => x.id === p.id) ?? localStore?.profiles.find(x => idMap[x.id] === p.id) ?? localStore?.profiles.find(x => sameTimetable(x, p))
         const settings = {...p.settings}
         for (const key of deviceSettings) { delete (settings as any)[key]; if (mine && key in mine.settings) (settings as any)[key] = (mine.settings as any)[key] }
         return {...p,settings}

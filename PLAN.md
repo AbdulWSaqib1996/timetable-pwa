@@ -1225,3 +1225,16 @@ Automated checks + results: legacy names updated (`Open session`; the light canv
 Known limits: Back stays a 44px control (the mockup's 30px would fail V-03); Reminders keep their controls inline rather than "Configure" links; the desktop grid keeps its measured lanes and 68px hour height.
 
 Released 10 September 2026: merge `56d72ec`, CI run 34535511182 success, `deploy.sh verify` six PASS. No worker change.
+
+### Pass 64 — Sync: one timetable, one profile across devices (owner bug report) — 10 September 2026
+
+Work items: the owner entered the sync code from one device on another and found that attendance marks and Term stats "did not sync". Root cause: each device creates its profile with a random id (`newProfileId`), and sync merges profile stores by id. Two devices that set up the same timetable independently therefore end up, after connecting, with TWO profiles each — the marks had synced, into the other device's profile, while the active profile (the device's own) stayed empty; Term stats follow the active profile. The two-device test seeded both devices with the same id, which hid this. Branch `sync-unify`, client only; no `shared/` or worker change (the worker stores opaque blobs).
+
+Behaviour before → after (`src/lib/sync.ts`):
+- **Adoption on merge** — `unifyProfiles(local, remote)`: before any merge, a local profile that is the same timetable as a remote one (same sheet id and tab; for the built-in demo only in the unambiguous case of exactly one demo profile on each side, since several demo profiles on a device are deliberately distinct — `phase-two`) but has a different id is re-keyed to the remote id; its notes/attendance, PGCE file and identity history fold into that profile (records merged newest-wins, never dropped). The remote id wins because the first device to park state defines it.
+- **Dedupe after merge** — `dedupeProfiles(payload)`: any two profiles for the same real sheet and tab in a merged (or local) payload fold into the earliest id with a profile tombstone in `deletedProfiles`, so devices that already parked duplicates converge on their next exchange and every other device drops the copy. Applied in `mergePayload`, on the local payload when the remote is empty, and in `applySyncPayload`.
+- **Active profile kept** — when the device's active profile is re-keyed or folded, the active id follows it (by id map, else by timetable identity); device-local settings still come from the device.
+
+Automated checks + results: `tests/sync-devices.spec.ts` gains two tests — (1) device B with its own profile id and its own note adopts device A's profile, sees A's mark in its active timetable without a reload, keeps its note, deletes its old keys, and A ends with one profile carrying B's note; (2) a device already holding the same real sheet twice folds to the earliest id with a tombstone and merged records. `npm run validate` AND `VERCEL=1 npm run validate` green — **161 unit and 140 browser tests**.
+
+Known limits: two different real sheets stay separate profiles by design; a timetable set up from the same sheet but a different tab (gid) is treated as a different timetable.
