@@ -135,6 +135,8 @@ export interface TaskRecord {
   notes?: string
   /** completion date, kept for history when reopened/edited */
   completedISO?: string
+  /** G2: a milestone of an academic project (tasks stay the owner model) */
+  projectId?: string
   at: number
 }
 
@@ -321,6 +323,72 @@ export interface MentorPrepRec {
   at: number
 }
 
+/** PG-04 (G2): a subject-knowledge goal in the learner's words. Confidence is
+ *  self-rated and dated; nothing here is assessed mastery. */
+export interface KnowledgeGoalRec {
+  id: string
+  topic: string
+  strand?: 'breadth' | 'depth'
+  question?: string
+  confidence?: { dateISO: string; level: 1 | 2 | 3 | 4 | 5; note?: string }[]
+  /** one resource ↔ many goals */
+  resourceRefs?: string[]
+  /** application opportunity: a lesson id */
+  lessonRef?: string
+  nextReviewISO?: string
+  state: 'open' | 'parked' | 'done'
+  /** created from a subject audit entry (shown as "Previously marked secure by you") */
+  legacyAuditId?: string
+  at: number
+}
+
+export interface ResourceRec {
+  id: string
+  title: string
+  url?: string
+  note?: string
+  at: number
+}
+
+export type ProjectStatus = 'draft' | 'ready' | 'submitted' | 'feedback' | 'result'
+
+/** PG-05 (G2): an academic project. The deadline is a reference to an existing
+ *  key date (never a copy); status moves only on the learner's confirmation
+ *  and a result is a label with its source, never an award. */
+export interface AcademicProjectRec {
+  id: string
+  title: string
+  brief?: string
+  criteria?: string
+  /** session key of the linked key date */
+  deadlineRef?: string
+  words?: number
+  credits?: number
+  status: ProjectStatus
+  submittedISO?: string
+  feedback?: { text: string; source: string }
+  result?: { text: string; source: string }
+  /** approval planning for a classroom enquiry — recorded, not a workflow */
+  enquiry?: { context?: string; participants?: string; consent?: string; risks?: string; approval?: string }
+  at: number
+}
+
+export interface ReadingNoteRec {
+  id: string
+  projectId: string
+  kind: 'quotation' | 'paraphrase' | 'interpretation'
+  text: string
+  source?: string
+  page?: string
+  at: number
+}
+
+export interface ContactRec { id: string; name: string; role?: string; contact?: string; at: number }
+export interface CourseQuestionRec { id: string; text: string; askedTo?: string; answered?: boolean; answer?: string; at: number }
+/** A weekly window the workload planner never fills (0 = Sunday). */
+export interface ProtectedWindowRec { id: string; day: number; start: string; end: string; label?: string; at: number }
+export interface SupportNoteRec { id: string; text: string; at: number }
+
 export interface AdminFile {
   /** written by this client (contracts ADMIN_SCHEMA_VERSION); older files have none */
   schemaVersion?: number
@@ -343,6 +411,14 @@ export interface AdminFile {
   milestones: MilestoneRec[]
   cycles: PracticeCycleRec[]
   preps: MentorPrepRec[]
+  goals: KnowledgeGoalRec[]
+  resources: ResourceRec[]
+  projects: AcademicProjectRec[]
+  readings: ReadingNoteRec[]
+  contacts: ContactRec[]
+  questions: CourseQuestionRec[]
+  protected: ProtectedWindowRec[]
+  supportNotes: SupportNoteRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -364,6 +440,14 @@ export const EMPTY_ADMIN: AdminFile = {
   milestones: [],
   cycles: [],
   preps: [],
+  goals: [],
+  resources: [],
+  projects: [],
+  readings: [],
+  contacts: [],
+  questions: [],
+  protected: [],
+  supportNotes: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`

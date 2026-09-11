@@ -6022,3 +6022,14 @@ button.workspace-row { cursor: pointer; }
 
 /* Nav re-anchor nudge after the keyboard closes (useVisualViewportOffset) */
 .vv-reflow .bottom-nav, .vv-reflow .fab-add { transform: translateZ(0); }
+
+/* G2 — knowledge, academic, workload */
+.workload-summary { margin: 8px 0; }
+.workload-summary dt.tag--amber { border-radius: 8px; padding: 0 6px; }
+.proposal-row { flex-wrap: wrap; }
+.goal--parked, .goal--done { opacity: 0.85; }
+.sheet-knowledge .task-edit-row, .sheet-academic .task-edit-row, .sheet-workload .task-edit-row { flex-wrap: wrap; }
+.sheet-knowledge .task-edit-row > *, .sheet-academic .task-edit-row > *, .sheet-workload .task-edit-row > * { flex: 1 1 9rem; min-width: 0; }
+.sheet-knowledge select, .sheet-knowledge input, .sheet-academic select, .sheet-academic input, .sheet-academic textarea, .sheet-workload select, .sheet-workload input, .sheet-workload textarea { max-width: 100%; min-width: 0; box-sizing: border-box; }
+.sheet-workload .segmented, .sheet-academic .segmented { flex-wrap: wrap; }
+.sheet-workload .segment { flex: 1 1 calc(50% - 4px); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
