@@ -97,6 +97,8 @@ Numbers follow PLAN.md: the next free pass is **68**. Each batch = one branch (`
 
 ### G3 — Evidence narratives (PG-06), experience ledger (PG-07), reviews & transition (PG-09) (Pass 72)
 
+> **Status (11 September 2026): implemented as Pass 72** — see PLAN.md. Refinements recorded there: review packs pin canonical JSON per item (the snapshot mechanism proposed in this section), attachments by name with a live local-only/missing state; the experience ledger's planned layer is shown from the existing placement code rather than duplicated as entries; comparisons only against confirmed requirements. With this pass the package is archived per §4.7.
+
 **In**
 - `EvidenceExample`: refs to existing records + narrative (context, decision, noticed, changed next); contexts course-curriculum / practice-cycle / provider-assessment; **ITTECF references and Teachers' Standards references are separate enums**, no combined score; Part Two = conduct context references only.
 - `ReviewPack`: pinned revisions (immutable snapshot mechanism chosen and documented — proposed: store the referenced records' canonical JSON inside the pack at selection time, plus attachment ids with local-only/missing states), "Selected / Draft / Discussed", exact preview of what leaves the device incl. provenance and captions; extends the existing binder export path.

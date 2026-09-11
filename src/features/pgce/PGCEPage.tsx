@@ -34,6 +34,10 @@ interface Props {
   onOpenKnowledge: () => void
   onOpenAcademic: () => void
   onOpenWorkload: () => void
+  onOpenExamples: () => void
+  onOpenReviewPacks: () => void
+  onOpenExperience: () => void
+  onOpenReviews: () => void
 }
 
 /**
@@ -70,6 +74,10 @@ export function PGCEPage({
   onOpenKnowledge,
   onOpenAcademic,
   onOpenWorkload,
+  onOpenExamples,
+  onOpenReviewPacks,
+  onOpenExperience,
+  onOpenReviews,
 }: Props) {
   const [walletCount, setWalletCount] = useState<number | null>(null)
   useEffect(() => {
@@ -130,6 +138,11 @@ export function PGCEPage({
               onAll={onOpenPlacements}
               onReviewMapping={onOpenPlacementSetup}
             />
+            <div className="btn-row">
+              <button type="button" className="btn-today-reset" onClick={onOpenExperience}>
+                Experience ledger ({(admin.experience ?? []).length})
+              </button>
+            </div>
           </Card>
         )}
 
@@ -190,6 +203,12 @@ export function PGCEPage({
             <button type="button" className="btn-today-reset" onClick={() => onOpenAdmin('reflect')}>
               Weekly reflections ({admin.reflections.length})
             </button>
+            <button type="button" className="btn-today-reset" onClick={onOpenExamples}>
+              Evidence examples ({(admin.examples ?? []).length})
+            </button>
+            <button type="button" className="btn-today-reset" onClick={onOpenReviewPacks}>
+              Review packs ({(admin.reviewPacks ?? []).length})
+            </button>
           </div>
         </Card>
 
@@ -224,6 +243,7 @@ export function PGCEPage({
                 { label: `Subject knowledge (${(admin.goals ?? []).filter((g) => g.state === 'open').length})`, onSelect: onOpenKnowledge },
                 { label: `Academic work (${(admin.projects ?? []).length})`, onSelect: onOpenAcademic },
                 { label: 'Workload & support', onSelect: onOpenWorkload },
+                { label: `Reviews & handover (${(admin.reviews ?? []).length})`, onSelect: onOpenReviews },
               ]}
             />
             <button type="button" className="btn-today-reset" onClick={() => onOpenAdmin('overview')}>

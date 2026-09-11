@@ -6033,3 +6033,12 @@ button.workspace-row { cursor: pointer; }
 .sheet-knowledge select, .sheet-knowledge input, .sheet-academic select, .sheet-academic input, .sheet-academic textarea, .sheet-workload select, .sheet-workload input, .sheet-workload textarea { max-width: 100%; min-width: 0; box-sizing: border-box; }
 .sheet-workload .segmented, .sheet-academic .segmented { flex-wrap: wrap; }
 .sheet-workload .segment { flex: 1 1 calc(50% - 4px); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* G3 — evidence, packs, ledger, reviews; What's new history */
+.pack-preview-text { font-size: 13px; max-height: 40vh; overflow: auto; }
+.whatsnew-entry + .whatsnew-entry { margin-top: 10px; }
+.sheet-examples .task-edit-row, .sheet-packs .task-edit-row, .sheet-experience .task-edit-row, .sheet-reviews .task-edit-row { flex-wrap: wrap; }
+.sheet-examples .task-edit-row > *, .sheet-packs .task-edit-row > *, .sheet-experience .task-edit-row > *, .sheet-reviews .task-edit-row > * { flex: 1 1 9rem; min-width: 0; }
+.sheet-examples select, .sheet-examples input, .sheet-packs select, .sheet-packs input, .sheet-experience select, .sheet-experience input, .sheet-reviews select, .sheet-reviews input { max-width: 100%; min-width: 0; box-sizing: border-box; }
+.whatsnew-banner { margin: 12px 0; }
+.whatsnew-banner .whatsnew-list { margin: 6px 0 10px; padding-left: 18px; }

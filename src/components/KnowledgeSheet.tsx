@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Dialog, Field, IconClose } from './ui'
+import { Dialog, Field, FieldGroup, IconClose } from './ui'
 import { newAdminId } from '../lib/admin'
 import type { AdminFile, KnowledgeGoalRec, ResourceRec } from '../lib/admin'
 
@@ -143,7 +143,7 @@ export function KnowledgeSheet({ admin, todayISO, onUpdateAdmin, onClose }: Prop
                       </Field>
                       <Field label="Next review"><input type="date" className="date-input" aria-label={`Next review: ${g.topic}`} value={g.nextReviewISO ?? ''} onChange={(e) => setGoal(g.id, { nextReviewISO: e.target.value || undefined })} /></Field>
                     </div>
-                    <Field label="Resources (one resource can serve many goals)">
+                    <FieldGroup label="Resources (one resource can serve many goals)">
                       {(g.resourceRefs ?? []).length > 0 && (
                         <ul className="workspace-list" aria-label={`Resources: ${g.topic}`}>
                           {(g.resourceRefs ?? []).map((id) => {
@@ -182,7 +182,7 @@ export function KnowledgeSheet({ admin, todayISO, onUpdateAdmin, onClose }: Prop
                           Add resource
                         </button>
                       </div>
-                    </Field>
+                    </FieldGroup>
                   </>
                 )}
                 <div className="btn-row">

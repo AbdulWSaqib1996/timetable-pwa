@@ -454,6 +454,19 @@ export function Field({
   )
 }
 
+/** A labelled group of controls (chips, checkbox lists) — a div, not a <label>,
+ *  so the first control never inherits the whole group's text as its name. */
+export function FieldGroup({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="ui-field" role="group" aria-label={label}>
+      <span className="ui-field-label">{label}</span>
+      {children}
+      {hint && <span className="filter-hint">{hint}</span>}
+    </div>
+  )
+}
+
+
 /** Accessible modal wrapper (focus trap + Escape via lib/a11y). */
 export function Dialog({
   label,

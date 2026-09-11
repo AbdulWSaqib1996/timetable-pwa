@@ -27,7 +27,7 @@ import type { SyncState } from '../lib/sync'
 import type { SourceStatus } from '../../shared/refresh.js'
 import type { PlacementExceptionRec } from '../lib/admin'
 import { placementBlocks as computePlacementBlocks } from '../lib/placement'
-import { WHATSNEW } from '../lib/changelog'
+import { WHATSNEW_ENTRIES } from '../lib/changelog'
 import { IconAlert, IconBack, IconBell, IconBook, IconCalendar, IconChart, IconCheck, IconChevronRight, IconClock, IconClose, IconDownload, IconHelp, IconMoon, IconNote, IconPin, IconSchedule, IconSchool, IconSearch, IconShare, IconShield, IconSun, IconUser, PageHeader, StatusMessage } from './ui'
 import { useOnline } from '../hooks/useOnline'
 import { BackupSheet, RestoreSheet } from './BackupSheets'
@@ -1995,11 +1995,16 @@ export function SettingsSheet({
             </span>
             <h3 tabIndex={-1}>What's new</h3>
           </div>
-          <ul className="whatsnew-list">
-            {WHATSNEW.map((n, i) => (
-              <li key={i}>{n}</li>
-            ))}
-          </ul>
+          {WHATSNEW_ENTRIES.map((entry) => (
+            <div key={entry.version} className="whatsnew-entry">
+              <p className="filter-hint"><strong>{entry.title}</strong> · {entry.dateISO}</p>
+              <ul className="whatsnew-list">
+                {entry.items.map((n, i) => (
+                  <li key={i}>{n}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
 
         {onInstall && (

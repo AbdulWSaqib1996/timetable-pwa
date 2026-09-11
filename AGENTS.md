@@ -32,7 +32,8 @@ a new commit. `all` runs everything in order.
 2. Change spans app **and** worker (e.g. a new endpoint)? → deploy the worker **first**, then push the app.
 3. `build` must pass before deploying; a red smoke test blocks — never skip it.
 4. After any deploy, run `verify` and report its output verbatim.
-5. If `git push` times out on port 22, retry with:
+5. **Every release pass updates What's new**: add an entry to `src/lib/changelog.ts` (`WHATSNEW_ENTRIES`, newest first — the version bump follows from it) describing what the learner will notice, in their words; the toast shows it once and Settings → Help keeps the history (owner instruction, 11 Sep 2026).
+6. If `git push` times out on port 22, retry with:
    `GIT_SSH_COMMAND="ssh -o HostName=ssh.github.com -o Port=443" git push origin main`
 
 ### Auth (humans only, one-time)

@@ -1,0 +1,15 @@
+{
+  "head": "d58a91f2f136d1e8cc3adfcc2f7b7bd4373b8f68",
+  "status": " M src/hooks/useNotifications.ts\n M src/lib/backup.ts\n M src/lib/cloudBackup/snapshot.ts\n M src/lib/push.ts\n M src/lib/shareTarget.ts\n M src/lib/storage.ts\n M workers/push/worker.js\n",
+  "hashes": {
+    "src/lib/admin.ts": "e40aa2e7c215874c0d318b0a7d2c30a842ad283399d949e0987efebe9c2286b7",
+    "src/lib/standards.ts": "eecf30a2a86084dd4e215d9e2d37c2a7e56e0b79e9309c8314eba71f60751417",
+    "src/features/pgce/PGCEPage.tsx": "505b45857b14089fc52116985babdd30d25d05d87d447b57f46d8022a84c5e36",
+    "src/features/pgce/PlacementPage.tsx": "95caa26f21165e74f04a982181a2716042e9b0994535756ea0455449aea668bc",
+    "src/components/JournalSheet.tsx": "bcf6e4ff1e03313379fd60c813fdb6299173f98f415f98fad1241ec592be432c",
+    "src/lib/placement.ts": "0ab128d708b8fce104553d0c2cd7641aff8de5da13a9bf9a7212e5b9a3843a72",
+    "src/lib/planProjection.ts": "83c0bb6b3c9fcf029d1496d0555a569f77537187c293d8256f6b081c833f6460",
+    "shared/contracts.js": "a4ef7b300a6ccffaffe8df21d9a0195366ea6bdaeec470c305d592b782374bd7",
+    "shared/merge.js": "62d9882018d541c2678fe4a50d9ca0e0540731174374b57deb4cdbe294a110a7"
+  }
+}
