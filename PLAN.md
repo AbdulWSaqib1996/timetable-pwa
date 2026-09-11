@@ -1258,3 +1258,5 @@ Behaviour before → after:
 Automated checks + results: `tests/nav-viewport.spec.ts` (2): a mocked, resizable visual viewport moves the nav up by 300px and back to 0 (and the FAB follows); closing the Schedule search blurs the input before removal. Both gates green.
 
 Known limits: the mock stands in for iOS; the real device check is the owner's.
+
+Released 11 September 2026: merge `2871d61`, CI run 34579780657 success, `deploy.sh verify` six PASS. No worker change.
