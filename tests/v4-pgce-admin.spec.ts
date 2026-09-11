@@ -32,12 +32,14 @@ async function seed(page: Page, opts: { admin?: Record<string, unknown>; width?:
 test('PGCE (empty): four identity tiles, one primary per card, no "View all", Set up placement, no invented percentages, privacy line', async ({ page }) => {
   await seed(page)
   await page.goto('./#/pgce')
+  // G1a: five section cards and tiles; the Placements card holds one primary per SE card.
   const cards = page.locator('.pgce-section')
-  await expect(cards).toHaveCount(4)
-  await expect(page.locator('.pgce-tile')).toHaveCount(4)
-  for (let i = 0; i < 4; i++) await expect(cards.nth(i).locator('.btn-primary')).toHaveCount(1)
+  await expect(cards).toHaveCount(5)
+  await expect(page.locator('.pgce-tile')).toHaveCount(5)
+  for (let i = 1; i < 5; i++) await expect(cards.nth(i).locator('.btn-primary')).toHaveCount(1)
+  await expect(cards.nth(0).locator('.placement-card .btn-primary')).toHaveCount(3)
   await expect(page.getByRole('button', { name: /View all/ })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Set up placement' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Set up SE1' })).toBeVisible()
   await expect(page.locator('.pgce-count')).toHaveCount(0) // no counts invented from nothing
   await expect(page.getByText(/%/)).toHaveCount(0)
   await expect(page.getByText(/stay private on this device/)).toBeVisible()
@@ -59,21 +61,19 @@ test('PGCE (populated): count badges come from real records, Open placement by s
   })
   await page.goto('./#/pgce')
   const cards = page.locator('.pgce-section')
-  await expect(cards).toHaveCount(4)
-  // Two columns at 1280: the first two cards share a row.
-  const a = await cards.nth(0).boundingBox()
-  const b = await cards.nth(1).boundingBox()
+  await expect(cards).toHaveCount(5)
+  // Two columns at 1280: the Placements card spans the row; the next two cards share one.
+  const a = await cards.nth(1).boundingBox()
+  const b = await cards.nth(2).boundingBox()
   expect(Math.abs(a!.y - b!.y)).toBeLessThan(4)
   expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1)
   await expect(cards.filter({ hasText: 'Evidence' }).locator('.pgce-count')).toHaveText('1 record')
   await expect(cards.filter({ hasText: 'Development' }).locator('.pgce-count')).toHaveText('3 records')
   await expect(cards.filter({ hasText: 'Development' })).toContainText('1 open target · 1 mentor action to tick off')
-  // Placement primary follows real state: "Open placement" only when blocks exist (then a logged-days badge shows), else "Set up placement".
-  const placementCard = cards.filter({ hasText: 'Placement' }).first()
-  const primary = placementCard.getByRole('button', { name: /^(Set up|Open) placement$/ })
-  await expect(primary).toBeVisible()
-  if ((await primary.textContent())!.includes('Open')) await expect(placementCard.locator('.pgce-count')).toContainText('days logged')
-  else await expect(placementCard.locator('.pgce-count')).toHaveCount(0)
+  // Placement primaries follow real state (G1a): nothing set up → "Set up SE1/SE2/SE3", no logged-days badge invented.
+  const placementCard = cards.filter({ hasText: 'Placements' }).first()
+  await expect(placementCard.getByRole('button', { name: /^Set up SE[123]$/ })).toHaveCount(3)
+  await expect(placementCard.locator('.pgce-count')).toHaveCount(0)
   // Editors within two purposeful steps: menu → Targets opens the admin sheet on Targets.
   await page.getByRole('button', { name: /Add or open a record/ }).click()
   await page.getByRole('menuitem', { name: /^Targets \(2\)/ }).click()

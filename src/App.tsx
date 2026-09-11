@@ -6,7 +6,7 @@ import { BACKUP_GENERATED_EVENT } from './lib/storage'
 import { PersistenceNotice } from './components/PersistenceNotice'
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
-import { IconAlert, IconBell, IconClose, IconPlus } from './components/ui'
+import { IconAlert, IconBell, IconClose, IconPlus, PageHeader } from './components/ui'
 import { clearAttention, setAttention } from './lib/attention'
 import { SessionDetail } from './components/SessionDetail'
 import { SetupScreen } from './components/SetupScreen'
@@ -37,6 +37,8 @@ const StatsSheet = lazy(() => import('./components/StatsSheet').then((m) => ({ d
 const PlacementSetupSheet = lazy(() => import('./components/PlacementSetupSheet').then((m) => ({ default: m.PlacementSetupSheet })))
 const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((m) => ({ default: m.StudyGroupSheet })))
 const CourseSheet = lazy(() => import('./components/CourseSheet').then((m) => ({ default: m.CourseSheet })))
+const PlacementSetupFlow = lazy(() => import('./components/PlacementSetupFlow').then((m) => ({ default: m.PlacementSetupFlow })))
+const ProgrammeSheet = lazy(() => import('./components/ProgrammeSheet').then((m) => ({ default: m.ProgrammeSheet })))
 import { sendTelemetry } from './lib/analytics'
 import { configureTelemetry } from './lib/telemetry'
 import { loadSyncState as loadSyncStateForPing } from './lib/sync'
@@ -79,6 +81,11 @@ import type { BlockPrefill } from './components/WorkPlanSection'
 import { toMins } from '../shared/intervals.js'
 import { CommitmentSheet } from './components/CommitmentSheet'
 import { PlacementPage } from './features/pgce/PlacementPage'
+import { PlacementWorkspacePage } from './features/pgce/PlacementWorkspacePage'
+import { PlacementJourneyPage } from './features/pgce/PlacementJourneyPage'
+import { placementForTag, placementLabel, schoolOf } from './lib/admin'
+import type { PlacementCode } from './lib/admin'
+import type { PlacementMirror } from './components/PlacementSetupFlow'
 import { TaskEditSheet } from './components/TaskEditSheet'
 import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
 import type { Notice } from './lib/notices'
@@ -107,7 +114,7 @@ import type {
   ViewMode,
 } from './types'
 
-type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek' | 'placementSetup'
+type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek' | 'placementSetup' | 'placementFlow' | 'programme'
 
 /** How often a visible device pulls the other devices' changes (10 Sep 2026). */
 const SYNC_POLL_MS = 3 * 60_000
@@ -133,6 +140,8 @@ export default function App() {
   const [store, setStore] = useState<ProfileStore | null>(initStore)
   const [addingProfile, setAddingProfile] = useState(false)
   const [openSheet, setOpenSheet] = useState<SheetName>('none')
+  /** which placement the setup flow edits (G1a): a code for a new one, an id for an existing one */
+  const [flowTarget, setFlowTarget] = useState<{ code?: PlacementCode; id?: string }>({})
   const [rechoosing, setRechoosing] = useState(false)
   // One date-selection model shared by Day/Week/Month (null = follow today).
   const [selectedDateISO, setSelectedDateISO] = useState<string | null>(null)
@@ -191,16 +200,36 @@ export default function App() {
   // Back only walks history when the previous entry is OURS: an external
   // deep link (notification, share) has history but no in-app predecessor,
   // and history.back() there would leave the PWA (R1 / TT-08).
+  /** G1a: the worker and the session travel tab read school details per BLOCK TAG from
+   *  settings.placements — a confirmed placement setup is mirrored there so reminders
+   *  resolve the school from the session's mapping (never from the page being viewed). */
+  const mirrorPlacementDetails = (m: PlacementMirror) => {
+    if (!settings || m.tags.length === 0) return
+    const current = settings.placements ?? {}
+    const patch: NonNullable<Settings['placements']> = {}
+    for (const tag of m.tags) {
+      patch[tag] = {
+        ...(current[tag] ?? {}),
+        ...(m.school ? { school: m.school } : {}),
+        ...(m.address ? { address: m.address } : {}),
+        ...(m.mentor ? { mentor: m.mentor } : {}),
+        ...(m.lat != null && m.lng != null ? { lat: m.lat, lng: m.lng } : {}),
+      }
+    }
+    updateSettings({ placements: { ...current, ...patch } })
+  }
+
   const goBackOr = (fallback: Route) => {
     if (hasInternalPredecessor()) window.history.back()
     else navigate(fallback, { replace: true })
   }
-  // An unknown settings section lands on the index with a small notice and a
-  // clean hash, never an empty page.
+  // An unknown settings section lands on the index — and an unknown placement
+  // sub-page on the placement (G1a) — with a small notice and a clean hash,
+  // never an empty page: the parser already chose the safe route.
   useEffect(() => {
     if (routeNotice) {
       setOpenNotice(routeNotice)
-      navigate({ name: 'settings' }, { replace: true })
+      navigate(route.name === 'placement' ? { name: 'placement', id: route.id } : { name: 'settings' }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeNotice])
@@ -1084,7 +1113,7 @@ export default function App() {
       route={route}
       onNavigate={handleNavigate}
       profileName={active.name}
-      hideNav={(route.name === 'session' || route.name === 'homeJourney') && !detailAsSheet}
+      hideNav={(route.name === 'session' || route.name === 'homeJourney' || (route.name === 'placement' && !!route.leg)) && !detailAsSheet}
     >
       <PersistenceNotice />
       <SyncNotice />
@@ -1257,6 +1286,7 @@ export default function App() {
             keyDates={allKeyDates}
             onOpenGroup={() => setOpenSheet('group')}
             onOpenCourse={() => setOpenSheet('course')}
+            onOpenProgramme={() => setOpenSheet('programme')}
             metaMap={metaMap}
             todayISO={todayISO}
             placementBlocks={placementStats.blocks}
@@ -1290,6 +1320,59 @@ export default function App() {
           onOpen={openFindResult}
           onBack={() => goBackOr({ name: 'schedule' })}
         />
+      ) : route.name === 'placement' && route.id ? (
+        (() => {
+          const placement = (adminFile.placements ?? []).find((p) => p.id === route.id)
+          if (!placement)
+            return (
+              <div className="page">
+                <button type="button" className="page-back" onClick={() => goBackOr({ name: 'pgce' })}>‹ PGCE file</button>
+                <PageHeader title="Placement not found" subtitle="It may have been removed on another device." />
+              </div>
+            )
+          const school = schoolOf(placement, adminFile.schools ?? [])
+          const openFlow = () => {
+            setFlowTarget({ id: placement.id })
+            setOpenSheet('placementFlow')
+          }
+          return route.leg ? (
+            <PlacementJourneyPage
+              placement={placement}
+              school={school}
+              leg={route.leg}
+              settings={settings}
+              coords={coords}
+              locationEnabled={locationEnabled}
+              travelMode={travelMode}
+              origins={journeyOrigins}
+              sessions={courseSessions}
+              profileId={active.id}
+              onBack={() => goBackOr({ name: 'placement', id: placement.id })}
+              onOpenSettings={() => navigate({ name: 'settings', section: 'travel' })}
+              onEditPlacement={openFlow}
+            />
+          ) : (
+            <PlacementWorkspacePage
+              placement={placement}
+              school={school}
+              settings={settings}
+              admin={adminFile}
+              sessions={rawCourseSessions}
+              metaMap={metaMap}
+              todayISO={todayISO}
+              onBack={() => goBackOr({ name: 'pgce' })}
+              onEdit={openFlow}
+              onJourney={(leg) => navigate({ name: 'placement', id: placement.id, leg })}
+              onOpenAdmin={(tab) => {
+                setAdminTab(tab)
+                setOpenSheet('admin')
+              }}
+              onOpenJournal={() => setOpenSheet('journal')}
+              onOpenSession={(s) => navigate({ name: 'session', key: sessionKey(s) })}
+              onAll={() => navigate({ name: 'placement' })}
+            />
+          )
+        })()
       ) : route.name === 'placement' ? (
         <PlacementPage
           profileName={active.name}
@@ -1367,6 +1450,16 @@ export default function App() {
           onOpenStats={() => setOpenSheet('stats')}
           onOpenPlacements={() => navigate({ name: 'placement' })}
           onOpenPlacementSetup={() => setOpenSheet('placementSetup')}
+          settings={settings}
+          todayISO={todayISO}
+          blocks={placementStats.blocks}
+          onOpenPlacement={(id) => navigate({ name: 'placement', id })}
+          onSetUpPlacement={(code, id) => {
+            setFlowTarget({ code, id })
+            setOpenSheet('placementFlow')
+          }}
+          onJourney={(id, leg) => navigate({ name: 'placement', id, leg })}
+          onOpenProgramme={() => setOpenSheet('programme')}
           onOpenSettings={() => navigate({ name: 'settings' })}
         />
       ) : route.name === 'schedule' ? (
@@ -1536,6 +1629,11 @@ export default function App() {
           placementInfo={
             isPlacementSession(selected) ? (settings.placements ?? {})[placementTag(selected.title)] : undefined
           }
+          placementLabel={(() => {
+            if (!isPlacementSession(selected)) return undefined
+            const p = placementForTag(adminFile.placements ?? [], placementTag(selected.title))
+            return p ? placementLabel(p, adminFile.schools ?? []) : undefined
+          })()}
           onPlacementInfo={(patch) => {
             const tag = placementTag(selected.title)
             updateSettings({
@@ -1601,6 +1699,31 @@ export default function App() {
         />
       )}
 
+      {openSheet === 'placementFlow' && settings && (
+        <PlacementSetupFlow
+          code={flowTarget.code}
+          placementId={flowTarget.id}
+          placements={adminFile.placements ?? []}
+          schools={adminFile.schools ?? []}
+          settings={settings}
+          blocks={placementStats.blocks}
+          onSave={(next, mirror) => {
+            updateAdmin((file) => ({ ...file, placements: next.placements, schools: next.schools }))
+            mirrorPlacementDetails(mirror)
+            setOpenSheet('none')
+          }}
+          onOpenSettings={() => {
+            setOpenSheet('none')
+            navigate({ name: 'settings', section: 'travel' })
+          }}
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'programme' && (
+        <ProgrammeSheet admin={adminFile} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />
+      )}
+
       {openSheet === 'stats' && (
         <StatsSheet
           sessions={courseSessions}
@@ -1625,6 +1748,8 @@ export default function App() {
           keyDates={allKeyDates}
           placementTargetDays={settings.placementTargetDays}
           todayISO={todayISO}
+          placements={adminFile.placements ?? []}
+          schools={adminFile.schools ?? []}
           onClose={() => setOpenSheet('none')}
         />
       )}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
-import type { AdminFile, AuditStage, Lesson, Meeting, Observation, Reflection, TargetItem } from '../lib/admin'
-import { mondayOfISO, newAdminId, reflectionStreak } from '../lib/admin'
+import type { AdminFile, AuditStage, Lesson, Meeting, Observation, Reflection, TargetItem, PlacementRec, SchoolLocationRec } from '../lib/admin'
+import { mondayOfISO, newAdminId, reflectionStreak, placementLabel } from '../lib/admin'
 import { sessionKey } from '../lib/diff'
 import { daysUntil, isPlacementSession, placementTag } from '../lib/format'
 import { BinderPreviewSheet } from './BinderPreviewSheet'
@@ -26,8 +26,30 @@ interface Props {
   keyDates: Session[]
   placementTargetDays?: number
   todayISO: string
+  /** G1a: placements a lesson/observation/meeting can belong to */
+  placements?: PlacementRec[]
+  schools?: SchoolLocationRec[]
   onClose: () => void
 }
+
+type PlacementOption = { value: string; label: string }
+
+function PlacementSelect({ options, value, onChange }: { options: PlacementOption[]; value: string; onChange: (v: string) => void }) {
+  if (options.length === 0) return null
+  return (
+    <label className="admin-label">
+      Placement
+      <select className="date-input" value={value} onChange={(e) => onChange(e.target.value)} aria-label="Placement">
+        <option value="">Unassigned</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+const placementTagLabel = (options: PlacementOption[], id?: string) => (id ? options.find((o) => o.value === id)?.label ?? 'Unassigned placement' : null)
 
 type Tab = 'overview' | 'reflect' | 'targets' | 'meetings' | 'obs' | 'lessons' | 'audits' | 'wallet'
 
@@ -197,10 +219,11 @@ function TargetsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
   )
 }
 
-function MeetingsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
+function MeetingsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; placementOptions: PlacementOption[] }) {
   const [date, setDate] = useState(todayISO)
   const [discussed, setDiscussed] = useState('')
   const [actionsText, setActionsText] = useState('')
+  const [placementId, setPlacementId] = useState('')
   const list = [...admin.meetings].sort((a, b) => b.dateISO.localeCompare(a.dateISO))
   return (
     <>
@@ -215,6 +238,7 @@ function MeetingsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; 
         </label>
         <textarea className="note-input" rows={2} placeholder="What was discussed…" value={discussed} onChange={(e) => setDiscussed(e.target.value)} />
         <textarea className="note-input" rows={2} placeholder="Actions agreed (one per line)…" value={actionsText} onChange={(e) => setActionsText(e.target.value)} />
+        <PlacementSelect options={placementOptions} value={placementId} onChange={setPlacementId} />
         <button
           type="button"
           className="btn-primary"
@@ -225,6 +249,7 @@ function MeetingsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; 
               dateISO: date || todayISO,
               discussed: discussed.trim(),
               actions: actionsText.split('\n').map((t) => t.trim()).filter(Boolean).map((text) => ({ id: newAdminId(), text, done: false })),
+              ...(placementId ? { placementId } : {}),
               at: Date.now(),
             }
             onUpdate((prev) => ({ ...prev, meetings: [...prev.meetings, entry] }))
@@ -238,6 +263,7 @@ function MeetingsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; 
       <ul className="admin-list">
         {list.map((m) => (
           <li key={m.id} className="admin-item">
+            {placementTagLabel(placementOptions, m.placementId) && <span className="tag admin-placement">{placementTagLabel(placementOptions, m.placementId)}</span>}
             <div className="admin-item-head">
               <strong>{fmt(m.dateISO)}</strong>
               <span className="journal-tags">
@@ -272,8 +298,9 @@ function MeetingsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; 
   )
 }
 
-function ObservationsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
+function ObservationsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; placementOptions: PlacementOption[] }) {
   const [date, setDate] = useState(todayISO)
+  const [placementId, setPlacementId] = useState('')
   const [observer, setObserver] = useState('')
   const [subject, setSubject] = useState('')
   const [focus, setFocus] = useState('')
@@ -296,6 +323,7 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFi
         <input type="text" className="placement-input" placeholder="Observation focus" value={focus} onChange={(e) => setFocus(e.target.value)} />
         <textarea className="note-input" rows={2} placeholder="Strengths…" value={strengths} onChange={(e) => setStrengths(e.target.value)} />
         <textarea className="note-input" rows={2} placeholder="Development points…" value={development} onChange={(e) => setDevelopment(e.target.value)} />
+        <PlacementSelect options={placementOptions} value={placementId} onChange={setPlacementId} />
         <label className="toggle-row">
           <input type="checkbox" checked={makeTarget} onChange={(e) => setMakeTarget(e.target.checked)} />
           Add development points as a target
@@ -305,7 +333,7 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFi
           className="btn-primary"
           disabled={!subject.trim() && !strengths.trim() && !development.trim()}
           onClick={() => {
-            const entry: Observation = { id: newAdminId(), dateISO: date || todayISO, observer: observer.trim(), subject: subject.trim(), focus: focus.trim(), strengths: strengths.trim(), development: development.trim(), at: Date.now() }
+            const entry: Observation = { id: newAdminId(), dateISO: date || todayISO, observer: observer.trim(), subject: subject.trim(), focus: focus.trim(), strengths: strengths.trim(), development: development.trim(), sourceType: 'learner-entered', ...(placementId ? { placementId } : {}), at: Date.now() }
             const target: TargetItem | null =
               makeTarget && development.trim()
                 ? { id: newAdminId(), text: development.trim(), standards: [], setISO: date || todayISO, status: 'open', source: 'observation', at: Date.now() }
@@ -324,6 +352,7 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFi
       <ul className="admin-list">
         {list.map((o) => (
           <li key={o.id} className="admin-item">
+            {placementTagLabel(placementOptions, o.placementId) && <span className="tag admin-placement">{placementTagLabel(placementOptions, o.placementId)}</span>}
             <div className="admin-item-head">
               <strong>{fmt(o.dateISO)} · {o.subject || 'Lesson'}</strong>
               <span className="journal-tags">
@@ -341,8 +370,9 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFi
   )
 }
 
-function LessonsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
+function LessonsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; placementOptions: PlacementOption[] }) {
   const [date, setDate] = useState(todayISO)
+  const [placementId, setPlacementId] = useState('')
   const [subject, setSubject] = useState('')
   const [classGroup, setClassGroup] = useState('')
   const [evaluation, setEvaluation] = useState('')
@@ -363,12 +393,13 @@ function LessonsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
         <input type="text" className="placement-input" placeholder="Class (e.g. Year 2)" value={classGroup} onChange={(e) => setClassGroup(e.target.value)} />
         <textarea className="note-input" rows={2} placeholder="How did it go? What would you change?…" value={evaluation} onChange={(e) => setEvaluation(e.target.value)} />
         <TSChips selected={standards} onToggle={(id) => setStandards((s) => toggleIn(s, id))} />
+        <PlacementSelect options={placementOptions} value={placementId} onChange={setPlacementId} />
         <button
           type="button"
           className="btn-primary"
           disabled={!subject.trim()}
           onClick={() => {
-            const entry: Lesson = { id: newAdminId(), dateISO: date || todayISO, classGroup: classGroup.trim(), subject: subject.trim(), evaluation: evaluation.trim(), standards, at: Date.now() }
+            const entry: Lesson = { id: newAdminId(), dateISO: date || todayISO, classGroup: classGroup.trim(), subject: subject.trim(), evaluation: evaluation.trim(), standards, ...(placementId ? { placementId } : {}), at: Date.now() }
             onUpdate((prev) => ({ ...prev, lessons: [...prev.lessons, entry] }))
             setSubject(''); setClassGroup(''); setEvaluation(''); setStandards([])
           }}
@@ -379,6 +410,7 @@ function LessonsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
       <ul className="admin-list">
         {list.map((l) => (
           <li key={l.id} className="admin-item">
+            {placementTagLabel(placementOptions, l.placementId) && <span className="tag admin-placement">{placementTagLabel(placementOptions, l.placementId)}</span>}
             <div className="admin-item-head">
               <strong>{fmt(l.dateISO)} · {l.subject}{l.classGroup ? ` (${l.classGroup})` : ''}</strong>
               <span className="journal-tags">
@@ -599,6 +631,7 @@ const KIND_COLLECTION: Record<RecordKind, 'reflections' | 'targets' | 'meetings'
 
 export function AdminSheet(props: Props) {
   const { profileId, profileName, admin, onUpdateAdmin, sessions, metaMap, keyDates, placementTargetDays, todayISO, onClose } = props
+  const placementOptions: PlacementOption[] = (props.placements ?? []).map((p) => ({ value: p.id, label: placementLabel(p, props.schools ?? []) }))
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const [tab, setTab] = useState<Tab>(props.initialTab ?? 'overview')
   const [editing, setEditing] = useState<{ kind: RecordKind; id: string } | null>(null)
@@ -639,9 +672,9 @@ export function AdminSheet(props: Props) {
         )}
         {tab === 'reflect' && <ReflectionsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
         {tab === 'targets' && <TargetsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
-        {tab === 'meetings' && <MeetingsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
-        {tab === 'obs' && <ObservationsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
-        {tab === 'lessons' && <LessonsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
+        {tab === 'meetings' && <MeetingsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}
+        {tab === 'obs' && <ObservationsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}
+        {tab === 'lessons' && <LessonsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}
         {tab === 'audits' && <AuditsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
         {tab === 'wallet' && <WalletTab profileId={profileId} />}
         {undoRec && (
@@ -677,6 +710,7 @@ export function AdminSheet(props: Props) {
                 kind={editing.kind}
                 record={record}
                 latest={record}
+                placementOptions={placementOptions}
                 onSave={(next) => {
                   onUpdateAdmin((prev) => ({
                     ...prev,

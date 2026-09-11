@@ -114,10 +114,16 @@ interface Props {
   onSave: (record: Value & { id: string; at: number }) => boolean
   onDelete: () => void
   onClose: () => void
+  /** G1a: placements a lesson/observation/meeting can be linked to (adds a Placement field) */
+  placementOptions?: { value: string; label: string }[]
 }
 
-export function RecordEditSheet({ profileId, kind, record, latest, onSave, onDelete, onClose }: Props) {
-  const schema = SCHEMAS[kind]
+export function RecordEditSheet({ profileId, kind, record, latest, onSave, onDelete, onClose, placementOptions }: Props) {
+  const base = SCHEMAS[kind]
+  const schema =
+    placementOptions && placementOptions.length > 0 && (kind === 'lesson' || kind === 'observation' || kind === 'meeting')
+      ? { ...base, fields: [...base.fields, { name: 'placementId', label: 'Placement', type: 'select' as const, options: [{ value: '', label: 'Unassigned' }, ...placementOptions] }] }
+      : base
   const draft = useDraft<Value>(profileId, kind, record.id, record.at, record)
   const [error, setError] = useState<string | null>(null)
   const [conflict, setConflict] = useState(false)
@@ -141,6 +147,8 @@ export function RecordEditSheet({ profileId, kind, record, latest, onSave, onDel
       }
     }
     const next = { ...record, ...value, id: record.id, at: Date.now() } as Value & { id: string; at: number }
+    // An unassigned placement is absent, never an empty string (the wire contract rejects '').
+    if (next.placementId === '' || next.placementId === undefined) delete next.placementId
     if (onSave(next)) {
       draft.commitClear()
       onClose()

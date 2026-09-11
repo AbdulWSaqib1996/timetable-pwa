@@ -41,8 +41,17 @@ export function parseRouteSafe(hash: string): ParsedRoute {
       return { ok: true, route: { name: 'pgce' } }
     case 'home':
       return { ok: true, route: { name: 'homeJourney' } }
-    case 'placement':
-      return { ok: true, route: { name: 'placement' } }
+    case 'placement': {
+      // #/placement (all placements), #/placement/<id> (one school's workspace),
+      // #/placement/<id>/journey/out|back (G1a journeys).
+      if (!parts[1]) return { ok: true, route: { name: 'placement' } }
+      if (parts[1].length > 300) return { ok: false, reason: 'oversized' }
+      const id = safeDecode(parts[1])
+      if (id === null || !/^[\w-]{1,100}$/.test(id)) return { ok: false, reason: 'malformed' }
+      if (parts.length === 2) return { ok: true, route: { name: 'placement', id } }
+      if (parts[2] === 'journey' && (parts[3] === 'out' || parts[3] === 'back') && parts.length === 4) return { ok: true, route: { name: 'placement', id, leg: parts[3] } }
+      return { ok: true, route: { name: 'placement', id }, notice: 'That placement page does not exist — showing the placement.' }
+    }
     case 'find':
       return { ok: true, route: { name: 'find' } }
     case 'settings': {

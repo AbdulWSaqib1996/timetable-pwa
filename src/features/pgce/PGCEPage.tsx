@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Card, IconBook, IconChart, IconNote, IconPin, IconPlus, IconPrint, IconShield, IconUser, PageHeader, QuickMenu, SettingsAction } from '../../components/ui'
-import { placementLabel } from '../../lib/admin'
-import type { AdminFile } from '../../lib/admin'
+import { Card, IconBook, IconCalendar, IconChart, IconNote, IconPin, IconPrint, IconShield, IconUser, PageHeader, QuickMenu, SettingsAction } from '../../components/ui'
+import type { AdminFile, PlacementCode } from '../../lib/admin'
+import { roadmapSummary } from '../../../shared/programme.js'
+import { PlacementChooser } from './PlacementChooser'
+import type { Settings } from '../../types'
 import { getWalletFiles } from '../../lib/wallet'
 import type { MetaMap } from '../../types'
 import { activeCourse } from '../../lib/course'
@@ -20,6 +22,13 @@ interface Props {
   onOpenPlacements: () => void
   onOpenPlacementSetup: () => void
   onOpenSettings: () => void
+  settings: Settings
+  todayISO: string
+  blocks: { tag: string; total: number; attended: number }[]
+  onOpenPlacement: (id: string) => void
+  onSetUpPlacement: (code: PlacementCode, id?: string) => void
+  onJourney: (id: string, leg: 'out' | 'back') => void
+  onOpenProgramme: () => void
 }
 
 /**
@@ -44,6 +53,13 @@ export function PGCEPage({
   onOpenPlacements,
   onOpenPlacementSetup,
   onOpenSettings,
+  settings,
+  todayISO,
+  blocks,
+  onOpenPlacement,
+  onSetUpPlacement,
+  onJourney,
+  onOpenProgramme,
 }: Props) {
   const [walletCount, setWalletCount] = useState<number | null>(null)
   useEffect(() => {
@@ -66,7 +82,7 @@ export function PGCEPage({
 
   const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
   const placementSetUp = placement.blocks > 0
-  const mappedPlacements = (admin.placements ?? []).filter((p) => p.mappedBlockTags.length > 0)
+  const roadmap = roadmapSummary(admin.requirements ?? [], admin.milestones ?? [], todayISO)
 
   return (
     <div className="page page-pgce">
@@ -74,12 +90,12 @@ export function PGCEPage({
 
       <div className="pgce-grid">
         {activeCourse().features.placement && (
-          <Card className="pgce-section pgce-section--placement">
+          <Card className="pgce-section pgce-section--placement pgce-section--wide">
             <div className="pgce-section-head">
               <span className="pgce-tile" aria-hidden="true">
                 <IconPin size={20} />
               </span>
-              <h2>Placement</h2>
+              <h2>Placements</h2>
               {placementSetUp && (
                 <span className="badge pgce-count">
                   {placement.attendedDays}
@@ -89,30 +105,58 @@ export function PGCEPage({
             </div>
             <p className="filter-hint">
               {placementSetUp
-                ? `${placement.attendedDays}${placement.targetDays ? ` of ${placement.targetDays}` : ''} school day${placement.attendedDays === 1 && !placement.targetDays ? '' : 's'} logged across ${count(placement.blocks, 'block')}. A logged day is one you ticked Attended on; school and mentor details live on any session of the block.`
-                : 'Add your school and mentor to organise your placement. Placement blocks from your timetable appear here with their logged days.'}
+                ? `${placement.attendedDays}${placement.targetDays ? ` of ${placement.targetDays}` : ''} school day${placement.attendedDays === 1 && !placement.targetDays ? '' : 's'} logged across ${count(placement.blocks, 'timetable block')}. A logged day is one you ticked Attended on.`
+                : 'Set up each placement with its school, mentor and dates. Blocks from your timetable are mapped to SE1, SE2 and SE3 — proposed, then confirmed by you.'}
             </p>
-            {mappedPlacements.length > 0 && (
-              <ul className="pgce-placement-list" aria-label="Placements">
-                {mappedPlacements.map((p) => (
-                  <li key={p.id}>
-                    <span className="tag">{placementLabel(p, admin.schools ?? [])}</span> {p.mappedBlockTags.join(', ')}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="btn-row">
-              <button type="button" className="btn-primary" onClick={onOpenPlacements}>
-                {placementSetUp ? 'Open placement' : <><IconPlus /> Set up placement</>}
-              </button>
-              {placementSetUp && (
-                <button type="button" className="btn-today-reset" onClick={onOpenPlacementSetup}>
-                  {mappedPlacements.length > 0 ? 'Review SE1, SE2, SE3 →' : 'Set up SE1, SE2, SE3 →'}
-                </button>
-              )}
-            </div>
+            <PlacementChooser
+              placements={admin.placements ?? []}
+              schools={admin.schools ?? []}
+              settings={settings}
+              todayISO={todayISO}
+              blocks={blocks}
+              onOpen={onOpenPlacement}
+              onSetUp={onSetUpPlacement}
+              onJourney={onJourney}
+              onAll={onOpenPlacements}
+              onReviewMapping={onOpenPlacementSetup}
+            />
           </Card>
         )}
+
+        <Card className="pgce-section pgce-section--roadmap">
+          <div className="pgce-section-head">
+            <span className="pgce-tile" aria-hidden="true">
+              <IconCalendar size={20} />
+            </span>
+            <h2>Programme roadmap</h2>
+            {roadmap.requirements > 0 && <span className="badge pgce-count">{count(roadmap.requirements, 'requirement')}</span>}
+          </div>
+          {roadmap.requirements === 0 && (admin.milestones ?? []).length === 0 ? (
+            <p className="filter-hint">Requirements not yet confirmed. Enter your course profile and import your provider's pack — nothing is assumed about day targets or deadlines until you confirm it.</p>
+          ) : (
+            <ul className="roadmap-lines" aria-label="Roadmap">
+              <li>
+                <span className="tag">Academic</span> {roadmap.academic.next ? `${roadmap.academic.next.title} · ${roadmap.academic.next.dateISO}` : 'nothing dated ahead'}
+                {roadmap.academic.total > 0 ? ` · ${roadmap.academic.done}/${roadmap.academic.total} done` : ''}
+              </li>
+              <li>
+                <span className="tag">Training</span> {roadmap.training.next ? `${roadmap.training.next.title} · ${roadmap.training.next.dateISO}` : 'nothing dated ahead'}
+                {roadmap.training.total > 0 ? ` · ${roadmap.training.done}/${roadmap.training.total} done` : ''}
+              </li>
+              <li>
+                <span className="tag">Next review</span> {roadmap.nextReview ? `${roadmap.nextReview.title} · ${roadmap.nextReview.dateISO}` : 'none scheduled'}
+              </li>
+              <li>
+                <span className={`tag${roadmap.unconfirmed > 0 ? ' tag--amber' : ''}`}>Requirements</span> {roadmap.unconfirmed > 0 ? `${roadmap.unconfirmed} of ${roadmap.requirements} not yet confirmed by you` : `${roadmap.requirements} confirmed by you`}
+              </li>
+            </ul>
+          )}
+          <div className="btn-row">
+            <button type="button" className="btn-primary" onClick={onOpenProgramme}>
+              Programme
+            </button>
+          </div>
+        </Card>
 
         <Card className="pgce-section pgce-section--evidence">
           <div className="pgce-section-head">

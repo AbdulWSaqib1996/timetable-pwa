@@ -66,7 +66,7 @@ test('a profile with three placements round-trips the wire contract and a merge 
 })
 
 test('schemaVersion is accepted when sane and rejected when not', () => {
-  assert.equal(ADMIN_SCHEMA_VERSION, 2)
+  assert.ok(ADMIN_SCHEMA_VERSION >= 2, 'G0 introduced version 2; later batches may raise it')
   assert.doesNotThrow(() => validatePayload(withAdmin({ ...empty(), schemaVersion: 2 })))
   assert.doesNotThrow(() => validatePayload(withAdmin({ ...empty(), schemaVersion: 7 })))
   assert.throws(() => validatePayload(withAdmin({ ...empty(), schemaVersion: 'two' })), /schema version/)
