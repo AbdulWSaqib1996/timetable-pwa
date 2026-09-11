@@ -5,6 +5,8 @@ import { reconcileEvents, eventKey } from '../../shared/identity.js'
 export { SyncStore } from './sync-store.js'
 export { GroupStore } from './group-store.js'
 export { AnalyticsStore } from './analytics-store.js'
+export { MentorStore } from './mentor-store.js'
+import { isSpaceId as mentorSpaceOk } from '../../shared/mentor.js'
 import { MAX_BATCH_BYTES, validateBatch } from '../../shared/analytics-contracts.js'
 /**
  * timetable-push worker — background Web Push for My Timetable.
@@ -1204,6 +1206,18 @@ const RATE_CAPS = {
   '/ping': 6,
   '/sync': 10,
   '/sync-v2': 20,
+  '/mentor/join': 10,
+  '/mentor/login': 10,
+  '/mentor/space': 20,
+  '/mentor/invite': 20,
+  '/mentor/revoke': 20,
+  '/mentor/mentors': 60,
+  '/mentor/share': 20,
+  '/mentor/inbox': 60,
+  '/mentor/verify': 60,
+  '/mentor/packs': 60,
+  '/mentor/attachment': 60,
+  '/mentor/feedback': 30,
   '/sync-v2/delete': 6,
   '/sync/delete': 6,
   '/group': 10,
@@ -1440,6 +1454,20 @@ export default {
       if (!/^[A-Z2-9]{4,8}$/.test(code)) return json({ error: 'unknown group' }, 404)
       const res = await groupFetch(code, '/group', 'GET')
       return json(res.body, res.status)
+    }
+    /* ---------- mentor portal (G4): one Durable Object per learner space ---------- */
+    if (request.method === 'POST' && url.pathname.startsWith('/mentor/')) {
+      const allowed = ['/mentor/space', '/mentor/invite', '/mentor/revoke', '/mentor/mentors', '/mentor/share', '/mentor/inbox', '/mentor/verify', '/mentor/join', '/mentor/login', '/mentor/packs', '/mentor/attachment', '/mentor/feedback']
+      if (!allowed.includes(url.pathname)) return json({ error: 'not found' }, 404)
+      const body = await boundedJSON(request, url.pathname === '/mentor/share' ? 15_000_000 : 65536)
+      if (!body) return json({ error: 'invalid request' }, 400)
+      const space = String(body.spaceId ?? '')
+      if (!mentorSpaceOk(space)) return json({ error: 'invalid request' }, 400)
+      const target = new URL(url)
+      target.searchParams.set('space', space)
+      const stub = env.MENTORS.get(env.MENTORS.idFromName(space))
+      const response = await stub.fetch(new Request(target, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } }))
+      return new Response(await response.text(), { status: response.status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...CORS } })
     }
     /* ---------- anonymous usage analytics (self-hosted; a random token per device) ---------- */
     /* ---------- v2 telemetry (A2): validated batches, atomic DO dedupe ---------- */

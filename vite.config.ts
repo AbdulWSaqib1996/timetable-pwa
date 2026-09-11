@@ -18,6 +18,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         analytics: fileURLToPath(new URL('./analytics.html', import.meta.url)),
+      mentor: fileURLToPath(new URL('./mentor.html', import.meta.url)),
       },
     },
   },
@@ -94,7 +95,7 @@ export default defineConfig({
         // an installed app's service worker controls the whole origin, and
         // without this denylist a navigation to analytics.html would render
         // learner Today instead (ADM-19). Registration strategy unchanged.
-        navigateFallbackDenylist: [/analytics/],
+        navigateFallbackDenylist: [/analytics/, /mentor/],
         importScripts: ['sw-periodic.js', 'sw-push.js'],
         runtimeCaching: [
           {

@@ -217,12 +217,19 @@ test('reviews: a provider judgement needs its source; the handover pack leaves o
 test('What’s new lists the latest release once and keeps the history in Settings → Help', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('timetable.store.v2', JSON.stringify({ activeId: 'd', profiles: [{ id: 'd', name: 'Demo learner', settings: { demo: true, sheetId: '', gid: null, specialismsChosen: true, checklistDismissed: true, usagePing: false } }] }))
-    localStorage.setItem('timetable.whatsnew.v1', '6')
+    // Init scripts re-run on every navigation: only seed the old version once, so 'Got it' can persist.
+    if (!localStorage.getItem('timetable.whatsnew.v1')) localStorage.setItem('timetable.whatsnew.v1', '6')
   })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('./#/today')
-  await expect(page.getByText(/Placements SE1, SE2 and SE3/)).toBeVisible()
+  // The banner shows the LATEST entry (entry 8, the mentor portal) once; older entries stay in Settings → Help.
+  await expect(page.getByText(/Invite a mentor or tutor to a portal/)).toBeVisible()
+  await page.getByRole('button', { name: 'Got it' }).click()
+  await expect(page.getByRole('region', { name: "What's new" })).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('region', { name: "What's new" })).toHaveCount(0)
   await page.goto('./#/settings/help')
+  await expect(page.getByText('Mentor portal', { exact: true })).toBeVisible()
   await expect(page.getByText('PGCE file: placements, lessons, knowledge, workload, evidence')).toBeVisible()
   await expect(page.getByText('History, journey home, PGCE file, digest')).toBeVisible()
 })

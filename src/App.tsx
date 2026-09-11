@@ -1364,6 +1364,8 @@ export default function App() {
             onOpenGroup={() => setOpenSheet('group')}
             onOpenCourse={() => setOpenSheet('course')}
             onOpenProgramme={() => setOpenSheet('programme')}
+            onUpdateAdmin={updateAdmin}
+            admin={adminFile}
             metaMap={metaMap}
             todayISO={todayISO}
             placementBlocks={placementStats.blocks}
@@ -1894,7 +1896,7 @@ export default function App() {
 
       {openSheet === 'examples' && <EvidenceExamplesSheet admin={adminFile} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
 
-      {openSheet === 'reviewPacks' && <ReviewPackSheet admin={adminFile} profileId={active.id} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
+      {openSheet === 'reviewPacks' && settings && <ReviewPackSheet admin={adminFile} profileId={active.id} todayISO={todayISO} settings={settings} onUpdateSettings={updateSettings} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
 
       {openSheet === 'experience' && settings && (
         <ExperienceSheet admin={adminFile} settings={settings} sessions={rawCourseSessions} metaMap={metaMap} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />

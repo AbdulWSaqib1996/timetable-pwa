@@ -32,3 +32,11 @@ class_name = "AnalyticsStore"
 [[migrations]]
 tag = "analytics-v1"
 new_sqlite_classes = ["AnalyticsStore"]
+
+[[durable_objects.bindings]]
+name = "MENTORS"
+class_name = "MentorStore"
+
+[[migrations]]
+tag = "mentor-v1"
+new_sqlite_classes = ["MentorStore"]

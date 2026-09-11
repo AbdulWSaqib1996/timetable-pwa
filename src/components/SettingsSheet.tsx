@@ -77,6 +77,9 @@ interface Props {
   onOpenCourse: () => void
   /** G1a: PG-01 programme roadmap sheet */
   onOpenProgramme?: () => void
+  /** G4: mentor access pulls signed feedback into the PGCE file */
+  onUpdateAdmin?: (updater: (prev: AdminFile) => AdminFile) => void
+  admin?: AdminFile
   onRechooseSpecialisms: () => void
   onSwitchProfile: (id: string) => void
   onAddProfile: () => void
@@ -85,6 +88,8 @@ interface Props {
 }
 
 import { DEFAULT_ICS_FEED_BASE, DEFAULT_PUSH_BASE } from '../lib/config'
+import { MentorAccessSection } from './MentorAccessSection'
+import type { AdminFile } from '../lib/admin'
 import { activeCourse, courseZone } from '../lib/course'
 import { downloadFile } from '../lib/files'
 
@@ -138,6 +143,7 @@ const KEY_DATE_REMINDER_OPTIONS = [
  */
 const SEARCH_ENTRIES: { section: SettingsSection; anchor: SettingsAnchor; title: string; keywords: string[] }[] = [
   { section: 'timetable', anchor: 'profiles', title: 'Timetables & profiles', keywords: ['profile', 'switch', 'timetable', 'sheet', 'merge', 'remove', 'add another'] },
+  { section: 'data', anchor: 'mentor-access', title: 'Mentor access', keywords: ['mentor', 'tutor', 'portal', 'invite', 'invitation', 'feedback', 'reviewer', 'share pack'] },
   { section: 'timetable', anchor: 'key-dates-source', title: 'Key dates source', keywords: ['key dates', 'deadline', 'submission', 'source', 'sheet', 'tab'] },
   { section: 'timetable', anchor: 'notices', title: 'Notices (cohort broadcasts)', keywords: ['notice', 'broadcast', 'announcement', 'cohort', 'banner'] },
   { section: 'timetable', anchor: 'specialisms', title: 'Specialisms', keywords: ['specialism', 'group', 'subject', 'choose', 'filter'] },
@@ -207,6 +213,7 @@ export type SettingsAnchor =
   | 'data-advanced'
   | 'backup'
   | 'sync'
+  | 'mentor-access'
   | 'theme'
   | 'density'
   | 'whats-new'
@@ -238,6 +245,8 @@ export function SettingsSheet({
   onOpenGroup,
   onOpenCourse,
   onOpenProgramme,
+  onUpdateAdmin,
+  admin,
   onRechooseSpecialisms,
   onSwitchProfile,
   onAddProfile,
@@ -1905,6 +1914,8 @@ export function SettingsSheet({
           )}
           {syncMsg && <p className="filter-hint">{syncMsg}</p>}
         </section>
+
+        {onUpdateAdmin && admin && <MentorAccessSection settings={settings} admin={admin} onUpdateSettings={onUpdateSettings} onUpdateAdmin={onUpdateAdmin} />}
 
         <section className="filter-section" id="attendance-analysis">
           <div className="section-head">

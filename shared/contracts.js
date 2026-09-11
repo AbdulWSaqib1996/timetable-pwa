@@ -1,3 +1,4 @@
+import { validAttestation } from './mentor.js'
 import { MAX_EFFORT_MINS } from './planValidation.js'
 /** Runtime-neutral input contracts, shared by browser and workers. */
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
@@ -10,7 +11,7 @@ export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments
  *  authenticated reviewer state needs the (future) portal. */
 export const clientSourceTypes = ['personal-reflection', 'learner-entered']
 /** AdminFile schema version written by this client; unknown newer fields are preserved, never dropped. */
-export const ADMIN_SCHEMA_VERSION = 6
+export const ADMIN_SCHEMA_VERSION = 7
 export function assert(condition, message) { if (!condition) throw new Error(message) }
 export function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 export function safeURL(value) {
@@ -93,7 +94,11 @@ export function validatePayload(data) {
             // G0: typed placement links and feedback provenance are additive and format-checked;
             // a dangling placementId is shown as Unassigned, never rejected on the wire.
             if (item.placementId !== undefined) assert(typeof item.placementId === 'string' && /^[\w-]{1,100}$/.test(item.placementId), 'Invalid placement link.')
-            if (key === 'observations' && item.sourceType !== undefined) assert(clientSourceTypes.includes(item.sourceType), 'Invalid feedback provenance.')
+            if (key === 'observations' && item.sourceType !== undefined) {
+              // G4: reviewer-authenticated is only valid with the portal's attestation (spaceId, mentor, feedback id, time, worker signature).
+              if (item.sourceType === 'reviewer-authenticated') assert(validAttestation(item.attestation), 'Invalid feedback provenance.')
+              else assert(clientSourceTypes.includes(item.sourceType), 'Invalid feedback provenance.')
+            }
             if (key === 'placements') {
               assert(/^[\w-]{1,20}$/.test(item.code), 'Invalid placement code.')
               if (item.label !== undefined) assert(typeof item.label === 'string' && item.label.length <= 80, 'Invalid placement label.')

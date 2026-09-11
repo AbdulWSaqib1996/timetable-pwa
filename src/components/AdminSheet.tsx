@@ -358,7 +358,11 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }
             <div className="admin-item-head">
               <strong>{fmt(o.dateISO)} · {o.subject || 'Lesson'}</strong>
               <span className="journal-tags">
-                <button type="button" className="btn-icon" aria-label="Edit observation" onClick={() => onEdit('observation', o.id)}><IconEdit /></button>
+                {o.sourceType === 'reviewer-authenticated' && o.attestation ? (
+                  <span className="tag tag--teal">Reviewer-authenticated · {o.attestation.mentorName}</span>
+                ) : (
+                  <button type="button" className="btn-icon" aria-label="Edit observation" onClick={() => onEdit('observation', o.id)}><IconEdit /></button>
+                )}
                 <button type="button" className="btn-icon" aria-label="Delete observation" onClick={() => onUpdate((prev) => ({ ...prev, observations: prev.observations.filter((x) => x.id !== o.id) }))}><IconClose /></button>
               </span>
             </div>

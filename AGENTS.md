@@ -29,6 +29,7 @@ a new commit. `all` runs everything in order.
 ### Decision rules
 
 1. Changed anything under `workers/`? → `deploy.sh workers` (git push does NOT deploy workers).
+   The push worker hosts four Durable Objects (`SyncStore`, `GroupStore`, `AnalyticsStore`, `MentorStore` — the G4 mentor portal, routes `/mentor/*`, signing key `mentor-signing-key` in KV, encrypted attachments under `matt:*`); never delete those KV records. `mentor.html` is a second Vite page like `analytics.html` and `verify` checks it.
 2. Change spans app **and** worker (e.g. a new endpoint)? → deploy the worker **first**, then push the app.
 3. `build` must pass before deploying; a red smoke test blocks — never skip it.
 4. After any deploy, run `verify` and report its output verbatim.
