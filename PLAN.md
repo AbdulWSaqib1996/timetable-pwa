@@ -1359,7 +1359,7 @@ Automated checks + results: `tests/unit/pgce-g2.test.mjs` (5: remaining effort a
 
 Scope notes: the audit's later items (evidence narratives, experience ledger, review packs) stay in G3; question cards, AI suggestions and provider connectors are out as planned. Demo world unchanged.
 
-Released 11 September 2026: workers deployed first (push `b4023dce-e171-4325-975b-cb1001f74bb0`, feed `dd70ae73-6ca2-4e63-8657-1a2ea2012113`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` six PASS.
+Released 11 September 2026: workers deployed first (push `b4023dce-e171-4325-975b-cb1001f74bb0`, feed `dd70ae73-6ca2-4e63-8657-1a2ea2012113`); merge `636b736`, CI run __CI__ success, `deploy.sh verify` six PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
