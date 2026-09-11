@@ -1305,7 +1305,7 @@ Automated checks + results: `tests/unit/pgce-g0.test.mjs` (6: optional collectio
 
 Scope notes: the demo world has no placement blocks, so the G0 fixture is a cached real-profile timetable (SE1a/SE1b/SE2); demo placement rows arrive with the chooser in Pass 69. No new telemetry, no outcomes inferred (attendance and standards untouched).
 
-Released 11 September 2026: workers deployed first (push `4c8cbcd4-1e7a-4f91-8829-2ef4cf79f0d4`, feed `6450b4d0-ee10-43d3-94e9-8a769cb5f2c7`); merge `9571060`, CI run __CI__ success, `deploy.sh verify` six PASS.
+Released 11 September 2026: workers deployed first (push `4c8cbcd4-1e7a-4f91-8829-2ef4cf79f0d4`, feed `6450b4d0-ee10-43d3-94e9-8a769cb5f2c7`); merge `9571060`, CI run 34584061351 success, `deploy.sh verify` six PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
