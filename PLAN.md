@@ -1324,7 +1324,7 @@ Automated checks + results: `tests/unit/pgce-g1a.test.mjs` (5: pack validation, 
 
 Scope notes: the demo world still carries no placement blocks (G0 note stands; the chooser shows three "Not set up" cards on the demo). Reminders keep reading `settings.placements[tag]`, now fed by the setup mirror — no worker logic change beyond the shared contract. Deferred to G1b: nothing from this pass; G1b is the lesson workbench, practice cycle and mentor preparation.
 
-Released 11 September 2026: workers deployed first (push `7613dd67-334f-4e23-a298-ca740df023b1`, feed `72c653ea-4558-4569-b8dd-c68d8ee09980`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` six PASS.
+Released 11 September 2026: workers deployed first (push `7613dd67-334f-4e23-a298-ca740df023b1`, feed `72c653ea-4558-4569-b8dd-c68d8ee09980`); merge `d98c7bd`, CI run __CI__ success, `deploy.sh verify` six PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
