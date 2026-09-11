@@ -34,6 +34,7 @@ const SettingsSheet = lazy(() => import('./components/SettingsSheet').then((m) =
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type SettingsSection = import('./components/SettingsSheet').SettingsSection
 const StatsSheet = lazy(() => import('./components/StatsSheet').then((m) => ({ default: m.StatsSheet })))
+const PlacementSetupSheet = lazy(() => import('./components/PlacementSetupSheet').then((m) => ({ default: m.PlacementSetupSheet })))
 const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((m) => ({ default: m.StudyGroupSheet })))
 const CourseSheet = lazy(() => import('./components/CourseSheet').then((m) => ({ default: m.CourseSheet })))
 import { sendTelemetry } from './lib/analytics'
@@ -106,7 +107,7 @@ import type {
   ViewMode,
 } from './types'
 
-type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek'
+type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek' | 'placementSetup'
 
 /** How often a visible device pulls the other devices' changes (10 Sep 2026). */
 const SYNC_POLL_MS = 3 * 60_000
@@ -1295,6 +1296,8 @@ export default function App() {
           settings={settings}
           sessions={rawCourseSessions}
           exceptions={adminFile.exceptions}
+          placements={adminFile.placements ?? []}
+          schools={adminFile.schools ?? []}
           metaMap={metaMap}
           todayISO={todayISO}
           onSaveException={(rec) =>
@@ -1363,6 +1366,7 @@ export default function App() {
           onOpenJournal={() => setOpenSheet('journal')}
           onOpenStats={() => setOpenSheet('stats')}
           onOpenPlacements={() => navigate({ name: 'placement' })}
+          onOpenPlacementSetup={() => setOpenSheet('placementSetup')}
           onOpenSettings={() => navigate({ name: 'settings' })}
         />
       ) : route.name === 'schedule' ? (
@@ -1579,6 +1583,20 @@ export default function App() {
             // membership is enrolment and stays as chosen.
             updateSettings({ filters: { ...DEFAULT_FILTERS } })
           }
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'placementSetup' && settings && (
+        <PlacementSetupSheet
+          blocks={placementStats.blocks}
+          placements={adminFile.placements ?? []}
+          schools={adminFile.schools ?? []}
+          settings={settings}
+          onConfirm={(next) => {
+            updateAdmin((file) => ({ ...file, placements: next.placements, schools: next.schools }))
+            setOpenSheet('none')
+          }}
           onClose={() => setOpenSheet('none')}
         />
       )}

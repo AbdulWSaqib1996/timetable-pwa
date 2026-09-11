@@ -18,7 +18,11 @@ export function mergeRecords(a = {}, b = {}) {
 export function mergeAdmin(a, b) {
   const deleted = { ...a.deleted }
   for (const [key, at] of Object.entries(b.deleted ?? {})) deleted[key] = Math.max(deleted[key] ?? 0, at)
-  const out = { deleted }
+  // Unknown top-level fields (a newer client's collections or settings) are
+  // carried through, remote-first — an older client must never strip them (G0).
+  const out = {}
+  for (const source of [a, b]) for (const [key, value] of Object.entries(source ?? {})) if (!collections.includes(key) && key !== 'deleted') out[key] = value
+  out.deleted = deleted
   for (const key of collections) {
     const records = mergeRecords(Object.fromEntries((a[key] ?? []).map(x => [x.id,x])), Object.fromEntries((b[key] ?? []).map(x => [x.id,x])))
     out[key] = Object.values(records).filter(x => !(deleted[key + ':' + x.id] >= x.at)).sort((a,b) => a.id.localeCompare(b.id))
