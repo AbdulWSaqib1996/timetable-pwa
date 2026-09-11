@@ -38,7 +38,7 @@
   --radius-badge: 6px;
   --radius-card: 12px;
   --radius-hero: 14px;
-  --nav-height: 64px;
+  --nav-height: 76px;
   color-scheme: light dark;
 }
 
@@ -725,7 +725,7 @@ body {
 .fab-add {
   position: fixed;
   right: 16px;
-  bottom: calc(70px + env(safe-area-inset-bottom));
+  bottom: calc(70px + env(safe-area-inset-bottom) + var(--vv-bottom-offset, 0px));
   z-index: 30;
   display: flex;
   align-items: center;
@@ -2611,7 +2611,8 @@ body {
 
 .bottom-nav {
   position: fixed;
-  inset: auto 0 0;
+  /* Bottom follows the live visual viewport (see useVisualViewportOffset). */
+  inset: auto 0 var(--vv-bottom-offset, 0px);
   z-index: 40;
   display: grid;
   /* One column per real destination (TT-19): a three-destination course

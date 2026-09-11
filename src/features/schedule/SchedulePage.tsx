@@ -222,6 +222,9 @@ export function SchedulePage({
               aria-label="Search"
               title="Search"
               onClick={() => {
+                // Blur first: removing a focused input while the keyboard is up
+                // leaves iOS fixed elements stuck at the keyboard's edge.
+                ;(document.activeElement as HTMLElement | null)?.blur?.()
                 setSearchOpen((v) => {
                   if (!v) trackUse('search')
                   return !v
