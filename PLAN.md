@@ -1,5 +1,7 @@
 # Timetable PWA — implementation record
 
+> **Archive note (Pass 67, 11 September 2026):** the visual UI audit package referenced in Passes 56–63 as `visual-ui-audit-2026-09-10/` now lives at [archive/enhancements/2026-09-10-visual-ui/](archive/enhancements/2026-09-10-visual-ui/README.md) (audit, batch plan, gap audit, designs, evidence and the closing capture matrix).
+
 ## Current architecture and Phase 1 implementation
 
 The React/Vite PWA is hosted on GitHub Pages and Vercel. Two separately deployed
@@ -1273,3 +1275,15 @@ Behaviour before → after:
 Automated checks + results: `tests/unit/eligibility.test.mjs` asserts the title rules; unit 162; both gates green. Worker deploy recorded below.
 
 Released 11 September 2026: workers deployed first (push `4a011823-48dd-4d23-95c8-44165a5fb23c`, feed `9d88255d-0824-4e2f-9667-fb45353b4c91`); merge `333c9dd`, CI run 34580402515 success, `deploy.sh verify` six PASS.
+
+### Pass 67 — Visual UI audit V5: validate, capture matrix and archive — 11 September 2026
+
+Work items: the audit's closing batch (`DEVELOPMENT_PLAN.md` V5 / audit §17 Batch E). Branch `visual-v5`, client only (one CSS wrap fix and one focus-return fix), plus the required archive step.
+
+Checks and results:
+- **Matrix, as assertions** — new `tests/v5-matrix.spec.ts` (4): no page-wide horizontal overflow on nine primary screens at 320/390/768/1024/1440px in light and dark; reduced motion plus 200% zoom at 390px (a 2px device-pixel tolerance); keyboard-only navigation (Tab to the bottom nav, Enter changes route, focus lands on the new page heading, a closed dialog returns focus to its opener); scroll reachability (the last actionable element on every screen clears the bottom navigation and the FAB).
+- **Matrix, as captures** — 96 files under `evidence/matrix/` (nine screens × five widths × light/dark, plus the session detail, travel and a 200% sample). Designer/developer review: dark hero, callouts and tabs hold; 320px wraps cleanly; two defects found and fixed — the page header actions and the Today hero actions clipped instead of wrapping at 200% (now `flex-wrap`), and a dialog whose first field autofocuses remembered its own input as the opener, so closing it returned focus nowhere (`useModalA11y` now restores the last element focused outside any dialog).
+- Permission failures, map failure, stale data, unsaved edits and offline are covered by the permanent suites (`v3-travel-settings` blocked permission and Offline, `audit-r2` TT-16 map failure and stale/expired plans, `audit-r5a` drafts, `v0-carry-forwards` restore impact); they ran green in both gates.
+- `npm run validate` AND `VERCEL=1 npm run validate` green — **162 unit and 146 browser tests**.
+
+Archive: `visual-ui-audit-2026-09-10/` moved to `archive/enhancements/2026-09-10-visual-ui/` (audit, batch plan, gap audit, designs incl. `design.css` and the gallery, evidence, capture matrix) with a README listing completed IDs (B-01, FA-01–07, V-01–V-10, look-and-feel) and verification results; relative links unchanged; PLAN.md carries an archive note at the top. Production source, permanent tests and runbooks stayed in place. The PGCE student-experience audit (`pgce-student-audit-2026-09-10/`) is a separate, unstarted package and stays at the root.
