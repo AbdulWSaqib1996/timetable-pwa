@@ -1343,7 +1343,7 @@ Owner report handled in the same pass (11 Sep, second screenshot): the bottom na
 
 Scope notes: templates are two built-in outlines, not a template editor; the audit's later items (subject-knowledge goals, academic workspace, workload, experience ledger, review packs) stay in G2/G3. Demo world unchanged.
 
-Released 11 September 2026: workers deployed first (push `ac80053f-ba61-408d-884e-528877195bb9`, feed `36b6c3a2-0be9-41c0-a798-76e7b21637e8`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` six PASS.
+Released 11 September 2026: workers deployed first (push `ac80053f-ba61-408d-884e-528877195bb9`, feed `36b6c3a2-0be9-41c0-a798-76e7b21637e8`); merge `70dcd13`, CI run __CI__ success, `deploy.sh verify` six PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
