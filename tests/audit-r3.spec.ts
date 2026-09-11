@@ -294,7 +294,8 @@ test('TT-20: PGCE shows four section cards, one dominant action each, record typ
   const trigger = page.getByRole('button', { name: /Add or open a record/ })
   await trigger.click()
   const menu = page.getByRole('menu', { name: 'Add or open a record' })
-  await expect(menu.getByRole('menuitem')).toHaveText([/^Targets/, /^Mentor meetings/, /^Observations/, /^Lessons/, /^Audits/])
+  // G1b added Practice focus and Mentor preparation to the same menu.
+  await expect(menu.getByRole('menuitem')).toHaveText([/^Targets/, /^Mentor meetings/, /^Observations/, /^Lessons/, /^Audits/, /^Practice focus/, /^Mentor preparation/])
   await expect(menu.getByRole('menuitem').first()).toBeFocused()
   await page.keyboard.press('ArrowDown')
   await expect(menu.getByRole('menuitem').nth(1)).toBeFocused()

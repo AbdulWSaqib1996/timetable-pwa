@@ -46,6 +46,8 @@ export interface Meeting {
   actions: MeetingAction[]
   /** G0: which placement this meeting belongs to (a placements-collection id); absent = Unassigned */
   placementId?: string
+  /** G1b: the preparation this meeting came from */
+  prepId?: string
   at: number
 }
 
@@ -65,17 +67,48 @@ export interface Observation {
   /** G0: who recorded this observation record (default 'learner-entered') */
   sourceType?: FeedbackSourceType
   placementId?: string
+  /** G1b: the lesson this feedback is about, and the practice focus it informs */
+  lessonId?: string
+  cycleId?: string
+  /** bumped on every edit after the first save — a reviewed record never changes silently */
+  revision?: number
   at: number
 }
+
+export type LessonStage = 'plan' | 'rehearse' | 'teach' | 'review'
 
 export interface Lesson {
   id: string
   dateISO: string
   classGroup: string
   subject: string
+  /** the review side: written after teaching, distinct from the plan revision */
   evaluation: string
   standards: string[]
   placementId?: string
+  // G1b workbench (all additive; the quick retrospective form never sets them)
+  /** typed ref to the timetable occurrence (session key) */
+  sessionRef?: string
+  unitRef?: string
+  intention?: string
+  priorKnowledge?: string
+  misconceptions?: string
+  sequence?: string
+  checks?: string
+  plannedResponses?: string
+  resources?: string[]
+  stage?: LessonStage
+  planRevision?: number
+  planAt?: number
+  rehearsedAt?: number
+  rehearsalTaskId?: string
+  taughtAt?: number
+  /** the plan revision that was actually taught — the review refers to it */
+  taughtPlanRevision?: number
+  reviewAt?: number
+  cycleId?: string
+  attempt?: number
+  duplicatedFrom?: string
   at: number
 }
 
@@ -256,6 +289,38 @@ export interface MilestoneRec {
   at: number
 }
 
+/** PG-03 practice cycle (G1b): one focus at a time, attempts are lessons with
+ *  this cycleId, feedback is observations with it; paused/closed by the learner. */
+export interface PracticeCycleRec {
+  id: string
+  focus: string
+  curriculumRef?: string
+  rehearsalNote?: string
+  state: 'active' | 'paused' | 'archived'
+  pausedReason?: string
+  reviewDecision?: 'continue' | 'adapt' | 'close'
+  reviewNote?: string
+  at: number
+}
+
+/** PG-03 mentor preparation: the agenda before, the outcome after. Agreed
+ *  actions stay owned by the Meeting record it creates. */
+export interface MentorPrepRec {
+  id: string
+  /** planned meeting date */
+  dateISO: string
+  changed?: string
+  helpNeeded?: string
+  /** lesson/observation ids selected as examples */
+  exampleRefs?: string[]
+  proposedSteps?: string
+  state: 'draft' | 'held'
+  meetingId?: string
+  outcome?: { happened?: string; durationMins?: number; nextReviewISO?: string }
+  placementId?: string
+  at: number
+}
+
 export interface AdminFile {
   /** written by this client (contracts ADMIN_SCHEMA_VERSION); older files have none */
   schemaVersion?: number
@@ -276,6 +341,8 @@ export interface AdminFile {
   packs: ProgrammePackRec[]
   requirements: RequirementRec[]
   milestones: MilestoneRec[]
+  cycles: PracticeCycleRec[]
+  preps: MentorPrepRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -295,6 +362,8 @@ export const EMPTY_ADMIN: AdminFile = {
   packs: [],
   requirements: [],
   milestones: [],
+  cycles: [],
+  preps: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`

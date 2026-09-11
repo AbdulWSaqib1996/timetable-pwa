@@ -29,6 +29,8 @@ interface Props {
   /** G1a: placements a lesson/observation/meeting can belong to */
   placements?: PlacementRec[]
   schools?: SchoolLocationRec[]
+  /** G1b: open a lesson in the Plan → Rehearse → Teach → Review workbench */
+  onOpenWorkbench?: (lessonId: string) => void
   onClose: () => void
 }
 
@@ -370,7 +372,7 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }
   )
 }
 
-function LessonsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; placementOptions: PlacementOption[] }) {
+function LessonsTab({ admin, todayISO, onUpdate, onEdit, placementOptions, onOpenWorkbench }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; placementOptions: PlacementOption[]; onOpenWorkbench?: (lessonId: string) => void }) {
   const [date, setDate] = useState(todayISO)
   const [placementId, setPlacementId] = useState('')
   const [subject, setSubject] = useState('')
@@ -417,6 +419,7 @@ function LessonsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { a
                 {l.standards.map((ts) => (
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
+                {onOpenWorkbench && <button type="button" className="travel-link" aria-label={`Open workbench: ${l.subject}`} onClick={() => onOpenWorkbench(l.id)}>Workbench{l.stage ? ` · ${l.stage}` : ''}</button>}
                 <button type="button" className="btn-icon" aria-label="Edit lesson" onClick={() => onEdit('lesson', l.id)}><IconEdit /></button>
                 <button type="button" className="btn-icon" aria-label="Delete lesson" onClick={() => onUpdate((prev) => ({ ...prev, lessons: prev.lessons.filter((x) => x.id !== l.id) }))}><IconClose /></button>
               </span>
@@ -674,7 +677,7 @@ export function AdminSheet(props: Props) {
         {tab === 'targets' && <TargetsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
         {tab === 'meetings' && <MeetingsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}
         {tab === 'obs' && <ObservationsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}
-        {tab === 'lessons' && <LessonsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}
+        {tab === 'lessons' && <LessonsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} onOpenWorkbench={props.onOpenWorkbench} />}
         {tab === 'audits' && <AuditsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
         {tab === 'wallet' && <WalletTab profileId={profileId} />}
         {undoRec && (
@@ -711,7 +714,9 @@ export function AdminSheet(props: Props) {
                 record={record}
                 latest={record}
                 placementOptions={placementOptions}
-                onSave={(next) => {
+                onSave={(rawNext) => {
+                  // A reviewed record never changes silently: observations carry a revision that grows on every edit (G1b).
+                  const next = editing.kind === 'observation' ? { ...rawNext, revision: ((record as { revision?: number }).revision ?? 0) + 1 } : rawNext
                   onUpdateAdmin((prev) => ({
                     ...prev,
                     [collection]: (prev[collection] as { id: string }[]).map((r) => (r.id === next.id ? next : r)),
