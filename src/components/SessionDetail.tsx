@@ -461,6 +461,7 @@ export function SessionDetail({
                     ? 'Self study — attendance is not recorded'
                     : 'Not recorded'}
             </p>
+            {!session.isSelfStudy && (
             <div className="attendance-choice" role="group" aria-label="Attendance">
               <button
                 type="button"
@@ -507,6 +508,7 @@ export function SessionDetail({
                 </select>
               )}
             </div>
+            )}
           </section>
           <section className="ui-card detail-card detail-section" aria-labelledby="detail-notes-heading">
             <div className="section-title">
