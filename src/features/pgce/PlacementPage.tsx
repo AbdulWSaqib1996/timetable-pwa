@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Card, Dialog, EmptyState, Field, IconClose, PageHeader } from '../../components/ui'
-import { newAdminId } from '../../lib/admin'
-import type { PlacementExceptionRec } from '../../lib/admin'
+import { newAdminId, placementForTag, placementLabel } from '../../lib/admin'
+import type { PlacementExceptionRec, PlacementRec, SchoolLocationRec } from '../../lib/admin'
 import { placementBlocks, placementPolicy } from '../../lib/placement'
 import type { PlacementDayView } from '../../lib/placement'
 import { formatRemaining } from '../../lib/format'
@@ -14,6 +14,9 @@ interface Props {
   /** course sessions BEFORE exception filtering (the raw plan) */
   sessions: Session[]
   exceptions: PlacementExceptionRec[]
+  /** G0 placement entities: a block shows its confirmed placement (SE1 · school) when mapped */
+  placements?: PlacementRec[]
+  schools?: SchoolLocationRec[]
   metaMap: MetaMap
   todayISO: string
   onSaveException: (rec: PlacementExceptionRec) => void
@@ -48,6 +51,8 @@ export function PlacementPage({
   settings,
   sessions,
   exceptions,
+  placements = [],
+  schools = [],
   metaMap,
   todayISO,
   onSaveException,
@@ -150,7 +155,7 @@ export function PlacementPage({
       {blocks.map((b) => (
         <Card key={b.tag} className="placement-block">
           <div className="pgce-section-head">
-            <h2>{b.tag}</h2>
+            <h2>{b.tag}{placementForTag(placements, b.tag) && <span className="tag placement-block-code">{placementLabel(placementForTag(placements, b.tag)!, schools)}</span>}</h2>
             <span className="filter-hint">
               Planned {b.plannedDays} day{b.plannedDays === 1 ? '' : 's'} ({hoursLabel(b.plannedMins)}) ·
               Logged {b.loggedDays} day{b.loggedDays === 1 ? '' : 's'} ({hoursLabel(b.loggedMins)})

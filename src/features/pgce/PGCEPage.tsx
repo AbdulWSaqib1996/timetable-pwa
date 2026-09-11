@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, IconBook, IconChart, IconNote, IconPin, IconPlus, IconPrint, IconShield, IconUser, PageHeader, QuickMenu, SettingsAction } from '../../components/ui'
+import { placementLabel } from '../../lib/admin'
 import type { AdminFile } from '../../lib/admin'
 import { getWalletFiles } from '../../lib/wallet'
 import type { MetaMap } from '../../types'
@@ -17,6 +18,7 @@ interface Props {
   onOpenJournal: () => void
   onOpenStats: () => void
   onOpenPlacements: () => void
+  onOpenPlacementSetup: () => void
   onOpenSettings: () => void
 }
 
@@ -40,6 +42,7 @@ export function PGCEPage({
   onOpenJournal,
   onOpenStats,
   onOpenPlacements,
+  onOpenPlacementSetup,
   onOpenSettings,
 }: Props) {
   const [walletCount, setWalletCount] = useState<number | null>(null)
@@ -63,6 +66,7 @@ export function PGCEPage({
 
   const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
   const placementSetUp = placement.blocks > 0
+  const mappedPlacements = (admin.placements ?? []).filter((p) => p.mappedBlockTags.length > 0)
 
   return (
     <div className="page page-pgce">
@@ -88,10 +92,24 @@ export function PGCEPage({
                 ? `${placement.attendedDays}${placement.targetDays ? ` of ${placement.targetDays}` : ''} school day${placement.attendedDays === 1 && !placement.targetDays ? '' : 's'} logged across ${count(placement.blocks, 'block')}. A logged day is one you ticked Attended on; school and mentor details live on any session of the block.`
                 : 'Add your school and mentor to organise your placement. Placement blocks from your timetable appear here with their logged days.'}
             </p>
+            {mappedPlacements.length > 0 && (
+              <ul className="pgce-placement-list" aria-label="Placements">
+                {mappedPlacements.map((p) => (
+                  <li key={p.id}>
+                    <span className="tag">{placementLabel(p, admin.schools ?? [])}</span> {p.mappedBlockTags.join(', ')}
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="btn-row">
               <button type="button" className="btn-primary" onClick={onOpenPlacements}>
                 {placementSetUp ? 'Open placement' : <><IconPlus /> Set up placement</>}
               </button>
+              {placementSetUp && (
+                <button type="button" className="btn-today-reset" onClick={onOpenPlacementSetup}>
+                  {mappedPlacements.length > 0 ? 'Review SE1, SE2, SE3 →' : 'Set up SE1, SE2, SE3 →'}
+                </button>
+              )}
             </div>
           </Card>
         )}

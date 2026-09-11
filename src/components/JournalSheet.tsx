@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
+import { EMPTY_ADMIN } from '../lib/admin'
 import type { AdminFile } from '../lib/admin'
 import { readAttachments } from '../lib/attachments'
 import { sessionKey } from '../lib/diff'
@@ -506,7 +507,7 @@ export function JournalSheet({ sessions, metaMap, profileId, admin, onSelect, on
             profileName={profileName}
             sessions={sessions}
             metaMap={metaMap}
-            admin={admin ?? { reflections: [], targets: [], meetings: [], observations: [], lessons: [], audits: [], tasks: [], exceptions: [], plans: [], commitments: [] }}
+            admin={admin ?? EMPTY_ADMIN}
             placementTargetDays={placementTargetDays}
             todayISO={todayISO}
             selection={[...selected]}

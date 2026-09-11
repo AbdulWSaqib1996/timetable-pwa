@@ -1,5 +1,5 @@
 import { persistJSON, persistValue } from './persistence'
-import { collections } from '../../shared/contracts.js'
+import { ADMIN_SCHEMA_VERSION, collections } from '../../shared/contracts.js'
 import { canonical, mergeAdmin } from '../../shared/merge.js'
 /**
  * The PGCE admin file: everything the course makes a student log — weekly
@@ -35,6 +35,8 @@ export interface MeetingAction {
   id: string
   text: string
   done: boolean
+  /** G0: optional link when an action belongs to a different placement from its meeting */
+  placementId?: string
 }
 
 export interface Meeting {
@@ -42,8 +44,15 @@ export interface Meeting {
   dateISO: string
   discussed: string
   actions: MeetingAction[]
+  /** G0: which placement this meeting belongs to (a placements-collection id); absent = Unassigned */
+  placementId?: string
   at: number
 }
+
+/** G0 feedback provenance. Only the first two can be written by this client;
+ *  'reviewer-authenticated' is reserved for a future portal and is never
+ *  settable here (the wire contract rejects it). */
+export type FeedbackSourceType = 'personal-reflection' | 'learner-entered' | 'reviewer-authenticated'
 
 export interface Observation {
   id: string
@@ -53,6 +62,9 @@ export interface Observation {
   focus: string
   strengths: string
   development: string
+  /** G0: who recorded this observation record (default 'learner-entered') */
+  sourceType?: FeedbackSourceType
+  placementId?: string
   at: number
 }
 
@@ -63,6 +75,7 @@ export interface Lesson {
   subject: string
   evaluation: string
   standards: string[]
+  placementId?: string
   at: number
 }
 
@@ -140,7 +153,50 @@ export interface CommitmentRec {
   at: number
 }
 
+/** School experience placements as recorded on the course: SE1, SE2, SE3. */
+export const PLACEMENT_CODES = ['SE1', 'SE2', 'SE3'] as const
+export type PlacementCode = (typeof PLACEMENT_CODES)[number]
+
+/** A confirmed school location (G0). Coordinates are only trusted once the
+ *  learner confirms them (confirmedAt); an imported guess stays unconfirmed. */
+export interface SchoolLocationRec {
+  id: string
+  name: string
+  address?: string
+  lat?: number
+  lng?: number
+  confirmedAt?: number
+  entranceNote?: string
+  at: number
+}
+
+/** A placement entity (G0): the thing lessons, observations and meetings are
+ *  linked to, mapped onto the imported timetable's block tags (SE1A, SE1B…).
+ *  Nothing is inferred from it automatically — no attendance, no outcomes. */
+export interface PlacementRec {
+  id: string
+  code: PlacementCode | string
+  label?: string
+  schoolLocationId?: string
+  startISO?: string
+  endISO?: string
+  /** imported block tags whose sessions belong to this placement */
+  mappedBlockTags: string[]
+  mentorName?: string
+  mentorContact?: string
+  /** working-pattern override for this placement (else settings.placementHours) */
+  workingHours?: { start: string; end: string }
+  insetCountsAsSchoolDay?: boolean
+  arrivalBufferMins?: number
+  /** where the learner returns to after school (home by default) */
+  returnPlaceId?: string
+  notes?: string
+  at: number
+}
+
 export interface AdminFile {
+  /** written by this client (contracts ADMIN_SCHEMA_VERSION); older files have none */
+  schemaVersion?: number
   deleted?: Record<string, number>
   reflections: Reflection[]
   targets: TargetItem[]
@@ -152,6 +208,8 @@ export interface AdminFile {
   exceptions: PlacementExceptionRec[]
   plans: PlanChildRec[]
   commitments: CommitmentRec[]
+  placements: PlacementRec[]
+  schools: SchoolLocationRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -165,6 +223,8 @@ export const EMPTY_ADMIN: AdminFile = {
   exceptions: [],
   plans: [],
   commitments: [],
+  placements: [],
+  schools: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`
@@ -178,6 +238,7 @@ export function loadAdminFile(pid: string): AdminFile {
     const raw = localStorage.getItem(adminKey(pid))
     if (!raw) return EMPTY_ADMIN
     const parsed = JSON.parse(raw) as Partial<AdminFile>
+    // Unknown (newer) fields ride along untouched: an older build never strips them.
     return { ...EMPTY_ADMIN, ...parsed }
   } catch {
     return EMPTY_ADMIN
@@ -186,7 +247,7 @@ export function loadAdminFile(pid: string): AdminFile {
 
 export function saveAdminFile(pid: string, file: AdminFile): void {
   const previous = loadAdminFile(pid)
-  const next = { ...file, deleted: { ...previous.deleted, ...file.deleted } }
+  const next = { ...previous, ...file, deleted: { ...previous.deleted, ...file.deleted }, schemaVersion: Math.max(ADMIN_SCHEMA_VERSION, previous.schemaVersion ?? 0) }
   const now = Date.now()
   for (const key of collections) {
     for (const item of previous[key]) if (!file[key].some(x => x.id === item.id)) next.deleted[key + ':' + item.id] = now
@@ -200,6 +261,80 @@ export function saveAdminFile(pid: string, file: AdminFile): void {
 }
 
 export function clearAdminFile(pid: string): void { persistValue(adminKey(pid), null) }
+
+/** Provenance of an observation record. Records written before G0 carry no
+ *  field and read as learner-entered — no rewrite, so their `at` and sync
+ *  identity are untouched. */
+export const observationSourceType = (o: Pick<Observation, 'sourceType'>): FeedbackSourceType => o.sourceType ?? 'learner-entered'
+
+/** Proposed placement for an imported block tag by its prefix: SE1A/SE1B → SE1.
+ *  A proposal only — the learner confirms in the setup sheet, never silently. */
+export function proposePlacementCode(tag: string): PlacementCode | '' {
+  const m = /^SE(\d)/i.exec(tag)
+  const code = m ? `SE${m[1]}` : ''
+  return (PLACEMENT_CODES as readonly string[]).includes(code) ? (code as PlacementCode) : ''
+}
+
+/** The placement a block tag is currently mapped to, if any. */
+export function placementForTag(placements: PlacementRec[], tag: string): PlacementRec | undefined {
+  return placements.find((p) => p.mappedBlockTags.includes(tag))
+}
+
+/** Display label: "SE1 · Riverside Primary" when the school is known, else the code. */
+export function placementLabel(placement: PlacementRec, schools: SchoolLocationRec[]): string {
+  const school = schools.find((s) => s.id === placement.schoolLocationId)
+  return school?.name ? `${placement.code} · ${school.name}` : placement.label ? `${placement.code} · ${placement.label}` : placement.code
+}
+
+export interface PlacementSetupResult { placements: PlacementRec[]; schools: SchoolLocationRec[] }
+
+/**
+ * Apply a confirmed tag → placement assignment (G0 migration sheet). Pure and
+ * idempotent: existing placement/school records keep their ids and every field
+ * not derived here; school and mentor details come from the imported tag's
+ * settings.placements entry only when the record has none yet (never
+ * overwritten, settings never deleted). Tags assigned '' stay Unassigned.
+ */
+export function applyPlacementAssignment(
+  current: PlacementSetupResult,
+  assignment: Record<string, PlacementCode | ''>,
+  tagDetails: Record<string, { school?: string; address?: string; mentor?: string; lat?: number; lng?: number } | undefined>,
+  makeId: () => string = newAdminId
+): PlacementSetupResult {
+  const schools = current.schools.map((s) => ({ ...s }))
+  const placements = current.placements.map((p) => ({ ...p, mappedBlockTags: [...p.mappedBlockTags] }))
+  const byCode = new Map<string, Record<string, unknown>[]>()
+  for (const [tag, code] of Object.entries(assignment)) {
+    // Remove the tag from every placement, then re-add to the chosen one.
+    for (const p of placements) p.mappedBlockTags = p.mappedBlockTags.filter((t) => t !== tag)
+    if (!code) continue
+    byCode.set(code, [...(byCode.get(code) ?? []), { tag }])
+  }
+  for (const code of PLACEMENT_CODES) {
+    const tags = (byCode.get(code) ?? []).map((x) => x.tag as string).sort()
+    let rec = placements.find((p) => p.code === code)
+    if (!rec) {
+      if (tags.length === 0) continue
+      rec = { id: makeId(), code, mappedBlockTags: [], at: 0 }
+      placements.push(rec)
+    }
+    rec.mappedBlockTags = [...new Set([...rec.mappedBlockTags, ...tags])].sort()
+    const detail = rec.mappedBlockTags.map((t) => tagDetails[t]).find((d) => d?.school)
+    if (detail?.school && !rec.schoolLocationId) {
+      let school = schools.find((s) => s.name === detail.school)
+      if (!school) {
+        school = { id: makeId(), name: detail.school, at: 0 }
+        if (detail.address) school.address = detail.address
+        if (Number.isFinite(detail.lat) && Number.isFinite(detail.lng)) { school.lat = detail.lat; school.lng = detail.lng }
+        schools.push(school)
+      }
+      rec.schoolLocationId = school.id
+    }
+    const mentor = rec.mappedBlockTags.map((t) => tagDetails[t]?.mentor).find(Boolean)
+    if (mentor && !rec.mentorName) rec.mentorName = mentor
+  }
+  return { placements, schools }
+}
 export const mergeAdminFiles = mergeAdmin
 
 /** Monday of a date's week (yyyy-mm-dd). */
