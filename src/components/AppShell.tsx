@@ -4,6 +4,7 @@ import type { Route } from '../lib/router'
 import { activeCourse } from '../lib/course'
 import { IconPGCE, IconSchedule, IconSettings, IconTasks, IconToday } from './ui'
 import { useAttention } from '../lib/attention'
+import { useVisualViewportOffset } from '../hooks/useVisualViewportOffset'
 
 interface Props {
   route: Route
@@ -48,6 +49,7 @@ function routeIdentity(route: Route): string {
  * focus itself (e.g. a settings anchor).
  */
 export function AppShell({ route, onNavigate, hideNav, profileName, children }: Props) {
+  useVisualViewportOffset()
   // Render exactly one navigation variant so assistive tech (and tests) see a
   // single Main navigation landmark.
   const [wide, setWide] = useState(() => window.matchMedia('(min-width: 1024px)').matches)

@@ -79,6 +79,8 @@ export function FindPage({ profileId, profileName, todayISO, state, includeNotes
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
+  // Leaving the page with the keyboard up must not strand fixed elements (iOS).
+  useEffect(() => () => (document.activeElement as HTMLElement | null)?.blur?.(), [])
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), DEBOUNCE_MS)
     return () => clearTimeout(t)

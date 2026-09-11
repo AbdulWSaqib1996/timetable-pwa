@@ -1240,3 +1240,21 @@ Automated checks + results: `tests/sync-devices.spec.ts` gains two tests — (1)
 Known limits: two different real sheets stay separate profiles by design; a timetable set up from the same sheet but a different tab (gid) is treated as a different timetable.
 
 Released 10 September 2026: merge `023264c`, CI run 34536830361 success, `deploy.sh verify` six PASS. No worker change.
+
+
+### Separate P1/P2/P3 placements — 11 September 2026 (documentation and concepts only)
+
+Updated `pgce-student-audit-2026-09-10/PGCE_QTS_STUDENT_EXPERIENCE_AUDIT.md` with owner clarification PG-07A: three placements at three different schools, separately configured and linked to school-specific lessons, attendance, mentor records, evidence and travel. Preserves existing per-tag details through explicit reviewed migration. Added 12 mockup screens (27 total), separate setup pages and outward/return journeys for each school, with illustrative non-live maps/times and preserved TfL/train requirements. All three school/setup/outward/return prototype navigation checks passed; no broken asset links or captured-width overflows. Existing application changes were preserved; no app source or production service changed.
+
+### Pass 65 — Bottom navigation follows the visual viewport (owner bug report) — 11 September 2026
+
+Work items: on iPhone the bottom navigation floated about 62% down the screen with page content continuing beneath it (owner screenshots, 11 Sep). The nav is `position: fixed; bottom: 0`; on iOS Safari and standalone PWAs a fixed element is left where the bottom of the screen WAS while the on-screen keyboard was open when the focused input is removed from the page — the Schedule search toggle and leaving Find both unmount a focused `autoFocus` input. Branch `nav-viewport`, client only.
+
+Behaviour before → after:
+- **Nav and FAB positioned from the live visual viewport** — `useVisualViewportOffset` (mounted in AppShell) keeps `--vv-bottom-offset` = the layout-viewport height hidden below the visual viewport, recomputed on visual-viewport resize/scroll, window resize, orientation change and shortly after any focus change; `.bottom-nav` uses `inset: auto 0 var(--vv-bottom-offset, 0px)` and the FAB adds the same offset. While a keyboard is up the nav sits on its edge; when it closes the offset returns to 0, so it can no longer be stranded.
+- **Inputs blur before they unmount** — the Schedule search close blurs the active element first; Find blurs on unmount.
+- `--nav-height` is 76px to match the Pass 63 nav so content padding clears it.
+
+Automated checks + results: `tests/nav-viewport.spec.ts` (2): a mocked, resizable visual viewport moves the nav up by 300px and back to 0 (and the FAB follows); closing the Schedule search blurs the input before removal. Both gates green.
+
+Known limits: the mock stands in for iOS; the real device check is the owner's.
