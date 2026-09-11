@@ -1271,3 +1271,5 @@ Behaviour before → after:
 - **Attendance**: self-study sessions were already outside the eligibility denominator and the "did you attend?" prompts (app and worker); the detail view now hides the Attended/Absent choice for them and states that attendance is not recorded.
 
 Automated checks + results: `tests/unit/eligibility.test.mjs` asserts the title rules; unit 162; both gates green. Worker deploy recorded below.
+
+Released 11 September 2026: workers deployed first (push `4a011823-48dd-4d23-95c8-44165a5fb23c`, feed `9d88255d-0824-4e2f-9667-fb45353b4c91`); merge `333c9dd`, CI run 34580402515 success, `deploy.sh verify` six PASS.
