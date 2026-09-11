@@ -44,6 +44,12 @@ const ProgrammeSheet = lazy(() => import('./components/ProgrammeSheet').then((m)
 import { LessonWorkbench } from './components/LessonWorkbench'
 import { PracticeSheet } from './components/PracticeSheet'
 import { MentorPrepSheet } from './components/MentorPrepSheet'
+const KnowledgeSheet = lazy(() => import('./components/KnowledgeSheet').then((m) => ({ default: m.KnowledgeSheet })))
+const AcademicSheet = lazy(() => import('./components/AcademicSheet').then((m) => ({ default: m.AcademicSheet })))
+const WorkloadSheet = lazy(() => import('./components/WorkloadSheet').then((m) => ({ default: m.WorkloadSheet })))
+import { proposalsToBlocks } from '../shared/workload.js'
+import { addDaysISO } from '../shared/calendar-time.js'
+import type { WorkloadProposal } from '../shared/workload.js'
 import { sendTelemetry } from './lib/analytics'
 import { configureTelemetry } from './lib/telemetry'
 import { loadSyncState as loadSyncStateForPing } from './lib/sync'
@@ -124,7 +130,7 @@ import type {
   ViewMode,
 } from './types'
 
-type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek' | 'placementSetup' | 'placementFlow' | 'programme' | 'workbench' | 'practice' | 'prep'
+type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek' | 'placementSetup' | 'placementFlow' | 'programme' | 'workbench' | 'practice' | 'prep' | 'knowledge' | 'academic' | 'workload'
 
 /** How often a visible device pulls the other devices' changes (10 Sep 2026). */
 const SYNC_POLL_MS = 3 * 60_000
@@ -155,6 +161,8 @@ export default function App() {
   /** G1b: which lesson the workbench shows, and on which stage */
   const [workbench, setWorkbench] = useState<{ lessonId: string; stage?: LessonStage } | null>(null)
   const [stepPrefs, setStepPrefs] = useState<NextStepPrefs>({ dismissed: [], pinned: [] })
+  /** G2: ids of the blocks the last accepted workload batch added (undo target), per profile on this device */
+  const [workloadBatch, setWorkloadBatch] = useState<string[] | null>(null)
   const [rechoosing, setRechoosing] = useState(false)
   // One date-selection model shared by Day/Week/Month (null = follow today).
   const [selectedDateISO, setSelectedDateISO] = useState<string | null>(null)
@@ -239,6 +247,12 @@ export default function App() {
   )
   useEffect(() => {
     setStepPrefs(active ? loadNextStepPrefs(active.id) : { dismissed: [], pinned: [] })
+    try {
+      const raw = active ? localStorage.getItem(`timetable.workload.v1.${active.id}`) : null
+      setWorkloadBatch(raw ? (JSON.parse(raw) as string[]) : null)
+    } catch {
+      setWorkloadBatch(null)
+    }
   }, [active?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const updateStepPrefs = (fn: (p: NextStepPrefs) => NextStepPrefs) => {
     setStepPrefs((p) => {
@@ -974,8 +988,19 @@ export default function App() {
       if (from === null || to === null) continue
       out.push({ d: s.dateISO, from, to, label: s.title, kind: s.isFreeTime ? 'free' : 'plan' })
     }
+    // G2: protected weekly windows block the week planner too (the workload planner adds them itself).
+    for (let i = 0; i < 28; i++) {
+      const d = addDaysISO(todayISO, i - 7)
+      const day = new Date(d + 'T00:00:00Z').getUTCDay()
+      for (const w of adminFile.protected ?? []) {
+        const from = toMins(w.start)
+        const to = toMins(w.end)
+        if (w.day !== day || from === null || to === null || to <= from) continue
+        out.push({ d, from, to, label: `Protected: ${w.label || 'time'}`, kind: 'personal' })
+      }
+    }
     return out
-  }, [courseSessions, adminFile.commitments, planSessions])
+  }, [courseSessions, adminFile.commitments, planSessions, adminFile.protected, todayISO])
   const planWeekDeadlines = useMemo(() => allKeyDates.map((k) => ({ d: k.dateISO, title: k.title })), [allKeyDates])
 
   // Placement progress: unique school days per block, attended via the ✓ tick.
@@ -1514,6 +1539,9 @@ export default function App() {
           onOpenProgramme={() => setOpenSheet('programme')}
           onOpenPractice={() => setOpenSheet('practice')}
           onOpenPrep={() => setOpenSheet('prep')}
+          onOpenKnowledge={() => setOpenSheet('knowledge')}
+          onOpenAcademic={() => setOpenSheet('academic')}
+          onOpenWorkload={() => setOpenSheet('workload')}
           onOpenSettings={() => navigate({ name: 'settings' })}
         />
       ) : route.name === 'schedule' ? (
@@ -1817,6 +1845,43 @@ export default function App() {
 
       {openSheet === 'prep' && (
         <MentorPrepSheet admin={adminFile} todayISO={todayISO} placementOptions={placementOptions} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />
+      )}
+
+      {openSheet === 'knowledge' && <KnowledgeSheet admin={adminFile} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
+
+      {openSheet === 'academic' && <AcademicSheet admin={adminFile} keyDates={allKeyDates} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
+
+      {openSheet === 'workload' && settings && (
+        <WorkloadSheet
+          admin={adminFile}
+          busy={planWeekBusy.filter((b) => !b.label.startsWith('Protected: '))}
+          deadlines={planWeekDeadlines}
+          settings={settings}
+          todayISO={todayISO}
+          lastBatch={workloadBatch}
+          onUpdateAdmin={updateAdmin}
+          onAccept={(proposals: WorkloadProposal[]) => {
+            const { blocks, ids } = proposalsToBlocks(proposals, newAdminId, Date.now())
+            updateAdmin((file) => ({ ...file, plans: [...file.plans, ...blocks] }))
+            setWorkloadBatch(ids)
+            try {
+              localStorage.setItem(`timetable.workload.v1.${active.id}`, JSON.stringify(ids))
+            } catch {
+              /* undo then lasts for this session only */
+            }
+          }}
+          onUndo={() => {
+            const ids = new Set(workloadBatch ?? [])
+            updateAdmin((file) => ({ ...file, plans: file.plans.filter((p) => !ids.has(p.id)) }))
+            setWorkloadBatch(null)
+            try {
+              localStorage.removeItem(`timetable.workload.v1.${active.id}`)
+            } catch {
+              /* nothing to clear */
+            }
+          }}
+          onClose={() => setOpenSheet('none')}
+        />
       )}
 
       {openSheet === 'stats' && (

@@ -31,6 +31,9 @@ interface Props {
   onOpenProgramme: () => void
   onOpenPractice: () => void
   onOpenPrep: () => void
+  onOpenKnowledge: () => void
+  onOpenAcademic: () => void
+  onOpenWorkload: () => void
 }
 
 /**
@@ -64,6 +67,9 @@ export function PGCEPage({
   onOpenProgramme,
   onOpenPractice,
   onOpenPrep,
+  onOpenKnowledge,
+  onOpenAcademic,
+  onOpenWorkload,
 }: Props) {
   const [walletCount, setWalletCount] = useState<number | null>(null)
   useEffect(() => {
@@ -215,6 +221,9 @@ export function PGCEPage({
                 { label: `Audits (${admin.audits.length})`, onSelect: () => onOpenAdmin('audits') },
                 { label: `Practice focus (${(admin.cycles ?? []).filter((c) => c.state !== 'archived').length})`, onSelect: onOpenPractice },
                 { label: `Mentor preparation (${(admin.preps ?? []).length})`, onSelect: onOpenPrep },
+                { label: `Subject knowledge (${(admin.goals ?? []).filter((g) => g.state === 'open').length})`, onSelect: onOpenKnowledge },
+                { label: `Academic work (${(admin.projects ?? []).length})`, onSelect: onOpenAcademic },
+                { label: 'Workload & support', onSelect: onOpenWorkload },
               ]}
             />
             <button type="button" className="btn-today-reset" onClick={() => onOpenAdmin('overview')}>

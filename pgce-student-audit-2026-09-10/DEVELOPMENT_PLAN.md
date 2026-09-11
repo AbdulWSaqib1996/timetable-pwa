@@ -84,6 +84,8 @@ Numbers follow PLAN.md: the next free pass is **68**. Each batch = one branch (`
 
 ### G2 — Subject knowledge (PG-04), academic workspace (PG-05), workload (PG-08) (Pass 71)
 
+> **Status (11 September 2026): implemented as Pass 71** — see PLAN.md. Refinements recorded there: the workload planner is `shared/workload.js` over `suggestPlanWeek` (same slot rules as Plan week, plus protected windows); protected windows, contacts, questions and the support agenda live in the admin file as collections (synced, backed up) rather than in Settings; the pack's curriculum list is the requirements whose section mentions curriculum/subject/knowledge.
+
 **In**
 - `KnowledgeGoal`: topic (from the programme pack's curriculum list; primary breadth or secondary depth), student's question, dated self-confidence events, resource refs (one resource ↔ many goals), application opportunity (lesson ref), next review. Existing subject audit `secure` migrates to "Previously marked secure by you (date)"; **never** assessed mastery. No question cards / AI in this batch.
 - `AcademicProject` (the PGCE form of MF-02): brief, provider criteria, deadline (linked to an existing key date, not a copy), optional word/credits (no award calculation), milestones as tasks (existing owner model), reading notes with quotation/paraphrase/interpretation + source/page (no invented bibliographic data), approval-planning section for classroom enquiry (recorded, not an approval workflow), status draft → ready → submitted (user confirmation only) → feedback → result (labelled by source; never awards anything). Export never marks Submitted.
