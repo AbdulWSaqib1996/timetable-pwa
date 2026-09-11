@@ -5,11 +5,16 @@ import { newAdminId } from '../lib/admin'
 import type { AdminFile, ReviewPackItem, ReviewPackRec } from '../lib/admin'
 import { downloadFile } from '../lib/files'
 import { getWalletFiles } from '../lib/wallet'
+import { absorbInbox, fetchInbox, fileToBytes, listMentors, sharePack } from '../lib/mentor'
+import type { MentorListing, MentorSpace } from '../lib/mentor'
+import type { Settings } from '../types'
 
 interface Props {
   admin: AdminFile
   profileId: string
   todayISO: string
+  settings: Settings
+  onUpdateSettings: (patch: Partial<Settings>) => void
   onUpdateAdmin: (updater: (prev: AdminFile) => AdminFile) => void
   onClose: () => void
 }
@@ -28,15 +33,23 @@ const fmt = (iso: string) => {
  * the device is exactly what was shown. Selected → Draft → Discussed is the
  * learner's own marking.
  */
-export function ReviewPackSheet({ admin, profileId, todayISO, onUpdateAdmin, onClose }: Props) {
+export function ReviewPackSheet({ admin, profileId, todayISO, settings, onUpdateSettings, onUpdateAdmin, onClose }: Props) {
   const [title, setTitle] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(admin.reviewPacks[0]?.id ?? null)
   const [picked, setPicked] = useState<string[]>([])
-  const [wallet, setWallet] = useState<{ id: string; name: string }[]>([])
+  const [wallet, setWallet] = useState<{ id: string; name: string; blob: Blob }[]>([])
+  // G4 mentor sharing
+  const space: MentorSpace | null = settings.mentorSpaceId && settings.mentorOwnerToken ? { spaceId: settings.mentorSpaceId, ownerToken: settings.mentorOwnerToken } : null
+  const [mentors, setMentors] = useState<MentorListing | null>(null)
+  const [shareWith, setShareWith] = useState<string[]>([])
+  const [shareAtt, setShareAtt] = useState<string[]>([])
+  const [shareMsg, setShareMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const [discussedISO, setDiscussedISO] = useState(todayISO)
   useEffect(() => {
     let live = true
-    void getWalletFiles(profileId).then((files) => live && setWallet(files.map((f) => ({ id: String((f as { id?: number }).id ?? ''), name: f.name })))).catch(() => live && setWallet([]))
+    void getWalletFiles(profileId).then((files) => live && setWallet(files.map((f) => ({ id: String((f as { id?: number }).id ?? ''), name: f.name, blob: (f as { blob: Blob }).blob })))).catch(() => live && setWallet([]))
+    if (space) void listMentors(settings, space).then((l) => live && setMentors(l)).catch(() => live && setMentors(null))
     return () => { live = false }
   }, [profileId])
   const pack = admin.reviewPacks.find((p) => p.id === selectedId) ?? null
@@ -145,6 +158,84 @@ export function ReviewPackSheet({ admin, profileId, todayISO, onUpdateAdmin, onC
           <h3 className="subheading">Exactly what leaves the device</h3>
           <pre className="plan-pre pack-preview-text" aria-label="Pack preview">{text}</pre>
           <div className="btn-row"><button type="button" className="btn-primary" onClick={() => downloadFile(`review-pack-${pack.title.replace(/[^\w-]+/g, '-').toLowerCase()}.txt`, text, 'text/plain')}>Export this text</button></div>
+          <h3 className="subheading">Share with a mentor</h3>
+          {!space ? (
+            <p className="filter-hint">Turn on mentor access in Settings → Data &amp; devices to share this pack with a mentor through the portal.</p>
+          ) : !mentors ? (
+            <p className="filter-hint">Loading your mentors…</p>
+          ) : mentors.mentors.filter((m) => !m.revokedAt).length === 0 ? (
+            <p className="filter-hint">No active mentor yet — create an invitation in Settings → Data &amp; devices → Mentor access.</p>
+          ) : (
+            <>
+              <ul className="setup-list" aria-label="Share with">
+                {mentors.mentors.filter((m) => !m.revokedAt).map((m) => (
+                  <li key={m.id} className="setup-row"><label className="toggle-row"><input type="checkbox" checked={shareWith.includes(m.id)} onChange={(e) => setShareWith(e.target.checked ? [...shareWith, m.id] : shareWith.filter((x) => x !== m.id))} /><span>{m.name}</span></label></li>
+                ))}
+              </ul>
+              {(pack.attachments ?? []).length > 0 && (
+                <ul className="setup-list" aria-label="Attachments to share">
+                  {(pack.attachments ?? []).filter((a) => attachmentState(a.id) === 'local-only').map((a) => (
+                    <li key={a.id} className="setup-row"><label className="toggle-row"><input type="checkbox" checked={shareAtt.includes(a.id)} onChange={(e) => setShareAtt(e.target.checked ? [...shareAtt, a.id] : shareAtt.filter((x) => x !== a.id))} /><span>{a.name} <span className="filter-hint">(encrypted on this device before upload, up to 2 MB)</span></span></label></li>
+                  ))}
+                </ul>
+              )}
+              <p className="filter-hint">They receive exactly the text above{shareAtt.length ? ` and ${shareAtt.length} attachment${shareAtt.length === 1 ? '' : 's'}` : ''}. Feedback they write comes back signed as reviewer-authenticated.</p>
+              <div className="btn-row">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={busy || shareWith.length === 0}
+                  onClick={() => {
+                    setBusy(true)
+                    setShareMsg(null)
+                    void (async () => {
+                      try {
+                        const files = []
+                        for (const id of shareAtt) {
+                          const w = wallet.find((x) => x.id === id)
+                          if (w) files.push({ id, name: w.name, bytes: await fileToBytes(w.blob) })
+                        }
+                        const res = await sharePack(settings, space, { id: pack.id, title: pack.title, text }, shareWith, files)
+                        setShareMsg(`Shared with ${shareWith.length} mentor${shareWith.length === 1 ? '' : 's'}${res.attachments ? ` · ${res.attachments} attachment${res.attachments === 1 ? '' : 's'} on the server` : ''}.`)
+                        setShareWith([])
+                        setShareAtt([])
+                      } catch (e) {
+                        setShareMsg(e instanceof Error ? e.message : 'Could not share the pack.')
+                      } finally {
+                        setBusy(false)
+                      }
+                    })()
+                  }}
+                >
+                  Share pack
+                </button>
+                <button
+                  type="button"
+                  className="btn-today-reset"
+                  disabled={busy}
+                  onClick={() => {
+                    setBusy(true)
+                    void (async () => {
+                      try {
+                        const items = await fetchInbox(settings, space, 0)
+                        const added = absorbInbox(admin, items, todayISO).added
+                        onUpdateAdmin((prev) => absorbInbox(prev, items, todayISO).file)
+                        onUpdateSettings({ mentorInboxAt: Date.now() })
+                        setShareMsg(added > 0 ? `${added} new feedback record${added === 1 ? '' : 's'} added (reviewer-authenticated).` : 'No new feedback.')
+                      } catch (e) {
+                        setShareMsg(e instanceof Error ? e.message : 'Could not check for feedback.')
+                      } finally {
+                        setBusy(false)
+                      }
+                    })()
+                  }}
+                >
+                  Check for feedback
+                </button>
+              </div>
+              {shareMsg && <p className="filter-hint" role="status">{shareMsg}</p>}
+            </>
+          )}
         </section>
       )}
     </Dialog>

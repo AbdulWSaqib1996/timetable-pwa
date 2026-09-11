@@ -72,6 +72,8 @@ export interface Observation {
   cycleId?: string
   /** bumped on every edit after the first save — a reviewed record never changes silently */
   revision?: number
+  /** G4: present only on reviewer-authenticated feedback that came through the mentor portal */
+  attestation?: { spaceId: string; mentorId: string; mentorName: string; feedbackId: string; at: number; sig: string }
   at: number
 }
 

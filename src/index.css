@@ -6042,3 +6042,4 @@ button.workspace-row { cursor: pointer; }
 .sheet-examples select, .sheet-examples input, .sheet-packs select, .sheet-packs input, .sheet-experience select, .sheet-experience input, .sheet-reviews select, .sheet-reviews input { max-width: 100%; min-width: 0; box-sizing: border-box; }
 .whatsnew-banner { margin: 12px 0; }
 .whatsnew-banner .whatsnew-list { margin: 6px 0 10px; padding-left: 18px; }
+.sheet-packs .setup-list { margin: 6px 0; }

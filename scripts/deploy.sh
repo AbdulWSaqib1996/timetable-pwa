@@ -96,6 +96,7 @@ verify() {
   curl -s -D - -o /dev/null "$FEED_BASE/?id=$SHEET_ID&gid=$SHEET_GID" | grep -qi 'cache-control: public, max-age=900' \
     && ok "feed worker + cache header" || bad "feed worker cache header"
   [ "$(curl -s -o /dev/null -w '%{http_code}' "${VERCEL_URL}analytics.html")" = "200" ] && ok "analytics dashboard 200" || bad "analytics dashboard"
+  [ "$(curl -s -o /dev/null -w '%{http_code}' "${VERCEL_URL}mentor.html")" = "200" ] && ok "mentor portal 200" || bad "mentor portal"
   [ "$FAILED" -eq 0 ] || exit 1
 }
 

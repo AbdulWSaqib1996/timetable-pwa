@@ -296,7 +296,7 @@ export function LessonWorkbench({ lessonId: initialId, admin, sessions, placemen
             {feedbackList.map((o) => (
               <li key={o.id} className="workspace-row feedback-row">
                 <span>
-                  <span className="tag">{provenanceLabel(o.sourceType)}</span>{o.observer ? ` ${o.observer}` : ''}{o.revision ? <span className="filter-hint"> · rev {o.revision}</span> : null}
+                  <span className={`tag${o.attestation ? ' tag--teal' : ''}`}>{provenanceLabel(o.sourceType)}{o.attestation ? ` · ${o.attestation.mentorName}` : ''}</span>{o.observer && !o.attestation ? ` ${o.observer}` : ''}{o.revision ? <span className="filter-hint"> · rev {o.revision}</span> : null}
                   {o.strengths && <p><strong>Strengths</strong> {o.strengths}</p>}
                   {o.development && <p><strong>Develop</strong> {o.development}</p>}
                 </span>

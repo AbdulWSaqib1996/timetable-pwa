@@ -138,6 +138,11 @@ export interface Settings {
   groupMemberId?: string
   /** device-held membership capability — never synced to other devices */
   groupToken?: string
+  /** G4 mentor portal: the learner's space id and owner token (synced between the learner's own devices) */
+  mentorSpaceId?: string
+  mentorOwnerToken?: string
+  /** last time the mentor inbox was pulled (ms) */
+  mentorInboxAt?: number
   /** saved default origin id for the journey home (NF-06 groundwork) */
   defaultOriginHome?: string
   /** versioned course configuration (P7-01); absent = UCL Primary PGCE built-in */

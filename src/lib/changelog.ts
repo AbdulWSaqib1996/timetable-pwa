@@ -7,6 +7,16 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 8,
+    dateISO: '2026-09-11',
+    title: 'Mentor portal',
+    items: [
+      'Invite a mentor or tutor to a portal where they see only the review packs you share (Settings → Data & devices → Mentor access)',
+      'Share a review pack from the PGCE file, with attachments encrypted on your device before upload',
+      'Their feedback arrives signed as reviewer-authenticated — shown with their name, never editable, and you can end anyone’s access at any time',
+    ],
+  },
+  {
     version: 7,
     dateISO: '2026-09-11',
     title: 'PGCE file: placements, lessons, knowledge, workload, evidence',
