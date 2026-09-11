@@ -1378,7 +1378,7 @@ Automated checks + results: `tests/unit/pgce-g3.test.mjs` (6: pinned snapshots s
 
 Archive: on completion of this pass the package (then `pgce-student-audit-2026-09-10/`) moved to `archive/enhancements/2026-09-11-pgce-student-experience/` with a README (audit, plan, designs, evidence). Production code, permanent tests and runbooks stay in place; G4 (mentor portal) remains out unless separately requested.
 
-Released 11 September 2026: workers deployed first (push `5c7f4c96-a7f3-46f8-9c1f-0d6086a99484`, feed `92857cd7-50f9-44f0-a4ae-a59836eb1232`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` six PASS.
+Released 11 September 2026: workers deployed first (push `5c7f4c96-a7f3-46f8-9c1f-0d6086a99484`, feed `92857cd7-50f9-44f0-a4ae-a59836eb1232`); merge `1e1a47d`, CI run __CI__ success, `deploy.sh verify` six PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
