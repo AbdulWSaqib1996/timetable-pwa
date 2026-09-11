@@ -5,6 +5,21 @@ import { useEffect, useRef } from 'react'
  * sheet, focus moves into the dialog on open and returns to the opener on close.
  * Attach the returned ref to the .modal-card element (alongside aria-modal).
  */
+// The element focused most recently OUTSIDE any dialog: a sheet whose first
+// field autofocuses would otherwise remember its own input as the "opener"
+// and return focus nowhere when it closes (V5 keyboard check).
+let lastOutsideDialog: HTMLElement | null = null
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'focusin',
+    (e) => {
+      const target = e.target as HTMLElement | null
+      if (target && !target.closest('[role="dialog"]')) lastOutsideDialog = target
+    },
+    true
+  )
+}
+
 export function useModalA11y<T extends HTMLElement>(onClose: () => void) {
   const ref = useRef<T | null>(null)
   const onCloseRef = useRef(onClose)
@@ -12,7 +27,8 @@ export function useModalA11y<T extends HTMLElement>(onClose: () => void) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const opener = document.activeElement as HTMLElement | null
+    const active = document.activeElement as HTMLElement | null
+    const opener = active && !active.closest('[role="dialog"]') ? active : lastOutsideDialog
     // Focus the dialog itself, not its first control — focusing an input would
     // pop the keyboard on mobile.
     el.setAttribute('tabindex', '-1')
@@ -44,7 +60,7 @@ export function useModalA11y<T extends HTMLElement>(onClose: () => void) {
     el.addEventListener('keydown', onKey)
     return () => {
       el.removeEventListener('keydown', onKey)
-      opener?.focus?.({ preventScroll: true })
+      if (opener && opener.isConnected) opener.focus({ preventScroll: true })
     }
   }, [])
   return ref

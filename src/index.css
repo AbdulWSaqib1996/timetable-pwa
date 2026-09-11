@@ -5885,3 +5885,45 @@ p.detail-title-sub {
   color: var(--accent);
   font-weight: 700;
 }
+/* V5: at very narrow widths or 200% text the header actions wrap under the title instead of clipping. */
+.page-header-row {
+  flex-wrap: wrap;
+}
+.page-actions {
+  flex-shrink: 0;
+}
+.today-hero-actions {
+  flex-wrap: wrap;
+}
+.today-hero-actions > * {
+  min-width: 0;
+}
+/* V5: intrinsic-width controls must be allowed to shrink at extreme widths / 200% text. */
+.segmented {
+  min-width: 0;
+  max-width: 100%;
+}
+.segment {
+  min-width: 0;
+  flex: 1 1 0;
+}
+.searchbox input,
+.task-search,
+.searchbar input {
+  min-width: 0;
+  width: 100%;
+}
+.section-head .notif-state {
+  white-space: normal;
+  max-width: 100%;
+  text-align: right;
+}
+.badge,
+.kd-chip,
+.tag {
+  max-width: 100%;
+  white-space: normal;
+}
+.task-card .kd-chip {
+  text-align: left;
+}
