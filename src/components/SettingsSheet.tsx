@@ -75,6 +75,8 @@ interface Props {
   onOpenStats: () => void
   onOpenGroup: () => void
   onOpenCourse: () => void
+  /** G1a: PG-01 programme roadmap sheet */
+  onOpenProgramme?: () => void
   onRechooseSpecialisms: () => void
   onSwitchProfile: (id: string) => void
   onAddProfile: () => void
@@ -235,6 +237,7 @@ export function SettingsSheet({
   onOpenStats,
   onOpenGroup,
   onOpenCourse,
+  onOpenProgramme,
   onRechooseSpecialisms,
   onSwitchProfile,
   onAddProfile,
@@ -944,6 +947,23 @@ export function SettingsSheet({
             Course setup
           </button>
         </section>
+
+        {onOpenProgramme && (
+          <section className="filter-section" id="programme">
+            <div className="section-head">
+              <span className="ui-tile ui-tile--violet" aria-hidden="true">
+                <IconCalendar />
+              </span>
+              <h3>Programme</h3>
+            </div>
+            <p className="filter-hint">
+              Your route, provider and year, the requirement packs you import, and dated milestones. Requirements stay “Unconfirmed” until you confirm each one from its source — no day target is built in.
+            </p>
+            <button type="button" className="btn-secondary" onClick={onOpenProgramme}>
+              Programme
+            </button>
+          </section>
+        )}
 
         <section className="filter-section">
           <div className="section-head">

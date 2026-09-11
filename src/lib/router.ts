@@ -14,7 +14,7 @@ export type Route =
   | { name: 'settings'; section?: string }
   | { name: 'session'; key: string }
   | { name: 'homeJourney' }
-  | { name: 'placement' }
+  | { name: 'placement'; id?: string; leg?: 'out' | 'back' }
   /** local Find anything search (R4 / NF-01) */
   | { name: 'find' }
   /** untrusted hash that could not be opened (R1 / TT-08) */
@@ -39,7 +39,7 @@ export function routeHash(route: Route): string {
     case 'homeJourney':
       return '#/home'
     case 'placement':
-      return '#/placement'
+      return route.id ? `#/placement/${encodeURIComponent(route.id)}${route.leg ? `/journey/${route.leg}` : ''}` : '#/placement'
     case 'find':
       return '#/find'
     case 'invalid':

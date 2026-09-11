@@ -61,6 +61,8 @@ interface Props {
   onClose: () => void
   /** the Journey home screen (V3 design: the return trip is a separate destination) */
   onOpenHomeJourney?: () => void
+  /** G1a: `SE2 · <school>` from the session's block mapping */
+  placementLabel?: string
 }
 
 function formatLongDate(dateISO: string): string {
@@ -114,6 +116,7 @@ export function SessionDetail({
   onSetArrivalBuffer,
   backLabel = 'Back',
   placementInfo,
+  placementLabel,
   onPlacementInfo,
   onMeta,
   onClose,
@@ -273,6 +276,7 @@ export function SessionDetail({
         <span className={`tag ${isTask ? 'tag--amber' : 'tag--teal'} badge-kind`}>
           {isTask ? <IconNote size={15} /> : <IconBook size={15} />} {isTask ? 'Key date' : sessionKindLabel(session)}
         </span>
+        {placementLabel && <span className="tag tag--teal badge-kind detail-placement-label">{placementLabel}</span>}
         <h2 className="detail-title">
           {titleSplit ? (
             <>

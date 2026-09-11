@@ -279,9 +279,14 @@ test('TT-20: PGCE shows four section cards, one dominant action each, record typ
   for (const name of ['Placement', 'Evidence & reflections', 'Development', 'Documents']) {
     await expect(page.getByRole('heading', { level: 2, name })).toBeVisible()
   }
+  // G1a: five cards — Placements (one primary per SE card inside it), Programme roadmap, and the original three.
   const cards = page.locator('.pgce-section')
-  await expect(cards).toHaveCount(4)
-  for (let i = 0; i < 4; i++) await expect(cards.nth(i).locator('.btn-primary')).toHaveCount(1)
+  await expect(cards).toHaveCount(5)
+  for (let i = 0; i < 5; i++) {
+    const primaries = await cards.nth(i).locator('.btn-primary').count()
+    const placementCards = await cards.nth(i).locator('.placement-card').count()
+    expect(primaries === 1 || primaries === placementCards, `card ${i}: ${primaries} primaries`).toBe(true)
+  }
   // V4: destination-named links replaced the four vague "View all" controls.
   await expect(page.getByRole('button', { name: /View all/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'All development records →' })).toBeVisible()

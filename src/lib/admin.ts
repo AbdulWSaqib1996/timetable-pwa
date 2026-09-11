@@ -194,6 +194,68 @@ export interface PlacementRec {
   at: number
 }
 
+/** PG-01 (G1a): the learner's course profile — facts entered by them, one record (id 'course'). */
+export interface ProgrammeProfileRec {
+  id: string
+  route: 'pgce-qts' | 'pgce' | 'qts-only' | 'other'
+  jurisdiction?: string
+  academicYear?: string
+  providerLabel?: string
+  phase?: 'primary' | 'secondary' | 'other'
+  subject?: string
+  ageRange?: string
+  startISO?: string
+  endISO?: string
+  mode?: 'full-time' | 'part-time'
+  at: number
+}
+
+/** An imported requirements pack: who wrote it and which version is applied. */
+export interface ProgrammePackRec {
+  id: string
+  label: string
+  ownerSource: 'provider' | 'dfe' | 'school' | 'self' | 'other'
+  url?: string
+  fileRef?: string
+  version: number
+  importedAt?: number
+  notes?: string
+  at: number
+}
+
+/** One requirement from a pack. Verification is the learner's act only. */
+export interface RequirementRec {
+  id: string
+  packId: string
+  packVersion?: number
+  section: string
+  title: string
+  applicability?: string
+  effectiveFromISO?: string
+  effectiveToISO?: string
+  plannedValue?: string
+  unit?: string
+  verification: 'unconfirmed' | 'confirmed'
+  confirmedSource?: string
+  confirmedAt?: number
+  at: number
+}
+
+/** A dated programme milestone; `done` is set by the learner, never inferred. */
+export interface MilestoneRec {
+  id: string
+  packId?: string
+  packVersion?: number
+  kind: 'academic' | 'training' | 'review'
+  title: string
+  dateISO: string
+  sourceRef?: string
+  state: 'planned' | 'done'
+  doneISO?: string
+  notes?: string
+  at: number
+}
+
 export interface AdminFile {
   /** written by this client (contracts ADMIN_SCHEMA_VERSION); older files have none */
   schemaVersion?: number
@@ -210,6 +272,10 @@ export interface AdminFile {
   commitments: CommitmentRec[]
   placements: PlacementRec[]
   schools: SchoolLocationRec[]
+  programmes: ProgrammeProfileRec[]
+  packs: ProgrammePackRec[]
+  requirements: RequirementRec[]
+  milestones: MilestoneRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -225,6 +291,10 @@ export const EMPTY_ADMIN: AdminFile = {
   commitments: [],
   placements: [],
   schools: [],
+  programmes: [],
+  packs: [],
+  requirements: [],
+  milestones: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`
@@ -287,6 +357,52 @@ export function placementLabel(placement: PlacementRec, schools: SchoolLocationR
 }
 
 export interface PlacementSetupResult { placements: PlacementRec[]; schools: SchoolLocationRec[] }
+
+export type PlacementSetupState = 'not-set-up' | 'incomplete' | 'ready'
+export type PlacementTiming = 'undated' | 'upcoming' | 'current' | 'finished'
+
+/** Setup state shown on the chooser: Not set up / School details incomplete / Ready to plan.
+ *  "Ready" needs a named school with a pin the learner has confirmed — an
+ *  address alone is never treated as verified. */
+export function placementSetupState(placement: PlacementRec | undefined, school: SchoolLocationRec | undefined): PlacementSetupState {
+  if (!placement) return 'not-set-up'
+  if (!school?.name || school.lat == null || school.lng == null || !school.confirmedAt) return 'incomplete'
+  return 'ready'
+}
+
+export function placementTiming(placement: PlacementRec | undefined, todayISO: string): PlacementTiming {
+  if (!placement?.startISO || !placement.endISO) return 'undated'
+  if (todayISO < placement.startISO) return 'upcoming'
+  if (todayISO > placement.endISO) return 'finished'
+  return 'current'
+}
+
+export const PLACEMENT_STATE_LABEL: Record<PlacementSetupState, string> = { 'not-set-up': 'Not set up', incomplete: 'School details incomplete', ready: 'Ready to plan' }
+export const PLACEMENT_TIMING_LABEL: Record<PlacementTiming, string> = { undated: 'Dates not set', upcoming: 'Upcoming', current: 'Current', finished: 'Finished' }
+
+export const schoolOf = (placement: PlacementRec | undefined, schools: SchoolLocationRec[]): SchoolLocationRec | undefined =>
+  placement?.schoolLocationId ? schools.find((s) => s.id === placement.schoolLocationId) : undefined
+
+/**
+ * Save one placement's setup (G1a). Pure: the returned arrays hold the SAME
+ * object references for every other placement and school, so saving SE2 can
+ * never modify SE1 or SE3 (the test compares them byte for byte).
+ */
+export function savePlacementSetup(
+  current: PlacementSetupResult,
+  placement: PlacementRec,
+  school: SchoolLocationRec | null
+): PlacementSetupResult {
+  const placements = current.placements.some((p) => p.id === placement.id)
+    ? current.placements.map((p) => (p.id === placement.id ? placement : p))
+    : [...current.placements, placement]
+  const schools = !school
+    ? current.schools
+    : current.schools.some((s) => s.id === school.id)
+      ? current.schools.map((s) => (s.id === school.id ? school : s))
+      : [...current.schools, school]
+  return { placements, schools }
+}
 
 /**
  * Apply a confirmed tag → placement assignment (G0 migration sheet). Pure and

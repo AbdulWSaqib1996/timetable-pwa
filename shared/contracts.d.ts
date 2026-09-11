@@ -1,6 +1,6 @@
 export const MAX_BACKUP_BYTES: number
 export const MAX_SYNC_BYTES: number
-export const collections: readonly ['reflections','targets','meetings','observations','lessons','audits','tasks','exceptions','plans','commitments','placements','schools']
+export const collections: readonly ['reflections','targets','meetings','observations','lessons','audits','tasks','exceptions','plans','commitments','placements','schools','programmes','packs','requirements','milestones']
 export const optionalCollections: readonly string[]
 export const clientSourceTypes: readonly ['personal-reflection','learner-entered']
 export const ADMIN_SCHEMA_VERSION: number

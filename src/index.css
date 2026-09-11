@@ -5935,3 +5935,57 @@ p.detail-title-sub {
 .setup-row select { flex: 0 0 auto; min-width: 7.5rem; }
 .setup-summary li, .pgce-placement-list li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.92rem; }
 .placement-block-code { margin-left: 8px; font-size: 13px; vertical-align: middle; }
+
+/* G1a — placement chooser, setup flow, workspace, journeys, programme */
+.pgce-section--wide { grid-column: 1 / -1; }
+.placement-chooser-list { list-style: none; margin: 12px 0 4px; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); min-width: 0; }
+.placement-card-facts, .placement-card-head, .placement-card-title { min-width: 0; }
+.kv > div { grid-template-columns: minmax(4rem, 6.5rem) 1fr; }
+.placement-card { height: 100%; display: flex; flex-direction: column; gap: 10px; }
+.placement-card-head { display: flex; gap: 12px; align-items: flex-start; }
+.placement-card-title h3 { margin: 0; font-size: 1.05rem; }
+.placement-card-school { font-weight: 500; }
+.placement-card-state { margin: 4px 0 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.placement-card--1 .placement-card-tile { background: rgba(59, 91, 219, 0.12); color: #3b5bdb; }
+.placement-card--2 .placement-card-tile { background: rgba(13, 148, 136, 0.12); color: #0d9488; }
+.placement-card--3 .placement-card-tile { background: rgba(124, 58, 237, 0.12); color: #7c3aed; }
+.tag--ready { background: rgba(13, 148, 136, 0.14); color: #0f766e; }
+.tag--incomplete { background: rgba(217, 119, 6, 0.14); color: #b45309; }
+.tag--not-set-up { opacity: 0.85; }
+.kv { display: grid; gap: 6px; margin: 0; }
+.kv > div { display: grid; grid-template-columns: 6.5rem 1fr; gap: 8px; font-size: 0.92rem; }
+.kv dt { margin: 0; opacity: 0.7; }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.placement-chooser-links { margin-top: 8px; }
+.setup-steps { list-style: none; display: flex; gap: 6px; flex-wrap: wrap; padding: 0; margin: 8px 0 12px; font-size: 13px; }
+.setup-steps li { padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,0.06); }
+.setup-steps li.is-current { background: rgba(59, 91, 219, 0.16); font-weight: 650; }
+.setup-steps li.is-done { opacity: 0.7; }
+.setup-nav { margin-top: 12px; }
+.pin-confirm { display: grid; gap: 10px; margin: 10px 0; }
+.callout { padding: 12px 14px; border-radius: 14px; background: rgba(0,0,0,0.05); display: grid; gap: 8px; }
+.callout--amber { background: rgba(245, 158, 11, 0.14); }
+.callout p { margin: 0; }
+.workspace-list { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 6px; }
+.workspace-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,0.04); border: 0; font: inherit; color: inherit; }
+button.workspace-row { cursor: pointer; }
+.requirement-row { flex-wrap: wrap; }
+.requirement-confirm { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.requirement-confirm input { min-width: 0; flex: 1 1 10rem; }
+.hero--placement { display: grid; gap: 12px; padding: 16px; }
+.roadmap-lines { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; font-size: 0.92rem; }
+.roadmap-lines li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.travel-od-when { margin: 6px 0 0; }
+.detail-placement-label { margin-left: 6px; }
+.pack-preview ul { margin: 6px 0; padding-left: 18px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .setup-steps li, :root:not([data-theme='light']) .workspace-row, :root:not([data-theme='light']) .callout { background: rgba(255,255,255,0.08); }
+  :root:not([data-theme='light']) .callout--amber { background: rgba(245, 158, 11, 0.2); }
+}
+:root[data-theme='dark'] .setup-steps li, :root[data-theme='dark'] .workspace-row, :root[data-theme='dark'] .callout { background: rgba(255,255,255,0.08); }
+:root[data-theme='dark'] .callout--amber { background: rgba(245, 158, 11, 0.2); }
+.admin-placement { align-self: flex-start; margin-bottom: 4px; }
+.placement-card-state .tag, .roadmap-lines .tag { font-size: 14px; }
+/* G1a — programme sheet tabs wrap on narrow screens instead of overlapping */
+.sheet-programme .segmented { flex-wrap: wrap; }
+.sheet-programme .segment { flex: 1 1 calc(50% - 4px); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
