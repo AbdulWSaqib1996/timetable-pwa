@@ -1287,3 +1287,9 @@ Checks and results:
 - `npm run validate` AND `VERCEL=1 npm run validate` green — **162 unit and 146 browser tests**.
 
 Archive: `visual-ui-audit-2026-09-10/` moved to `archive/enhancements/2026-09-10-visual-ui/` (audit, batch plan, gap audit, designs incl. `design.css` and the gallery, evidence, capture matrix) with a README listing completed IDs (B-01, FA-01–07, V-01–V-10, look-and-feel) and verification results; relative links unchanged; PLAN.md carries an archive note at the top. Production source, permanent tests and runbooks stayed in place. The PGCE student-experience audit (`pgce-student-audit-2026-09-10/`) is a separate, unstarted package and stays at the root.
+
+Released 11 September 2026: merge `78a1936`; Vercel deployed and `deploy.sh verify` six PASS. CI run 34581806662 failed its first attempt on two telemetry-timing tests (`admin-a4` task_created/task_completed counts, `admin-a2` usage toggle — both green locally in every gate and on the previous five CI runs) and passed on rerun of the failed job. No worker change. The visual UI audit is complete and archived.
+
+### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
+
+The owner asked for the deployment of `pgce-student-audit-2026-09-10/PGCE_QTS_STUDENT_EXPERIENCE_AUDIT.md` to be planned in batches. The plan is [pgce-student-audit-2026-09-10/DEVELOPMENT_PLAN.md](pgce-student-audit-2026-09-10/DEVELOPMENT_PLAN.md): G0 (Pass 68) placement/provenance foundations and a reviewable tag migration; G1a (Pass 69) P1/P2/P3 school workspaces with outward/return journeys plus the course-aware roadmap; G1b (Pass 70) lesson workbench, practice cycle and mentor preparation; G2 (Pass 71) knowledge goals, academic workspace, workload; G3 (Pass 72) evidence narratives, experience ledger, review packs; G4 (portal) only on a separate go-ahead. Owner questions are in its §5. Nothing is implemented until "Run G0".
