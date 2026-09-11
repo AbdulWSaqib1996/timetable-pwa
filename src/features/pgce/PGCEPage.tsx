@@ -29,6 +29,8 @@ interface Props {
   onSetUpPlacement: (code: PlacementCode, id?: string) => void
   onJourney: (id: string, leg: 'out' | 'back') => void
   onOpenProgramme: () => void
+  onOpenPractice: () => void
+  onOpenPrep: () => void
 }
 
 /**
@@ -60,6 +62,8 @@ export function PGCEPage({
   onSetUpPlacement,
   onJourney,
   onOpenProgramme,
+  onOpenPractice,
+  onOpenPrep,
 }: Props) {
   const [walletCount, setWalletCount] = useState<number | null>(null)
   useEffect(() => {
@@ -209,6 +213,8 @@ export function PGCEPage({
                 { label: `Observations (${admin.observations.length})`, onSelect: () => onOpenAdmin('obs') },
                 { label: `Lessons (${admin.lessons.length})`, onSelect: () => onOpenAdmin('lessons') },
                 { label: `Audits (${admin.audits.length})`, onSelect: () => onOpenAdmin('audits') },
+                { label: `Practice focus (${(admin.cycles ?? []).filter((c) => c.state !== 'archived').length})`, onSelect: onOpenPractice },
+                { label: `Mentor preparation (${(admin.preps ?? []).length})`, onSelect: onOpenPrep },
               ]}
             />
             <button type="button" className="btn-today-reset" onClick={() => onOpenAdmin('overview')}>

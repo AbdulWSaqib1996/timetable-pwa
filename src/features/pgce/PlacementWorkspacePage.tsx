@@ -21,6 +21,8 @@ interface Props {
   onJourney: (leg: 'out' | 'back') => void
   onOpenAdmin: (tab: AdminTab) => void
   onOpenJournal: () => void
+  /** G1b: open a lesson in the workbench */
+  onOpenLesson: (lessonId: string) => void
   onOpenSession: (session: Session) => void
   onAll: () => void
 }
@@ -37,7 +39,7 @@ const fmtDate = (iso: string) => {
  * each linking back to the record editors. Rows show `SE2 · <school>` from the
  * session's mapping, never from which placement happens to be open.
  */
-export function PlacementWorkspacePage({ placement, school, settings, admin, sessions, metaMap, todayISO, onBack, onEdit, onJourney, onOpenAdmin, onOpenJournal, onOpenSession, onAll }: Props) {
+export function PlacementWorkspacePage({ placement, school, settings, admin, sessions, metaMap, todayISO, onBack, onEdit, onJourney, onOpenAdmin, onOpenJournal, onOpenLesson, onOpenSession, onAll }: Props) {
   const state = placementSetupState(placement, school)
   const timing = placementTiming(placement, todayISO)
   const policy = placementPolicy(settings)
@@ -151,8 +153,9 @@ export function PlacementWorkspacePage({ placement, school, settings, admin, ses
             <ul className="workspace-list" aria-label="Lessons">
               {lessons.slice(0, 6).map((l) => (
                 <li key={l.id}>
-                  <button type="button" className="workspace-row" onClick={() => onOpenAdmin('lessons')}>
+                  <button type="button" className="workspace-row" onClick={() => onOpenLesson(l.id)}>
                     <span>{fmtDate(l.dateISO)} · {l.subject || 'Lesson'}{l.classGroup ? ` · ${l.classGroup}` : ''}</span>
+                    <span className="tag">{l.stage ?? 'plan'}</span>
                   </button>
                 </li>
               ))}

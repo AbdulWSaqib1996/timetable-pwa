@@ -39,6 +39,11 @@ const StudyGroupSheet = lazy(() => import('./components/StudyGroupSheet').then((
 const CourseSheet = lazy(() => import('./components/CourseSheet').then((m) => ({ default: m.CourseSheet })))
 const PlacementSetupFlow = lazy(() => import('./components/PlacementSetupFlow').then((m) => ({ default: m.PlacementSetupFlow })))
 const ProgrammeSheet = lazy(() => import('./components/ProgrammeSheet').then((m) => ({ default: m.ProgrammeSheet })))
+// G1b: the workbench, practice and preparation sheets ship in the main bundle so the
+// full cycle works offline once the app has loaded (a lazy chunk cannot be fetched then).
+import { LessonWorkbench } from './components/LessonWorkbench'
+import { PracticeSheet } from './components/PracticeSheet'
+import { MentorPrepSheet } from './components/MentorPrepSheet'
 import { sendTelemetry } from './lib/analytics'
 import { configureTelemetry } from './lib/telemetry'
 import { loadSyncState as loadSyncStateForPing } from './lib/sync'
@@ -86,6 +91,11 @@ import { PlacementJourneyPage } from './features/pgce/PlacementJourneyPage'
 import { placementForTag, placementLabel, schoolOf } from './lib/admin'
 import type { PlacementCode } from './lib/admin'
 import type { PlacementMirror } from './components/PlacementSetupFlow'
+import { newAdminId, placementLabel as placementLabelOf } from './lib/admin'
+import type { Lesson, LessonStage } from './lib/admin'
+import { deriveNextSteps, loadNextStepPrefs, saveNextStepPrefs } from './lib/nextSteps'
+import type { NextStepPrefs } from './lib/nextSteps'
+import type { NextStep } from '../shared/practice.js'
 import { TaskEditSheet } from './components/TaskEditSheet'
 import { fetchNotices, loadDismissedNotices, dismissNotice } from './lib/notices'
 import type { Notice } from './lib/notices'
@@ -114,7 +124,7 @@ import type {
   ViewMode,
 } from './types'
 
-type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek' | 'placementSetup' | 'placementFlow' | 'programme'
+type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek' | 'placementSetup' | 'placementFlow' | 'programme' | 'workbench' | 'practice' | 'prep'
 
 /** How often a visible device pulls the other devices' changes (10 Sep 2026). */
 const SYNC_POLL_MS = 3 * 60_000
@@ -142,6 +152,9 @@ export default function App() {
   const [openSheet, setOpenSheet] = useState<SheetName>('none')
   /** which placement the setup flow edits (G1a): a code for a new one, an id for an existing one */
   const [flowTarget, setFlowTarget] = useState<{ code?: PlacementCode; id?: string }>({})
+  /** G1b: which lesson the workbench shows, and on which stage */
+  const [workbench, setWorkbench] = useState<{ lessonId: string; stage?: LessonStage } | null>(null)
+  const [stepPrefs, setStepPrefs] = useState<NextStepPrefs>({ dismissed: [], pinned: [] })
   const [rechoosing, setRechoosing] = useState(false)
   // One date-selection model shared by Day/Week/Month (null = follow today).
   const [selectedDateISO, setSelectedDateISO] = useState<string | null>(null)
@@ -217,6 +230,41 @@ export default function App() {
       }
     }
     updateSettings({ placements: { ...current, ...patch } })
+  }
+
+  /** G1b: placement options shared by the editors and the workbench */
+  const placementOptions = useMemo(
+    () => (adminFile.placements ?? []).map((p) => ({ value: p.id, label: placementLabelOf(p, adminFile.schools ?? []) })),
+    [adminFile.placements, adminFile.schools]
+  )
+  useEffect(() => {
+    setStepPrefs(active ? loadNextStepPrefs(active.id) : { dismissed: [], pinned: [] })
+  }, [active?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const updateStepPrefs = (fn: (p: NextStepPrefs) => NextStepPrefs) => {
+    setStepPrefs((p) => {
+      const next = fn(p)
+      if (active) saveNextStepPrefs(active.id, next)
+      return next
+    })
+  }
+  const nextStepsToday: NextStep[] = useMemo(() => deriveNextSteps(adminFile, todayISO, stepPrefs), [adminFile, todayISO, stepPrefs])
+  /** A rehearsal block through the canonical plan model (task + timed block), never a new block type. */
+  const addRehearsalBlock = (lesson: Lesson, block: { dateISO: string; startTime: string; endTime: string }) => {
+    const now = Date.now()
+    const [sh, sm] = block.startTime.split(':').map(Number)
+    const [eh, em] = block.endTime.split(':').map(Number)
+    const effortMins = Math.max(5, eh * 60 + em - (sh * 60 + sm))
+    updateAdmin((file) => {
+      const existing = lesson.rehearsalTaskId ? file.tasks.find((t) => t.id === lesson.rehearsalTaskId) : undefined
+      const task = existing ?? { id: newAdminId(), title: `Rehearse: ${lesson.subject || 'lesson'}`, dueISO: lesson.dateISO || block.dateISO, status: 'todo' as const, at: now }
+      const child = { id: newAdminId(), parentId: task.id, kind: 'block' as const, title: `Rehearse ${lesson.subject || 'lesson'}`, dateISO: block.dateISO, startTime: block.startTime, endTime: block.endTime, effortMins, at: now }
+      return {
+        ...file,
+        tasks: existing ? file.tasks : [...file.tasks, task],
+        plans: [...file.plans, child],
+        lessons: file.lessons.map((l) => (l.id === lesson.id ? { ...l, rehearsalTaskId: task.id } : l)),
+      }
+    })
   }
 
   const goBackOr = (fallback: Route) => {
@@ -1368,6 +1416,10 @@ export default function App() {
                 setOpenSheet('admin')
               }}
               onOpenJournal={() => setOpenSheet('journal')}
+              onOpenLesson={(lessonId) => {
+                setWorkbench({ lessonId })
+                setOpenSheet('workbench')
+              }}
               onOpenSession={(s) => navigate({ name: 'session', key: sessionKey(s) })}
               onAll={() => navigate({ name: 'placement' })}
             />
@@ -1460,6 +1512,8 @@ export default function App() {
           }}
           onJourney={(id, leg) => navigate({ name: 'placement', id, leg })}
           onOpenProgramme={() => setOpenSheet('programme')}
+          onOpenPractice={() => setOpenSheet('practice')}
+          onOpenPrep={() => setOpenSheet('prep')}
           onOpenSettings={() => navigate({ name: 'settings' })}
         />
       ) : route.name === 'schedule' ? (
@@ -1526,6 +1580,17 @@ export default function App() {
           onOpenSchedule={() => navigate({ name: 'schedule' })}
           personalSessions={settings && getFilters(settings).showPersonal === false ? [] : personalSessions}
           onOpenHomeJourney={() => navigate({ name: 'homeJourney' })}
+          nextSteps={nextStepsToday}
+          onOpenStep={(step) => {
+            if (step.kind === 'focus') setOpenSheet('practice')
+            else if (step.kind === 'prep') setOpenSheet('prep')
+            else if (step.lessonId) {
+              setWorkbench({ lessonId: step.lessonId, stage: step.kind === 'review' ? 'review' : step.kind === 'rehearse' ? 'rehearse' : 'plan' })
+              setOpenSheet('workbench')
+            }
+          }}
+          onDismissStep={(id) => updateStepPrefs((p) => ({ ...p, dismissed: [...p.dismissed.filter((d) => d.id !== id), { id, dateISO: todayISO }] }))}
+          onPinStep={(id, pinned) => updateStepPrefs((p) => ({ ...p, pinned: pinned ? [...p.pinned.filter((x) => x !== id), id] : p.pinned.filter((x) => x !== id) }))}
         />
       )}
 
@@ -1724,6 +1789,36 @@ export default function App() {
         <ProgrammeSheet admin={adminFile} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />
       )}
 
+      {openSheet === 'workbench' && workbench && (
+        <LessonWorkbench
+          lessonId={workbench.lessonId}
+          initialStage={workbench.stage}
+          admin={adminFile}
+          sessions={courseSessions}
+          placementOptions={placementOptions}
+          todayISO={todayISO}
+          onUpdateAdmin={updateAdmin}
+          onAddRehearsalBlock={addRehearsalBlock}
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'practice' && (
+        <PracticeSheet
+          admin={adminFile}
+          onUpdateAdmin={updateAdmin}
+          onOpenLesson={(lessonId) => {
+            setWorkbench({ lessonId })
+            setOpenSheet('workbench')
+          }}
+          onClose={() => setOpenSheet('none')}
+        />
+      )}
+
+      {openSheet === 'prep' && (
+        <MentorPrepSheet admin={adminFile} todayISO={todayISO} placementOptions={placementOptions} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />
+      )}
+
       {openSheet === 'stats' && (
         <StatsSheet
           sessions={courseSessions}
@@ -1750,6 +1845,10 @@ export default function App() {
           todayISO={todayISO}
           placements={adminFile.placements ?? []}
           schools={adminFile.schools ?? []}
+          onOpenWorkbench={(lessonId) => {
+            setWorkbench({ lessonId })
+            setOpenSheet('workbench')
+          }}
           onClose={() => setOpenSheet('none')}
         />
       )}

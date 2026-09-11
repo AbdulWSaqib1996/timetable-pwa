@@ -27,6 +27,8 @@ import {
   SettingsAction,
 } from '../../components/ui'
 import { AttendancePromptCard } from '../../components/AttendancePrompt'
+import { NextStepsCard } from './NextStepsCard'
+import type { NextStep } from '../../../shared/practice.js'
 import type { AttendanceAnswer } from '../../components/AttendancePrompt'
 import type { MetaMap, Session, SessionChange, Settings } from '../../types'
 
@@ -57,6 +59,11 @@ interface Props {
   onOpenTasks: () => void
   onOpenSchedule: () => void
   onOpenHomeJourney: () => void
+  /** G1b: up to three next steps derived from dated work and the active focus */
+  nextSteps?: NextStep[]
+  onOpenStep?: (step: NextStep) => void
+  onDismissStep?: (id: string) => void
+  onPinStep?: (id: string, pinned: boolean) => void
 }
 
 function formatAge(fetchedAt: number): string {
@@ -131,6 +138,10 @@ export function TodayPage({
   onOpenTasks,
   onOpenSchedule,
   onOpenHomeJourney,
+  nextSteps,
+  onOpenStep,
+  onDismissStep,
+  onPinStep,
 }: Props) {
   // ONE course clock (TT-05): "now" is course wall time, compared against
   // course wall times — never the device's getHours().
@@ -352,6 +363,10 @@ export function TodayPage({
       {urgent}
 
       {promptSession && <AttendancePromptCard session={promptSession} onAnswer={onMarkAttendance} />}
+
+      {nextSteps && nextSteps.length > 0 && onOpenStep && onDismissStep && onPinStep && (
+        <NextStepsCard steps={nextSteps} onOpen={onOpenStep} onDismiss={onDismissStep} onPin={onPinStep} />
+      )}
 
       {hero && (
         <section className="today-hero" aria-label={current ? 'Current session' : 'Next session'}>

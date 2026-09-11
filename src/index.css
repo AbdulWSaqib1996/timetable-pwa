@@ -5989,3 +5989,36 @@ button.workspace-row { cursor: pointer; }
 /* G1a — programme sheet tabs wrap on narrow screens instead of overlapping */
 .sheet-programme .segmented { flex-wrap: wrap; }
 .sheet-programme .segment { flex: 1 1 calc(50% - 4px); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* G1b — workbench, practice, preparation, next steps */
+.next-steps { margin: 12px 0; }
+.next-steps-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.next-step { display: flex; align-items: center; gap: 8px; }
+.next-step-main { flex: 1 1 auto; display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 12px; border: 0; font: inherit; color: inherit; background: rgba(0,0,0,0.04); cursor: pointer; min-width: 0; }
+.next-step-actions { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.next-step-actions .btn-icon.is-on { color: #3b5bdb; }
+.workbench-meta { margin: -4px 0 8px; }
+.plan-pre { white-space: pre-wrap; font: inherit; margin: 8px 0; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,0.04); }
+.plan-summary p { margin: 6px 0; }
+.teach-mode { font-size: 1.15rem; line-height: 1.5; }
+.teach-intention { font-weight: 650; font-size: 1.25rem; }
+.teach-sequence { font-size: 1.15rem; }
+.teach-resources { padding-left: 20px; }
+.btn-large { min-height: 56px; font-size: 1.1rem; padding: 0 22px; }
+.practice-list { gap: 12px; }
+.practice-cycle { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: rgba(0,0,0,0.04); }
+.practice-cycle h3 { margin: 0; font-size: 1.02rem; }
+.feedback-row p { margin: 4px 0 0; }
+.prep-editor { margin-top: 12px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .next-step-main, :root:not([data-theme='light']) .plan-pre, :root:not([data-theme='light']) .practice-cycle { background: rgba(255,255,255,0.08); }
+}
+:root[data-theme='dark'] .next-step-main, :root[data-theme='dark'] .plan-pre, :root[data-theme='dark'] .practice-cycle { background: rgba(255,255,255,0.08); }
+/* G1b — sheet form rows wrap on narrow screens; controls never overflow the sheet */
+.sheet-workbench .task-edit-row, .sheet-prep .task-edit-row, .sheet-practice .task-edit-row { flex-wrap: wrap; }
+.sheet-workbench .task-edit-row > *, .sheet-prep .task-edit-row > *, .sheet-practice .task-edit-row > * { flex: 1 1 9rem; min-width: 0; }
+.sheet-workbench select, .sheet-workbench input, .sheet-workbench textarea, .sheet-prep select, .sheet-prep input, .sheet-prep textarea, .sheet-practice select, .sheet-practice input { max-width: 100%; min-width: 0; box-sizing: border-box; }
+.sheet-workbench .ui-field select, .sheet-prep .ui-field select { width: 100%; }
+
+/* Nav re-anchor nudge after the keyboard closes (useVisualViewportOffset) */
+.vv-reflow .bottom-nav, .vv-reflow .fab-add { transform: translateZ(0); }
