@@ -1398,7 +1398,7 @@ Automated checks + results: `tests/unit/mentor-store.test.mjs` (4: owner token g
 
 What's new: entry 8 (mentor portal). Known limits: attachments are capped at 2 MB and expire after 60 days on the server; the display name a mentor chooses is not itself signed (identity is the mentor id); there is no e-mail — invitation links are sent by the learner however they choose; provider adapters remain out.
 
-Released 11 September 2026: workers deployed first (push `22a944ba-3e00-41d2-ad48-a2f2b403f14e`, feed `57e62da0-9faa-43ce-b663-e4d1e33e0faa`); merge `24ae366`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 11 September 2026: workers deployed first (push `22a944ba-3e00-41d2-ad48-a2f2b403f14e`, feed `57e62da0-9faa-43ce-b663-e4d1e33e0faa`); merge `24ae366`, CI run 34600638596 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
