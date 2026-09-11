@@ -1,0 +1,110 @@
+{
+  "dashboard": {
+    "title": "My PGCE",
+    "desktop": false
+  },
+  "roadmap": {
+    "title": "My programme",
+    "desktop": false
+  },
+  "programme": {
+    "title": "Course setup",
+    "desktop": false
+  },
+  "lesson": {
+    "title": "Lesson workbench",
+    "desktop": false
+  },
+  "coaching": {
+    "title": "Practice cycle",
+    "desktop": false
+  },
+  "mentor": {
+    "title": "Mentor meeting",
+    "desktop": false
+  },
+  "knowledge": {
+    "title": "Subject knowledge",
+    "desktop": false
+  },
+  "assignment": {
+    "title": "Assignment workspace",
+    "desktop": false
+  },
+  "evidence": {
+    "title": "Evidence that helps",
+    "desktop": false
+  },
+  "placement": {
+    "title": "Placement experience",
+    "desktop": false
+  },
+  "workload": {
+    "title": "A manageable week",
+    "desktop": false
+  },
+  "review": {
+    "title": "Review pack",
+    "desktop": false
+  },
+  "dashboard-desktop": {
+    "title": "Your week, connected",
+    "desktop": true
+  },
+  "lesson-desktop": {
+    "title": "Lesson workbench",
+    "desktop": true
+  },
+  "review-desktop": {
+    "title": "Prepare a useful review",
+    "desktop": true
+  },
+  "placements": {
+    "title": "Your three placements",
+    "desktop": false
+  },
+  "placement-p1": {
+    "title": "P1 \u00b7 Maple Primary",
+    "desktop": false
+  },
+  "journey-p1-out": {
+    "title": "Travel to P1",
+    "desktop": false
+  },
+  "journey-p1-back": {
+    "title": "Home from P1",
+    "desktop": false
+  },
+  "placement-p2": {
+    "title": "P2 \u00b7 Riverside Primary",
+    "desktop": false
+  },
+  "journey-p2-out": {
+    "title": "Travel to P2",
+    "desktop": false
+  },
+  "journey-p2-back": {
+    "title": "Home from P2",
+    "desktop": false
+  },
+  "placement-p3": {
+    "title": "P3 \u00b7 Oakfield Primary",
+    "desktop": false
+  },
+  "journey-p3-out": {
+    "title": "Travel to P3",
+    "desktop": false
+  },
+  "journey-p3-back": {
+    "title": "Home from P3",
+    "desktop": false
+  },
+  "placement-setup": {
+    "title": "Set up P1",
+    "desktop": false
+  },
+  "placements-desktop": {
+    "title": "P1, P2 and P3 \u2014 three school workspaces",
+    "desktop": true
+  }
+}

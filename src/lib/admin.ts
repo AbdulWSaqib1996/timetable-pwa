@@ -389,6 +389,65 @@ export interface CourseQuestionRec { id: string; text: string; askedTo?: string;
 export interface ProtectedWindowRec { id: string; day: number; start: string; end: string; label?: string; at: number }
 export interface SupportNoteRec { id: string; text: string; at: number }
 
+/** PG-06 (G3): an evidence example — references to existing records plus
+ *  the learner's narrative. ITTECF and Teachers' Standards are separate
+ *  lists with no combined score; Part Two lists conduct contexts only. */
+export interface EvidenceExampleRec {
+  id: string
+  title: string
+  context: 'course-curriculum' | 'practice-cycle' | 'provider-assessment'
+  refs?: { entityType: string; entityId: string }[]
+  narrative?: { context?: string; decision?: string; noticed?: string; changedNext?: string }
+  ittecf?: string[]
+  standards?: string[]
+  partTwo?: string[]
+  at: number
+}
+
+/** PG-09 (G3): a review pack pins the canonical JSON of each selected record. */
+export interface ReviewPackItem { kind: 'example' | 'lesson' | 'observation' | 'meeting' | 'reflection'; id: string; revision: number; snapshot: string; caption?: string; provenance?: string }
+export interface ReviewPackRec {
+  id: string
+  title: string
+  state: 'selected' | 'draft' | 'discussed'
+  createdISO: string
+  discussedISO?: string
+  items: ReviewPackItem[]
+  attachments?: { id: string; name: string; state: 'local-only' | 'missing' }[]
+  notes?: string
+  at: number
+}
+
+/** PG-07 (G3): one experience-ledger entry; layers are never summed together. */
+export interface ExperienceLogRec {
+  id: string
+  placementId?: string
+  dateISO: string
+  type: 'mentor-meeting' | 'observation' | 'teaching' | 'itap' | 'other'
+  layer: 'planned' | 'learner-logged' | 'discussed-reviewed' | 'provider-outcome-reference'
+  durationMins?: number
+  /** typed source (lesson/meeting/observation id or a session key) */
+  sourceRef?: string
+  /** for provider references: where the value came from */
+  sourceLabel?: string
+  note?: string
+  at: number
+}
+
+/** PG-09 (G3): a review record; learner notes are private and never exported. */
+export interface ReviewRecordRec {
+  id: string
+  dateISO: string
+  participants?: string
+  focus?: string
+  questions?: string
+  learnerNotes?: string
+  providerJudgement?: { text: string; source: string }
+  nextSteps?: string
+  packId?: string
+  at: number
+}
+
 export interface AdminFile {
   /** written by this client (contracts ADMIN_SCHEMA_VERSION); older files have none */
   schemaVersion?: number
@@ -419,6 +478,10 @@ export interface AdminFile {
   questions: CourseQuestionRec[]
   protected: ProtectedWindowRec[]
   supportNotes: SupportNoteRec[]
+  examples: EvidenceExampleRec[]
+  reviewPacks: ReviewPackRec[]
+  experience: ExperienceLogRec[]
+  reviews: ReviewRecordRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -448,6 +511,10 @@ export const EMPTY_ADMIN: AdminFile = {
   questions: [],
   protected: [],
   supportNotes: [],
+  examples: [],
+  reviewPacks: [],
+  experience: [],
+  reviews: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`

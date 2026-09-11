@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Dialog, Field, IconClose } from './ui'
+import { Dialog, Field, FieldGroup, IconClose } from './ui'
 import { provenanceLabel } from '../../shared/practice.js'
 import { newAdminId } from '../lib/admin'
 import type { AdminFile, Meeting, MentorPrepRec } from '../lib/admin'
@@ -105,7 +105,7 @@ export function MentorPrepSheet({ admin, todayISO, placementOptions, onUpdateAdm
             <>
               <Field label="What changed since last time"><textarea className="placement-input" rows={2} value={selected.changed ?? ''} onChange={(e) => setPrep(selected.id, { changed: e.target.value })} /></Field>
               <Field label="Where I need help"><textarea className="placement-input" rows={2} value={selected.helpNeeded ?? ''} onChange={(e) => setPrep(selected.id, { helpNeeded: e.target.value })} /></Field>
-              <Field label="Examples to bring (referenced, not copied)">
+              <FieldGroup label="Examples to bring (referenced, not copied)">
                 {examples.length === 0 ? <p className="filter-hint">No lessons or feedback records yet.</p> : (
                   <ul className="setup-list" aria-label="Examples">
                     {examples.map((x) => (
@@ -118,9 +118,9 @@ export function MentorPrepSheet({ admin, todayISO, placementOptions, onUpdateAdm
                     ))}
                   </ul>
                 )}
-              </Field>
+              </FieldGroup>
               <Field label="Proposed next steps"><textarea className="placement-input" rows={2} value={selected.proposedSteps ?? ''} onChange={(e) => setPrep(selected.id, { proposedSteps: e.target.value })} /></Field>
-              <Field label="Open actions already owed (from meeting records)">
+              <FieldGroup label="Open actions already owed (from meeting records)">
                 {openActions.length === 0 ? <p className="filter-hint">None open.</p> : (
                   <ul className="workspace-list" aria-label="Open actions">
                     {openActions.map((a) => (
@@ -128,7 +128,7 @@ export function MentorPrepSheet({ admin, todayISO, placementOptions, onUpdateAdm
                     ))}
                   </ul>
                 )}
-              </Field>
+              </FieldGroup>
               <h3 className="subheading">After the meeting</h3>
               <Field label="What happened"><textarea className="placement-input" rows={2} aria-label="What happened" value={held.happened} onChange={(e) => setHeld({ ...held, happened: e.target.value })} /></Field>
               <div className="task-edit-row">

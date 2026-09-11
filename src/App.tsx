@@ -47,6 +47,10 @@ import { MentorPrepSheet } from './components/MentorPrepSheet'
 const KnowledgeSheet = lazy(() => import('./components/KnowledgeSheet').then((m) => ({ default: m.KnowledgeSheet })))
 const AcademicSheet = lazy(() => import('./components/AcademicSheet').then((m) => ({ default: m.AcademicSheet })))
 const WorkloadSheet = lazy(() => import('./components/WorkloadSheet').then((m) => ({ default: m.WorkloadSheet })))
+const EvidenceExamplesSheet = lazy(() => import('./components/EvidenceExamplesSheet').then((m) => ({ default: m.EvidenceExamplesSheet })))
+const ReviewPackSheet = lazy(() => import('./components/ReviewPackSheet').then((m) => ({ default: m.ReviewPackSheet })))
+const ExperienceSheet = lazy(() => import('./components/ExperienceSheet').then((m) => ({ default: m.ExperienceSheet })))
+const ReviewSheet = lazy(() => import('./components/ReviewSheet').then((m) => ({ default: m.ReviewSheet })))
 import { proposalsToBlocks } from '../shared/workload.js'
 import { addDaysISO } from '../shared/calendar-time.js'
 import type { WorkloadProposal } from '../shared/workload.js'
@@ -130,7 +134,7 @@ import type {
   ViewMode,
 } from './types'
 
-type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek' | 'placementSetup' | 'placementFlow' | 'programme' | 'workbench' | 'practice' | 'prep' | 'knowledge' | 'academic' | 'workload'
+type SheetName = 'none' | 'filters' | 'changes' | 'stats' | 'group' | 'journal' | 'admin' | 'course' | 'planWeek' | 'placementSetup' | 'placementFlow' | 'programme' | 'workbench' | 'practice' | 'prep' | 'knowledge' | 'academic' | 'workload' | 'examples' | 'reviewPacks' | 'experience' | 'reviews'
 
 /** How often a visible device pulls the other devices' changes (10 Sep 2026). */
 const SYNC_POLL_MS = 3 * 60_000
@@ -1542,6 +1546,10 @@ export default function App() {
           onOpenKnowledge={() => setOpenSheet('knowledge')}
           onOpenAcademic={() => setOpenSheet('academic')}
           onOpenWorkload={() => setOpenSheet('workload')}
+          onOpenExamples={() => setOpenSheet('examples')}
+          onOpenReviewPacks={() => setOpenSheet('reviewPacks')}
+          onOpenExperience={() => setOpenSheet('experience')}
+          onOpenReviews={() => setOpenSheet('reviews')}
           onOpenSettings={() => navigate({ name: 'settings' })}
         />
       ) : route.name === 'schedule' ? (
@@ -1883,6 +1891,16 @@ export default function App() {
           onClose={() => setOpenSheet('none')}
         />
       )}
+
+      {openSheet === 'examples' && <EvidenceExamplesSheet admin={adminFile} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
+
+      {openSheet === 'reviewPacks' && <ReviewPackSheet admin={adminFile} profileId={active.id} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
+
+      {openSheet === 'experience' && settings && (
+        <ExperienceSheet admin={adminFile} settings={settings} sessions={rawCourseSessions} metaMap={metaMap} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />
+      )}
+
+      {openSheet === 'reviews' && <ReviewSheet admin={adminFile} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
 
       {openSheet === 'stats' && (
         <StatsSheet

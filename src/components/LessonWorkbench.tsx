@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { Dialog, Field, IconClose } from './ui'
+import { Dialog, Field, FieldGroup, IconClose } from './ui'
 import { LESSON_TEMPLATES, activateCycle, nextAttempt, provenanceLabel, withPlanRevision } from '../../shared/practice.js'
 import { newAdminId } from '../lib/admin'
 import type { AdminFile, Lesson, LessonStage, Observation, PracticeCycleRec } from '../lib/admin'
@@ -279,13 +279,13 @@ export function LessonWorkbench({ lessonId: initialId, admin, sessions, placemen
         <Field label="Evaluation (how did it go, what changes next time)">
           <textarea className="placement-input" rows={4} value={evaluation} onChange={(e) => setEvaluation(e.target.value)} />
         </Field>
-        <Field label="Teachers' Standards evidenced (your tag, not a judgement)">
+        <FieldGroup label="Teachers' Standards evidenced (your tag, not a judgement)">
           <div className="chip-grid ts-chips">
             {TEACHERS_STANDARDS.map((ts) => (
               <button key={ts.id} type="button" className={`chip chip-small${standards.includes(ts.id) ? ' chip-on' : ''}`} aria-pressed={standards.includes(ts.id)} title={ts.label} onClick={() => setStandards((s) => (s.includes(ts.id) ? s.filter((x) => x !== ts.id) : [...s, ts.id].sort()))}>{ts.id}</button>
             ))}
           </div>
-        </Field>
+        </FieldGroup>
         <div className="btn-row">
           <button type="button" className="btn-primary" onClick={() => { update((l) => ({ ...l, evaluation: evaluation.trim(), standards, reviewAt: Date.now(), stage: 'review' })); setSaved('Review saved') }}>Save review</button>
           <button type="button" className="btn-today-reset" onClick={startNextAttempt}>Next attempt →</button>

@@ -2,15 +2,15 @@ import { MAX_EFFORT_MINS } from './planValidation.js'
 /** Runtime-neutral input contracts, shared by browser and workers. */
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 export const MAX_SYNC_BYTES = 2 * 1024 * 1024
-export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes']
+export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews']
 /** Collections added in Phase 5 and G0 — absent in older payloads/backups, so their
  *  arrays are optional on read and treated as empty. */
-export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes']
+export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews']
 /** Feedback provenance (G0): a client may only record its own account; an
  *  authenticated reviewer state needs the (future) portal. */
 export const clientSourceTypes = ['personal-reflection', 'learner-entered']
 /** AdminFile schema version written by this client; unknown newer fields are preserved, never dropped. */
-export const ADMIN_SCHEMA_VERSION = 5
+export const ADMIN_SCHEMA_VERSION = 6
 export function assert(condition, message) { if (!condition) throw new Error(message) }
 export function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 export function safeURL(value) {
@@ -87,7 +87,7 @@ export function validatePayload(data) {
           for (const item of value[key]) {
             assert(object(item) && typeof item.id === 'string' && !seen.has(item.id) && Number.isFinite(item.at), 'Invalid admin record.')
             seen.add(item.id)
-            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text']}
+            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text'],examples:['title','context'],reviewPacks:['title','state','createdISO'],experience:['dateISO','type','layer'],reviews:['dateISO']}
             for (const field of strings[key]) assert(typeof item[field] === 'string', 'Invalid admin field: ' + field)
             for (const field of ['dateISO','weekISO','setISO','metISO','dueISO','completedISO','startISO','endISO','effectiveFromISO','effectiveToISO','doneISO']) if (item[field]) assert(validDate(item[field]), 'Invalid admin date.')
             // G0: typed placement links and feedback provenance are additive and format-checked;
@@ -170,6 +170,31 @@ export function validatePayload(data) {
               assert(Number.isInteger(item.day) && item.day >= 0 && item.day <= 6, 'Invalid protected weekday.')
               assert(validTime(item.start) && validTime(item.end) && item.end > item.start, 'Invalid protected window.')
               if (item.label !== undefined) assert(typeof item.label === 'string' && item.label.length <= 100, 'Invalid protected label.')
+            }
+            if (key === 'examples') {
+              assert(['course-curriculum','practice-cycle','provider-assessment'].includes(item.context), 'Invalid example context.')
+              if (item.refs !== undefined) assert(Array.isArray(item.refs) && item.refs.length <= 50 && item.refs.every((r) => object(r) && typeof r.entityType === 'string' && /^[a-z]+$/.test(r.entityType) && typeof r.entityId === 'string' && r.entityId.length <= 200), 'Invalid example references.')
+              if (item.narrative !== undefined) assert(object(item.narrative) && Object.values(item.narrative).every((v) => typeof v === 'string' && v.length <= 4000), 'Invalid example narrative.')
+              for (const f of ['ittecf','standards','partTwo']) if (item[f] !== undefined) assert(Array.isArray(item[f]) && item[f].length <= 20 && item[f].every((x) => typeof x === 'string' && /^[\w-]{1,40}$/.test(x)), 'Invalid example framework references.')
+            }
+            if (key === 'reviewPacks') {
+              assert(['selected','draft','discussed'].includes(item.state), 'Invalid pack state.')
+              assert(validDate(item.createdISO), 'Invalid pack date.')
+              if (item.discussedISO !== undefined) assert(validDate(item.discussedISO), 'Invalid pack date.')
+              if (item.notes !== undefined) assert(typeof item.notes === 'string' && item.notes.length <= 4000, 'Invalid pack notes.')
+              assert(Array.isArray(item.items ?? []) && (item.items ?? []).length <= 100, 'Invalid pack items.')
+              for (const it of item.items ?? []) assert(object(it) && ['example','lesson','observation','meeting','reflection'].includes(it.kind) && typeof it.id === 'string' && Number.isFinite(it.revision) && typeof it.snapshot === 'string' && it.snapshot.length <= 20000 && (it.caption === undefined || (typeof it.caption === 'string' && it.caption.length <= 500)) && (it.provenance === undefined || typeof it.provenance === 'string'), 'Invalid pack item.')
+              if (item.attachments !== undefined) assert(Array.isArray(item.attachments) && item.attachments.length <= 100 && item.attachments.every((a) => object(a) && typeof a.name === 'string' && a.name.length <= 300 && ['local-only','missing'].includes(a.state)), 'Invalid pack attachments.')
+            }
+            if (key === 'experience') {
+              assert(['mentor-meeting','observation','teaching','itap','other'].includes(item.type), 'Invalid experience type.')
+              assert(['planned','learner-logged','discussed-reviewed','provider-outcome-reference'].includes(item.layer), 'Invalid experience layer.')
+              if (item.durationMins !== undefined) assert(Number.isInteger(item.durationMins) && item.durationMins >= 0 && item.durationMins <= 1440, 'Invalid experience duration.')
+              for (const f of ['placementId','sourceRef','note','sourceLabel']) if (item[f] !== undefined) assert(typeof item[f] === 'string' && item[f].length <= 2000, 'Invalid experience field: ' + f)
+            }
+            if (key === 'reviews') {
+              for (const f of ['participants','focus','questions','learnerNotes','nextSteps','packId']) if (item[f] !== undefined) assert(typeof item[f] === 'string' && item[f].length <= 4000, 'Invalid review field: ' + f)
+              if (item.providerJudgement !== undefined) assert(object(item.providerJudgement) && typeof item.providerJudgement.text === 'string' && item.providerJudgement.text.length <= 4000 && typeof item.providerJudgement.source === 'string' && item.providerJudgement.source.length <= 200, 'Invalid provider judgement.')
             }
             if (key === 'programmes') {
               assert(['pgce-qts','pgce','qts-only','other'].includes(item.route), 'Invalid programme route.')

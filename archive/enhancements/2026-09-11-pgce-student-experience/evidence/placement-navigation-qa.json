@@ -1,0 +1,26 @@
+[
+  {
+    "placement": "p1",
+    "school": "Maple Primary",
+    "selector": true,
+    "outward": true,
+    "return": true,
+    "separateSetup": true
+  },
+  {
+    "placement": "p2",
+    "school": "Riverside Primary",
+    "selector": true,
+    "outward": true,
+    "return": true,
+    "separateSetup": true
+  },
+  {
+    "placement": "p3",
+    "school": "Oakfield Primary",
+    "selector": true,
+    "outward": true,
+    "return": true,
+    "separateSetup": true
+  }
+]

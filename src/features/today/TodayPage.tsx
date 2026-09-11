@@ -28,6 +28,7 @@ import {
 } from '../../components/ui'
 import { AttendancePromptCard } from '../../components/AttendancePrompt'
 import { NextStepsCard } from './NextStepsCard'
+import { WhatsNewBanner } from '../../components/WhatsNewBanner'
 import type { NextStep } from '../../../shared/practice.js'
 import type { AttendanceAnswer } from '../../components/AttendancePrompt'
 import type { MetaMap, Session, SessionChange, Settings } from '../../types'
@@ -361,6 +362,8 @@ export function TodayPage({
       />
 
       {urgent}
+
+      <WhatsNewBanner onOpenHelp={onOpenSettings} />
 
       {promptSession && <AttendancePromptCard session={promptSession} onAnswer={onMarkAttendance} />}
 
