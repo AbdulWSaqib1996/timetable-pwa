@@ -1260,3 +1260,14 @@ Automated checks + results: `tests/nav-viewport.spec.ts` (2): a mocked, resizabl
 Known limits: the mock stands in for iOS; the real device check is the owner's.
 
 Released 11 September 2026: merge `2871d61`, CI run 34579780657 success, `deploy.sh verify` six PASS. No worker change.
+
+### Pass 66 — Self-study rows are self study, never a placement; no attendance for self study (owner bug report) — 11 September 2026
+
+Work items: "SE1a Briefing Self Study" showed as a Placement (kind tag, Placement details form, school-day counting) and offered attendance. Root cause: `shared/timetable.js` only flagged `isSelfStudy` when the whole title was "Self Study", and `isPlacementTitle` matches the "SE1a" block code, so a self-study briefing about a placement fell into the placement rule. Branch `self-study-not-placement`; `shared/` changed, so both workers deploy first.
+
+Behaviour before → after:
+- **Parser** (`shared/timetable.js`, mirrored in `src/lib/demo.ts`): any title containing "self study" / "self-study", or a tutor of "Self Study", is self study.
+- **Placement rule** (`shared/eligibility.js` + the push worker's mirror): `isSelfStudyTitle(t)` is exported and `isPlacementTitle` excludes it, so self-study rows never count as school days, never expand into placement day spans, never get placement reminders, and never show the Placement details form.
+- **Attendance**: self-study sessions were already outside the eligibility denominator and the "did you attend?" prompts (app and worker); the detail view now hides the Attended/Absent choice for them and states that attendance is not recorded.
+
+Automated checks + results: `tests/unit/eligibility.test.mjs` asserts the title rules; unit 162; both gates green. Worker deploy recorded below.

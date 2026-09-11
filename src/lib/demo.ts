@@ -64,7 +64,7 @@ export function buildDemoSessions(): Session[] {
       link: item.link,
       isSpecialism: !!specialismMatch,
       specialismName: specialismMatch ? specialismMatch[1].trim() : undefined,
-      isSelfStudy: /^self[- ]?study$/i.test(item.title),
+      isSelfStudy: /\bself[- ]?study\b/i.test(item.title),
       isOptional: /\(optional\)/i.test(item.title),
     }
   }).sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))

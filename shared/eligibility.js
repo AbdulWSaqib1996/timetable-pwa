@@ -10,7 +10,9 @@
  * when the caller supplies the current minutes.
  */
 
-export const isPlacementTitle = (t) => /school experience|placement|\bSE ?\d[a-z]?\b/i.test(t || '')
+/** Self-study rows ("SE1a Briefing Self Study") prepare for a placement; they are never a school day. */
+export const isSelfStudyTitle = (t) => /\bself[- ]?study\b/i.test(t || '')
+export const isPlacementTitle = (t) => !isSelfStudyTitle(t) && /school experience|placement|\bSE ?\d[a-z]?\b/i.test(t || '')
 
 export const placementTagOf = (t) => {
   const m = (t || '').match(/SE ?\d[a-z]?/i)

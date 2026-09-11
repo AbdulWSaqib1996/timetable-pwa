@@ -1,3 +1,4 @@
+export function isSelfStudyTitle(title: string | undefined): boolean
 export function isPlacementTitle(title: string | undefined): boolean
 export function placementTagOf(title: string | undefined): string
 export function isEligibleSession(s: { isKeyDate?: boolean; isSelfStudy?: boolean; title: string }): boolean

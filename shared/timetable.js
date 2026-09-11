@@ -266,7 +266,8 @@ export function parseTimetable(table) {
             link: /^https?:\/\//i.test(linkText) ? linkText : undefined,
             isSpecialism: !!specialismMatch,
             specialismName: specialismMatch ? specialismMatch[1].trim() : undefined,
-            isSelfStudy: /^self[- ]?study$/i.test(title),
+            // Any title that says self study IS self study — e.g. "SE1a Briefing Self Study" (owner, 11 Sep 2026).
+            isSelfStudy: /\bself[- ]?study\b/i.test(title) || /^self[- ]?study$/i.test(get('tutor')),
             isOptional: /\(optional\)/i.test(title),
         });
     }

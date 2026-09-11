@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { attendanceSummary, isCompleted, isEligibleSession, placementDaySummary } from '../../shared/eligibility.js'
+import { attendanceSummary, isCompleted, isEligibleSession, isPlacementTitle, isSelfStudyTitle, placementDaySummary } from '../../shared/eligibility.js'
 
 const today = '2026-09-07'
 const s = (patch = {}) => ({ id: 'x', title: 'Teaching', dateISO: '2026-09-01', start: '09:00', end: '10:00', ...patch })
@@ -62,4 +62,14 @@ test('two placement events on one date are one school day; inferred days are lab
   assert.equal(out.blocks[0].attended, 1)
   assert.equal(out.blocks[0].inferred, 1)
   assert.equal(out.inferredDays, 1)
+})
+
+test('a self-study row about a placement block is self study, not a school day (owner, 11 Sep 2026)', () => {
+  assert.equal(isPlacementTitle('SE1a Briefing Self Study'), false)
+  assert.equal(isPlacementTitle('SE1a Placement day'), true)
+  assert.equal(isPlacementTitle('School Experience 2'), true)
+  assert.equal(isSelfStudyTitle('SE1a Briefing Self Study'), true)
+  assert.equal(isSelfStudyTitle('Self-study'), true)
+  assert.equal(isSelfStudyTitle('PS1 - Exploring Professionalism'), false)
+  assert.equal(isEligibleSession({ title: 'SE1a Briefing Self Study', isSelfStudy: true }), false)
 })

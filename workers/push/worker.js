@@ -146,7 +146,8 @@ async function fetchSessions(sheetId, gid) {
 }
 
 /* ---------- placement (school experience) parity with the app ---------- */
-const isPlacementTitle = (t) => /school experience|placement|\bSE ?\d[a-z]?\b/i.test(t || '')
+const isSelfStudyTitle = (t) => /\bself[- ]?study\b/i.test(t || '')
+const isPlacementTitle = (t) => !isSelfStudyTitle(t) && /school experience|placement|\bSE ?\d[a-z]?\b/i.test(t || '')
 const placementTagOf = (t) => {
   const m = (t || '').match(/SE ?\d[a-z]?/i)
   return m ? m[0].replace(/\s/g, '').toUpperCase() : 'PLACEMENT'
