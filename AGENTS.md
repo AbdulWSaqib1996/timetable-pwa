@@ -33,7 +33,7 @@ a new commit. `all` runs everything in order.
 2. Change spans app **and** worker (e.g. a new endpoint)? → deploy the worker **first**, then push the app.
 3. `build` must pass before deploying; a red smoke test blocks — never skip it.
 4. After any deploy, run `verify` and report its output verbatim.
-5. **Every release pass updates What's new**: add an entry to `src/lib/changelog.ts` (`WHATSNEW_ENTRIES`, newest first — the version bump follows from it) describing what the learner will notice, in their words; the toast shows it once and Settings → Help keeps the history (owner instruction, 11 Sep 2026).
+5. **Every release that changes the app updates What's new** (documentation-only passes need no entry): add an entry to `src/lib/changelog.ts` (`WHATSNEW_ENTRIES`, newest first — the version bump follows from it) describing what the learner will notice, in their words; the toast shows it once and Settings → Help keeps the history (owner instruction, 11 Sep 2026).
 6. If `git push` times out on port 22, retry with:
    `GIT_SSH_COMMAND="ssh -o HostName=ssh.github.com -o Port=443" git push origin main`
 
@@ -72,4 +72,4 @@ Expected: all PASS — Vercel 200, Pages 200, `/vapid` returns a key, `/stats`
 
 ## Remaining phases and UI design references
 
-For Phases 3–7, read [TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md](TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md). The accompanying [handoff-assets](handoff-assets/) directory contains the before/after screenshots and HTML concepts. These references now live in this repository; follow the handoff’s phase boundaries, styling specifications and acceptance tests when implementing the relevant phase.
+Completed handoffs and audits are archived under [archive/](archive/README.md) (the Phases 3–7 handoff with its `handoff-assets/` is at `archive/enhancements/2026-09-06-remaining-phases/`); the active package, if any, stays at the repo root until its last batch ships. Follow a handoff’s phase boundaries, styling specifications and acceptance tests when implementing it.

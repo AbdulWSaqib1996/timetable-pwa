@@ -17,3 +17,5 @@ Quick image references:
 All data is synthetic. Before images render the reviewed current page; after images are proposals. This package does not implement or deploy the admin redesign. No production credentials or analytics were accessed.
 
 The `evidence` folder records the reviewed commit/file hashes, locally reproduced defects, fixture data and design checks. The HTML source reference has a `.txt` extension intentionally; do not rename it and run it against production. The app was undergoing concurrent development, so re-read current source and AGENTS.md before starting A1.
+
+> Archived: moved from the repo root on 13 September 2026 once its batches had shipped (see archive/README.md).

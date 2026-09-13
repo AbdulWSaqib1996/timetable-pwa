@@ -1,0 +1,67 @@
+
+> timetable-pwa@0.1.0 build
+> tsc && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 215 modules transformed.
+rendering chunks...
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/attachments.ts is dynamically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/storage.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/sync.ts but also statically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/components/BackupSheets.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/components/BinderPreviewSheet.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/components/JournalSheet.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/components/SettingsSheet.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/hooks/useFindIndex.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/backup.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/photos.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/recovery.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/storage.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/wallet.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/recovery.ts is dynamically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/storage.ts but also statically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/backup.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/sync.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/main.tsx, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/photos.ts is dynamically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/storage.ts but also statically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/components/SessionDetail.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/components/SharedPhotosSheet.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/backup.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/printBinder.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/printBundle.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/wallet.ts is dynamically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/storage.ts but also statically imported by /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/components/AdminSheet.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/components/ReviewPackSheet.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/features/pgce/PGCEPage.tsx, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/hooks/useFindIndex.ts, /Users/abdulsaqib/Documents/ChatGPT/Timetable PWA/audit-2026-09-13/runtime/src/lib/backup.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/mentor.html                                   0.81 kB │ gzip:   0.39 kB
+dist/manifest.webmanifest                          0.95 kB
+dist/analytics.html                                1.20 kB │ gzip:   0.51 kB
+dist/index.html                                    1.33 kB │ gzip:   0.59 kB
+dist/assets/mentor-1GhuVOdh.css                    2.08 kB │ gzip:   0.80 kB
+dist/assets/analytics-TVxZgfq1.css                13.00 kB │ gzip:   3.07 kB
+dist/assets/main-BiNwutQL.css                     86.48 kB │ gzip:  15.58 kB
+dist/assets/files-CxGBNeyw.js                      0.26 kB │ gzip:   0.22 kB
+dist/assets/ics-tpDggA7G.js                        0.36 kB │ gzip:   0.28 kB
+dist/assets/config-GEgZlfrO.js                     1.42 kB │ gzip:   0.70 kB
+dist/assets/ChangesSheet-CNvp4TSL.js               1.77 kB │ gzip:   0.84 kB
+dist/assets/PlacementSetupSheet-bjxQkvdv.js        2.66 kB │ gzip:   1.19 kB
+dist/assets/mentor-dxjJPfm0.js                     3.16 kB │ gzip:   1.36 kB
+dist/assets/analytics-contracts-DHxpbcQO.js        3.58 kB │ gzip:   1.20 kB
+dist/assets/backup-CeTNWq5q.js                     4.42 kB │ gzip:   1.94 kB
+dist/assets/FilterSheet-CCMf6Dkv.js                4.94 kB │ gzip:   1.51 kB
+dist/assets/workbox-window.prod.es5-BqEJf4Xk.js    5.71 kB │ gzip:   2.34 kB
+dist/assets/ReviewSheet-BJ1RWuSO.js                5.87 kB │ gzip:   1.97 kB
+dist/assets/EvidenceExamplesSheet-BuAr57XX.js      6.26 kB │ gzip:   2.16 kB
+dist/assets/evidence-DYMiWwNi.js                   6.92 kB │ gzip:   2.97 kB
+dist/assets/mentor-Cf7Z-mmB.js                     7.43 kB │ gzip:   2.69 kB
+dist/assets/ExperienceSheet-CeeYgEe_.js            7.99 kB │ gzip:   2.92 kB
+dist/assets/KnowledgeSheet-D8dmTovc.js             8.29 kB │ gzip:   2.66 kB
+dist/assets/StatsSheet-Cf9_pEbX.js                 8.70 kB │ gzip:   3.56 kB
+dist/assets/PlacementSetupFlow-CSN7DiLm.js         9.64 kB │ gzip:   3.27 kB
+dist/assets/CourseSheet-XB5c4R4o.js                9.70 kB │ gzip:   2.80 kB
+dist/assets/WorkloadSheet-BygKJ8_A.js              9.97 kB │ gzip:   3.06 kB
+dist/assets/AcademicSheet-CGWRPCfN.js             10.10 kB │ gzip:   3.04 kB
+dist/assets/ReviewPackSheet-DgTIoB6z.js           10.56 kB │ gzip:   3.47 kB
+dist/assets/BinderPreviewSheet-BETFFgkY.js        11.04 kB │ gzip:   4.01 kB
+dist/assets/ProgrammeSheet-DmiQxcNo.js            12.17 kB │ gzip:   3.61 kB
+dist/assets/JournalSheet-COONHmXo.js              13.72 kB │ gzip:   4.68 kB
+dist/assets/StudyGroupSheet-C8ofLYxc.js           15.84 kB │ gzip:   5.40 kB
+dist/assets/AdminSheet-9BSH_BN5.js                29.65 kB │ gzip:   7.94 kB
+dist/assets/analytics-C_-qh7zD.js                 42.38 kB │ gzip:  13.23 kB
+dist/assets/SettingsSheet-CNkDA40_.js             78.47 kB │ gzip:  22.08 kB
+dist/assets/client-Cgp6FJpf.js                   142.55 kB │ gzip:  45.76 kB
+dist/assets/main-BC6O98GM.js                     433.31 kB │ gzip: 134.10 kB
+✓ built in 1.18s
+
+PWA v1.3.0
+mode      generateSW
+precache  67 entries (1060.65 KiB)
+files generated
+  dist/sw.js
+  dist/workbox-bdb082da.js

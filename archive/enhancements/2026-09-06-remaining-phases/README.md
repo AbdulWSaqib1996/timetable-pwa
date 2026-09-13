@@ -1,0 +1,3 @@
+# Remaining phases handoff — archived package (6–7 September 2026)
+
+Moved from the repo root on 13 September 2026 once every phase had shipped. Contents: `TIMETABLE_PWA_ENHANCEMENTS.md` (the 6 September review whose §7 became the seven-phase roadmap), `TIMETABLE_PWA_REMAINING_PHASES_IMPLEMENTATION.md` (the binding handoff for Phases 3–7 with the release runbook and completion records), `handoff-assets/` (before/after screenshots and HTML concepts), `PHASE4_INVENTORY.md` (the Phase 4 redesign inventory, formerly `docs/`). Delivered: Phases 1–7 except P7-02 (paid storage, excluded by the owner); PLAN.md Passes 40–44.

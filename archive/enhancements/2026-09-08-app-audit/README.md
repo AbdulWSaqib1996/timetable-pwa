@@ -9,3 +9,5 @@ The `evidence` directory contains current synthetic screenshots, observed defect
 For a quick starting point, inspect `evidence/screens/schedule-desktop.png` alongside `evidence/desktop-sizing.json`, then the Today timezone screenshots and `evidence/new-commitment-draft.json`. The written spec distinguishes reproduced defects from conditional risks and proposals.
 
 The inert observation test `evidence/current-audit.spec.ts.txt` documents the synthetic scenarios. Do not copy it into the app bundle. To adapt it into a development test, put it under the repository's tests folder, use the configured baseURL rather than its audit port, choose a temporary evidence directory, and change assertions from recording known defects to verifying the desired behaviour. Never point it at production.
+
+> Archived: moved from the repo root on 13 September 2026 once its batches had shipped (see archive/README.md).

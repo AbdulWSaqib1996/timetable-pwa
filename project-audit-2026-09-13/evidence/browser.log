@@ -1,0 +1,14 @@
+[WebServer] (node:25511) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 5 tests using 1 worker
+
+(node:25523) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/audit-sept13.spec.ts:45:1 › audit: failed mentor listing stays in loading state (763ms)
+  ✓  2 tests/audit-sept13.spec.ts:58:1 › audit: selection carries across packs (316ms)
+  ✓  3 tests/audit-sept13.spec.ts:70:1 › audit: portal network failure leaves sign-in disabled (267ms)
+  ✓  4 tests/audit-sept13.spec.ts:81:1 › audit: current UI captures and width evidence (347ms)
+  ✓  5 tests/audit-sept13.spec.ts:92:1 › audit: pack B uploads attachment selected in pack A (422ms)
+
+  5 passed (3.4s)
