@@ -1437,7 +1437,7 @@ Planning of the new package: [project-audit-2026-09-13/DEVELOPMENT_PLAN.md](proj
 
 Checks: `npm run validate` green after the moves (no test or build references the moved folders); no worker change; What's new unchanged (no learner-visible change — AGENTS.md rule 5 wording clarified to "every release that changes the app").
 
-Released 13 September 2026: merge `7a95668`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 13 September 2026: merge `7a95668`, CI run 34783066783 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
