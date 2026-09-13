@@ -1425,7 +1425,7 @@ Behaviour before → after: marking a task done now **opens the Completed sectio
 
 Automated checks + results: `tests/tasks-completed-visible.spec.ts` (1: mark done → section open, row highlighted and inside the viewport, completion date shown, collapse by hand, Put it back restores). What's new entry 10. `npm run validate` AND `VERCEL=1 npm run validate` green — **194 unit and 169 browser tests** (phase-five updated: the section now opens itself).
 
-Released 13 September 2026: no worker change; merge `7eed422`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 13 September 2026: no worker change; merge `7eed422`, CI run 34781327169 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
