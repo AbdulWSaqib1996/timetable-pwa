@@ -1415,6 +1415,18 @@ Automated checks + results: `tests/keydate-dedupe.spec.ts` (1: a repeated sheet 
 
 Released 13 September 2026: no worker change; merge `668c43e`, CI run 34780267953 success, `deploy.sh verify` seven PASS.
 
+### Pass 75 — Completed tasks easy to find after marking done (owner report) — 13 September 2026
+
+Work items: the owner reported that after marking a task complete the Completed section "does not render correctly" — they had to scroll to the very bottom to find the collapsible card. Branch `tasks-completed-visible`, client only.
+
+Finding: the section's layout measured correctly at 390px (it renders as the last card above the bottom navigation), but the interaction was poor — the task vanished from the list it was in and reappeared inside a **collapsed** card at the foot of the page, so the change looked like a rendering failure.
+
+Behaviour before → after: marking a task done now **opens the Completed section, scrolls it into view (`scrollIntoView` nearest, smooth), highlights the moved row for eight seconds and shows a status line "“<task>” moved to Completed below. Put it back"** (named so it never collides with the delete Undo); Put it back returns the task to To do and clears the notice; the section stays hand-collapsible (its open state is now controlled). Safari's default disclosure marker is hidden on the summary.
+
+Automated checks + results: `tests/tasks-completed-visible.spec.ts` (1: mark done → section open, row highlighted and inside the viewport, completion date shown, collapse by hand, Put it back restores). What's new entry 10. `npm run validate` AND `VERCEL=1 npm run validate` green — **194 unit and 169 browser tests** (phase-five updated: the section now opens itself).
+
+Released 13 September 2026: no worker change; merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
 The owner asked for the deployment of `archive/enhancements/2026-09-11-pgce-student-experience/PGCE_QTS_STUDENT_EXPERIENCE_AUDIT.md` to be planned in batches. The plan is [archive/enhancements/2026-09-11-pgce-student-experience/DEVELOPMENT_PLAN.md](archive/enhancements/2026-09-11-pgce-student-experience/DEVELOPMENT_PLAN.md): G0 (Pass 68) placement/provenance foundations and a reviewable tag migration; G1a (Pass 69) P1/P2/P3 school workspaces with outward/return journeys plus the course-aware roadmap; G1b (Pass 70) lesson workbench, practice cycle and mentor preparation; G2 (Pass 71) knowledge goals, academic workspace, workload; G3 (Pass 72) evidence narratives, experience ledger, review packs; G4 (portal) only on a separate go-ahead. Owner questions are in its §5. G0–G3 shipped as Passes 68–72; the package is archived at [archive/enhancements/2026-09-11-pgce-student-experience/](archive/enhancements/2026-09-11-pgce-student-experience/README.md). G4 (mentor portal) shipped as Pass 73 on the owner's go-ahead.

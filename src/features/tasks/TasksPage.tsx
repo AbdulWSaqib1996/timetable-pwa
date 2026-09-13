@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EmptyState, IconArrowRight, IconCheck, IconPlus, IconSearch, PageHeader, SettingsAction, StatusMessage } from '../../components/ui'
 import type { Meeting, TaskRecord } from '../../lib/admin'
 import { sessionKey } from '../../lib/diff'
@@ -82,6 +82,28 @@ export function TasksPage({
   onOpenSettings,
 }: Props) {
   const [query, setQuery] = useState('')
+  // Owner report (13 Sep 2026): a task marked done vanished from the list while the
+  // collapsed Completed section sat far below the fold. Marking done now opens that
+  // section, scrolls it into view, highlights the row and offers Undo.
+  const [completedOpen, setCompletedOpen] = useState(false)
+  const [justCompleted, setJustCompleted] = useState<Session | null>(null)
+  const completedRef = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    if (!justCompleted) return
+    setCompletedOpen(true)
+    const t1 = setTimeout(() => completedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50)
+    const t2 = setTimeout(() => setJustCompleted(null), 8000)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [justCompleted])
+  const setStatusFor = (k: Session, record: TaskRecord | undefined, next: 'todo' | 'doing' | 'done') => {
+    if (record) onSetTaskStatus(record, next)
+    else onSetStatus(k, next)
+    if (next === 'done') setJustCompleted(k)
+    else if (justCompleted && justCompleted.id === k.id) setJustCompleted(null)
+  }
   const taskById = new Map(tasks.map((t) => [t.id, t]))
   const recordOf = (k: Session): TaskRecord | undefined =>
     k.id.startsWith('custom-') ? taskById.get(k.id.slice('custom-'.length)) : undefined
@@ -120,7 +142,7 @@ export function TasksPage({
         ? `Completed ${formatDate(record.completedISO)} · due ${formatDate(k.dateISO)}`
         : `Due ${formatDate(k.dateISO)}${k.start ? ` · ${k.start}` : ''}`
     return (
-      <li key={k.id} className={`task-card${status === 'done' ? ' kd-done' : ''}${overdueNow ? ' task-card-overdue' : ''}`}>
+      <li key={k.id} className={`task-card${status === 'done' ? ' kd-done' : ''}${overdueNow ? ' task-card-overdue' : ''}${justCompleted?.id === k.id ? ' task-card-just-completed' : ''}`}>
         <div className="keydate-line">
           <button
             type="button"
@@ -150,11 +172,7 @@ export function TasksPage({
               className={`kd-status kd-status-${status}`}
               aria-label={`Status for ${k.title}`}
               value={status ?? 'todo'}
-              onChange={(e) => {
-                const next = e.target.value as 'todo' | 'doing' | 'done'
-                if (record) onSetTaskStatus(record, next)
-                else onSetStatus(k, next)
-              }}
+              onChange={(e) => setStatusFor(k, record, e.target.value as 'todo' | 'doing' | 'done')}
             >
               <option value="todo">To do</option>
               <option value="doing">In progress</option>
@@ -307,8 +325,16 @@ export function TasksPage({
         <p className="filter-hint">Everything is done — completed tasks are below.</p>
       )}
 
+      {justCompleted && (
+        <p className="filter-hint task-moved" role="status">
+          “{justCompleted.title}” moved to Completed below.{' '}
+          <button type="button" className="travel-link" onClick={() => setStatusFor(justCompleted, recordOf(justCompleted), 'todo')}>
+            Put it back
+          </button>
+        </p>
+      )}
       {completed.length > 0 && (
-        <details className="completed-tasks" open={!!needle || undefined}>
+        <details ref={completedRef} className="completed-tasks" open={!!needle || completedOpen} onToggle={(e) => setCompletedOpen((e.currentTarget as HTMLDetailsElement).open)}>
           <summary>
             <span className="ui-tile ui-tile--teal" aria-hidden="true">
               <IconCheck />
