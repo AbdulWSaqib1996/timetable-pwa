@@ -1453,7 +1453,7 @@ Automated checks + results: `tests/unit/mentor-store.test.mjs` (6, reworked: ver
 
 Known limits (stated in the audit): copies mentors already downloaded cannot be recalled; the DO manifest and KV blobs are not one atomic transaction — version isolation is what protects the previous share.
 
-Released 13 September 2026: workers deployed first (push `d5fd3899-b2df-4ad2-a029-3d05d9336c15`, feed `6477077e-2fb0-45a9-a1f2-6b525a878039`); merge `460b1b0`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 13 September 2026: workers deployed first (push `d5fd3899-b2df-4ad2-a029-3d05d9336c15`, feed `6477077e-2fb0-45a9-a1f2-6b525a878039`); merge `460b1b0`, CI run 34784438894 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
