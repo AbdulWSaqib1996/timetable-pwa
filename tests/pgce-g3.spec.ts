@@ -215,6 +215,9 @@ test('reviews: a provider judgement needs its source; the handover pack leaves o
 })
 
 test('What’s new lists the latest release once and keeps the history in Settings → Help', async ({ page }) => {
+  // Read the changelog itself so this test survives every release (AGENTS.md rule 5).
+  const { WHATSNEW_ENTRIES } = await import('../src/lib/changelog')
+  const latest = WHATSNEW_ENTRIES[0]
   await page.addInitScript(() => {
     localStorage.setItem('timetable.store.v2', JSON.stringify({ activeId: 'd', profiles: [{ id: 'd', name: 'Demo learner', settings: { demo: true, sheetId: '', gid: null, specialismsChosen: true, checklistDismissed: true, usagePing: false } }] }))
     // Init scripts re-run on every navigation: only seed the old version once, so 'Got it' can persist.
@@ -222,14 +225,13 @@ test('What’s new lists the latest release once and keeps the history in Settin
   })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('./#/today')
-  // The banner shows the LATEST entry (entry 8, the mentor portal) once; older entries stay in Settings → Help.
-  await expect(page.getByText(/Invite a mentor or tutor to a portal/)).toBeVisible()
+  const banner = page.getByRole('region', { name: "What's new" })
+  await expect(banner).toContainText(latest.title)
+  await expect(banner).toContainText(latest.items[0].slice(0, 40))
   await page.getByRole('button', { name: 'Got it' }).click()
-  await expect(page.getByRole('region', { name: "What's new" })).toHaveCount(0)
+  await expect(banner).toHaveCount(0)
   await page.reload()
   await expect(page.getByRole('region', { name: "What's new" })).toHaveCount(0)
   await page.goto('./#/settings/help')
-  await expect(page.getByText('Mentor portal', { exact: true })).toBeVisible()
-  await expect(page.getByText('PGCE file: placements, lessons, knowledge, workload, evidence')).toBeVisible()
-  await expect(page.getByText('History, journey home, PGCE file, digest')).toBeVisible()
+  for (const entry of WHATSNEW_ENTRIES) await expect(page.getByText(entry.title, { exact: true })).toBeVisible()
 })

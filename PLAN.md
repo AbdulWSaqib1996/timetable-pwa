@@ -1400,6 +1400,21 @@ What's new: entry 8 (mentor portal). Known limits: attachments are capped at 2 M
 
 Released 11 September 2026: workers deployed first (push `22a944ba-3e00-41d2-ad48-a2f2b403f14e`, feed `57e62da0-9faa-43ce-b663-e4d1e33e0faa`); merge `24ae366`, CI run 34600638596 success, `deploy.sh verify` seven PASS.
 
+### Pass 74 — Key dates shown once and first on the day (owner report) — 13 September 2026
+
+Work items: the owner reported key dates duplicating on the timetable and appearing among the sessions in an arbitrary position. Branch `keydate-dedupe`, client only.
+
+Root cause: the schedule projection deduplicated key dates by event identity only. Three real sources of a second copy survive that: the key-dates tab repeating a deadline row with its own Event ID (a distinct identity by design, per `reconcileEvents`), a personal task with the same title on the same day (e.g. an academic milestone), and the same deadline also listed as a row on the main timetable tab (a plain session, not a key date). Ordering sorted the day by start time with untimed key dates last, so a key date's place depended on whether it carried a time.
+
+Behaviour before → after:
+- **One highlighted key date per day and title** — `dedupeKeyDates` (in `scheduleProjection.ts`) keeps the first of each day + normalised-title pair after the identity dedupe; the sheet's key dates come before task pins, so the sheet row wins and the task itself is untouched on Tasks. Applied to `allKeyDates`, so Today's deadline strip, reminders and the calendar feed also see each key date once.
+- **The plain course row for that deadline is not repeated** — the projection drops a course session whose day and title match a visible key-date pin; personal events are never touched.
+- **Key dates lead their day** — `byDayKeyDateFirst` sorts the Schedule rows by day, then key dates first, then timed rows by start.
+
+Automated checks + results: `tests/keydate-dedupe.spec.ts` (1: a repeated sheet row with its own ID, a same-title task and the deadline on the main tab collapse to one highlighted first row; other rows keep their order; the task remains on Tasks). What's new entry 9. `npm run validate` AND `VERCEL=1 npm run validate` green — **194 unit and 168 browser tests** (the What's new test now reads the changelog so it survives every release).
+
+Released 13 September 2026: no worker change; merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
 The owner asked for the deployment of `archive/enhancements/2026-09-11-pgce-student-experience/PGCE_QTS_STUDENT_EXPERIENCE_AUDIT.md` to be planned in batches. The plan is [archive/enhancements/2026-09-11-pgce-student-experience/DEVELOPMENT_PLAN.md](archive/enhancements/2026-09-11-pgce-student-experience/DEVELOPMENT_PLAN.md): G0 (Pass 68) placement/provenance foundations and a reviewable tag migration; G1a (Pass 69) P1/P2/P3 school workspaces with outward/return journeys plus the course-aware roadmap; G1b (Pass 70) lesson workbench, practice cycle and mentor preparation; G2 (Pass 71) knowledge goals, academic workspace, workload; G3 (Pass 72) evidence narratives, experience ledger, review packs; G4 (portal) only on a separate go-ahead. Owner questions are in its §5. G0–G3 shipped as Passes 68–72; the package is archived at [archive/enhancements/2026-09-11-pgce-student-experience/](archive/enhancements/2026-09-11-pgce-student-experience/README.md). G4 (mentor portal) shipped as Pass 73 on the owner's go-ahead.

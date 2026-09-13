@@ -7,6 +7,15 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 9,
+    dateISO: '2026-09-13',
+    title: 'Key dates shown once, first on the day',
+    items: [
+      'A key date that appears more than once — a repeated sheet row, a task with the same title, or the same deadline on the timetable tab — now shows as one highlighted row',
+      'On the Schedule, key dates lead their day instead of sitting among the sessions by time',
+    ],
+  },
+  {
     version: 8,
     dateISO: '2026-09-11',
     title: 'Mentor portal',

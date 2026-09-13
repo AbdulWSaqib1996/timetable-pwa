@@ -20,7 +20,7 @@ import { JourneyHomePage } from './features/today/JourneyHomePage'
 import { TodayPage } from './features/today/TodayPage'
 import { parseRoute, useRoute } from './lib/router'
 import { hasInternalPredecessor } from './lib/navigationState'
-import { buildProjection } from './lib/scheduleProjection'
+import { buildProjection, dedupeKeyDates, byDayKeyDateFirst } from './lib/scheduleProjection'
 import { InvalidLinkPage } from './components/InvalidLinkPage'
 import type { Route } from './lib/router'
 
@@ -809,7 +809,8 @@ export default function App() {
   // the shared key-date pipeline (calendar, reminders, Today strip).
   const allKeyDates = useMemo(() => {
     const custom = adminFile.tasks.map(taskToSession)
-    return [...keyDates, ...custom].sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
+    // Sheet key dates first so they win a same-day/same-title dedupe over a task pin.
+    return dedupeKeyDates([...keyDates, ...custom]).sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
   }, [keyDates, adminFile.tasks])
 
   // Task status/notes overlaid on session metadata for display consumers —
@@ -918,7 +919,8 @@ export default function App() {
     [filteredSessions, courseSessions, personalSessions, allKeyDates, settings]
   )
   const scheduleSessions = useMemo(
-    () => [...projection.calendar, ...projection.pins].sort((a, b) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99'))),
+    // Key dates lead their day (owner report, 13 Sep 2026), then timed rows by start.
+    () => [...projection.calendar, ...projection.pins].sort(byDayKeyDateFirst),
     [projection]
   )
 
