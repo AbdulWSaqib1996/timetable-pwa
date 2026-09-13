@@ -1,0 +1,1178 @@
+
+> timetable-pwa@0.1.0 test:unit
+> node --test tests/unit/*.test.mjs
+
+TAP version 13
+# Subtest: actions route to their owning profile, even while another profile is active
+ok 1 - actions route to their owning profile, even while another profile is active
+  ---
+  duration_ms: 1.230875
+  type: 'test'
+  ...
+# Subtest: an action owned by a deleted profile is dropped, never re-attached
+ok 2 - an action owned by a deleted profile is dropped, never re-attached
+  ---
+  duration_ms: 0.159208
+  type: 'test'
+  ...
+# Subtest: unscoped legacy actions apply only when exactly one profile exists
+ok 3 - unscoped legacy actions apply only when exactly one profile exists
+  ---
+  duration_ms: 0.134666
+  type: 'test'
+  ...
+# Subtest: duplicate action ids are applied once; malformed and unknown records are dropped safely
+ok 4 - duplicate action ids are applied once; malformed and unknown records are dropped safely
+  ---
+  duration_ms: 0.188
+  type: 'test'
+  ...
+# Subtest: task 'done' and 'open' route with their kinds; open carries the owner
+ok 5 - task 'done' and 'open' route with their kinds; open carries the owner
+  ---
+  duration_ms: 0.110333
+  type: 'test'
+  ...
+# Subtest: notification data is versioned and drops snoozeUrl without a key
+ok 6 - notification data is versioned and drops snoozeUrl without a key
+  ---
+  duration_ms: 2.262334
+  type: 'test'
+  ...
+# Subtest: a valid batch rebuilds cleanly; unknown fields cannot pass through
+ok 7 - a valid batch rebuilds cleanly; unknown fields cannot pass through
+  ---
+  duration_ms: 5.177542
+  type: 'test'
+  ...
+# Subtest: invalid envelopes are refused whole: bad ids, versions, dates, counts, unknown events
+ok 8 - invalid envelopes are refused whole: bad ids, versions, dates, counts, unknown events
+  ---
+  duration_ms: 1.152166
+  type: 'test'
+  ...
+# Subtest: tomorrow within skew is allowed; setup keeps reported booleans only
+ok 9 - tomorrow within skew is allowed; setup keeps reported booleans only
+  ---
+  duration_ms: 0.134583
+  type: 'test'
+  ...
+# Subtest: the catalogue stays within the per-version cap; capability gates which client may send what
+ok 10 - the catalogue stays within the per-version cap; capability gates which client may send what
+  ---
+  duration_ms: 0.14475
+  type: 'test'
+  ...
+# Subtest: stats/v2 envelope validation: numerator>denominator, bad enums and reversed periods are refused
+ok 11 - stats/v2 envelope validation: numerator>denominator, bad enums and reversed periods are refused
+  ---
+  duration_ms: 0.738167
+  type: 'test'
+  ...
+# Subtest: a replayed batch returns the same ack and never double counts (crash/restart included)
+ok 12 - a replayed batch returns the same ack and never double counts (crash/restart included)
+  ---
+  duration_ms: 23.736416
+  type: 'test'
+  ...
+# Subtest: two new batches on the same token/day each add exactly once; context follows, counts never overwritten
+ok 13 - two new batches on the same token/day each add exactly once; context follows, counts never overwritten
+  ---
+  duration_ms: 1.386167
+  type: 'test'
+  ...
+# Subtest: aggregate: distinct tokens, v2 first-seen new/returning, watermark, honest feature states
+ok 14 - aggregate: distinct tokens, v2 first-seen new/returning, watermark, honest feature states
+  ---
+  duration_ms: 13.331833
+  type: 'test'
+  ...
+# Subtest: aggregate prunes only expired analytics rows; fresh rows and unexpired dedupe records stay
+ok 15 - aggregate prunes only expired analytics rows; fresh rows and unexpired dedupe records stay
+  ---
+  duration_ms: 1.091666
+  type: 'test'
+  ...
+# Subtest: reserved ffffffff test tokens are accepted (smoke tests) but never aggregated
+ok 16 - reserved ffffffff test tokens are accepted (smoke tests) but never aggregated
+  ---
+  duration_ms: 1.800541
+  type: 'test'
+  ...
+# Subtest: cohorts: UTC Monday membership, EXACT-week returns, incomplete weeks dashed, no rolling windows
+ok 17 - cohorts: UTC Monday membership, EXACT-week returns, incomplete weeks dashed, no rolling windows
+  ---
+  duration_ms: 1.846583
+  type: 'test'
+  ...
+# Subtest: capability-2 tokens make real eligible denominators and per-capability start dates
+ok 18 - capability-2 tokens make real eligible denominators and per-capability start dates
+  ---
+  duration_ms: 0.990542
+  type: 'test'
+  ...
+# Subtest: reliability: outcomes counted transactionally by reason and day; rates suppressed below the minimum
+ok 19 - reliability: outcomes counted transactionally by reason and day; rates suppressed below the minimum
+  ---
+  duration_ms: 1.966334
+  type: 'test'
+  ...
+# Subtest: releases: latest observed build per token, Unknown category, comparison only with >= 20 eligible tokens
+ok 20 - releases: latest observed build per token, Unknown category, comparison only with >= 20 eligible tokens
+  ---
+  duration_ms: 5.044417
+  type: 'test'
+  ...
+# Subtest: freshness policy: fresh within the window, stale after it, missing without data
+ok 21 - freshness policy: fresh within the window, stale after it, missing without data
+  ---
+  duration_ms: 1.448416
+  type: 'test'
+  ...
+# Subtest: personal busy blocks remove free time exactly like course sessions
+ok 22 - personal busy blocks remove free time exactly like course sessions
+  ---
+  duration_ms: 0.993
+  type: 'test'
+  ...
+# Subtest: working hours and minimum meeting length are honoured, weekends skipped
+ok 23 - working hours and minimum meeting length are honoured, weekends skipped
+  ---
+  duration_ms: 0.344833
+  type: 'test'
+  ...
+# Subtest: timezone difference: Paris wall slots land on London wall time, cross-day splits are honest
+ok 24 - timezone difference: Paris wall slots land on London wall time, cross-day splits are honest
+  ---
+  duration_ms: 22.081167
+  type: 'test'
+  ...
+# Subtest: intersection counts only fresh members; stale and missing are excluded with reasons
+ok 25 - intersection counts only fresh members; stale and missing are excluded with reasons
+  ---
+  duration_ms: 0.40825
+  type: 'test'
+  ...
+# Subtest: same-name members intersect as distinct people
+ok 26 - same-name members intersect as distinct people
+  ---
+  duration_ms: 0.096958
+  type: 'test'
+  ...
+# Subtest: a member in another timezone intersects on converted wall time
+ok 27 - a member in another timezone intersects on converted wall time
+  ---
+  duration_ms: 0.285291
+  type: 'test'
+  ...
+# Subtest: privacy: the published payload carries intervals and identity only — never titles
+ok 28 - privacy: the published payload carries intervals and identity only — never titles
+  ---
+  duration_ms: 0.135375
+  type: 'test'
+  ...
+# Subtest: export identity: the same proposal always yields the same calendar UID
+ok 29 - export identity: the same proposal always yields the same calendar UID
+  ---
+  duration_ms: 1.037583
+  type: 'test'
+  ...
+# Subtest: envelope constants and document shape
+ok 30 - envelope constants and document shape
+  ---
+  duration_ms: 223.836875
+  type: 'test'
+  ...
+# Subtest: round trip: right passphrase opens; wrong passphrase, tampering and parameter edits all fail closed
+ok 31 - round trip: right passphrase opens; wrong passphrase, tampering and parameter edits all fail closed
+  ---
+  duration_ms: 14.487958
+  type: 'test'
+  ...
+# Subtest: passphrase policy: shorter than the minimum is refused before any key derivation
+ok 32 - passphrase policy: shorter than the minimum is refused before any key derivation
+  ---
+  duration_ms: 0.366166
+  type: 'test'
+  ...
+# Subtest: test vector: fixed salt/IV/iterations produce the documented ciphertext and open again
+ok 33 - test vector: fixed salt/IV/iterations produce the documented ciphertext and open again
+  ---
+  duration_ms: 8.379542
+  type: 'test'
+  ...
+# Subtest: course "today" follows Europe/London, not the device zone
+ok 34 - course "today" follows Europe/London, not the device zone
+  ---
+  duration_ms: 22.217416
+  type: 'test'
+  ...
+# Subtest: day arithmetic crosses months, leap days and year boundaries
+ok 35 - day arithmetic crosses months, leap days and year boundaries
+  ---
+  duration_ms: 0.322083
+  type: 'test'
+  ...
+# Subtest: month navigation preserves the day number where valid and clamps otherwise
+ok 36 - month navigation preserves the day number where valid and clamps otherwise
+  ---
+  duration_ms: 1.84825
+  type: 'test'
+  ...
+# Subtest: migration fixture: the UCL built-in validates and matches the pre-P7 constants
+ok 37 - migration fixture: the UCL built-in validates and matches the pre-P7 constants
+  ---
+  duration_ms: 20.655125
+  type: 'test'
+  ...
+# Subtest: a second course in another timezone validates; its wall times convert on the shared path
+ok 38 - a second course in another timezone validates; its wall times convert on the shared path
+  ---
+  duration_ms: 3.063
+  type: 'test'
+  ...
+# Subtest: two courses can share a subject/course name — identity is the configId, not the name
+ok 39 - two courses can share a subject/course name — identity is the configId, not the name
+  ---
+  duration_ms: 0.324875
+  type: 'test'
+  ...
+# Subtest: invalid templates are refused with reasons, never half-applied
+ok 40 - invalid templates are refused with reasons, never half-applied
+  ---
+  duration_ms: 0.200042
+  type: 'test'
+  ...
+# Subtest: template update preserves personal data: only courseConfig changes
+ok 41 - template update preserves personal data: only courseConfig changes
+  ---
+  duration_ms: 0.722208
+  type: 'test'
+  ...
+# Subtest: portable template contains no secrets: whitelist rebuild drops every foreign field
+ok 42 - portable template contains no secrets: whitelist rebuild drops every foreign field
+  ---
+  duration_ms: 0.219417
+  type: 'test'
+  ...
+# Subtest: journeyProvider is part of the template: defaults to tfl, accepts none, rejects anything else
+ok 43 - journeyProvider is part of the template: defaults to tfl, accepts none, rejects anything else
+  ---
+  duration_ms: 0.3485
+  type: 'test'
+  ...
+# Subtest: release driver selects its own dispatch and fails closed on missing, failed or timed out runs
+ok 44 - release driver selects its own dispatch and fails closed on missing, failed or timed out runs
+  ---
+  duration_ms: 1170.987083
+  type: 'test'
+  ...
+# Subtest: shared hosting gate stops after each failed stage
+ok 45 - shared hosting gate stops after each failed stage
+  ---
+  duration_ms: 829.576542
+  type: 'test'
+  ...
+# Subtest: attended, absent and unrecorded are separate; future and non-eligible rows are excluded
+ok 46 - attended, absent and unrecorded are separate; future and non-eligible rows are excluded
+  ---
+  duration_ms: 0.868542
+  type: 'test'
+  ...
+# Subtest: all unrecorded and zero-denominator cases stay honest
+ok 47 - all unrecorded and zero-denominator cases stay honest
+  ---
+  duration_ms: 0.832542
+  type: 'test'
+  ...
+# Subtest: deleted metadata counts as unrecorded, never as attendance or absence
+ok 48 - deleted metadata counts as unrecorded, never as attendance or absence
+  ---
+  duration_ms: 0.130417
+  type: 'test'
+  ...
+# Subtest: a session later today is not completed until its end time passes
+ok 49 - a session later today is not completed until its end time passes
+  ---
+  duration_ms: 0.151416
+  type: 'test'
+  ...
+# Subtest: two placement events on one date are one school day; inferred days are labelled
+ok 50 - two placement events on one date are one school day; inferred days are labelled
+  ---
+  duration_ms: 0.523042
+  type: 'test'
+  ...
+# Subtest: a self-study row about a placement block is self study, not a school day (owner, 11 Sep 2026)
+ok 51 - a self-study row about a placement block is self study, not a school day (owner, 11 Sep 2026)
+  ---
+  duration_ms: 0.112875
+  type: 'test'
+  ...
+# Subtest: normalizeText folds case, accents and punctuation
+ok 52 - normalizeText folds case, accents and punctuation
+  ---
+  duration_ms: 2.764459
+  type: 'test'
+  ...
+# Subtest: default scope searches titles/rooms/tutors; notes only when opted in
+ok 53 - default scope searches titles/rooms/tutors; notes only when opted in
+  ---
+  duration_ms: 0.777166
+  type: 'test'
+  ...
+# Subtest: rebuild reuses unchanged entries and drops tombstoned owners
+ok 54 - rebuild reuses unchanged entries and drops tombstoned owners
+  ---
+  duration_ms: 0.234333
+  type: 'test'
+  ...
+# Subtest: ranking: title hits first, then upcoming soonest, then past newest
+ok 55 - ranking: title hits first, then upcoming soonest, then past newest
+  ---
+  duration_ms: 9.021375
+  type: 'test'
+  ...
+# Subtest: 10,000 entries: paged to 50 and every query answers fast
+ok 56 - 10,000 entries: paged to 50 and every query answers fast
+  ---
+  duration_ms: 78.976458
+  type: 'test'
+  ...
+# Subtest: create → join → get: stable ids, tokens never listed, same-name members stay distinct
+ok 57 - create → join → get: stable ids, tokens never listed, same-name members stay distinct
+  ---
+  duration_ms: 24.578875
+  type: 'test'
+  ...
+# Subtest: rename keeps identity; a stale/wrong token is refused, not applied to someone else
+ok 58 - rename keeps identity; a stale/wrong token is refused, not applied to someone else
+  ---
+  duration_ms: 2.494042
+  type: 'test'
+  ...
+# Subtest: two simultaneous joins both land (transactions serialize; no lost update)
+ok 59 - two simultaneous joins both land (transactions serialize; no lost update)
+  ---
+  duration_ms: 1.369834
+  type: 'test'
+  ...
+# Subtest: legacy KV members import once with stable ids and stay name-addressable; KV is never deleted
+ok 60 - legacy KV members import once with stable ids and stay name-addressable; KV is never deleted
+  ---
+  duration_ms: 0.915542
+  type: 'test'
+  ...
+# Subtest: invalid intervals are dropped and joins to a missing group 404
+ok 61 - invalid intervals are dropped and joins to a missing group 404
+  ---
+  duration_ms: 0.295291
+  type: 'test'
+  ...
+# Subtest: leaving the last member removes the group; a full group refuses a 13th member
+ok 62 - leaving the last member removes the group; a full group refuses a 13th member
+  ---
+  duration_ms: 6.169875
+  type: 'test'
+  ...
+# Subtest: KV listings paginate through every cursor page
+ok 63 - KV listings paginate through every cursor page
+  ---
+  duration_ms: 17.080208
+  type: 'test'
+  ...
+# Subtest: propose requires a valid capability; the proposal lists with stable id, rev and proposer-yes
+ok 64 - propose requires a valid capability; the proposal lists with stable id, rev and proposer-yes
+  ---
+  duration_ms: 1.560042
+  type: 'test'
+  ...
+# Subtest: simultaneous proposal edits: the second writer with a stale rev gets 409 plus the fresh copy
+ok 65 - simultaneous proposal edits: the second writer with a stale rev gets 409 plus the fresh copy
+  ---
+  duration_ms: 1.183
+  type: 'test'
+  ...
+# Subtest: withdraw is proposer-only; a member who leaves takes their votes and open proposals with them
+ok 66 - withdraw is proposer-only; a member who leaves takes their votes and open proposals with them
+  ---
+  duration_ms: 3.028375
+  type: 'test'
+  ...
+# Subtest: past-dated proposals are pruned on read; invalid slots are refused
+ok 67 - past-dated proposals are pruned on read; invalid slots are refused
+  ---
+  duration_ms: 1.901
+  type: 'test'
+  ...
+# Subtest: London wall times convert to the right UTC instants in summer and winter
+ok 68 - London wall times convert to the right UTC instants in summer and winter
+  ---
+  duration_ms: 23.127125
+  type: 'test'
+  ...
+# Subtest: DST gap shifts forward with a warning; ambiguous hour takes the earlier instant with a warning
+ok 69 - DST gap shifts forward with a warning; ambiguous hour takes the earlier instant with a warning
+  ---
+  duration_ms: 2.418459
+  type: 'test'
+  ...
+# Subtest: ICS folding counts UTF-8 octets, unfolds back to the original
+ok 70 - ICS folding counts UTF-8 octets, unfolds back to the original
+  ---
+  duration_ms: 0.329375
+  type: 'test'
+  ...
+# Subtest: calendar output: UTC instants, all-day deadlines, escaped Unicode titles, stable UIDs
+ok 71 - calendar output: UTC instants, all-day deadlines, escaped Unicode titles, stable UIDs
+  ---
+  duration_ms: 1.402166
+  type: 'test'
+  ...
+# Subtest: verbatim duplicate sheet rows pair with duplicate history and are never flagged
+ok 72 - verbatim duplicate sheet rows pair with duplicate history and are never flagged
+  ---
+  duration_ms: 1.0105
+  type: 'test'
+  ...
+# Subtest: an extra new duplicate is treated as new, not fuzzy-linked to another date
+ok 73 - an extra new duplicate is treated as new, not fuzzy-linked to another date
+  ---
+  duration_ms: 0.389041
+  type: 'test'
+  ...
+# Subtest: a resolved identity sticks across refreshes (resolved history entry wins the claim)
+ok 74 - a resolved identity sticks across refreshes (resolved history entry wins the claim)
+  ---
+  duration_ms: 5.229
+  type: 'test'
+  ...
+# Subtest: toMins parses wall times and rejects garbage
+ok 75 - toMins parses wall times and rejects garbage
+  ---
+  duration_ms: 0.88325
+  type: 'test'
+  ...
+# Subtest: lanes are assigned per connected overlap component (TT-14)
+ok 76 - lanes are assigned per connected overlap component (TT-14)
+  ---
+  duration_ms: 0.310291
+  type: 'test'
+  ...
+# Subtest: classifyNow places every item exactly once by identity; equal starts and nesting survive (TT-06)
+ok 77 - classifyNow places every item exactly once by identity; equal starts and nesting survive (TT-06)
+  ---
+  duration_ms: 2.016208
+  type: 'test'
+  ...
+# Subtest: request identity covers origin+basis, destination, mode, intent time and buffer
+ok 78 - request identity covers origin+basis, destination, mode, intent time and buffer
+  ---
+  duration_ms: 1.080584
+  type: 'test'
+  ...
+# Subtest: required arrival subtracts the buffer; zero and large buffers behave
+ok 79 - required arrival subtracts the buffer; zero and large buffers behave
+  ---
+  duration_ms: 0.428167
+  type: 'test'
+  ...
+# Subtest: validateItinerary parses London wall times (BST) and rejects invalid responses
+ok 80 - validateItinerary parses London wall times (BST) and rejects invalid responses
+  ---
+  duration_ms: 21.703792
+  type: 'test'
+  ...
+# Subtest: feasible pick: latest departure that still arrives by the required instant; none → null
+ok 81 - feasible pick: latest departure that still arrives by the required instant; none → null
+  ---
+  duration_ms: 0.277916
+  type: 'test'
+  ...
+# Subtest: departure state is timestamp-derived: future → imminent → passed, never negative
+ok 82 - departure state is timestamp-derived: future → imminent → passed, never negative
+  ---
+  duration_ms: 0.159792
+  type: 'test'
+  ...
+# Subtest: DST boundary: an arrive-by on the clock-change morning still parses to real instants
+ok 83 - DST boundary: an arrive-by on the clock-change morning still parses to real instants
+  ---
+  duration_ms: 0.637375
+  type: 'test'
+  ...
+# Subtest: duplicate disruption entries on a leg collapse to one warning (TfL repeats them per stop)
+ok 84 - duplicate disruption entries on a leg collapse to one warning (TfL repeats them per stop)
+  ---
+  duration_ms: 1.00125
+  type: 'test'
+  ...
+# Subtest: a station notice attached to two consecutive legs is shown once, on the first leg (owner report)
+ok 85 - a station notice attached to two consecutive legs is shown once, on the first leg (owner report)
+  ---
+  duration_ms: 0.337334
+  type: 'test'
+  ...
+# Subtest: group ranges, lists, dash variants and normalisation all match membership
+ok 86 - group ranges, lists, dash variants and normalisation all match membership
+  ---
+  duration_ms: 1.10225
+  type: 'test'
+  ...
+# Subtest: all-groups forms and empty cells are unrestricted
+ok 87 - all-groups forms and empty cells are unrestricted
+  ---
+  duration_ms: 0.703209
+  type: 'test'
+  ...
+# Subtest: malformed, reversed and oversized ranges are never expanded — literal match only, flagged unknown
+ok 88 - malformed, reversed and oversized ranges are never expanded — literal match only, flagged unknown
+  ---
+  duration_ms: 0.495583
+  type: 'test'
+  ...
+# Subtest: option expansion lists each joinable group once, numerically sorted
+ok 89 - option expansion lists each joinable group once, numerically sorted
+  ---
+  duration_ms: 9.151291
+  type: 'test'
+  ...
+# Subtest: membership combines specialisms and groups; empty selections never narrow
+ok 90 - membership combines specialisms and groups; empty selections never narrow
+  ---
+  duration_ms: 0.318667
+  type: 'test'
+  ...
+# Subtest: worker-config adapter agrees with the membership test for a shared fixture
+ok 91 - worker-config adapter agrees with the membership test for a shared fixture
+  ---
+  duration_ms: 0.453875
+  type: 'test'
+  ...
+# Subtest: owner routes need the owner token; a second device with a different token cannot claim the space
+ok 92 - owner routes need the owner token; a second device with a different token cannot claim the space
+  ---
+  duration_ms: 27.65475
+  type: 'test'
+  ...
+# Subtest: invitation: single use, wrong secret refused, join creates a scoped mentor with a session; login works; passphrase rules
+ok 93 - invitation: single use, wrong secret refused, join creates a scoped mentor with a session; login works; passphrase rules
+  ---
+  duration_ms: 98.574708
+  type: 'test'
+  ...
+# Subtest: packs are scoped to the mentors they were shared with; attachments come back encrypted with their key; feedback is signed and verifiable; revocation cuts everything
+ok 94 - packs are scoped to the mentors they were shared with; attachments come back encrypted with their key; feedback is signed and verifiable; revocation cuts everything
+  ---
+  duration_ms: 64.69275
+  type: 'test'
+  ...
+# Subtest: client contract: reviewer-authenticated needs a well-formed attestation; learner-entered never carries one by mistake
+ok 95 - client contract: reviewer-authenticated needs a well-formed attestation; learner-entered never carries one by mistake
+  ---
+  duration_ms: 3.571375
+  type: 'test'
+  ...
+# Subtest: zero-duration marker rows (end === start) are kept; inverted times are dropped
+ok 96 - zero-duration marker rows (end === start) are kept; inverted times are dropped
+  ---
+  duration_ms: 9.883292
+  type: 'test'
+  ...
+# Subtest: placements and schools are optional collections: legacy and Phase-5 payloads still validate
+ok 97 - placements and schools are optional collections: legacy and Phase-5 payloads still validate
+  ---
+  duration_ms: 2.389084
+  type: 'test'
+  ...
+# Subtest: a placement record validates: code, block mapping, hours, dates, school link; bad shapes are rejected
+ok 98 - a placement record validates: code, block mapping, hours, dates, school link; bad shapes are rejected
+  ---
+  duration_ms: 3.527209
+  type: 'test'
+  ...
+# Subtest: typed placement links on lessons, observations and meetings are format-checked; provenance is client-limited
+ok 99 - typed placement links on lessons, observations and meetings are format-checked; provenance is client-limited
+  ---
+  duration_ms: 1.1135
+  type: 'test'
+  ...
+# Subtest: a profile with three placements round-trips the wire contract and a merge unchanged
+ok 100 - a profile with three placements round-trips the wire contract and a merge unchanged
+  ---
+  duration_ms: 9.551959
+  type: 'test'
+  ...
+# Subtest: schemaVersion is accepted when sane and rejected when not
+ok 101 - schemaVersion is accepted when sane and rejected when not
+  ---
+  duration_ms: 0.566292
+  type: 'test'
+  ...
+# Subtest: mergeAdmin merges placements and schools per record with tombstones, and never drops unknown newer fields
+ok 102 - mergeAdmin merges placements and schools per record with tombstones, and never drops unknown newer fields
+  ---
+  duration_ms: 0.417708
+  type: 'test'
+  ...
+# Subtest: a pack validates as a whitelist rebuild; bad shapes list every error and invent nothing
+ok 103 - a pack validates as a whitelist rebuild; bad shapes list every error and invent nothing
+  ---
+  duration_ms: 1.794458
+  type: 'test'
+  ...
+# Subtest: apply v1 then v2: unchanged requirements keep confirmation, changed ones lose it, removed ones go, done milestones never move, versions pinned
+ok 104 - apply v1 then v2: unchanged requirements keep confirmation, changed ones lose it, removed ones go, done milestones never move, versions pinned
+  ---
+  duration_ms: 0.976791
+  type: 'test'
+  ...
+# Subtest: another pack is untouched by reference when one pack is applied
+ok 105 - another pack is untouched by reference when one pack is applied
+  ---
+  duration_ms: 0.154916
+  type: 'test'
+  ...
+# Subtest: roadmap summary: two pathways, one next review, unconfirmed count; nothing invents a target
+ok 106 - roadmap summary: two pathways, one next review, unconfirmed count; nothing invents a target
+  ---
+  duration_ms: 0.174958
+  type: 'test'
+  ...
+# Subtest: the wire contract validates programmes, packs, requirements and milestones and rejects invented states
+ok 107 - the wire contract validates programmes, packs, requirements and milestones and rejects invented states
+  ---
+  duration_ms: 5.081791
+  type: 'test'
+  ...
+# Subtest: plan revisions: only plan fields bump the revision; evaluation is the other side of the record
+ok 108 - plan revisions: only plan fields bump the revision; evaluation is the other side of the record
+  ---
+  duration_ms: 0.599833
+  type: 'test'
+  ...
+# Subtest: next attempt duplicates the plan under a new identity and copies no outcome
+ok 109 - next attempt duplicates the plan under a new identity and copies no outcome
+  ---
+  duration_ms: 0.530208
+  type: 'test'
+  ...
+# Subtest: one active focus: activating one pauses the other with a reason, never a failure label
+ok 110 - one active focus: activating one pauses the other with a reason, never a failure label
+  ---
+  duration_ms: 0.168084
+  type: 'test'
+  ...
+# Subtest: next steps: dated work only, max three, pinned first, dismissed per day, past plans never "overdue", undated focus never overdue
+ok 111 - next steps: dated work only, max three, pinned first, dismissed per day, past plans never "overdue", undated focus never overdue
+  ---
+  duration_ms: 15.880042
+  type: 'test'
+  ...
+# Subtest: provenance labels: learner-entered never reads as reviewer authorship
+ok 112 - provenance labels: learner-entered never reads as reviewer authorship
+  ---
+  duration_ms: 0.199666
+  type: 'test'
+  ...
+# Subtest: wire contract: workbench fields, cycles and preps validate; invented states and reviewer authorship are rejected
+ok 113 - wire contract: workbench fields, cycles and preps validate; invented states and reviewer authorship are rejected
+  ---
+  duration_ms: 8.399208
+  type: 'test'
+  ...
+# Subtest: remaining effort: estimates on undone children minus future blocks; no estimate is unknown (null), never zero
+ok 114 - remaining effort: estimates on undone children minus future blocks; no estimate is unknown (null), never zero
+  ---
+  duration_ms: 0.677083
+  type: 'test'
+  ...
+# Subtest: proposals never touch protected time or travel buffers, respect due dates, and are earliest-deadline-first
+ok 115 - proposals never touch protected time or travel buffers, respect due dates, and are earliest-deadline-first
+  ---
+  duration_ms: 13.392292
+  type: 'test'
+  ...
+# Subtest: no duplicate scheduling: accepted blocks count as planned and are not proposed again; undo restores the previous plans
+ok 116 - no duplicate scheduling: accepted blocks count as planned and are not proposed again; undo restores the previous plans
+  ---
+  duration_ms: 2.352833
+  type: 'test'
+  ...
+# Subtest: a deadline change recomputes the proposals (no acceptance happens by itself); an impossible deadline reports the gap
+ok 117 - a deadline change recomputes the proposals (no acceptance happens by itself); an impossible deadline reports the gap
+  ---
+  duration_ms: 0.8775
+  type: 'test'
+  ...
+# Subtest: wire contract: goals, resources, projects, readings, contacts, questions, protected windows and support notes validate; invented states rejected
+ok 118 - wire contract: goals, resources, projects, readings, contacts, questions, protected windows and support notes validate; invented states rejected
+  ---
+  duration_ms: 6.763458
+  type: 'test'
+  ...
+# Subtest: a pack pins the canonical record; the old pack stays readable after the source changes and says it is stale
+ok 119 - a pack pins the canonical record; the old pack stays readable after the source changes and says it is stale
+  ---
+  duration_ms: 1.009833
+  type: 'test'
+  ...
+# Subtest: one source record can sit in many examples by reference; removing an example never touches the lesson
+ok 120 - one source record can sit in many examples by reference; removing an example never touches the lesson
+  ---
+  duration_ms: 0.507417
+  type: 'test'
+  ...
+# Subtest: experience ledger: same date/type/layer/source is a double count; layers are summarised apart and never summed; untimed entries are not inferred
+ok 121 - experience ledger: same date/type/layer/source is a double count; layers are summarised apart and never summed; untimed entries are not inferred
+  ---
+  duration_ms: 0.679084
+  type: 'test'
+  ...
+# Subtest: comparisons only against a confirmed requirement; otherwise a total with no deficit
+ok 122 - comparisons only against a confirmed requirement; otherwise a total with no deficit
+  ---
+  duration_ms: 0.217417
+  type: 'test'
+  ...
+# Subtest: handover text leaves out private notes, contacts and identifiers and says nobody received it
+ok 123 - handover text leaves out private notes, contacts and identifiers and says nobody received it
+  ---
+  duration_ms: 0.357666
+  type: 'test'
+  ...
+# Subtest: wire contract: examples, review packs, experience and reviews validate; invented states rejected; legacy merges
+ok 124 - wire contract: examples, review packs, experience and reviews validate; invented states rejected; legacy merges
+  ---
+  duration_ms: 7.041958
+  type: 'test'
+  ...
+# Subtest: legacy payloads without the Phase 5 collections still validate (back-compat)
+ok 125 - legacy payloads without the Phase 5 collections still validate (back-compat)
+  ---
+  duration_ms: 2.437416
+  type: 'test'
+  ...
+# Subtest: new collection records validate strictly: enums, dates, times, bounds
+ok 126 - new collection records validate strictly: enums, dates, times, bounds
+  ---
+  duration_ms: 3.43125
+  type: 'test'
+  ...
+# Subtest: task edits merge per record; identity survives title/due changes; undo beats the tombstone
+ok 127 - task edits merge per record; identity survives title/due changes; undo beats the tombstone
+  ---
+  duration_ms: 11.43825
+  type: 'test'
+  ...
+# Subtest: commitments and plan children merge with tombstones like every other record
+ok 128 - commitments and plan children merge with tombstones like every other record
+  ---
+  duration_ms: 0.485333
+  type: 'test'
+  ...
+# Subtest: shared parser rejects impossible dates/times and only forward fills blank cells
+ok 129 - shared parser rejects impossible dates/times and only forward fills blank cells
+  ---
+  duration_ms: 10.634083
+  type: 'test'
+  ...
+# Subtest: rescheduling and row movement keep legacy owner and calendar UID; explicit IDs handle title changes
+ok 130 - rescheduling and row movement keep legacy owner and calendar UID; explicit IDs handle title changes
+  ---
+  duration_ms: 0.42625
+  type: 'test'
+  ...
+# Subtest: merge tombstones prevent resurrection and converge in both directions
+ok 131 - merge tombstones prevent resurrection and converge in both directions
+  ---
+  duration_ms: 1.763625
+  type: 'test'
+  ...
+# Subtest: payload contracts reject unsafe settings and malformed collections
+ok 132 - payload contracts reject unsafe settings and malformed collections
+  ---
+  duration_ms: 3.683375
+  type: 'test'
+  ...
+# Subtest: sync object imports legacy ciphertext and rejects simultaneous stale revision without deleting KV
+ok 133 - sync object imports legacy ciphertext and rejects simultaneous stale revision without deleting KV
+  ---
+  duration_ms: 19.037292
+  type: 'test'
+  ...
+# Subtest: calendar feed preserves existing UIDs for moved sessions and deadlines
+ok 134 - calendar feed preserves existing UIDs for moved sessions and deadlines
+  ---
+  duration_ms: 17.966042
+  type: 'test'
+  ...
+# Subtest: holiday and cancelled days leave the plan; totals reflect it
+ok 135 - holiday and cancelled days leave the plan; totals reflect it
+  ---
+  duration_ms: 12.804917
+  type: 'test'
+  ...
+# Subtest: inset days follow the explicit policy, never an assumption
+ok 136 - inset days follow the explicit policy, never an assumption
+  ---
+  duration_ms: 1.105041
+  type: 'test'
+  ...
+# Subtest: half days and changed working hours adjust planned minutes; breaks subtract
+ok 137 - half days and changed working hours adjust planned minutes; breaks subtract
+  ---
+  duration_ms: 0.217333
+  type: 'test'
+  ...
+# Subtest: two source rows on one date are ONE day; whole-day tick logs it with honest provenance
+ok 138 - two source rows on one date are ONE day; whole-day tick logs it with honest provenance
+  ---
+  duration_ms: 0.111792
+  type: 'test'
+  ...
+# Subtest: an hours correction overrides the whole-day tick; missing records stay unrecorded, not absent
+ok 139 - an hours correction overrides the whole-day tick; missing records stay unrecorded, not absent
+  ---
+  duration_ms: 0.130667
+  type: 'test'
+  ...
+# Subtest: inferred (span-expanded) days are labelled until confirmed; policy defaults are explicit
+ok 140 - inferred (span-expanded) days are labelled until confirmed; policy defaults are explicit
+  ---
+  duration_ms: 0.089333
+  type: 'test'
+  ...
+# Subtest: real calendar dates only
+ok 141 - real calendar dates only
+  ---
+  duration_ms: 0.972958
+  type: 'test'
+  ...
+# Subtest: study blocks: missing date, impossible date, reverse/zero interval and effort bounds cannot commit; errors name the field (TT-10)
+ok 142 - study blocks: missing date, impossible date, reverse/zero interval and effort bounds cannot commit; errors name the field (TT-10)
+  ---
+  duration_ms: 0.366458
+  type: 'test'
+  ...
+# Subtest: legacy invalid records are flagged "Needs scheduling", never deleted
+ok 143 - legacy invalid records are flagged "Needs scheduling", never deleted
+  ---
+  duration_ms: 0.137
+  type: 'test'
+  ...
+# Subtest: the wire contract enforces the same block/effort rules on import and sync ingestion
+ok 144 - the wire contract enforces the same block/effort rules on import and sync ingestion
+  ---
+  duration_ms: 3.915959
+  type: 'test'
+  ...
+# Subtest: no suggestion overlaps a busy interval; the travel buffer around sessions is honoured and named
+ok 145 - no suggestion overlaps a busy interval; the travel buffer around sessions is honoured and named
+  ---
+  duration_ms: 3.067459
+  type: 'test'
+  ...
+# Subtest: quiet hours and the configurable range cut suggestions; free personal events do not block
+ok 146 - quiet hours and the configurable range cut suggestions; free personal events do not block
+  ---
+  duration_ms: 0.525583
+  type: 'test'
+  ...
+# Subtest: deadlines give a reason; workload totals separate timetabled, planned and personal minutes
+ok 147 - deadlines give a reason; workload totals separate timetabled, planned and personal minutes
+  ---
+  duration_ms: 0.190375
+  type: 'test'
+  ...
+# Subtest: a DST-change week plans on wall minutes: Sunday 25 Oct 2026 keeps its 08:00–20:00 range
+ok 148 - a DST-change week plans on wall minutes: Sunday 25 Oct 2026 keeps its 08:00–20:00 range
+  ---
+  duration_ms: 0.203458
+  type: 'test'
+  ...
+# Subtest: legacy broadcast is disabled; absent or mismatched device credentials never send
+ok 149 - legacy broadcast is disabled; absent or mismatched device credentials never send
+  ---
+  duration_ms: 23.299417
+  type: 'test'
+  ...
+# Subtest: one authenticated device gets one correctly encrypted notification; cooldown is per device
+ok 150 - one authenticated device gets one correctly encrypted notification; cooldown is per device
+  ---
+  duration_ms: 11.612041
+  type: 'test'
+  ...
+# Subtest: reject untrusted destinations, malformed keys, oversized bodies and credential replacement
+ok 151 - reject untrusted destinations, malformed keys, oversized bodies and credential replacement
+  ---
+  duration_ms: 3.398542
+  type: 'test'
+  ...
+# Subtest: provider errors and redirects fail without leaking response bodies or changing subscriptions
+ok 152 - provider errors and redirects fail without leaking response bodies or changing subscriptions
+  ---
+  duration_ms: 3.259834
+  type: 'test'
+  ...
+# Subtest: attendance report: mark, clear, stale revision, unrelated profile and old-day expiry
+ok 153 - attendance report: mark, clear, stale revision, unrelated profile and old-day expiry
+  ---
+  duration_ms: 1.458208
+  type: 'test'
+  ...
+# Subtest: attendance report: legacy union-style marks migrate into the subscription profile by their key date, else expire
+ok 154 - attendance report: legacy union-style marks migrate into the subscription profile by their key date, else expire
+  ---
+  duration_ms: 0.276333
+  type: 'test'
+  ...
+# Subtest: /attendance endpoint: validates the snapshot contract, rejects stale reports with 409, skips unchanged writes, migrates legacy marks
+ok 155 - /attendance endpoint: validates the snapshot contract, rejects stale reports with 409, skips unchanged writes, migrates legacy marks
+  ---
+  duration_ms: 3.60675
+  type: 'test'
+  ...
+# Subtest: planSources lists main, extra tabs and key dates in a stable order; demo plans nothing
+ok 156 - planSources lists main, extra tabs and key dates in a stable order; demo plans nothing
+  ---
+  duration_ms: 0.80025
+  type: 'test'
+  ...
+# Subtest: one failed source keeps its last good rows, labelled stale, without advancing success time
+ok 157 - one failed source keeps its last good rows, labelled stale, without advancing success time
+  ---
+  duration_ms: 1.252084
+  type: 'test'
+  ...
+# Subtest: a failed source with nothing cached reports an error and returns no rows
+ok 158 - a failed source with nothing cached reports an error and returns no rows
+  ---
+  duration_ms: 0.162417
+  type: 'test'
+  ...
+# Subtest: rows from a source that is no longer configured are dropped from the live set
+ok 159 - rows from a source that is no longer configured are dropped from the live set
+  ---
+  duration_ms: 0.134917
+  type: 'test'
+  ...
+# Subtest: cached rows without a sourceKey belong to the main source and survive its failure
+ok 160 - cached rows without a sourceKey belong to the main source and survive its failure
+  ---
+  duration_ms: 0.183959
+  type: 'test'
+  ...
+# Subtest: warning-only source stays ok and keeps its warnings; empty rows are not an error
+ok 161 - warning-only source stays ok and keeps its warnings; empty rows are not an error
+  ---
+  duration_ms: 0.182333
+  type: 'test'
+  ...
+# Subtest: generation gate: an older request that resolves after a newer one is not current
+ok 162 - generation gate: an older request that resolves after a newer one is not current
+  ---
+  duration_ms: 31.833459
+  type: 'test'
+  ...
+# Subtest: parseLineString: provider JSON in, [lat,lng] pairs out; garbage and bad points dropped
+ok 163 - parseLineString: provider JSON in, [lat,lng] pairs out; garbage and bad points dropped
+  ---
+  duration_ms: 1.095583
+  type: 'test'
+  ...
+# Subtest: very long lines downsample but keep both endpoints
+ok 164 - very long lines downsample but keep both endpoints
+  ---
+  duration_ms: 2.162584
+  type: 'test'
+  ...
+# Subtest: fitZoom: every route point projects inside the padded viewport at the returned zoom
+ok 165 - fitZoom: every route point projects inside the padded viewport at the returned zoom
+  ---
+  duration_ms: 0.349875
+  type: 'test'
+  ...
+# Subtest: a long route fits at a lower zoom than a short one; a single point stays a sane close-up
+ok 166 - a long route fits at a lower zoom than a short one; a single point stays a sane close-up
+  ---
+  duration_ms: 0.197917
+  type: 'test'
+  ...
+# Subtest: itinerary legs carry provider geometry when present, [] when absent or broken — never invented
+ok 167 - itinerary legs carry provider geometry when present, [] when absent or broken — never invented
+  ---
+  duration_ms: 15.603625
+  type: 'test'
+  ...
+# Subtest: ADM-01: /stats fails CLOSED — absent or empty server key is 503 and nothing is scanned
+ok 168 - ADM-01: /stats fails CLOSED — absent or empty server key is 503 and nothing is scanned
+  ---
+  duration_ms: 17.17125
+  type: 'test'
+  ...
+# Subtest: ADM-01/03: wrong or missing credentials are 401 before any scan; Bearer only (query window closed in A2)
+ok 169 - ADM-01/03: wrong or missing credentials are 401 before any scan; Bearer only (query window closed in A2)
+  ---
+  duration_ms: 3.828959
+  type: 'test'
+  ...
+# Subtest: ADM-09: days=1 does not truncate the NAMED 7/30-day figures
+ok 170 - ADM-09: days=1 does not truncate the NAMED 7/30-day figures
+  ---
+  duration_ms: 0.681375
+  type: 'test'
+  ...
+# Subtest: ADM-10: a listed row whose read returns null is completeness metadata, not activity
+ok 171 - ADM-10: a listed row whose read returns null is completeness metadata, not activity
+  ---
+  duration_ms: 0.828167
+  type: 'test'
+  ...
+# Subtest: ADM-11: a capped pagination scan is flagged incomplete, never a silent partial total
+ok 172 - ADM-11: a capped pagination scan is flagged incomplete, never a silent partial total
+  ---
+  duration_ms: 1.800958
+  type: 'test'
+  ...
+# Subtest: ADM-12: zero/negative counters never mint adopters; unknown setup is not false
+ok 173 - ADM-12: zero/negative counters never mint adopters; unknown setup is not false
+  ---
+  duration_ms: 1.034333
+  type: 'test'
+  ...
+# Subtest: ADM-12/16: /ping stores only positive counters and reported booleans; oversized/non-JSON is refused
+ok 174 - ADM-12/16: /ping stores only positive counters and reported booleans; oversized/non-JSON is refused
+  ---
+  duration_ms: 2.416041
+  type: 'test'
+  ...
+# Subtest: /stats/v2: fail-closed Bearer-only auth, section allowlist, published-snapshot-or-503, no-store
+ok 175 - /stats/v2: fail-closed Bearer-only auth, section allowlist, published-snapshot-or-503, no-store
+  ---
+  duration_ms: 0.693833
+  type: 'test'
+  ...
+# Subtest: /v2/batch: schema failures are refused before any write; a valid batch reaches the coordinator once
+ok 176 - /v2/batch: schema failures are refused before any write; a valid batch reaches the coordinator once
+  ---
+  duration_ms: 1.358458
+  type: 'test'
+  ...
+# Subtest: /v2/batch reports refused attempts (schema, oversize, rate-limit) to the coordinator, accepted ones record last-seen
+ok 177 - /v2/batch reports refused attempts (schema, oversize, rate-limit) to the coordinator, accepted ones record last-seen
+  ---
+  duration_ms: 16.301542
+  type: 'test'
+  ...
+# Subtest: retention rule: dormant without activation, grace period honoured, expires ONLY old first-seen tokens with no last-seen
+ok 178 - retention rule: dormant without activation, grace period honoured, expires ONLY old first-seen tokens with no last-seen
+  ---
+  duration_ms: 0.388917
+  type: 'test'
+  ...
+# Subtest: snapshot publishing: republishes when ANY section changes, skips only pure timestamp churn, keeps the old snapshot on failure
+ok 179 - snapshot publishing: republishes when ANY section changes, skips only pure timestamp churn, keeps the old snapshot on failure
+  ---
+  duration_ms: 0.496542
+  type: 'test'
+  ...
+# Subtest: ADM-05: an event recorded during a send survives the acknowledgement
+ok 180 - ADM-05: an event recorded during a send survives the acknowledgement
+  ---
+  duration_ms: 1.719666
+  type: 'test'
+  ...
+# Subtest: a lost acknowledgement resends the SAME immutable batchId; duplicate ack is a no-op
+ok 181 - a lost acknowledgement resends the SAME immutable batchId; duplicate ack is a no-op
+  ---
+  duration_ms: 0.307083
+  type: 'test'
+  ...
+# Subtest: ADM-06: two tabs cannot send concurrently; an expired lease is taken over with the same batch
+ok 182 - ADM-06: two tabs cannot send concurrently; an expired lease is taken over with the same batch
+  ---
+  duration_ms: 0.251583
+  type: 'test'
+  ...
+# Subtest: ADM-08: offline days keep their own observed dates; a batch carries at most 7, oldest first
+ok 183 - ADM-08: offline days keep their own observed dates; a batch carries at most 7, oldest first
+  ---
+  duration_ms: 9.761459
+  type: 'test'
+  ...
+# Subtest: ADM-07: opt-out clears every pending counter and a stale in-flight batch cannot resurface
+ok 184 - ADM-07: opt-out clears every pending counter and a stale in-flight batch cannot resurface
+  ---
+  duration_ms: 0.1995
+  type: 'test'
+  ...
+# Subtest: context rides the day segment; counts clamp at 999
+ok 185 - context rides the day segment; counts clamp at 999
+  ---
+  duration_ms: 2.262208
+  type: 'test'
+  ...
+# Subtest: light: every semantic text/background pair reaches 4.5:1
+ok 186 - light: every semantic text/background pair reaches 4.5:1
+  ---
+  duration_ms: 1.250875
+  type: 'test'
+  ...
+# Subtest: dark (data-theme): every semantic text/background pair reaches 4.5:1
+ok 187 - dark (data-theme): every semantic text/background pair reaches 4.5:1
+  ---
+  duration_ms: 0.171916
+  type: 'test'
+  ...
+# Subtest: dark (prefers): every semantic text/background pair reaches 4.5:1
+ok 188 - dark (prefers): every semantic text/background pair reaches 4.5:1
+  ---
+  duration_ms: 0.106167
+  type: 'test'
+  ...
+# Subtest: the dark themes declare the same semantic tokens as light
+ok 189 - the dark themes declare the same semantic tokens as light
+  ---
+  duration_ms: 0.577333
+  type: 'test'
+  ...
+# Subtest: legacy hard-coded status colours are gone from the stylesheet
+ok 190 - legacy hard-coded status colours are gone from the stylesheet
+  ---
+  duration_ms: 2.862792
+  type: 'test'
+  ...
+# Subtest: status derives from timestamps: live → cached → expired, never backwards
+ok 191 - status derives from timestamps: live → cached → expired, never backwards
+  ---
+  duration_ms: 0.433583
+  type: 'test'
+  ...
+# Subtest: provider data and old cached durations never share a live label; estimates say so
+ok 192 - provider data and old cached durations never share a live label; estimates say so
+  ---
+  duration_ms: 0.154417
+  type: 'test'
+  ...
+# Subtest: departure boards expire on their own short TTL
+ok 193 - departure boards expire on their own short TTL
+  ---
+  duration_ms: 0.133667
+  type: 'test'
+  ...
+# Subtest: alreadyAtDestination: recent fix within 150 m suppresses; far, stale or missing fixes never do
+ok 194 - alreadyAtDestination: recent fix within 150 m suppresses; far, stale or missing fixes never do
+  ---
+  duration_ms: 0.203
+  type: 'test'
+  ...
+1..194
+# tests 194
+# suites 0
+# pass 194
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2074.18775
