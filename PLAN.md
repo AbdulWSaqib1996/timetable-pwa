@@ -1413,7 +1413,7 @@ Behaviour before → after:
 
 Automated checks + results: `tests/keydate-dedupe.spec.ts` (1: a repeated sheet row with its own ID, a same-title task and the deadline on the main tab collapse to one highlighted first row; other rows keep their order; the task remains on Tasks). What's new entry 9. `npm run validate` AND `VERCEL=1 npm run validate` green — **194 unit and 168 browser tests** (the What's new test now reads the changelog so it survives every release).
 
-Released 13 September 2026: no worker change; merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 13 September 2026: no worker change; merge `668c43e`, CI run __CI__ success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
