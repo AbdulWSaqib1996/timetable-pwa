@@ -7,6 +7,14 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 10,
+    dateISO: '2026-09-13',
+    title: 'Completed tasks are easy to find',
+    items: [
+      'Marking a task done opens the Completed section, scrolls it into view, highlights the task and offers Put it back',
+    ],
+  },
+  {
     version: 9,
     dateISO: '2026-09-13',
     title: 'Key dates shown once, first on the day',

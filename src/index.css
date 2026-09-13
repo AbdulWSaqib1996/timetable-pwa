@@ -6043,3 +6043,8 @@ button.workspace-row { cursor: pointer; }
 .whatsnew-banner { margin: 12px 0; }
 .whatsnew-banner .whatsnew-list { margin: 6px 0 10px; padding-left: 18px; }
 .sheet-packs .setup-list { margin: 6px 0; }
+
+/* Tasks: a just-completed row is easy to find in the Completed section (13 Sep 2026) */
+.completed-tasks > summary::-webkit-details-marker { display: none; }
+.task-card-just-completed { outline: 2px solid var(--accent, #3b5bdb); outline-offset: 2px; }
+.task-moved { margin: 12px 0 0; }

@@ -79,7 +79,8 @@ test('task CRUD: create, edit keeps identity, duplicate never inherits completio
   // completion history stays.
   // R1 / TT-09: the status control is an explicit labelled menu, not a cycle.
   await page.getByRole('combobox', { name: 'Status for Write assignment plan' }).selectOption('done')
-  await page.locator('.completed-tasks summary').click()
+  // Pass 75: marking done opens the Completed section itself.
+  await expect(page.locator('.completed-tasks')).toHaveAttribute('open', '')
   await page.locator('.completed-tasks li', { hasText: 'Write assignment plan' }).locator('.keydate-row').click()
   await page.getByLabel('Title').fill('Write assignment plan v2')
   await page.getByRole('button', { name: 'Save task' }).click()
