@@ -31,6 +31,8 @@ Before planning, each P1/P2 finding was checked against `main`:
 
 ### Batch A — sharing correctness and one school truth (Pass 77) — B01, B02, B03, B04
 
+> **Status (13 September 2026): implemented as Pass 77** — see PLAN.md. Deviations: none of substance; the legacy-map mirror from G1a was removed rather than kept as a projection, and the worker's share/attachment handlers moved outside the storage transaction because they touch KV.
+
 **In**
 - **B03 stable attachment identity first** (it underpins B01/B02): pack attachment references become `{ uid, profileId, name, size, digest? }` using `attachmentUid`; numeric IndexedDB ids stay local handles. Wire validation for the new shape; migration of existing `attachments[]` entries by resolving the local numeric id → uid where the file is present, else marking `missing` with a **Relink** control ("Missing — choose the original file"); backup/restore keeps uids. Mentor share attachment ids become the uid (hash-encoded to satisfy the worker's id regex).
 - **B01 isolated pack editor state**: `picked / shareWith / shareAtt / shareMsg` keyed by `{profileId, packId}` (a draft per pack, reset on profile change); files resolved only from the current pack's references ∩ wallet ∩ explicit selection; the share becomes an immutable **share command** `{packId, revision, recipients, attachments}` built at confirm time; a status line per pack. Test asserts the exact request body across A→B switches.
@@ -103,7 +105,7 @@ Per the audit's §7: move `project-audit-2026-09-13/` to `archive/enhancements/2
 
 ## 5. Questions for the owner (defaults apply if unanswered)
 
-1. Display labels: show placements as P1/P2/P3 (audit) or keep SE1/SE2/SE3 on screen? — *default: keep SE1/SE2/SE3 on screen (owner's own codes, Pass 69); ids never change either way.*
-2. B08: should "End mentor access" also be offered as a service-side close of the whole space? — *default: yes, recoverable (`closedAt`), no deletion.*
+1. Display labels: show placements as P1/P2/P3 (audit) or keep SE1/SE2/SE3 on screen? — *default: keep SE1/SE2/SE3 on screen (owner's own codes, Pass 69); ids never change either way.* Keep SE1/SE2/SE3
+2. B08: should "End mentor access" also be offered as a service-side close of the whole space? — *default: yes, recoverable (`closedAt`), no deletion.* Yes
 3. U05: replace the large transient sheets with routes in Batch C, or keep sheets and add routes only for deep links? — *default: routes for the PGCE workspaces, sheets kept for quick-add forms.*
 4. Batch C order vs D1: run usability before connected features (audit order) — *default: audit order.*

@@ -18,6 +18,8 @@ import { WeekStrip } from './WeekStrip'
 
 interface Props {
   settings: Settings
+  /** B04: school details projected from the canonical placement records (falls back to settings.placements) */
+  placementDetails?: Settings['placements']
   profileName: string
   todayISO: string
   view: ViewMode
@@ -114,6 +116,7 @@ export function SchedulePage({
   onFindAnything,
   planUndo,
   onUndoPlan,
+  placementDetails,
 }: Props) {
   const wide = useMinWidth(1024)
   // ≥1280px: selection fills the side panel instead of opening the full
@@ -329,7 +332,7 @@ export function SchedulePage({
           termStartISO={settings.termStartISO}
           coords={coords}
           travelMode={travelMode}
-          placements={settings.placements}
+          placements={placementDetails ?? settings.placements}
           emptyMessage={`No sessions match “${query.trim()}”.`}
         />
         </>
@@ -363,7 +366,7 @@ export function SchedulePage({
             termStartISO={settings.termStartISO}
             coords={coords}
             travelMode={travelMode}
-            placements={settings.placements}
+            placements={placementDetails ?? settings.placements}
             windowed
             showAllPast={anchorISO < todayISO}
             emptyMessage="No sessions match the current filters."
@@ -382,7 +385,7 @@ export function SchedulePage({
               termStartISO={settings.termStartISO}
               coords={coords}
               travelMode={travelMode}
-              placements={settings.placements}
+              placements={placementDetails ?? settings.placements}
             />
           </div>
           {panel && hasPanel && (
@@ -437,7 +440,7 @@ export function SchedulePage({
                   metaMap={metaMap}
                   coords={coords}
                   travelMode={travelMode}
-                  placements={settings.placements}
+                  placements={placementDetails ?? settings.placements}
                   emptyMessage="No sessions on this day."
                   onSelect={onSelect}
                 />
@@ -467,7 +470,7 @@ export function SchedulePage({
                 metaMap={metaMap}
                 coords={coords}
                 travelMode={travelMode}
-                placements={settings.placements}
+                placements={placementDetails ?? settings.placements}
                 emptyMessage="No sessions on this day."
                 onSelect={onSelect}
               />

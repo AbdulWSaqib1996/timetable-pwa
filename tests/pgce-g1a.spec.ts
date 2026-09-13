@@ -63,7 +63,7 @@ async function seed(page: Page, opts: { home?: boolean; admin?: Record<string, u
 const admin = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.fx') ?? '{}'))
 const card = (page: Page, code: string) => page.getByRole('list', { name: 'Your placements' }).getByRole('listitem').filter({ has: page.getByRole('heading', { level: 3, name: new RegExp(`^${code}`) }) })
 
-test('chooser states; setting up SE2 through the flow leaves SE1 and SE3 byte-for-byte unchanged and mirrors the confirmed pin', async ({ page, context }) => {
+test('chooser states; setting up SE2 through the flow leaves SE1 and SE3 byte-for-byte unchanged and writes nothing to the legacy map', async ({ page, context }) => {
   await context.route('**/api.postcodes.io/**', (route: Route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 200, result: { latitude: 51.52, longitude: -0.09 } }) }))
   await seed(page)
   await page.goto('./#/pgce')
@@ -118,9 +118,10 @@ test('chooser states; setting up SE2 through the flow leaves SE1 and SE3 byte-fo
   expect(school.confirmedAt).toBeGreaterThan(0)
   await expect(card(page, 'SE2')).toContainText('Ready to plan')
   await expect(card(page, 'SE2')).toContainText('Upcoming')
-  // The block-tag mirror the worker and session travel tab read.
+  // Pass 77 (audit B04): the canonical record is the only owner — nothing is mirrored into the legacy per-block map,
+  // which keeps only what the timetable import wrote and is read solely for blocks no placement claims.
   const settings = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.store.v2')!).profiles[0].settings)
-  expect(settings.placements.SE2).toMatchObject({ school: 'Meadow Park Primary', lat: 51.52, lng: -0.09, mentor: 'B Mentor' })
+  expect(settings.placements.SE2).toBeUndefined()
   expect(settings.placements.SE1A.school).toBe('Riverside Primary')
 })
 

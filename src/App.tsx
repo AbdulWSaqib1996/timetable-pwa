@@ -98,9 +98,9 @@ import { CommitmentSheet } from './components/CommitmentSheet'
 import { PlacementPage } from './features/pgce/PlacementPage'
 import { PlacementWorkspacePage } from './features/pgce/PlacementWorkspacePage'
 import { PlacementJourneyPage } from './features/pgce/PlacementJourneyPage'
-import { placementForTag, placementLabel, schoolOf } from './lib/admin'
+import { placementForTag, placementLabel, proposePlacementCode, schoolOf } from './lib/admin'
+import { effectivePlacementMap, resolvePlacementForSession } from './lib/placementResolve'
 import type { PlacementCode } from './lib/admin'
-import type { PlacementMirror } from './components/PlacementSetupFlow'
 import { newAdminId, placementLabel as placementLabelOf } from './lib/admin'
 import type { Lesson, LessonStage } from './lib/admin'
 import { deriveNextSteps, loadNextStepPrefs, saveNextStepPrefs } from './lib/nextSteps'
@@ -225,25 +225,6 @@ export default function App() {
   // Back only walks history when the previous entry is OURS: an external
   // deep link (notification, share) has history but no in-app predecessor,
   // and history.back() there would leave the PWA (R1 / TT-08).
-  /** G1a: the worker and the session travel tab read school details per BLOCK TAG from
-   *  settings.placements — a confirmed placement setup is mirrored there so reminders
-   *  resolve the school from the session's mapping (never from the page being viewed). */
-  const mirrorPlacementDetails = (m: PlacementMirror) => {
-    if (!settings || m.tags.length === 0) return
-    const current = settings.placements ?? {}
-    const patch: NonNullable<Settings['placements']> = {}
-    for (const tag of m.tags) {
-      patch[tag] = {
-        ...(current[tag] ?? {}),
-        ...(m.school ? { school: m.school } : {}),
-        ...(m.address ? { address: m.address } : {}),
-        ...(m.mentor ? { mentor: m.mentor } : {}),
-        ...(m.lat != null && m.lng != null ? { lat: m.lat, lng: m.lng } : {}),
-      }
-    }
-    updateSettings({ placements: { ...current, ...patch } })
-  }
-
   /** G1b: placement options shared by the editors and the workbench */
   const placementOptions = useMemo(
     () => (adminFile.placements ?? []).map((p) => ({ value: p.id, label: placementLabelOf(p, adminFile.schools ?? []) })),
@@ -1009,6 +990,23 @@ export default function App() {
   }, [courseSessions, adminFile.commitments, planSessions, adminFile.protected, todayISO])
   const planWeekDeadlines = useMemo(() => allKeyDates.map((k) => ({ d: k.dateISO, title: k.title })), [allKeyDates])
 
+  // B04: one source of truth for school details — the canonical placement → school
+  // records, projected into the per-block shape every consumer already reads;
+  // the old per-block map is read only for blocks no placement has claimed.
+  const effectivePlacements = useMemo(
+    () => (settings ? effectivePlacementMap(adminFile, settings, courseSessions) : {}),
+    [adminFile, settings, courseSessions]
+  )
+  const effectiveSettings = useMemo(() => (settings ? { ...settings, placements: effectivePlacements } : settings), [settings, effectivePlacements])
+  // The push worker's config (placement coords for reminders) is built from the projection too.
+  settingsRef.current = effectiveSettings
+  const selectedPlacement = useMemo(() => (selected && settings ? resolvePlacementForSession(selected, adminFile, settings) : null), [selected, adminFile, settings])
+  const openPlacementSetupFor = (tag: string) => {
+    const p = placementForTag(adminFile.placements ?? [], tag)
+    setFlowTarget(p ? { id: p.id } : { code: proposePlacementCode(tag) || 'SE1' })
+    setOpenSheet('placementFlow')
+  }
+
   // Placement progress: unique school days per block, attended via the ✓ tick.
   const placementStats = useMemo(() => {
     const byTag = new Map<string, { total: Set<string>; attended: Set<string> }>()
@@ -1124,7 +1122,7 @@ export default function App() {
   useNotifications({
     metaReady,
     profileId: active?.id ?? null,
-    settings,
+    settings: effectiveSettings,
     reminderSessions: [...reminderSessions, ...remindablePersonal],
     allKeyDates,
     metaMap: effectiveMeta,
@@ -1359,7 +1357,7 @@ export default function App() {
             sources={sources}
             exceptions={adminFile.exceptions}
             personalSessions={personalSessions}
-            settings={settings}
+            settings={effectiveSettings!}
             store={store}
             courseSessions={courseSessions}
             keyDates={allKeyDates}
@@ -1559,6 +1557,7 @@ export default function App() {
       ) : route.name === 'schedule' ? (
         <SchedulePage
           settings={settings}
+          placementDetails={effectivePlacements}
           profileName={active.name}
           todayISO={todayISO}
           view={view}
@@ -1608,7 +1607,7 @@ export default function App() {
           metaMap={effectiveMeta}
           unseenChanges={unseenChanges}
           latestChange={changes.find((c) => !c.seen) ?? null}
-          settings={settings}
+          settings={effectiveSettings!}
           coords={coords}
           travelMode={travelMode}
           locationEnabled={locationEnabled}
@@ -1731,9 +1730,9 @@ export default function App() {
           locationEnabled={locationEnabled}
           travelMode={travelMode}
           profileId={active.id}
-          placementInfo={
-            isPlacementSession(selected) ? (settings.placements ?? {})[placementTag(selected.title)] : undefined
-          }
+          placementInfo={selectedPlacement && selectedPlacement.provenance !== 'none' ? selectedPlacement.info : undefined}
+          placementProvenance={selectedPlacement?.provenance ?? 'none'}
+          onOpenPlacementSetup={() => openPlacementSetupFor(placementTag(selected.title))}
           placementLabel={(() => {
             if (!isPlacementSession(selected)) return undefined
             const p = placementForTag(adminFile.placements ?? [], placementTag(selected.title))
@@ -1812,9 +1811,8 @@ export default function App() {
           schools={adminFile.schools ?? []}
           settings={settings}
           blocks={placementStats.blocks}
-          onSave={(next, mirror) => {
+          onSave={(next) => {
             updateAdmin((file) => ({ ...file, placements: next.placements, schools: next.schools }))
-            mirrorPlacementDetails(mirror)
             setOpenSheet('none')
           }}
           onOpenSettings={() => {
@@ -1898,7 +1896,7 @@ export default function App() {
 
       {openSheet === 'examples' && <EvidenceExamplesSheet admin={adminFile} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
 
-      {openSheet === 'reviewPacks' && settings && <ReviewPackSheet admin={adminFile} profileId={active.id} todayISO={todayISO} settings={settings} onUpdateSettings={updateSettings} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
+      {openSheet === 'reviewPacks' && settings && <ReviewPackSheet key={active.id} admin={adminFile} profileId={active.id} todayISO={todayISO} settings={settings} onUpdateSettings={updateSettings} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
 
       {openSheet === 'experience' && settings && (
         <ExperienceSheet admin={adminFile} settings={settings} sessions={rawCourseSessions} metaMap={metaMap} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />

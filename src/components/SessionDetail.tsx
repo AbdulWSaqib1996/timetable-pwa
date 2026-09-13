@@ -63,6 +63,9 @@ interface Props {
   onOpenHomeJourney?: () => void
   /** G1a: `SE2 · <school>` from the session's block mapping */
   placementLabel?: string
+  /** B04: where the school details come from — the placement setup (canonical) or the old per-block map */
+  placementProvenance?: 'canonical' | 'legacy' | 'none'
+  onOpenPlacementSetup?: () => void
 }
 
 function formatLongDate(dateISO: string): string {
@@ -117,6 +120,8 @@ export function SessionDetail({
   backLabel = 'Back',
   placementInfo,
   placementLabel,
+  placementProvenance,
+  onOpenPlacementSetup,
   onPlacementInfo,
   onMeta,
   onClose,
@@ -390,7 +395,29 @@ export function SessionDetail({
         </section>
       ) : (
         <>
-          {isPlacementSession(session) && onPlacementInfo && (
+          {isPlacementSession(session) && placementProvenance === 'canonical' && (
+            <section className="ui-card detail-card placement-details" aria-label="Placement details">
+              <div className="section-title">
+                <span className="ui-tile ui-tile--teal" aria-hidden="true">
+                  <IconSchool />
+                </span>
+                <h3>Placement details</h3>
+              </div>
+              <dl className="kv">
+                <div><dt>School</dt><dd>{placementInfo?.school || 'Not set'}</dd></div>
+                <div><dt>Address</dt><dd>{placementInfo?.address || 'Not set'}</dd></div>
+                <div><dt>Mentor</dt><dd>{placementInfo?.mentor || 'Not set'}</dd></div>
+                {placementInfo?.notes && <div><dt>Notes</dt><dd>{placementInfo.notes}</dd></div>}
+              </dl>
+              <p className="filter-hint">From your placement setup — one record for every session of this block. Change it there and every screen follows.</p>
+              {onOpenPlacementSetup && (
+                <div className="btn-row">
+                  <button type="button" className="btn-today-reset" onClick={onOpenPlacementSetup}>Edit placement setup</button>
+                </div>
+              )}
+            </section>
+          )}
+          {isPlacementSession(session) && placementProvenance !== 'canonical' && onPlacementInfo && (
             <section className="ui-card detail-card placement-details">
               <div className="section-title">
                 <span className="ui-tile ui-tile--teal" aria-hidden="true">
@@ -446,7 +473,12 @@ export function SessionDetail({
                 value={placementInfo?.notes ?? ''}
                 onChange={(e) => onPlacementInfo({ notes: e.target.value })}
               />
-              <p className="filter-hint">Shared across all sessions of this placement block; saved on this device.</p>
+              <p className="filter-hint">{placementProvenance === 'legacy' ? 'From the timetable only — set up the placement to confirm the school and use it everywhere.' : 'This block is not set up as a placement yet.'}</p>
+              {onOpenPlacementSetup && (
+                <div className="btn-row">
+                  <button type="button" className="btn-today-reset" onClick={onOpenPlacementSetup}>Set up placement</button>
+                </div>
+              )}
             </section>
           )}
           <section className="ui-card detail-card detail-section" aria-labelledby="detail-attendance-heading">

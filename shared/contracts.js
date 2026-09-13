@@ -11,7 +11,7 @@ export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments
  *  authenticated reviewer state needs the (future) portal. */
 export const clientSourceTypes = ['personal-reflection', 'learner-entered']
 /** AdminFile schema version written by this client; unknown newer fields are preserved, never dropped. */
-export const ADMIN_SCHEMA_VERSION = 7
+export const ADMIN_SCHEMA_VERSION = 8
 export function assert(condition, message) { if (!condition) throw new Error(message) }
 export function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 export function safeURL(value) {
@@ -189,7 +189,8 @@ export function validatePayload(data) {
               if (item.notes !== undefined) assert(typeof item.notes === 'string' && item.notes.length <= 4000, 'Invalid pack notes.')
               assert(Array.isArray(item.items ?? []) && (item.items ?? []).length <= 100, 'Invalid pack items.')
               for (const it of item.items ?? []) assert(object(it) && ['example','lesson','observation','meeting','reflection'].includes(it.kind) && typeof it.id === 'string' && Number.isFinite(it.revision) && typeof it.snapshot === 'string' && it.snapshot.length <= 20000 && (it.caption === undefined || (typeof it.caption === 'string' && it.caption.length <= 500)) && (it.provenance === undefined || typeof it.provenance === 'string'), 'Invalid pack item.')
-              if (item.attachments !== undefined) assert(Array.isArray(item.attachments) && item.attachments.length <= 100 && item.attachments.every((a) => object(a) && typeof a.name === 'string' && a.name.length <= 300 && ['local-only','missing'].includes(a.state)), 'Invalid pack attachments.')
+              if (item.attachments !== undefined) assert(Array.isArray(item.attachments) && item.attachments.length <= 100 && item.attachments.every((a) => object(a) && typeof a.name === 'string' && a.name.length <= 300 && ['local-only','missing'].includes(a.state) && (a.uid === undefined || (typeof a.uid === 'string' && a.uid.length <= 120)) && (a.size === undefined || (Number.isInteger(a.size) && a.size >= 0))), 'Invalid pack attachments.')
+              if (item.sharing !== undefined) assert(object(item.sharing) && Number.isInteger(item.sharing.revision) && item.sharing.revision >= 1 && Number.isFinite(item.sharing.sharedAt) && Array.isArray(item.sharing.mentorIds) && Array.isArray(item.sharing.attachmentUids) && typeof item.sharing.textHash === 'string', 'Invalid pack sharing summary.')
             }
             if (key === 'experience') {
               assert(['mentor-meeting','observation','teaching','itap','other'].includes(item.type), 'Invalid experience type.')
