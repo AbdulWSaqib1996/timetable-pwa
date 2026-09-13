@@ -415,8 +415,12 @@ export interface ReviewPackRec {
   createdISO: string
   discussedISO?: string
   items: ReviewPackItem[]
-  attachments?: { id: string; name: string; state: 'local-only' | 'missing' }[]
+  /** B03: `uid` is the stable wallet identity (`attachmentUid`); `id` is the local IndexedDB
+   *  handle kept only for pre-Pass-77 records until they are relinked. */
+  attachments?: { id: string; uid?: string; name: string; size?: number; state: 'local-only' | 'missing' }[]
   notes?: string
+  /** B01/B02: what the portal last received — the diff base for the next share */
+  sharing?: { revision: number; sharedAt: number; mentorIds: string[]; attachmentUids: string[]; textHash: string }
   at: number
 }
 

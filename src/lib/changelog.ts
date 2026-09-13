@@ -7,6 +7,16 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 11,
+    dateISO: '2026-09-13',
+    title: 'Sharing you can check, one school record everywhere',
+    items: [
+      'Review packs: each pack keeps its own picks, recipients and files; sharing shows exactly what changes before you send, and a share replaces what the portal held',
+      'Pack attachments are matched by the file itself, not a device number — a file this device cannot find says so and can be relinked',
+      'School details come from your placement setup everywhere: session travel, the Schedule school-day card, Today and reminders; edit them in one place',
+    ],
+  },
+  {
     version: 10,
     dateISO: '2026-09-13',
     title: 'Completed tasks are easy to find',

@@ -1,4 +1,4 @@
-import { MENTOR_ATTACHMENT_MAX_BYTES, bytesToBase64, encryptBytes, randomHex, validAttestation } from '../../shared/mentor.js'
+import { MENTOR_ATTACHMENT_MAX_BYTES, bytesToBase64, encryptBytes, randomHex, sha256Hex, validAttestation } from '../../shared/mentor.js'
 import type { Attestation } from '../../shared/mentor.js'
 import { DEFAULT_PUSH_BASE } from './config'
 import { newAdminId } from './admin'
@@ -63,18 +63,36 @@ export async function revokeMentor(settings: Settings, space: MentorSpace, mento
   if (!res.ok) throw new Error('Could not end that mentor’s access.')
 }
 
-export interface ShareAttachment { id: string; name: string; bytes: Uint8Array }
+export interface ShareAttachment { uid: string; name: string; bytes: Uint8Array }
 
-/** Share a pack's text with chosen mentors; attachments are encrypted per file before they leave the device. */
-export async function sharePack(settings: Settings, space: MentorSpace, pack: { id: string; title: string; text: string }, mentorIds: string[], attachments: ShareAttachment[]): Promise<{ sharedAt: number; attachments: number }> {
+/** The portal-side attachment id for a stable wallet uid (fits the worker's record-id rule). */
+export const shareAttachmentId = async (uid: string): Promise<string> => (await sha256Hex(`att:${uid}`)).slice(0, 32)
+/** Text hash kept on the pack so the next share can say whether the text changed. */
+export const packTextHash = async (text: string): Promise<string> => (await sha256Hex(text)).slice(0, 32)
+
+export class StaleShareError extends Error {
+  constructor(public readonly revision: number) {
+    super('The pack changed on the server since you last shared — review and share again.')
+  }
+}
+
+/**
+ * Share ONE revision of a pack as a complete replacement of its portal content
+ * (audit B01/B02): text, recipients and attachments. Attachments are encrypted
+ * per file with a fresh key before upload. `revision` must be the last shared
+ * revision + 1; the worker refuses anything else (StaleShareError) and treats a
+ * repeat of the current revision as a harmless replay.
+ */
+export async function sharePack(settings: Settings, space: MentorSpace, pack: { id: string; title: string; text: string }, mentorIds: string[], attachments: ShareAttachment[], revision: number): Promise<{ revision: number; sharedAt: number; attachments: number; replayed?: boolean }> {
   const encrypted = []
   for (const a of attachments) {
     if (a.bytes.byteLength > MENTOR_ATTACHMENT_MAX_BYTES) throw new Error(`${a.name} is over the 2 MB limit for shared attachments.`)
     const key = randomHex(32)
     const blob = await encryptBytes(a.bytes, key)
-    encrypted.push({ id: a.id, name: a.name, size: a.bytes.byteLength, key, iv: blob.iv, data: blob.data })
+    encrypted.push({ id: await shareAttachmentId(a.uid), name: a.name, size: a.bytes.byteLength, key, iv: blob.iv, data: blob.data })
   }
-  const res = await post<{ sharedAt: number; attachments: number; error?: string }>(baseOf(settings), '/mentor/share', { spaceId: space.spaceId, ownerToken: space.ownerToken, pack, mentorIds, attachments: encrypted })
+  const res = await post<{ revision: number; sharedAt: number; attachments: number; replayed?: boolean; error?: string }>(baseOf(settings), '/mentor/share', { spaceId: space.spaceId, ownerToken: space.ownerToken, revision, pack, mentorIds, attachments: encrypted })
+  if (res.status === 409) throw new StaleShareError(Number((res.body as { revision?: number }).revision ?? 0))
   if (!res.ok) throw new Error(res.body.error ?? 'Could not share the pack.')
   return res.body
 }

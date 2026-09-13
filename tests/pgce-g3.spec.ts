@@ -103,7 +103,8 @@ test('review pack: pins snapshots, stays readable after the source edits, shows 
   // A pinned attachment that is not on this device is shown as missing (packs never carry file bytes).
   await page.evaluate(() => {
     const raw = JSON.parse(localStorage.getItem('timetable.admin.v1.fx')!)
-    raw.reviewPacks[0].attachments = [{ id: '424242', name: 'lesson-plan.pdf', state: 'local-only' }]
+    // Pass 77: attachments are matched by stable uid; a uid this device does not hold is missing.
+    raw.reviewPacks[0].attachments = [{ id: '', uid: 'no-such-uid-on-this-device', name: 'lesson-plan.pdf', size: 1200, state: 'local-only' }]
     localStorage.setItem('timetable.admin.v1.fx', JSON.stringify(raw))
   })
   await page.reload()

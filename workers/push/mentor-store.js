@@ -24,15 +24,22 @@ import {
 } from '../../shared/mentor.js'
 
 /**
- * MentorStore (G4): one Durable Object per learner space. Owner routes need
- * the owner token; mentor routes need a live session. Invitations are single
- * use and expire; revocation removes every session at once and hides every
- * pack from that mentor. Attachments are stored ENCRYPTED in KV (the learner's
- * device encrypted them; the per-attachment key lives in this object, so only
- * an authenticated mentor of the space can obtain both). Feedback is signed
+ * MentorStore (G4; sharing semantics reworked in Pass 77 / audit B02): one
+ * Durable Object per learner space. Owner routes need the owner token; mentor
+ * routes need a live session. Invitations are single use and expire;
+ * revocation removes every session at once and hides every pack from that
+ * mentor.
+ *
+ * A share is the COMPLETE REPLACEMENT of a pack's portal content: `{revision,
+ * text, mentorIds, attachments}`. Revisions are per pack and monotonic: a
+ * repeat of the current revision is a no-op replay (retry safe), anything
+ * else out of order is refused with 409 so the learner reviews again.
+ * Ciphertext is written to KV under versioned keys
+ * (`matt:<space>:<pack>:<revision>:<attachment>`) BEFORE the manifest is
+ * committed in this object's storage; a failed upload or commit leaves the
+ * previous manifest valid, and old revisions' blobs simply age out on their
+ * TTL. Mentor routes serve the committed manifest only. Feedback is signed
  * with a worker-wide HMAC key kept in KV (`mentor-signing-key`, minted once).
- * Nothing here touches the learner's own records; the learner's app decides
- * what to store from the inbox.
  */
 
 const json = (obj, status = 200) => Response.json(obj, { status })
@@ -53,6 +60,21 @@ export class MentorStore {
     return key
   }
 
+  async ownerOk(body) {
+    const owner = await this.state.storage.get('owner')
+    if (!owner || !isOwnerToken(body.ownerToken)) return false
+    return constantEquals(await sha256Hex(body.ownerToken), owner.tokenHash)
+  }
+
+  async mentorFromSession(body) {
+    if (!isHex(body.session, 48)) return null
+    const session = await this.state.storage.get(`session:${body.session}`)
+    if (!session || session.expiresAt < now()) return null
+    const mentor = await this.state.storage.get(`mentor:${session.mentorId}`)
+    if (!mentor || mentor.revokedAt) return null
+    return mentor
+  }
+
   async fetch(request) {
     const url = new URL(request.url)
     const space = String(url.searchParams.get('space') ?? '')
@@ -67,6 +89,21 @@ export class MentorStore {
     if (!body || typeof body !== 'object') return json({ error: 'invalid request' }, 400)
     const path = url.pathname
 
+    // Defence in depth: this object serves exactly one space id.
+    const bound = await this.state.storage.get('owner')
+    if (bound && bound.spaceId && bound.spaceId !== space) return json({ error: 'unknown space' }, 404)
+
+    /* ---------- routes that touch KV run outside the storage transaction ---------- */
+    if (path === '/mentor/share') return this.share(space, body)
+    if (path === '/mentor/attachment') return this.attachment(body)
+
+    const newSession = async (tx, mentor) => {
+      const sid = randomHex(24)
+      const expiresAt = now() + MENTOR_SESSION_TTL_MS
+      await tx.put(`session:${sid}`, { mentorId: mentor.id, expiresAt })
+      await tx.put(`mentor:${mentor.id}`, { ...mentor, sessions: [...(mentor.sessions ?? []), sid].slice(-10), lastSeenAt: now() })
+      return { session: sid, expiresAt }
+    }
     const ownerOk = async (tx) => {
       const owner = await tx.get('owner')
       if (!owner || !isOwnerToken(body.ownerToken)) return false
@@ -80,19 +117,8 @@ export class MentorStore {
       if (!mentor || mentor.revokedAt) return null
       return mentor
     }
-    const newSession = async (tx, mentor) => {
-      const sid = randomHex(24)
-      const expiresAt = now() + MENTOR_SESSION_TTL_MS
-      await tx.put(`session:${sid}`, { mentorId: mentor.id, expiresAt })
-      await tx.put(`mentor:${mentor.id}`, { ...mentor, sessions: [...(mentor.sessions ?? []), sid].slice(-10), lastSeenAt: now() })
-      return { session: sid, expiresAt }
-    }
 
     return this.state.storage.transaction(async (tx) => {
-      // Defence in depth: this object serves exactly one space id (the router already
-      // maps each id to its own object); a request for another id is unknown here.
-      const bound = await tx.get('owner')
-      if (bound && bound.spaceId && bound.spaceId !== space) return json({ error: 'unknown space' }, 404)
       /* ---------- owner routes ---------- */
       if (path === '/mentor/space') {
         if (!isOwnerToken(body.ownerToken)) return json({ error: 'invalid request' }, 400)
@@ -139,34 +165,9 @@ export class MentorStore {
         const packs = []
         for (const id of packIds) {
           const p = await tx.get(`pack:${id}`)
-          if (p) packs.push({ id: p.id, title: p.title, sharedAt: p.sharedAt, mentorIds: p.mentorIds, attachments: p.attachments.length })
+          if (p) packs.push({ id: p.id, title: p.title, revision: p.revision, sharedAt: p.sharedAt, mentorIds: p.mentorIds, attachments: p.attachments.length })
         }
         return json({ mentors, invites, packs })
-      }
-      if (path === '/mentor/share') {
-        if (!(await ownerOk(tx))) return json({ error: 'unauthorized' }, 403)
-        const pack = body.pack
-        if (!pack || !isRecordId(pack.id) || typeof pack.title !== 'string' || !pack.title.trim() || typeof pack.text !== 'string' || pack.text.length > MENTOR_PACK_TEXT_MAX) return json({ error: 'invalid pack' }, 400)
-        const mentorIds = Array.isArray(body.mentorIds) ? body.mentorIds.filter(isRecordId) : []
-        for (const id of mentorIds) {
-          const m = await tx.get(`mentor:${id}`)
-          if (!m || m.revokedAt) return json({ error: 'a chosen mentor is not active' }, 400)
-        }
-        const incoming = Array.isArray(body.attachments) ? body.attachments : []
-        if (incoming.length > MENTOR_ATTACHMENTS_PER_PACK) return json({ error: 'too many attachments' }, 400)
-        const attachments = []
-        for (const a of incoming) {
-          if (!a || !isRecordId(a.id) || typeof a.name !== 'string' || !isHex(a.key, 64) || typeof a.iv !== 'string' || typeof a.data !== 'string' || !Number.isFinite(a.size) || a.size > MENTOR_ATTACHMENT_MAX_BYTES || a.data.length > MENTOR_ATTACHMENT_MAX_BYTES * 1.4) return json({ error: 'invalid attachment' }, 400)
-          const kvKey = `matt:${space}:${pack.id}:${a.id}`
-          await this.env.PUSH.put(kvKey, JSON.stringify({ iv: a.iv, data: a.data }), { expirationTtl: MENTOR_ATTACHMENT_TTL_S })
-          attachments.push({ id: a.id, name: cleanName(a.name) || 'file', size: a.size, key: a.key, kvKey })
-        }
-        const existing = await tx.get(`pack:${pack.id}`)
-        const rec = { id: pack.id, title: cleanName(pack.title) || 'Review pack', text: pack.text, sharedAt: now(), mentorIds, attachments: existing ? [...existing.attachments, ...attachments] : attachments }
-        await tx.put(`pack:${pack.id}`, rec)
-        const packIds = (await tx.get('packs')) ?? []
-        if (!packIds.includes(pack.id)) await tx.put('packs', [...packIds, pack.id].slice(-100))
-        return json({ ok: true, packId: pack.id, sharedAt: rec.sharedAt, attachments: rec.attachments.length })
       }
       if (path === '/mentor/inbox') {
         if (!(await ownerOk(tx))) return json({ error: 'unauthorized' }, 403)
@@ -219,7 +220,7 @@ export class MentorStore {
         const packs = []
         for (const id of packIds) {
           const p = await tx.get(`pack:${id}`)
-          if (p && p.mentorIds.includes(mentor.id)) packs.push({ id: p.id, title: p.title, text: p.text, sharedAt: p.sharedAt, attachments: p.attachments.map((a) => ({ id: a.id, name: a.name, size: a.size })) })
+          if (p && p.mentorIds.includes(mentor.id)) packs.push({ id: p.id, title: p.title, revision: p.revision, text: p.text, sharedAt: p.sharedAt, attachments: p.attachments.map((a) => ({ id: a.id, name: a.name, size: a.size })) })
         }
         const feedbackIds = (await tx.get('feedback')) ?? []
         const mine = []
@@ -229,17 +230,6 @@ export class MentorStore {
         }
         return json({ mentor: { id: mentor.id, name: mentor.name }, packs, feedback: mine })
       }
-      if (path === '/mentor/attachment') {
-        const mentor = await mentorFromSession(tx)
-        if (!mentor) return json({ error: 'sign in again' }, 401)
-        const p = isRecordId(body.packId) ? await tx.get(`pack:${body.packId}`) : null
-        if (!p || !p.mentorIds.includes(mentor.id)) return json({ error: 'not shared with you' }, 404)
-        const a = p.attachments.find((x) => x.id === body.attachmentId)
-        if (!a) return json({ error: 'unknown attachment' }, 404)
-        const blob = await this.env.PUSH.get(a.kvKey, 'json')
-        if (!blob) return json({ error: 'attachment expired' }, 410)
-        return json({ name: a.name, size: a.size, key: a.key, iv: blob.iv, data: blob.data })
-      }
       if (path === '/mentor/feedback') {
         const mentor = await mentorFromSession(tx)
         if (!mentor) return json({ error: 'sign in again' }, 401)
@@ -247,17 +237,88 @@ export class MentorStore {
         if (!p || !p.mentorIds.includes(mentor.id)) return json({ error: 'not shared with you' }, 404)
         const text = cleanText(body.text, MENTOR_FEEDBACK_MAX).trim()
         if (!text) return json({ error: 'feedback is empty' }, 400)
+        // Idempotent by the client's own id, so a retry after an uncertain outcome never duplicates.
+        const clientId = isRecordId(body.clientId) ? body.clientId : null
+        if (clientId) {
+          const prior = await tx.get(`feedback-client:${clientId}`)
+          if (prior) {
+            const f = await tx.get(`feedback:${prior}`)
+            if (f) return json({ feedbackId: f.feedbackId, at: f.at, sig: f.sig, replayed: true })
+          }
+        }
         const feedbackId = `fb${randomHex(6)}`
         const at = now()
         const attestation = { spaceId: space, mentorId: mentor.id, mentorName: mentor.name, feedbackId, at }
         const sig = await hmacHex(await this.signingKey(), attestationString(attestation, text))
-        const rec = { ...attestation, sig, packId: p.id, packTitle: p.title, text }
+        const rec = { ...attestation, sig, packId: p.id, packTitle: p.title, packRevision: p.revision, text }
         await tx.put(`feedback:${feedbackId}`, rec)
+        if (clientId) await tx.put(`feedback-client:${clientId}`, feedbackId)
         const ids = (await tx.get('feedback')) ?? []
         await tx.put('feedback', [...ids, feedbackId].slice(-500))
         return json({ feedbackId, at, sig })
       }
       return json({ error: 'not found' }, 404)
     })
+  }
+
+  /** B02: validate the whole manifest, upload ciphertext under versioned keys, then commit atomically. */
+  async share(space, body) {
+    if (!(await this.ownerOk(body))) return json({ error: 'unauthorized' }, 403)
+    const pack = body.pack
+    if (!pack || !isRecordId(pack.id) || typeof pack.title !== 'string' || !pack.title.trim() || typeof pack.text !== 'string' || pack.text.length > MENTOR_PACK_TEXT_MAX) return json({ error: 'invalid pack' }, 400)
+    if (!Number.isInteger(body.revision) || body.revision < 1) return json({ error: 'invalid revision' }, 400)
+    const mentorIds = Array.isArray(body.mentorIds) ? [...new Set(body.mentorIds.filter(isRecordId))] : []
+    for (const id of mentorIds) {
+      const m = await this.state.storage.get(`mentor:${id}`)
+      if (!m || m.revokedAt) return json({ error: 'a chosen mentor is not active' }, 400)
+    }
+    const incoming = Array.isArray(body.attachments) ? body.attachments : []
+    if (incoming.length > MENTOR_ATTACHMENTS_PER_PACK) return json({ error: `at most ${MENTOR_ATTACHMENTS_PER_PACK} attachments per pack` }, 400)
+    const seen = new Set()
+    for (const a of incoming) {
+      if (!a || !isRecordId(a.id) || seen.has(a.id) || typeof a.name !== 'string' || !isHex(a.key, 64) || typeof a.iv !== 'string' || typeof a.data !== 'string' || !Number.isFinite(a.size) || a.size > MENTOR_ATTACHMENT_MAX_BYTES || a.data.length > MENTOR_ATTACHMENT_MAX_BYTES * 1.4) return json({ error: 'invalid attachment' }, 400)
+      seen.add(a.id)
+    }
+    const existing = await this.state.storage.get(`pack:${pack.id}`)
+    const current = existing?.revision ?? 0
+    if (body.revision === current && existing) return json({ ok: true, replayed: true, packId: pack.id, revision: existing.revision, sharedAt: existing.sharedAt, attachments: existing.attachments.length })
+    if (body.revision !== current + 1) return json({ error: 'stale share — the pack changed; review and share again', revision: current }, 409)
+    // 1. Upload every blob under a key that names this revision; nothing served yet.
+    const attachments = []
+    for (const a of incoming) {
+      const kvKey = `matt:${space}:${pack.id}:${body.revision}:${a.id}`
+      try {
+        await this.env.PUSH.put(kvKey, JSON.stringify({ iv: a.iv, data: a.data }), { expirationTtl: MENTOR_ATTACHMENT_TTL_S })
+      } catch {
+        return json({ error: 'upload failed — the previous share is unchanged' }, 502)
+      }
+      attachments.push({ id: a.id, name: cleanName(a.name) || 'file', size: a.size, key: a.key, kvKey })
+    }
+    // 2. Commit the manifest; the transaction is the only thing mentors read.
+    const rec = { id: pack.id, title: cleanName(pack.title) || 'Review pack', revision: body.revision, text: pack.text, sharedAt: now(), mentorIds, attachments }
+    try {
+      await this.state.storage.transaction(async (tx) => {
+        const latest = await tx.get(`pack:${pack.id}`)
+        if ((latest?.revision ?? 0) !== current) throw new Error('concurrent')
+        await tx.put(`pack:${pack.id}`, rec)
+        const packIds = (await tx.get('packs')) ?? []
+        if (!packIds.includes(pack.id)) await tx.put('packs', [...packIds, pack.id].slice(-100))
+      })
+    } catch {
+      return json({ error: 'stale share — the pack changed; review and share again', revision: current }, 409)
+    }
+    return json({ ok: true, packId: pack.id, revision: rec.revision, sharedAt: rec.sharedAt, attachments: rec.attachments.length })
+  }
+
+  async attachment(body) {
+    const mentor = await this.mentorFromSession(body)
+    if (!mentor) return json({ error: 'sign in again' }, 401)
+    const p = isRecordId(body.packId) ? await this.state.storage.get(`pack:${body.packId}`) : null
+    if (!p || !p.mentorIds.includes(mentor.id)) return json({ error: 'not shared with you' }, 404)
+    const a = p.attachments.find((x) => x.id === body.attachmentId)
+    if (!a) return json({ error: 'unknown attachment' }, 404)
+    const blob = await this.env.PUSH.get(a.kvKey, 'json')
+    if (!blob) return json({ error: 'attachment expired' }, 410)
+    return json({ name: a.name, size: a.size, key: a.key, iv: blob.iv, data: blob.data, revision: p.revision })
   }
 }
