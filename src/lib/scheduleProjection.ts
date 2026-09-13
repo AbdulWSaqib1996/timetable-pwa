@@ -31,6 +31,35 @@ export interface Projection {
 
 const byDateTime = (a: Session, b: Session) => (a.dateISO + (a.start || '99')).localeCompare(b.dateISO + (b.start || '99'))
 
+/** Same day and, after trimming/case/whitespace, the same title: one key date, however many rows say so. */
+export const sameDayTitle = (s: Session) => `${s.dateISO}|${s.title.trim().toLowerCase().replace(/\s+/g, ' ')}`
+
+/**
+ * Key dates shown once (owner report, 13 Sep 2026): the key-dates tab can
+ * repeat a deadline row with its own ID, and a personal task can carry the
+ * same title on the same day. Identity dedupe keeps both; this keeps the
+ * FIRST of each day+title pair — sheet key dates come before task pins in the
+ * input, so the sheet's row wins and the task still lives on Tasks.
+ */
+export function dedupeKeyDates(items: Session[]): Session[] {
+  const seenTitle = new Set<string>()
+  const out: Session[] = []
+  for (const s of dedupeByKey(items)) {
+    const t = sameDayTitle(s)
+    if (seenTitle.has(t)) continue
+    seenTitle.add(t)
+    out.push(s)
+  }
+  return out
+}
+
+/** Day first; on a day the highlighted key dates lead, then timed rows by start. */
+export const byDayKeyDateFirst = (a: Session, b: Session) => {
+  if (a.dateISO !== b.dateISO) return a.dateISO.localeCompare(b.dateISO)
+  if (!!a.isKeyDate !== !!b.isKeyDate) return a.isKeyDate ? -1 : 1
+  return (a.start || '99').localeCompare(b.start || '99')
+}
+
 export function dedupeByKey(items: Session[]): Session[] {
   const seen = new Set<string>()
   const out: Session[] = []
@@ -44,8 +73,11 @@ export function dedupeByKey(items: Session[]): Session[] {
 }
 
 export function buildProjection(input: ProjectionInput): Projection {
-  const calendar = dedupeByKey([...input.filteredCourse, ...(input.showPersonal ? input.personal : [])]).sort(byDateTime)
-  const pins = input.showKeyDates ? dedupeByKey(input.keyDates).sort(byDateTime) : []
+  const pins = input.showKeyDates ? dedupeKeyDates(input.keyDates).sort(byDateTime) : []
+  // A deadline that the main timetable tab ALSO lists as a row on that day is one key
+  // date, shown once and highlighted — the plain course row for it is not repeated.
+  const pinTitles = new Set(pins.map(sameDayTitle))
+  const calendar = dedupeByKey([...input.filteredCourse.filter((s) => !pinTitles.has(sameDayTitle(s))), ...(input.showPersonal ? input.personal : [])]).sort(byDateTime)
   // Search ignores temporary display filters: course-member events, personal
   // events and task pins across all dates — the user is looking for a thing,
   // not for what today's filter happens to show.
