@@ -1488,7 +1488,7 @@ Automated checks + results: `tests/unit/tokens.test.mjs` (+2: mentor portal ligh
 
 Known limits: the section pages list recent records only for lessons, meetings and packs (academic work opens its own sheet); the recommendation reads `nextSteps` dismissals from Today, so a step dismissed there is not recommended on the landing that day either.
 
-Released 14 September 2026: no worker change; merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 14 September 2026: no worker change; merge `5175546`, CI run 34828853286 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
