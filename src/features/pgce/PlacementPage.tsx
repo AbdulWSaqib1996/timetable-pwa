@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Card, Dialog, EmptyState, Field, IconClose, PageHeader } from '../../components/ui'
 import { newAdminId, placementForTag, placementLabel } from '../../lib/admin'
-import type { PlacementExceptionRec, PlacementRec, SchoolLocationRec } from '../../lib/admin'
+import type { PlacementCode, PlacementExceptionRec, PlacementRec, SchoolLocationRec } from '../../lib/admin'
+import { PlacementChooser } from './PlacementChooser'
 import { placementBlocks, placementPolicy } from '../../lib/placement'
 import type { PlacementDayView } from '../../lib/placement'
 import { formatRemaining } from '../../lib/format'
@@ -23,6 +24,14 @@ interface Props {
   onDeleteException: (id: string) => void
   onUpdateSettings: (patch: Partial<Settings>) => void
   onBack: () => void
+  /** U01: "All placements" — the three separately configured schools live here now */
+  chooser?: {
+    blocks: { tag: string; total: number; attended: number }[]
+    onOpen: (id: string) => void
+    onSetUp: (code: PlacementCode, id?: string) => void
+    onJourney: (id: string, leg: 'out' | 'back') => void
+    onReviewMapping: () => void
+  }
 }
 
 const fmt = (dateISO: string) => {
@@ -59,6 +68,7 @@ export function PlacementPage({
   onDeleteException,
   onUpdateSettings,
   onBack,
+  chooser,
 }: Props) {
   const policy = placementPolicy(settings)
   const blocks = placementBlocks(sessions, exceptions, settings, (s) => metaMap[sessionKey(s)])
@@ -88,6 +98,14 @@ export function PlacementPage({
         ‹ PGCE file
       </button>
       <PageHeader title="Placement" subtitle={profileName} />
+
+      {chooser && (
+        <Card className="pgce-section pgce-section--placement">
+          <h2 className="subheading">All placements</h2>
+          <p className="filter-hint">Three separately configured schools: set up each with its school, mentor and dates. Blocks from your timetable are mapped to SE1, SE2 and SE3 — proposed, then confirmed by you.</p>
+          <PlacementChooser placements={placements} schools={schools} settings={settings} todayISO={todayISO} blocks={chooser.blocks} onOpen={chooser.onOpen} onSetUp={chooser.onSetUp} onJourney={chooser.onJourney} onAll={() => undefined} onReviewMapping={chooser.onReviewMapping} />
+        </Card>
+      )}
 
       <Card>
         <h3 className="subheading">Working hours & policy</h3>

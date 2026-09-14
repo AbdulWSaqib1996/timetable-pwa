@@ -101,6 +101,8 @@ test('learner and mentor, end to end: invite → join → share exactly the prev
   const sheet = page.getByRole('dialog', { name: 'Review packs' })
   await sheet.getByRole('button', { name: /Progress review 1/ }).click()
   const preview = (await sheet.getByLabel('Pack preview').textContent())!
+  // Pass 79 (U02): recipients live in the People step.
+  await sheet.getByRole('tab', { name: 'People' }).click()
   await sheet.getByRole('checkbox', { name: 'A Mentor' }).check()
   // Pass 77: a share is reviewed first, then sent as a numbered version.
   await sheet.getByRole('button', { name: 'Review share' }).click()
@@ -131,8 +133,7 @@ test('learner and mentor, end to end: invite → join → share exactly the prev
   await expect(sheet.getByRole('status')).toContainText('No new feedback.')
   expect((await admin(page)).observations).toHaveLength(1)
   await sheet.getByRole('button', { name: 'Close' }).click()
-  await page.getByRole('button', { name: /Add or open a record/ }).click()
-  await page.getByRole('menuitem', { name: /^Observations/ }).click()
+  await page.getByRole('button', { name: /^Observations \(/ }).click()
   const obsSheet = page.getByRole('dialog')
   await expect(obsSheet).toContainText('Reviewer-authenticated · A Mentor')
   await expect(obsSheet.getByRole('button', { name: 'Edit observation' })).toHaveCount(0)

@@ -99,7 +99,8 @@ import { PlacementPage } from './features/pgce/PlacementPage'
 import { PlacementWorkspacePage } from './features/pgce/PlacementWorkspacePage'
 import { PlacementJourneyPage } from './features/pgce/PlacementJourneyPage'
 import { placementForTag, placementLabel, proposePlacementCode, schoolOf } from './lib/admin'
-import { effectivePlacementMap, resolvePlacementForSession } from './lib/placementResolve'
+import { effectivePlacementMap, resolvePlacementForSession, resolvePlacementForTag } from './lib/placementResolve'
+import { placementPolicy } from './lib/placement'
 import type { PlacementCode } from './lib/admin'
 import { newAdminId, placementLabel as placementLabelOf } from './lib/admin'
 import type { Lesson, LessonStage } from './lib/admin'
@@ -181,6 +182,9 @@ export default function App() {
   const [dismissedNotices, setDismissedNotices] = useState<Set<string>>(() => loadDismissedNotices())
   const [adminFile, setAdminFile] = useState<AdminFile>(EMPTY_ADMIN)
   const [adminTab, setAdminTab] = useState<AdminTab>('overview')
+  // U05: route-driven sheets carry only transient hints here (form focus, workbench stage).
+  const [adminFocusAdd, setAdminFocusAdd] = useState(false)
+  const [routeWorkbenchStage, setRouteWorkbenchStage] = useState<LessonStage | undefined>(undefined)
   // Task editor: null = closed, { task: null } = create (P5-01).
   const [taskEdit, setTaskEdit] = useState<{ task: TaskRecord | null; focusPlanId?: string; prefillBlock?: BlockPrefill } | null>(null)
   // A study block just added from a Plan-week suggestion — Undo removes it (NF-03).
@@ -1477,6 +1481,16 @@ export default function App() {
           }
           onUpdateSettings={updateSettings}
           onBack={() => goBackOr({ name: 'pgce' })}
+          chooser={{
+            blocks: placementStats.blocks,
+            onOpen: (id) => navigate({ name: 'placement', id }),
+            onSetUp: (code, id) => {
+              setFlowTarget({ code, id })
+              setOpenSheet('placementFlow')
+            },
+            onJourney: (id, leg) => navigate({ name: 'placement', id, leg }),
+            onReviewMapping: () => setOpenSheet('placementSetup'),
+          }}
         />
       ) : route.name === 'tasks' ? (
         <TasksPage
@@ -1525,10 +1539,18 @@ export default function App() {
             targetDays: settings.placementTargetDays,
             blocks: placementStats.blocks.length,
           }}
-          onOpenAdmin={(tab) => {
-            setAdminTab(tab)
-            setOpenSheet('admin')
+          section={route.section ?? null}
+          onOpenSection={(s) => navigate(s ? { name: 'pgce', section: s } : { name: 'pgce' })}
+          onOpenRecords={(tab, opts) => {
+            setAdminFocusAdd(!!opts?.focusAdd)
+            navigate({ name: 'pgce', tab, ...(opts?.recordId ? { recordId: opts.recordId } : {}) })
           }}
+          onOpenLesson={(lessonId, stage) => {
+            setRouteWorkbenchStage(stage)
+            navigate({ name: 'pgce', lessonId })
+          }}
+          onOpenPacks={(packId) => navigate({ name: 'pgce', packs: true, ...(packId ? { packId } : {}) })}
+          onOpenMentorAccess={() => navigate({ name: 'settings', section: 'data' })}
           onOpenJournal={() => setOpenSheet('journal')}
           onOpenStats={() => setOpenSheet('stats')}
           onOpenPlacements={() => navigate({ name: 'placement' })}
@@ -1549,7 +1571,6 @@ export default function App() {
           onOpenAcademic={() => setOpenSheet('academic')}
           onOpenWorkload={() => setOpenSheet('workload')}
           onOpenExamples={() => setOpenSheet('examples')}
-          onOpenReviewPacks={() => setOpenSheet('reviewPacks')}
           onOpenExperience={() => setOpenSheet('experience')}
           onOpenReviews={() => setOpenSheet('reviews')}
           onOpenSettings={() => navigate({ name: 'settings' })}
@@ -1586,6 +1607,15 @@ export default function App() {
           onOpenSettings={() => navigate({ name: 'settings' })}
           onPlanWeek={() => setOpenSheet('planWeek')}
           onFindAnything={() => navigate({ name: 'find' })}
+          schoolDayFor={(tag) => {
+            // U03: the school-day card reads the canonical resolver (B04) and the placement's own hours.
+            const r = resolvePlacementForTag(tag, adminFile, settings)
+            if (r.provenance === 'none') return null
+            const policy = placementPolicy(settings)
+            const hours = r.placement?.workingHours ?? { start: policy.start, end: policy.end }
+            return { code: r.placement?.code ?? tag, school: r.info.school, hours, hoursSource: r.placement?.workingHours ? 'placement' : 'default', source: r.provenance, placementId: r.placement?.id, ready: r.setupState === 'ready' }
+          }}
+          onJourney={(id, leg) => navigate({ name: 'placement', id, leg })}
           planUndo={planUndo}
           onUndoPlan={(block) => {
             deletePlanChild(block.id)
@@ -1827,17 +1857,21 @@ export default function App() {
         <ProgrammeSheet admin={adminFile} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />
       )}
 
-      {openSheet === 'workbench' && workbench && (
+      {((openSheet === 'workbench' && workbench) || (route.name === 'pgce' && route.lessonId)) && (
         <LessonWorkbench
-          lessonId={workbench.lessonId}
-          initialStage={workbench.stage}
+          key={route.name === 'pgce' && route.lessonId ? `route-${route.lessonId}` : `sheet-${workbench?.lessonId ?? ''}`}
+          lessonId={route.name === 'pgce' && route.lessonId ? route.lessonId : workbench!.lessonId}
+          initialStage={route.name === 'pgce' && route.lessonId ? routeWorkbenchStage : workbench?.stage}
           admin={adminFile}
           sessions={courseSessions}
           placementOptions={placementOptions}
           todayISO={todayISO}
           onUpdateAdmin={updateAdmin}
           onAddRehearsalBlock={addRehearsalBlock}
-          onClose={() => setOpenSheet('none')}
+          onClose={() => {
+            if (openSheet === 'workbench') setOpenSheet('none')
+            else goBackOr({ name: 'pgce', section: 'lessons' })
+          }}
         />
       )}
 
@@ -1896,7 +1930,22 @@ export default function App() {
 
       {openSheet === 'examples' && <EvidenceExamplesSheet admin={adminFile} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
 
-      {openSheet === 'reviewPacks' && settings && <ReviewPackSheet key={active.id} admin={adminFile} profileId={active.id} todayISO={todayISO} settings={settings} onUpdateSettings={updateSettings} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
+      {(openSheet === 'reviewPacks' || (route.name === 'pgce' && route.packs)) && settings && (
+        <ReviewPackSheet
+          key={active.id}
+          admin={adminFile}
+          profileId={active.id}
+          todayISO={todayISO}
+          settings={settings}
+          initialPackId={route.name === 'pgce' ? route.packId : undefined}
+          onUpdateSettings={updateSettings}
+          onUpdateAdmin={updateAdmin}
+          onClose={() => {
+            if (openSheet === 'reviewPacks') setOpenSheet('none')
+            else goBackOr({ name: 'pgce', section: 'evidence' })
+          }}
+        />
+      )}
 
       {openSheet === 'experience' && settings && (
         <ExperienceSheet admin={adminFile} settings={settings} sessions={rawCourseSessions} metaMap={metaMap} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />
@@ -1916,9 +1965,12 @@ export default function App() {
         />
       )}
 
-      {openSheet === 'admin' && (
+      {(openSheet === 'admin' || (route.name === 'pgce' && route.tab)) && (
         <AdminSheet
-          initialTab={adminTab}
+          key={route.name === 'pgce' && route.tab ? `route-${route.tab}-${route.recordId ?? ''}` : 'sheet'}
+          initialTab={route.name === 'pgce' && route.tab ? route.tab : adminTab}
+          initialRecordId={route.name === 'pgce' ? route.recordId : undefined}
+          focusAdd={route.name === 'pgce' && !!route.tab && adminFocusAdd}
           profileId={active.id}
           profileName={active.name}
           admin={adminFile}
@@ -1931,10 +1983,18 @@ export default function App() {
           placements={adminFile.placements ?? []}
           schools={adminFile.schools ?? []}
           onOpenWorkbench={(lessonId) => {
+            if (route.name === 'pgce' && route.tab) {
+              setRouteWorkbenchStage(undefined)
+              navigate({ name: 'pgce', lessonId })
+              return
+            }
             setWorkbench({ lessonId })
             setOpenSheet('workbench')
           }}
-          onClose={() => setOpenSheet('none')}
+          onClose={() => {
+            if (openSheet === 'admin') setOpenSheet('none')
+            else goBackOr({ name: 'pgce' })
+          }}
         />
       )}
 

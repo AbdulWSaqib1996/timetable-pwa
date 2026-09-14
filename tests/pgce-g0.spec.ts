@@ -84,7 +84,8 @@ test('proposals by prefix, confirm writes SE1/SE2 with carried school details, i
   expect(riverside).toMatchObject({ name: 'Riverside Primary', address: '1 River Lane', lat: 51.5, lng: -0.1 })
   expect(riverside.confirmedAt).toBeUndefined()
   expect(first.schools.find((s: { id: string }) => s.id === se2.schoolLocationId)?.name).toBe('Hillside Academy')
-  // The PGCE card now lists the confirmed placements; Settings still hold the imported details.
+  // All placements (Pass 79: `#/placement`) lists the confirmed placements; Settings still hold the imported details.
+  await page.goto('./#/placement')
   await expect(page.getByRole('list', { name: 'Your placements' })).toContainText('SE1 · Riverside Primary')
   await expect(page.getByRole('list', { name: 'Your placements' })).toContainText('SE2 · Hillside Academy')
   const settings = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.store.v2')!).profiles[0].settings)

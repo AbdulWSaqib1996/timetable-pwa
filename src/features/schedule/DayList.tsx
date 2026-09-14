@@ -6,6 +6,18 @@ import { formatRemaining, isPlacementSession, placementTag, toMinutes } from '..
 import { keyDateSiblings } from '../../lib/scheduleProjection'
 import type { MetaMap, Session } from '../../types'
 
+/** U03: what the school-day card says about a block — school, hours and where each came from. */
+export interface SchoolDayInfo {
+  code: string
+  school?: string
+  hours: { start: string; end: string }
+  hoursSource: 'placement' | 'default'
+  source: 'canonical' | 'legacy'
+  placementId?: string
+  /** journeys are offered only once the school pin is confirmed */
+  ready: boolean
+}
+
 interface Props {
   /** the selected day's rows (sessions + woven key dates), time-sorted */
   sessions: Session[]
@@ -13,6 +25,8 @@ interface Props {
   coords?: Coords | null
   travelMode?: TravelMode
   placements?: Record<string, { school?: string }>
+  schoolDayFor?: (tag: string) => SchoolDayInfo | null
+  onJourney?: (placementId: string, leg: 'out' | 'back') => void
   emptyMessage: string
   onSelect: (s: Session) => void
 }
@@ -20,9 +34,10 @@ interface Props {
 /**
  * One selected day's list (P4-03): session cards with neutral break rows
  * derived from the day's canonical intervals, clash badges for genuine
- * overlaps, and the calm collapsed placement-day block.
+ * overlaps, and the calm collapsed placement-day card (U03: with the school,
+ * its working hours and their source, plus To school / Back home).
  */
-export function DayList({ sessions, metaMap, coords, travelMode, placements, emptyMessage, onSelect }: Props) {
+export function DayList({ sessions, metaMap, coords, travelMode, placements, schoolDayFor, onJourney, emptyMessage, onSelect }: Props) {
   if (sessions.length === 0) {
     return <p className="week-free day-list-empty">{emptyMessage}</p>
   }
@@ -36,6 +51,13 @@ export function DayList({ sessions, metaMap, coords, travelMode, placements, emp
     return n > 1 ? <span className="filter-hint keydate-group">{n} items with this title today{s.start ? ` · this one at ${s.start}` : ''}</span> : null
   }
   if (real.length > 0 && real.every(isPlacementSession)) {
+    const tag = placementTag(real[0].title)
+    const info = schoolDayFor?.(tag) ?? null
+    const school = info?.school ?? placements?.[tag]?.school
+    // The imported block says when the timetable row runs; the placement says the working
+    // day — both are shown when they differ, never merged into one invented duration.
+    const rowHours = real[0].start && real[0].end ? `${real[0].start}–${real[0].end}` : null
+    const dayHours = info ? `${info.hours.start}–${info.hours.end}` : null
     return (
       <div className="day-sessions day-list">
         {pins.map((s) => (
@@ -44,16 +66,24 @@ export function DayList({ sessions, metaMap, coords, travelMode, placements, emp
             {group(s)}
           </div>
         ))}
-        <button type="button" className="placement-day" onClick={() => onSelect(real[0])}>
-          <IconSchool size={16} /> {real[0].title}
-          {real.length > 1 ? ` (+${real.length - 1} more)` : ''}
-          <span className="placement-sub">
-            School experience day
-            {placements?.[placementTag(real[0].title)]?.school
-              ? ` · ${placements[placementTag(real[0].title)].school}`
-              : ' · tap to add school details'}
-          </span>
-        </button>
+        <div className="school-day-card ui-card">
+          <button type="button" className="placement-day" onClick={() => onSelect(real[0])} aria-label={`Open school day: ${info?.code ?? tag}${school ? ` at ${school}` : ''}`}>
+            <IconSchool size={16} /> {info?.code ?? tag} · School day
+            {real.length > 1 ? ` (+${real.length - 1} more)` : ''}
+            <span className="placement-sub school-day-school">{school ?? 'Tap to add school details'}</span>
+            <span className="placement-sub school-day-hours">
+              {dayHours ? `Working day ${dayHours}${info?.hoursSource === 'default' ? ' (course default)' : ' (this placement)'}` : rowHours ? `Timetable row ${rowHours}` : 'Hours not set'}
+              {dayHours && rowHours && rowHours !== dayHours ? ` · timetable row ${rowHours}` : ''}
+              {info ? ` · ${info.source === 'canonical' ? 'from your placement setup' : 'from the timetable only'}` : ''}
+            </span>
+          </button>
+          {info?.placementId && info.ready && onJourney && (
+            <div className="btn-row school-day-actions">
+              <button type="button" className="btn-today-reset" onClick={() => onJourney(info.placementId!, 'out')}>To school</button>
+              <button type="button" className="btn-today-reset" onClick={() => onJourney(info.placementId!, 'back')}>Back home</button>
+            </div>
+          )}
+        </div>
       </div>
     )
   }

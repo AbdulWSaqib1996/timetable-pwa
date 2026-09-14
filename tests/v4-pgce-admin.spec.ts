@@ -32,14 +32,15 @@ async function seed(page: Page, opts: { admin?: Record<string, unknown>; width?:
 test('PGCE (empty): four identity tiles, one primary per card, no "View all", Set up placement, no invented percentages, privacy line', async ({ page }) => {
   await seed(page)
   await page.goto('./#/pgce')
-  // G1a: five section cards and tiles; the Placements card holds one primary per SE card.
+  // Pass 79 (U01): the active placement, Next, four destinations and Documents — one primary each; tiles on every card but Next.
   const cards = page.locator('.pgce-section')
-  await expect(cards).toHaveCount(5)
-  await expect(page.locator('.pgce-tile')).toHaveCount(5)
-  for (let i = 1; i < 5; i++) await expect(cards.nth(i).locator('.btn-primary')).toHaveCount(1)
-  await expect(cards.nth(0).locator('.placement-card .btn-primary')).toHaveCount(3)
+  await expect(cards).toHaveCount(7)
+  await expect(page.locator('.pgce-tile')).toHaveCount(6)
+  for (let i = 0; i < 7; i++) await expect(cards.nth(i).locator('.btn-primary')).toHaveCount(1)
   await expect(page.getByRole('button', { name: /View all/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Set up SE1' })).toBeVisible()
+  // An empty profile gets ONE setup action in the Next slot, not a screen of zero counters.
+  await expect(page.getByLabel('Next action')).toContainText('Add your first lesson')
   await expect(page.locator('.pgce-count')).toHaveCount(0) // no counts invented from nothing
   await expect(page.getByText(/%/)).toHaveCount(0)
   await expect(page.getByText(/stay private on this device/)).toBeVisible()
@@ -61,24 +62,27 @@ test('PGCE (populated): count badges come from real records, Open placement by s
   })
   await page.goto('./#/pgce')
   const cards = page.locator('.pgce-section')
-  await expect(cards).toHaveCount(5)
-  // Two columns at 1280: the Placements card spans the row; the next two cards share one.
-  const a = await cards.nth(1).boundingBox()
-  const b = await cards.nth(2).boundingBox()
+  await expect(cards).toHaveCount(7)
+  // Two columns at 1280: the four destination cards share rows two by two.
+  const grid = page.locator('.pgce-grid .pgce-section')
+  const a = await grid.nth(0).boundingBox()
+  const b = await grid.nth(1).boundingBox()
   expect(Math.abs(a!.y - b!.y)).toBeLessThan(4)
   expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1)
-  await expect(cards.filter({ hasText: 'Evidence' }).locator('.pgce-count')).toHaveText('1 record')
-  await expect(cards.filter({ hasText: 'Development' }).locator('.pgce-count')).toHaveText('3 records')
-  await expect(cards.filter({ hasText: 'Development' })).toContainText('1 open target · 1 mentor action to tick off')
-  // Placement primaries follow real state (G1a): nothing set up → "Set up SE1/SE2/SE3", no logged-days badge invented.
-  const placementCard = cards.filter({ hasText: 'Placements' }).first()
-  await expect(placementCard.getByRole('button', { name: /^Set up SE[123]$/ })).toHaveCount(3)
-  await expect(placementCard.locator('.pgce-count')).toHaveCount(0)
-  // Editors within two purposeful steps: menu → Targets opens the admin sheet on Targets.
-  await page.getByRole('button', { name: /Add or open a record/ }).click()
-  await page.getByRole('menuitem', { name: /^Targets \(2\)/ }).click()
+  // Counts come from real records and are labelled by destination.
+  await expect(page.getByRole('button', { name: 'Weekly reflections (1)' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Targets (2)' })).toBeVisible()
+  await expect(cards.filter({ hasText: 'Mentor & feedback' })).toContainText('1 mentor action to tick off')
+  // The active placement card follows real state (G1a): nothing set up → "Set up SE1", no logged-days badge invented.
+  await expect(page.getByRole('button', { name: 'Set up SE1' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'All placements' })).toBeVisible()
+  await expect(cards.first().locator('.pgce-count')).toHaveCount(0)
+  // Editors within two purposeful steps: Targets is one labelled control away and has its own URL.
+  await page.getByRole('button', { name: 'Targets (2)' }).click()
   await expect(page.getByRole('dialog')).toContainText('Questioning')
+  await expect(page).toHaveURL(/#\/pgce\/records\/targets$/)
   await page.keyboard.press('Escape')
+  await expect(page).toHaveURL(/#\/pgce$/)
   await page.getByRole('button', { name: 'Weekly reflections (1)' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
 })

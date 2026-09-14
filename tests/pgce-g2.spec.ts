@@ -43,8 +43,8 @@ async function seed(page: Page, admin: Record<string, unknown> = base()) {
 const admin = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('timetable.admin.v1.fx') ?? '{}'))
 async function openMenu(page: Page, item: RegExp) {
   await page.goto('./#/pgce')
-  await page.getByRole('button', { name: /Add or open a record/ }).click()
-  await page.getByRole('menuitem', { name: item }).click()
+  // Pass 79 (U01): every record function is a labelled control on the landing.
+  await page.getByRole('button', { name: item }).click()
 }
 
 test('subject knowledge: goal from the pack topic list, self-rated confidence, shared resource, application lesson, audit → "previously marked secure by you"', async ({ page }) => {

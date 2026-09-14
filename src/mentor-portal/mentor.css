@@ -1,22 +1,61 @@
-:root { color-scheme: light dark; --m-bg: #f4f5fa; --m-card: #ffffff; --m-text: #16213a; --m-muted: #5b6478; --m-accent: #3b5bdb; --m-border: rgba(0,0,0,0.08); }
-@media (prefers-color-scheme: dark) { :root { --m-bg: #101722; --m-card: #1a2333; --m-text: #eef1f7; --m-muted: #aab3c5; --m-accent: #8fa4ff; --m-border: rgba(255,255,255,0.1); } }
+/*
+ * Mentor portal (U04, Pass 79): the learner app's semantic palette, restated
+ * here because mentor.html is a separate page. Every text/surface pair is
+ * contrast-tested in tests/unit/tokens.test.mjs — dark mode uses a dark
+ * foreground on the light accent instead of white on a pale blue.
+ */
+:root {
+  color-scheme: light dark;
+  --m-bg: #f4f5fa;
+  --m-card: #ffffff;
+  --m-text: #16213a;
+  --m-muted: #5b6478;
+  --m-accent: #3b5bdb;
+  --m-on-accent: #ffffff;
+  --m-link: #2f4ac2;
+  --m-error: #b42318;
+  --m-success: #0f766e;
+  --m-border: rgba(0, 0, 0, 0.08);
+  --m-focus: #3b5bdb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --m-bg: #101722;
+    --m-card: #1a2333;
+    --m-text: #eef1f7;
+    --m-muted: #b4bccc;
+    --m-accent: #8fa4ff;
+    --m-on-accent: #101722;
+    --m-link: #a9b9ff;
+    --m-error: #ff8f85;
+    --m-success: #5fd3c5;
+    --m-border: rgba(255, 255, 255, 0.1);
+    --m-focus: #a9b9ff;
+  }
+}
 body { margin: 0; background: var(--m-bg); color: var(--m-text); font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 .mentor-page { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
-.mentor-page h1 { font-size: 1.6rem; margin: 0 0 12px; }
+.mentor-page h1 { font-size: 28px; line-height: 1.2; margin: 0 0 12px; }
 .mentor-head p { margin: 0 0 16px; color: var(--m-muted); }
-.mentor-card { background: var(--m-card); border: 1px solid var(--m-border); border-radius: 18px; padding: 16px; margin: 12px 0; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.mentor-card { background: var(--m-card); border: 1px solid var(--m-border); border-radius: 18px; padding: 16px; margin: 12px 0; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
 .mentor-card label { display: grid; gap: 6px; margin: 12px 0; font-weight: 600; }
-.mentor-card input, .mentor-card textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--m-border); background: var(--m-bg); color: inherit; }
-.mentor-primary { font: inherit; font-weight: 700; min-height: 46px; padding: 0 20px; border: 0; border-radius: 12px; background: var(--m-accent); color: #fff; cursor: pointer; }
+.mentor-card input, .mentor-card textarea { font: inherit; padding: 10px 12px; min-height: 44px; border-radius: 12px; border: 1px solid var(--m-border); background: var(--m-bg); color: inherit; }
+.mentor-primary { font: inherit; font-weight: 700; min-height: 46px; padding: 0 20px; border: 0; border-radius: 12px; background: var(--m-accent); color: var(--m-on-accent); cursor: pointer; }
 .mentor-primary:disabled { opacity: 0.5; cursor: default; }
-.mentor-link { font: inherit; background: none; border: 0; color: var(--m-accent); cursor: pointer; padding: 0; font-weight: 600; }
-.mentor-error { color: #b42318; font-weight: 600; }
-.mentor-notice { color: #0f766e; font-weight: 600; }
-.mentor-foot { color: var(--m-muted); font-size: 0.92rem; }
+.mentor-link { font: inherit; background: none; border: 0; color: var(--m-link); cursor: pointer; padding: 0; min-height: 44px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.mentor-link:disabled { opacity: 0.5; cursor: default; }
+.mentor-error { color: var(--m-error); font-weight: 600; }
+.mentor-notice { color: var(--m-success); font-weight: 600; min-height: 1.5em; }
+.mentor-foot { color: var(--m-muted); font-size: 14px; }
 .mentor-packs { list-style: none; padding: 0; margin: 0; }
-.mentor-pack-head { width: 100%; text-align: left; font: inherit; background: none; border: 0; color: inherit; display: grid; gap: 2px; cursor: pointer; padding: 0; }
-.mentor-pack-head span { color: var(--m-muted); font-size: 0.92rem; }
-.mentor-pack-text { white-space: pre-wrap; font: inherit; font-size: 0.95rem; background: var(--m-bg); padding: 12px; border-radius: 12px; max-height: 50vh; overflow: auto; }
+.mentor-pack-head { width: 100%; text-align: left; font: inherit; background: none; border: 0; color: inherit; display: grid; gap: 2px; cursor: pointer; padding: 4px 0; min-height: 44px; }
+.mentor-pack-head strong { font-size: 17px; }
+.mentor-pack-head span { color: var(--m-muted); font-size: 14px; }
+.mentor-pack-text { white-space: pre-wrap; font: inherit; font-size: 15px; background: var(--m-bg); padding: 12px; border-radius: 12px; max-height: 50vh; overflow: auto; }
 .mentor-attachments, .mentor-feedback { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
-.mentor-feedback li span { color: var(--m-muted); font-size: 0.9rem; }
+.mentor-feedback li span { color: var(--m-muted); font-size: 14px; }
 .mentor-feedback li p { margin: 2px 0 0; white-space: pre-wrap; }
+:focus-visible { outline: 3px solid var(--m-focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

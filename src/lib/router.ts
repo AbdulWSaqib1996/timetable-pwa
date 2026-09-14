@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { noteHistoryPop, noteInternalNavigation, parseRouteSafe } from './navigationState'
+import type { PgceSection, PgceTab } from './navigationState'
 
 /**
  * Hash-based routing for the Phase 4 shell (works identically under both
@@ -10,7 +11,8 @@ export type Route =
   | { name: 'today' }
   | { name: 'schedule' }
   | { name: 'tasks' }
-  | { name: 'pgce' }
+  /** PGCE file: the landing, one of its four destinations, a records tab (optionally one record), a lesson workbench or the review packs (U01/U05) */
+  | { name: 'pgce'; section?: PgceSection; tab?: PgceTab; recordId?: string; lessonId?: string; packs?: boolean; packId?: string }
   | { name: 'settings'; section?: string }
   | { name: 'session'; key: string }
   | { name: 'homeJourney' }
@@ -31,7 +33,10 @@ export function routeHash(route: Route): string {
     case 'tasks':
       return '#/tasks'
     case 'pgce':
-      return '#/pgce'
+      if (route.lessonId) return `#/pgce/lesson/${encodeURIComponent(route.lessonId)}`
+      if (route.tab) return `#/pgce/records/${route.tab}${route.recordId ? `/${encodeURIComponent(route.recordId)}` : ''}`
+      if (route.packs || route.packId) return `#/pgce/packs${route.packId ? `/${encodeURIComponent(route.packId)}` : ''}`
+      return route.section ? `#/pgce/${route.section}` : '#/pgce'
     case 'settings':
       return route.section ? `#/settings/${route.section}` : '#/settings'
     case 'session':
