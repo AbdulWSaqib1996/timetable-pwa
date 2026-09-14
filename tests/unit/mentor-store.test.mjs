@@ -170,6 +170,64 @@ test('feedback is signed and verifiable, retry-idempotent by client id; revocati
   assert.equal((await share(store, 'k2', 1, [a.mentorId], [])).status, 400, 'cannot share with a revoked mentor')
 })
 
+test('B10: unshare is owner-only and idempotent — the pack leaves the portal (packs and attachment refused), a stale client share is refused, the next share works', async () => {
+  const { store } = await setup()
+  const a = await mk(store, 'A Mentor')
+  const att1 = await file('att1', 'first')
+  assert.equal((await share(store, 'k1', 1, [a.mentorId], [att1])).status, 200)
+  assert.equal((await call(store, '/mentor/unshare', { ownerToken: randomHex(24), packId: 'k1' })).status, 403)
+  assert.equal((await call(store, '/mentor/unshare', { ownerToken: OWNER, packId: 'nope' })).body.unshared, false, 'unknown pack is a harmless no-op')
+  const un = (await call(store, '/mentor/unshare', { ownerToken: OWNER, packId: 'k1' })).body
+  assert.equal(un.unshared, true)
+  assert.equal(un.revision, 2)
+  assert.equal((await call(store, '/mentor/packs', { session: a.session })).body.packs.length, 0, 'gone from the mentor')
+  assert.equal((await call(store, '/mentor/attachment', { session: a.session, packId: 'k1', attachmentId: 'att1' })).status, 404)
+  assert.equal((await call(store, '/mentor/feedback', { session: a.session, packId: 'k1', text: 'late' })).status, 404)
+  const again = (await call(store, '/mentor/unshare', { ownerToken: OWNER, packId: 'k1' })).body
+  assert.equal(again.replayed, true)
+  assert.equal(again.revision, 2, 'idempotent: no further revision')
+  assert.deepEqual((await call(store, '/mentor/mentors', { ownerToken: OWNER })).body.packs.map((p) => [p.id, p.revision, p.mentorIds, p.attachments]), [['k1', 2, [], 0]])
+  assert.equal((await share(store, 'k1', 2, [a.mentorId], [])).status, 409, 'a client that missed the unshare must review again')
+  assert.equal((await share(store, 'k1', 3, [a.mentorId], [att1])).status, 200)
+  assert.equal((await call(store, '/mentor/packs', { session: a.session })).body.packs.length, 1)
+})
+
+test('B08: close-space is owner-only and recoverable — every mentor route is refused with 403 while closed, nothing is deleted, reopen restores exactly what was shared', async () => {
+  const { store, records } = await setup()
+  const a = await mk(store, 'A Mentor')
+  const att1 = await file('att1', 'first')
+  assert.equal((await share(store, 'k1', 1, [a.mentorId], [att1])).status, 200)
+  const fb = await call(store, '/mentor/feedback', { session: a.session, packId: 'k1', text: 'Before closing.' })
+  assert.equal(fb.status, 200)
+  assert.equal((await call(store, '/mentor/close', { ownerToken: randomHex(24) })).status, 403)
+  const closed = await call(store, '/mentor/close', { ownerToken: OWNER })
+  assert.equal(closed.status, 200)
+  assert.ok(closed.body.closedAt > 0)
+  const before = JSON.stringify([...records.keys()].filter((k) => k.startsWith('pack:') || k.startsWith('feedback:') || k.startsWith('mentor:')).sort())
+  for (const [path, body] of [
+    ['/mentor/packs', { session: a.session }],
+    ['/mentor/attachment', { session: a.session, packId: 'k1', attachmentId: 'att1' }],
+    ['/mentor/feedback', { session: a.session, packId: 'k1', text: 'x' }],
+    ['/mentor/login', { mentorId: a.mentorId, passphrase: 'correct horse battery' }],
+  ]) assert.equal((await call(store, path, body)).status, 403, `${path} refused while closed`)
+  const inv = (await call(store, '/mentor/invite', { ownerToken: OWNER })).body
+  assert.equal((await call(store, '/mentor/join', { code: inv.code, secret: inv.secret, name: 'B', passphrase: 'correct horse battery' })).status, 403, 'no joining while closed')
+  const list = (await call(store, '/mentor/mentors', { ownerToken: OWNER })).body
+  assert.equal(list.closedAt, closed.body.closedAt)
+  assert.equal(list.packs.length, 1, 'owner still sees the manifest')
+  assert.equal((await call(store, '/mentor/inbox', { ownerToken: OWNER, since: 0 })).body.feedback.length, 1, 'feedback kept')
+  assert.equal((await call(store, '/mentor/close', { ownerToken: OWNER })).body.closedAt, closed.body.closedAt, 'idempotent')
+  assert.equal(JSON.stringify([...records.keys()].filter((k) => k.startsWith('pack:') || k.startsWith('feedback:') || k.startsWith('mentor:')).sort()), before, 'nothing deleted')
+  const reopened = await call(store, '/mentor/reopen', { ownerToken: OWNER })
+  assert.equal(reopened.body.closedAt, null)
+  const login = await call(store, '/mentor/login', { mentorId: a.mentorId, passphrase: 'correct horse battery' })
+  assert.equal(login.status, 200)
+  const packs = (await call(store, '/mentor/packs', { session: login.body.session })).body.packs
+  assert.deepEqual(packs.map((p) => [p.id, p.revision, p.attachments.length]), [['k1', 1, 1]])
+  const got = (await call(store, '/mentor/attachment', { session: login.body.session, packId: 'k1', attachmentId: 'att1' })).body
+  assert.equal(await decryptText({ iv: got.iv, data: got.data }, got.key), 'first')
+})
+
 test('client contract: reviewer-authenticated needs a well-formed attestation; pack attachments carry a stable uid and a sharing summary', () => {
   const empty = Object.fromEntries(collections.map((k) => [k, []]))
   const withAdmin = (admin) => ({ store: { activeId: 'p1', profiles: [{ id: 'p1', name: 'one', settings: { demo: true, sheetId: '', gid: null } }] }, admin: { p1: admin } })

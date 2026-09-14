@@ -7,6 +7,18 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 12,
+    dateISO: '2026-09-14',
+    title: 'Recover, pause and take back',
+    items: [
+      'Mentor portal: every action can be retried, drafts survive a failed send, and expired sessions, ended access and connection problems each say what happened',
+      'Mentor access: pause it on one device without losing anything, or end it for every mentor with a preview of what changes — and reopen later',
+      'Review packs: unshare a pack from all mentors, and deleting a pack or a reflection asks first and offers Undo',
+      'Journeys: “Open planned route” starts from the origin you chose; “Navigate from my location” is its own button',
+      'Key dates that share a title at different times or rooms now both show, marked as a group',
+    ],
+  },
+  {
     version: 11,
     dateISO: '2026-09-13',
     title: 'Sharing you can check, one school record everywhere',

@@ -29,7 +29,8 @@ export function mergeAdmin(a, b) {
   }
   return out
 }
-export const deviceSettings = ['pushEnabled','locationEnabled','bgLeaveAlerts','theme','activeView','reminderOffsets','attendancePrompts','quietFrom','quietTo','usagePing','groupMemberId','groupToken','cloudBackups']
+// `mentorAccessPaused` (audit B08) is a per-device pause of the mentor space UI: the credential itself stays synced.
+export const deviceSettings = ['pushEnabled','locationEnabled','bgLeaveAlerts','theme','activeView','reminderOffsets','attendancePrompts','quietFrom','quietTo','usagePing','groupMemberId','groupToken','cloudBackups','mentorAccessPaused']
 export function syncSettings(settings) {
   return Object.fromEntries(Object.entries(settings).filter(([key]) => !deviceSettings.includes(key)))
 }

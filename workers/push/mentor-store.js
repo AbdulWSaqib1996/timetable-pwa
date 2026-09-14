@@ -40,6 +40,13 @@ import {
  * previous manifest valid, and old revisions' blobs simply age out on their
  * TTL. Mentor routes serve the committed manifest only. Feedback is signed
  * with a worker-wide HMAC key kept in KV (`mentor-signing-key`, minted once).
+ *
+ * Pass 78 (audit B08/B10): the owner can CLOSE the space (`closedAt`, a
+ * recoverable flag — every mentor route is refused with 403 while it is set,
+ * nothing is deleted, `/mentor/reopen` clears it) and UNSHARE one pack
+ * (idempotent: the pack's recipients become none, its attachments are dropped
+ * from the manifest, its revision advances so a stale client share is refused;
+ * copies already downloaded are, by nature, not recalled).
  */
 
 const json = (obj, status = 200) => Response.json(obj, { status })
@@ -68,6 +75,8 @@ export class MentorStore {
 
   async mentorFromSession(body) {
     if (!isHex(body.session, 48)) return null
+    const owner = await this.state.storage.get('owner')
+    if (owner?.closedAt) return null
     const session = await this.state.storage.get(`session:${body.session}`)
     if (!session || session.expiresAt < now()) return null
     const mentor = await this.state.storage.get(`mentor:${session.mentorId}`)
@@ -109,8 +118,10 @@ export class MentorStore {
       if (!owner || !isOwnerToken(body.ownerToken)) return false
       return constantEquals(await sha256Hex(body.ownerToken), owner.tokenHash)
     }
+    const closed = async (tx) => !!(await tx.get('owner'))?.closedAt
     const mentorFromSession = async (tx) => {
       if (!isHex(body.session, 48)) return null
+      if (await closed(tx)) return null
       const session = await tx.get(`session:${body.session}`)
       if (!session || session.expiresAt < now()) return null
       const mentor = await tx.get(`mentor:${session.mentorId}`)
@@ -148,8 +159,33 @@ export class MentorStore {
         await tx.put(`mentor:${mentor.id}`, { ...mentor, sessions: [], revokedAt: now() })
         return json({ ok: true, revokedAt: now() })
       }
+      if (path === '/mentor/close' || path === '/mentor/reopen') {
+        if (!(await ownerOk(tx))) return json({ error: 'unauthorized' }, 403)
+        const owner = await tx.get('owner')
+        const closedAt = path === '/mentor/close' ? owner.closedAt ?? now() : null
+        await tx.put('owner', { ...owner, closedAt })
+        if (closedAt) for (const id of (await tx.get('mentors')) ?? []) {
+          // Live sessions end now; mentor records, packs and feedback stay for a reopen.
+          const m = await tx.get(`mentor:${id}`)
+          if (!m) continue
+          for (const sid of m.sessions ?? []) await tx.delete(`session:${sid}`)
+          await tx.put(`mentor:${id}`, { ...m, sessions: [] })
+        }
+        return json({ ok: true, closedAt })
+      }
+      if (path === '/mentor/unshare') {
+        if (!(await ownerOk(tx))) return json({ error: 'unauthorized' }, 403)
+        if (!isRecordId(body.packId)) return json({ error: 'invalid request' }, 400)
+        const p = await tx.get(`pack:${body.packId}`)
+        if (!p) return json({ ok: true, revision: 0, unshared: false })
+        if (p.mentorIds.length === 0 && p.attachments.length === 0) return json({ ok: true, revision: p.revision, unsharedAt: p.unsharedAt ?? null, unshared: true, replayed: true })
+        const rec = { ...p, revision: p.revision + 1, mentorIds: [], attachments: [], unsharedAt: now() }
+        await tx.put(`pack:${p.id}`, rec)
+        return json({ ok: true, revision: rec.revision, unsharedAt: rec.unsharedAt, unshared: true })
+      }
       if (path === '/mentor/mentors') {
         if (!(await ownerOk(tx))) return json({ error: 'unauthorized' }, 403)
+        const owner = await tx.get('owner')
         const ids = (await tx.get('mentors')) ?? []
         const mentors = []
         for (const id of ids) {
@@ -165,9 +201,9 @@ export class MentorStore {
         const packs = []
         for (const id of packIds) {
           const p = await tx.get(`pack:${id}`)
-          if (p) packs.push({ id: p.id, title: p.title, revision: p.revision, sharedAt: p.sharedAt, mentorIds: p.mentorIds, attachments: p.attachments.length })
+          if (p) packs.push({ id: p.id, title: p.title, revision: p.revision, sharedAt: p.sharedAt, mentorIds: p.mentorIds, attachments: p.attachments.length, unsharedAt: p.unsharedAt ?? null })
         }
-        return json({ mentors, invites, packs })
+        return json({ mentors, invites, packs, closedAt: owner?.closedAt ?? null })
       }
       if (path === '/mentor/inbox') {
         if (!(await ownerOk(tx))) return json({ error: 'unauthorized' }, 403)
@@ -189,6 +225,9 @@ export class MentorStore {
       }
 
       /* ---------- mentor routes ---------- */
+      if (path === '/mentor/join' || path === '/mentor/login') {
+        if (await closed(tx)) return json({ error: 'access is not active' }, 403)
+      }
       if (path === '/mentor/join') {
         if (!isInviteCode(body.code) || !isHex(body.secret, 32)) return json({ error: 'invalid invitation' }, 400)
         const invite = await tx.get(`invite:${body.code}`)
@@ -214,6 +253,7 @@ export class MentorStore {
         return json({ mentorId: mentor.id, name: mentor.name, session, expiresAt })
       }
       if (path === '/mentor/packs') {
+        if (await closed(tx)) return json({ error: 'access is not active' }, 403)
         const mentor = await mentorFromSession(tx)
         if (!mentor) return json({ error: 'sign in again' }, 401)
         const packIds = (await tx.get('packs')) ?? []
@@ -231,6 +271,7 @@ export class MentorStore {
         return json({ mentor: { id: mentor.id, name: mentor.name }, packs, feedback: mine })
       }
       if (path === '/mentor/feedback') {
+        if (await closed(tx)) return json({ error: 'access is not active' }, 403)
         const mentor = await mentorFromSession(tx)
         if (!mentor) return json({ error: 'sign in again' }, 401)
         const p = isRecordId(body.packId) ? await tx.get(`pack:${body.packId}`) : null
@@ -281,7 +322,15 @@ export class MentorStore {
     }
     const existing = await this.state.storage.get(`pack:${pack.id}`)
     const current = existing?.revision ?? 0
-    if (body.revision === current && existing) return json({ ok: true, replayed: true, packId: pack.id, revision: existing.revision, sharedAt: existing.sharedAt, attachments: existing.attachments.length })
+    if (body.revision === current && existing) {
+      // A replay is the SAME manifest again (retry after an uncertain outcome). The same
+      // revision number with different content — e.g. a client that missed an unshare —
+      // is stale and must be reviewed again (B10).
+      const sameIds = (a, b) => a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i])
+      const same = existing.text === pack.text && sameIds(existing.mentorIds, mentorIds) && sameIds(existing.attachments.map((x) => x.id), incoming.map((x) => x.id))
+      if (same) return json({ ok: true, replayed: true, packId: pack.id, revision: existing.revision, sharedAt: existing.sharedAt, attachments: existing.attachments.length })
+      return json({ error: 'stale share — the pack changed; review and share again', revision: current }, 409)
+    }
     if (body.revision !== current + 1) return json({ error: 'stale share — the pack changed; review and share again', revision: current }, 409)
     // 1. Upload every blob under a key that names this revision; nothing served yet.
     const attachments = []
@@ -311,6 +360,7 @@ export class MentorStore {
   }
 
   async attachment(body) {
+    if ((await this.state.storage.get('owner'))?.closedAt) return json({ error: 'access is not active' }, 403)
     const mentor = await this.mentorFromSession(body)
     if (!mentor) return json({ error: 'sign in again' }, 401)
     const p = isRecordId(body.packId) ? await this.state.storage.get(`pack:${body.packId}`) : null

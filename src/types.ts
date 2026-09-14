@@ -143,6 +143,8 @@ export interface Settings {
   mentorOwnerToken?: string
   /** last time the mentor inbox was pulled (ms) */
   mentorInboxAt?: number
+  /** audit B08: mentor access paused on THIS device only (never synced); the credential above is kept */
+  mentorAccessPaused?: boolean
   /** saved default origin id for the journey home (NF-06 groundwork) */
   defaultOriginHome?: string
   /** versioned course configuration (P7-01); absent = UCL Primary PGCE built-in */

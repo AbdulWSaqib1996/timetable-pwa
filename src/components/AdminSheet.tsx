@@ -95,8 +95,10 @@ const toggleIn = (list: string[], id: string) =>
 
 /* ---------- tab components (each owns its add-form state) ---------- */
 
-function ReflectionsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
+function ReflectionsTab({ admin, todayISO, onUpdate, onEdit, onDelete }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; onDelete: (kind: RecordKind, record: { id: string; at: number }) => void }) {
   const [week, setWeek] = useState(todayISO)
+  // B10: deletion is reviewable — a confirm step on the row, then Undo from the sheet.
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [wentWell, setWentWell] = useState('')
   const [challenges, setChallenges] = useState('')
   const [focus, setFocus] = useState('')
@@ -151,9 +153,18 @@ function ReflectionsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFil
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
                 <button type="button" className="btn-icon" aria-label="Edit reflection" onClick={() => onEdit('reflection', r.id)}><IconEdit /></button>
-                <button type="button" className="btn-icon" aria-label="Delete reflection" onClick={() => onUpdate((prev) => ({ ...prev, reflections: prev.reflections.filter((x) => x.id !== r.id) }))}><IconClose /></button>
+                <button type="button" className="btn-icon" aria-label="Delete reflection" aria-expanded={confirmId === r.id} onClick={() => setConfirmId(confirmId === r.id ? null : r.id)}><IconClose /></button>
               </span>
             </div>
+            {confirmId === r.id && (
+              <div className="callout callout--amber" aria-label="Confirm deletion">
+                <p>Delete the reflection for w/c {fmt(r.weekISO)}? You can undo straight after; it is removed from this device and your synced copies.</p>
+                <div className="btn-row">
+                  <button type="button" className="btn-primary" onClick={() => { setConfirmId(null); onDelete('reflection', r) }}>Delete reflection</button>
+                  <button type="button" className="btn-ghost" onClick={() => setConfirmId(null)}>Keep</button>
+                </div>
+              </div>
+            )}
             {r.wentWell && <p><strong>Went well:</strong> {r.wentWell}</p>}
             {r.challenges && <p><strong>Challenges:</strong> {r.challenges}</p>}
             {r.focus && <p><strong>Focus:</strong> {r.focus}</p>}
@@ -645,6 +656,12 @@ export function AdminSheet(props: Props) {
   const [undoRec, setUndoRec] = useState<{ kind: RecordKind; record: { id: string; at: number } } | null>(null)
   const [binderPreview, setBinderPreview] = useState(false)
   const onEdit = (kind: RecordKind, id: string) => setEditing({ kind, id })
+  /** B10: delete with Undo — the tombstone is written now; Undo writes a newer revision. */
+  const deleteWithUndo = (kind: RecordKind, record: { id: string; at: number }) => {
+    const collection = KIND_COLLECTION[kind]
+    setUndoRec({ kind, record })
+    onUpdateAdmin((prev) => ({ ...prev, [collection]: (prev[collection] as { id: string }[]).filter((r) => r.id !== record.id) }))
+  }
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -677,7 +694,7 @@ export function AdminSheet(props: Props) {
         {tab === 'overview' && (
           <Overview admin={admin} sessions={sessions} metaMap={metaMap} keyDates={keyDates} placementTargetDays={placementTargetDays} todayISO={todayISO} />
         )}
-        {tab === 'reflect' && <ReflectionsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
+        {tab === 'reflect' && <ReflectionsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} onDelete={deleteWithUndo} />}
         {tab === 'targets' && <TargetsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
         {tab === 'meetings' && <MeetingsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}
         {tab === 'obs' && <ObservationsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}

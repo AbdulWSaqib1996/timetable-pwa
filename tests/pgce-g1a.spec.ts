@@ -172,7 +172,9 @@ test('To school plans arrive-by with the placement buffer; Back home leaves now 
   await expect(page.getByRole('combobox', { name: /origin/i })).toHaveValue('home')
   await expect(page.locator('.journey-steps')).toContainText('Walk to Riverside Primary', { timeout: 10000 })
   await expect(page.getByText('live TfL')).toBeVisible()
-  await expect(page.getByRole('link', { name: /Open in Maps/ })).toHaveAttribute('href', /destination=51\.53,-0\.11/)
+  // B07: the planned link names the chosen origin (home) AND the school; the device link is separate.
+  await expect(page.getByRole('link', { name: /Open planned route from Home/ })).toHaveAttribute('href', /origin=51\.55,-0\.1&destination=51\.53,-0\.11&travelmode=transit/)
+  await expect(page.getByRole('link', { name: /Navigate from my location/ })).toHaveAttribute('href', /\?api=1&destination=51\.53,-0\.11/)
   expect(requests.length).toBeGreaterThan(0)
 
   await page.goto('./#/placement/pl-se1/journey/back')
@@ -181,7 +183,7 @@ test('To school plans arrive-by with the placement buffer; Back home leaves now 
   await expect(back).toContainText('Leaving now · school day ends 15:45')
   await expect(back).toContainText('1 Example Street')
   await expect(page.getByRole('combobox', { name: /origin/i })).toHaveValue('placement-pl-se1')
-  await expect(page.getByRole('link', { name: /Open in Maps/ })).toHaveAttribute('href', /destination=51\.55,-0\.1/)
+  await expect(page.getByRole('link', { name: /Open planned route from Riverside Primary/ })).toHaveAttribute('href', /origin=51\.53,-0\.11&destination=51\.55,-0\.1&/)
 
   // A late SE1 outward response must not render under SE3, which has no confirmed pin.
   await page.goto('./#/placement/pl-se1/journey/out')

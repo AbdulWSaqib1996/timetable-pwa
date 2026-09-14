@@ -28,7 +28,7 @@ const KEYDATES = [
   { ...session('kd-3', 'Reading log', D, '', '', { isKeyDate: true, sourceKey: 'keydates', sourceId: 'R1' }), eventKey: 'event:keydates:R1' },
 ]
 
-async function seed(page: Page) {
+async function seed(page: Page, SESSIONS_ = SESSIONS, KEYDATES_ = KEYDATES) {
   await page.clock.install({ time: new Date('2026-09-14T06:05:00Z') })
   await page.addInitScript(
     ({ SESSIONS, KEYDATES, D }) => {
@@ -39,7 +39,7 @@ async function seed(page: Page) {
       // A personal task with the same title on the same day (a milestone, say).
       localStorage.setItem('timetable.admin.v1.fx', JSON.stringify({ reflections: [], targets: [], meetings: [], observations: [], lessons: [], audits: [], exceptions: [], plans: [], commitments: [], tasks: [{ id: 't1', title: 'assignment 1 hand-in', dueISO: D, status: 'todo', at: 1 }] }))
     },
-    { SESSIONS, KEYDATES, D }
+    { SESSIONS: SESSIONS_, KEYDATES: KEYDATES_, D }
   )
   await page.setViewportSize({ width: 390, height: 844 })
 }
@@ -64,4 +64,40 @@ test('one highlighted key date per day and title, shown first; the plain course 
   // The task itself is untouched on Tasks.
   await page.goto('./#/tasks')
   await expect(page.getByText('assignment 1 hand-in')).toBeVisible()
+})
+
+/**
+ * Audit B09 (Pass 78): dedupe only merges EQUIVALENT rows. Two key dates with
+ * one title at different times (or rooms) are two items, both shown and
+ * marked as a group; a lesson that merely shares a deadline's title at another
+ * time stays on the timetable. The Pass 74 case above still yields one row.
+ */
+test('two timed key dates with one title stay as a marked group; a same-titled lesson at another time is not dropped; an equivalent repeat still merges', async ({ page }) => {
+  const sessions = [
+    // A lesson that happens to be titled like the deadline, at a different time: a real session.
+    session('s1', 'Progress review', D, '09:00', '10:00'),
+    session('s2', 'English 2', D, '14:00', '16:00'),
+    // The main tab's own row for the 12:00 deadline: the pin itself, not repeated.
+    session('s3', 'Portfolio submission', D, '12:00', '12:00'),
+  ]
+  const keyDates = [
+    { ...session('kd-a', 'Progress review', D, '10:30', '11:00', { isKeyDate: true, sourceKey: 'keydates', sourceId: 'PR1' }), eventKey: 'event:keydates:PR1' },
+    { ...session('kd-b', 'Progress review', D, '15:00', '15:30', { isKeyDate: true, sourceKey: 'keydates', sourceId: 'PR2' }), eventKey: 'event:keydates:PR2' },
+    // An untimed repeat of the 10:30 one (same room) — equivalent, merged.
+    { ...session('kd-c', 'progress review', D, '', '', { isKeyDate: true, sourceKey: 'keydates', sourceId: 'PR1-copy' }), eventKey: 'event:keydates:PR1-copy' },
+    { ...session('kd-d', 'Portfolio submission', D, '12:00', '12:00', { isKeyDate: true, sourceKey: 'keydates', sourceId: 'PS' }), eventKey: 'event:keydates:PS' },
+  ]
+  await seed(page, sessions, keyDates)
+  await page.goto(`./#/schedule`)
+  await expect(page.getByRole('heading', { level: 1, name: 'Schedule' })).toBeVisible()
+  const cards = page.locator('.day-list .session-card')
+  // 3 sheet key dates (two Progress reviews + Portfolio) and the seed's task pin lead the day, then the lesson and English — 6 rows, not 5 or 7.
+  await expect(cards).toHaveCount(6)
+  await expect(page.locator('.day-list .session-card.key-date').filter({ hasText: 'Progress review' })).toHaveCount(2)
+  await expect(page.locator('.day-list .session-card:not(.key-date)').filter({ hasText: 'Progress review' })).toHaveCount(1)
+  await expect(page.locator('.day-list .session-card').filter({ hasText: 'Portfolio submission' })).toHaveCount(1)
+  await expect(page.locator('.day-list .keydate-group')).toHaveCount(2)
+  await expect(page.locator('.day-list .keydate-group').first()).toContainText('2 items with this title today · this one at 10:30')
+  const kinds = await cards.evaluateAll((els) => els.map((el) => el.classList.contains('key-date')))
+  expect(kinds).toEqual([true, true, true, true, false, false])
 })

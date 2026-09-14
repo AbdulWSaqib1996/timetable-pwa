@@ -1213,6 +1213,9 @@ const RATE_CAPS = {
   '/mentor/revoke': 20,
   '/mentor/mentors': 60,
   '/mentor/share': 20,
+  '/mentor/unshare': 20,
+  '/mentor/close': 6,
+  '/mentor/reopen': 6,
   '/mentor/inbox': 60,
   '/mentor/verify': 60,
   '/mentor/packs': 60,
@@ -1457,7 +1460,7 @@ export default {
     }
     /* ---------- mentor portal (G4): one Durable Object per learner space ---------- */
     if (request.method === 'POST' && url.pathname.startsWith('/mentor/')) {
-      const allowed = ['/mentor/space', '/mentor/invite', '/mentor/revoke', '/mentor/mentors', '/mentor/share', '/mentor/inbox', '/mentor/verify', '/mentor/join', '/mentor/login', '/mentor/packs', '/mentor/attachment', '/mentor/feedback']
+      const allowed = ['/mentor/space', '/mentor/invite', '/mentor/revoke', '/mentor/mentors', '/mentor/share', '/mentor/unshare', '/mentor/close', '/mentor/reopen', '/mentor/inbox', '/mentor/verify', '/mentor/join', '/mentor/login', '/mentor/packs', '/mentor/attachment', '/mentor/feedback']
       if (!allowed.includes(url.pathname)) return json({ error: 'not found' }, 404)
       const body = await boundedJSON(request, url.pathname === '/mentor/share' ? 15_000_000 : 65536)
       if (!body) return json({ error: 'invalid request' }, 400)

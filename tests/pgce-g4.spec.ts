@@ -117,7 +117,7 @@ test('learner and mentor, end to end: invite → join → share exactly the prev
   // 4. Mentor sends feedback; the learner pulls it as reviewer-authenticated, read-only.
   await portal.getByLabel('Feedback: Progress review 1').fill('Strong modelling; extend the wait time after questions.')
   await portal.getByRole('button', { name: 'Send feedback' }).click()
-  await expect(portal.getByRole('status')).toContainText('Feedback sent')
+  await expect(portal.getByRole('status')).toContainText('Feedback saved. The learner can collect it in their app.')
   await expect(portal.getByRole('list', { name: 'Your feedback' })).toContainText('extend the wait time')
   await sheet.getByRole('button', { name: 'Check for feedback' }).click()
   await expect(sheet.getByRole('status')).toContainText('1 new feedback record added (reviewer-authenticated)')
@@ -141,11 +141,13 @@ test('learner and mentor, end to end: invite → join → share exactly the prev
   await expect(page.getByRole('dialog')).toHaveCount(0)
   // 5. Learner ends the mentor's access: the portal is refused.
   await page.goto('./#/settings/data')
+  // Pass 78 (B08): the mentor list lives under "Manage shared access".
+  await section.getByText('Manage shared access', { exact: true }).click()
   await expect(section.getByRole('list', { name: 'Mentors' })).toContainText('A Mentor')
   await section.getByRole('button', { name: 'End access' }).click()
   await expect(section.getByRole('list', { name: 'Mentors' })).toContainText('Access ended')
   await portal.reload()
-  await expect(portal.getByText('Your session has ended — sign in again.')).toBeVisible()
+  await expect(portal.getByText('Your session has expired — sign in again.')).toBeVisible()
   await portal.getByLabel(/Passphrase/).fill('correct horse battery')
   await portal.getByRole('button', { name: 'Sign in' }).click()
   await expect(portal.getByRole('alert')).toContainText('Your access to this learner has been ended.')
@@ -155,7 +157,7 @@ test('learner and mentor, end to end: invite → join → share exactly the prev
   await again.getByLabel('Your name').fill('Someone else')
   await again.getByLabel(/Passphrase/).fill('another passphrase')
   await again.getByRole('button', { name: 'Join' }).click()
-  await expect(again.getByRole('alert')).toContainText('invitation not valid')
+  await expect(again.getByRole('alert')).toContainText('That invitation is not valid')
 })
 
 test('the portal without an invitation shows nothing, and the learner app never sends the owner token to a mentor route', async ({ page, context }) => {

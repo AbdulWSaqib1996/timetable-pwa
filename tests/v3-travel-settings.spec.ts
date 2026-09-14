@@ -100,9 +100,12 @@ test('Journey home: one origin/destination summary, an explicit unknown starting
   await expect(od.getByRole('button', { name: 'Copy address' })).toBeVisible()
   await expect(page.getByText(/Travel time needs a starting point/)).toBeVisible()
   const choose = page.getByRole('button', { name: 'Choose starting point' })
-  const maps = page.getByRole('link', { name: /Open home in Maps/ })
+  // B07: with no origin chosen only the device-origin link exists, and it names home as the destination.
+  const maps = page.getByRole('link', { name: /Navigate from my location/ })
   await expect(choose).toBeVisible()
   await expect(maps).toBeVisible()
+  await expect(maps).toHaveAttribute('href', /\?api=1&destination=51\.55,-0\.1&travelmode=transit/)
+  await expect(page.getByRole('link', { name: /Open planned route/ })).toHaveCount(0)
   await choose.click()
   await expect(page.getByLabel('Journey origin')).toBeFocused()
   await od.getByRole('button', { name: 'Edit home location' }).click()
