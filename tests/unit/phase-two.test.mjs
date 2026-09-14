@@ -43,6 +43,11 @@ test('merge tombstones prevent resurrection and converge in both directions', ()
   const p={id:'p1',name:'one',at:1,settings:{sheetId:'',demo:true}}
   assert.equal(mergeStores({activeId:'p1',profiles:[p]},{activeId:'',profiles:[],deletedProfiles:{p1:2}}).profiles.length,0)
   assert.equal(syncSettings({...p.settings,pushEnabled:true}).pushEnabled,undefined)
+  // Audit B08: the pause is device-local, the mentor credential still syncs.
+  const synced=syncSettings({...p.settings,mentorAccessPaused:true,mentorSpaceId:'abc',mentorOwnerToken:'tok'})
+  assert.equal(synced.mentorAccessPaused,undefined)
+  assert.equal(synced.mentorSpaceId,'abc')
+  assert.equal(synced.mentorOwnerToken,'tok')
 })
 test('payload contracts reject unsafe settings and malformed collections', () => {
   const payload={store:{activeId:'p1',profiles:[{id:'p1',name:'one',settings:{demo:true,sheetId:'',gid:null}}]},meta:{p1:{}}}

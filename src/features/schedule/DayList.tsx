@@ -3,6 +3,7 @@ import { SessionCard } from '../../components/SessionCard'
 import type { Coords, TravelMode } from '../../lib/campus'
 import { sessionKey } from '../../lib/diff'
 import { formatRemaining, isPlacementSession, placementTag, toMinutes } from '../../lib/format'
+import { keyDateSiblings } from '../../lib/scheduleProjection'
 import type { MetaMap, Session } from '../../types'
 
 interface Props {
@@ -27,14 +28,22 @@ export function DayList({ sessions, metaMap, coords, travelMode, placements, emp
   }
 
   const real = sessions.filter((s) => !s.isKeyDate)
+  const pins = sessions.filter((s) => s.isKeyDate)
+  // B09: two genuinely different key dates with one title (different times or rooms) both
+  // stay, and each says so — the learner sees the group, not a silent merge.
+  const group = (s: Session) => {
+    const n = s.isKeyDate ? keyDateSiblings(s, pins) : 1
+    return n > 1 ? <span className="filter-hint keydate-group">{n} items with this title today{s.start ? ` · this one at ${s.start}` : ''}</span> : null
+  }
   if (real.length > 0 && real.every(isPlacementSession)) {
     return (
       <div className="day-sessions day-list">
-        {sessions
-          .filter((s) => s.isKeyDate)
-          .map((s) => (
-            <SessionCard key={s.id} session={s} onSelect={onSelect} />
-          ))}
+        {pins.map((s) => (
+          <div key={s.id} className="session-slot">
+            <SessionCard session={s} onSelect={onSelect} />
+            {group(s)}
+          </div>
+        ))}
         <button type="button" className="placement-day" onClick={() => onSelect(real[0])}>
           <IconSchool size={16} /> {real[0].title}
           {real.length > 1 ? ` (+${real.length - 1} more)` : ''}
@@ -92,6 +101,7 @@ export function DayList({ sessions, metaMap, coords, travelMode, placements, emp
               conflict={clashes.has(s.id)}
               onSelect={onSelect}
             />
+            {group(s)}
           </div>
         )
       })}

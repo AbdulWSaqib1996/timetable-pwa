@@ -47,6 +47,8 @@ Before planning, each P1/P2 finding was checked against `main`:
 
 ### Batch B — recovery and control (Pass 78) — B05, B06, B07, B08, B09, B10
 
+> **Status (14 September 2026): implemented as Pass 78** — see PLAN.md. Deviations: the "2 items" affordance is a caption under each grouped key date rather than a collapsed group; the close-space route is `/mentor/close` with `/mentor/reopen` as its inverse; the two-device pause/sync test is a unit test of the sync projection (the pause never leaves the device) plus a browser test that the paused device keeps the credential and can still revoke; a replay of the current revision is now accepted only when the manifest is identical, so a client that missed an unshare gets 409 rather than a silent no-op.
+
 **In**
 - **B05** portal operations with an explicit status machine, bounded timeout/abort, `finally` cleanup, named Retry, drafts preserved, late responses discarded after sign-out/route change; 401 = expired, 403 = access ended, network = connection, decryption = attachment error; copy "Feedback saved. The learner can collect it in their app."; feedback submission idempotent by a client-generated id.
 - **B06** `idle | loading | ready | error` for the mentor list and the wallet in `ReviewPackSheet` and `MentorAccessSection`; effects keyed on space id and service base; wallet storage denial ≠ empty wallet; one polite status region, alerts on failed actions.

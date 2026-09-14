@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { telemetryTrack } from '../../lib/telemetry'
 import { useCourseClock } from '../../hooks/useCourseClock'
 import { utcToZonedParts } from '../../../shared/calendar-time.js'
+import { externalRouteUrl } from '../../../shared/routeUrl.js'
 import { courseZone } from '../../lib/course'
 import { ItinerarySteps } from '../../components/ItinerarySteps'
 import { OriginSelector } from '../../components/OriginSelector'
@@ -132,7 +133,10 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
     minutes !== null
       ? `${utcToZonedParts(Date.now() + minutes * 60_000, courseZone()).hhmm}${clock.zoneDiffers ? ' course time' : ''}`
       : null
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${home.lat},${home.lng}&travelmode=${travelMode === 'transit' ? 'transit' : travelMode}`
+  // B07: the planned link names the chosen saved origin; "from my location" is the separate device-origin action.
+  const plannedOrigin = origin && origin.basis !== 'device' ? origin : null
+  const plannedUrl = plannedOrigin ? externalRouteUrl({ origin: plannedOrigin.coords, destination: home, mode: travelMode }) : null
+  const deviceUrl = externalRouteUrl({ destination: home, mode: travelMode })
   const tone = journey.itinerary ? 'live' : journey.status === 'error' || journey.status === 'no-route' ? 'attention' : origin ? 'estimate' : 'missing'
 
   return (
@@ -287,10 +291,15 @@ export function JourneyHomePage({ settings, coords, locationEnabled, travelMode,
         </p>
       )}
 
-      <a className={`${origin ? 'btn-primary' : 'btn-secondary'} btn-link external-nav`} href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={() => telemetryTrack('navigation_link_opened')}>
-        Open home in Maps ↗
+      {plannedUrl && plannedOrigin && (
+        <a className="btn-primary btn-link external-nav" href={plannedUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open planned route from ${plannedOrigin.label} to Home in Maps`} onClick={() => telemetryTrack('navigation_link_opened')}>
+          Open planned route ↗
+        </a>
+      )}
+      <a className={`${plannedUrl ? 'btn-secondary' : origin ? 'btn-primary' : 'btn-secondary'} btn-link external-nav`} href={deviceUrl} target="_blank" rel="noopener noreferrer" aria-label="Navigate from my location to Home in Maps" onClick={() => telemetryTrack('navigation_link_opened')}>
+        Navigate from my location ↗
       </a>
-      <p className="filter-hint external-nav-caption">Opens navigation outside My Timetable — Maps may ask for your location when you start.</p>
+      <p className="filter-hint external-nav-caption">{plannedUrl ? `Planned route starts from ${plannedOrigin!.label}; ` : ''}Opens navigation outside My Timetable — Maps may ask for your location when you start from it.</p>
     </div>
   )
 }

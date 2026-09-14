@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Dialog, Field, FieldGroup, IconClose } from './ui'
+import { Dialog, Field, FieldGroup, IconClose, StatusMessage } from './ui'
 import { buildReviewPackText, pinRecord, pinStale } from '../../shared/evidence.js'
 import { newAdminId } from '../lib/admin'
 import type { AdminFile, ReviewPackItem, ReviewPackRec } from '../lib/admin'
 import { downloadFile } from '../lib/files'
 import { getWalletFiles } from '../lib/wallet'
 import { attachmentUid } from '../lib/attachments'
-import { StaleShareError, absorbInbox, fetchInbox, fileToBytes, listMentors, packTextHash, sharePack } from '../lib/mentor'
+import { StaleShareError, absorbInbox, fetchInbox, fileToBytes, listMentors, packTextHash, sharePack, unsharePack } from '../lib/mentor'
 import type { MentorListing, MentorSpace } from '../lib/mentor'
 import type { Settings } from '../types'
 
@@ -30,6 +30,9 @@ const emptyDraft = (): Draft => ({ picked: [], shareWith: [], shareAtt: [], msg:
 
 /** The immutable command built when the learner asks to review a share (audit B01). */
 interface ShareCommand { packId: string; packAt: number; revision: number; text: string; textHash: string; recipients: string[]; files: { uid: string; name: string; size: number; blob: Blob }[] }
+/** B06: loading, ready and error are three different things — never "no files" for a blocked store. */
+type WalletState = { status: 'loading' } | { status: 'ready'; entries: WalletEntry[] } | { status: 'error'; message: string }
+type MentorsState = { status: 'idle' } | { status: 'loading' } | { status: 'ready'; listing: MentorListing } | { status: 'error'; message: string }
 
 const fmt = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number)
@@ -51,16 +54,23 @@ export function ReviewPackSheet({ admin, profileId, todayISO, settings, onUpdate
   const [title, setTitle] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(admin.reviewPacks[0]?.id ?? null)
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
-  const [wallet, setWallet] = useState<WalletEntry[] | null>(null)
+  const [walletState, setWalletState] = useState<WalletState>({ status: 'loading' })
   const [discussedISO, setDiscussedISO] = useState(todayISO)
   const [relink, setRelink] = useState<Record<string, string>>({})
   const [command, setCommand] = useState<ShareCommand | null>(null)
   const [busy, setBusy] = useState(false)
   const space: MentorSpace | null = settings.mentorSpaceId && settings.mentorOwnerToken ? { spaceId: settings.mentorSpaceId, ownerToken: settings.mentorOwnerToken } : null
-  const [mentors, setMentors] = useState<MentorListing | null>(null)
+  const paused = !!space && !!settings.mentorAccessPaused
+  const [mentorsState, setMentorsState] = useState<MentorsState>({ status: 'idle' })
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [confirmUnshare, setConfirmUnshare] = useState<string | null>(null)
+  const [undo, setUndo] = useState<ReviewPackRec | null>(null)
+  const [walletTick, setWalletTick] = useState(0)
+  const [mentorsTick, setMentorsTick] = useState(0)
 
   useEffect(() => {
     let live = true
+    setWalletState({ status: 'loading' })
     void getWalletFiles(profileId)
       .then(async (files) => {
         const out: WalletEntry[] = []
@@ -68,15 +78,30 @@ export function ReviewPackSheet({ admin, profileId, todayISO, settings, onUpdate
           const rec = f as { id?: number; uid?: string; blob: Blob }
           out.push({ uid: rec.uid ?? (await attachmentUid({ ...f, uid: undefined })), localId: String(rec.id ?? ''), name: f.name, size: f.size, blob: rec.blob })
         }
-        if (live) setWallet(out)
+        if (live) setWalletState({ status: 'ready', entries: out })
       })
-      .catch(() => live && setWallet([]))
-    if (space) void listMentors(settings, space).then((l) => live && setMentors(l)).catch(() => live && setMentors(null))
+      .catch((e) => live && setWalletState({ status: 'error', message: `Could not read your wallet on this device${e instanceof Error && e.message ? ` (${e.message})` : ''} — storage may be blocked in this browser mode.` }))
+    return () => {
+      live = false
+    }
+  }, [profileId, walletTick])
+  useEffect(() => {
+    let live = true
+    if (!space || paused) {
+      setMentorsState({ status: 'idle' })
+      return
+    }
+    setMentorsState({ status: 'loading' })
+    void listMentors(settings, space)
+      .then((listing) => live && setMentorsState({ status: 'ready', listing }))
+      .catch((e) => live && setMentorsState({ status: 'error', message: e instanceof Error ? e.message : 'Could not load your mentors.' }))
     return () => {
       live = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, settings.mentorSpaceId])
+  }, [settings.mentorSpaceId, settings.pushServerBase, paused, mentorsTick])
+  const wallet = walletState.status === 'ready' ? walletState.entries : null
+  const mentors = mentorsState.status === 'ready' ? mentorsState.listing : null
 
   const pack = admin.reviewPacks.find((p) => p.id === selectedId) ?? null
   const draft: Draft = (pack && drafts[pack.id]) || emptyDraft()
@@ -154,6 +179,31 @@ export function ReviewPackSheet({ admin, profileId, todayISO, settings, onUpdate
     } finally {
       setBusy(false)
     }
+  }
+  /** B10: take the pack away from every mentor; the local pack and its sharing history stay. */
+  const unshare = async () => {
+    if (!pack || !space) return
+    setBusy(true)
+    setDraft({ msg: null })
+    try {
+      const res = await unsharePack(settings, space, pack.id)
+      const prev = pack.sharing
+      setPack(pack.id, { sharing: { revision: Math.max(res.revision, prev?.revision ?? 0), sharedAt: prev?.sharedAt ?? Date.now(), mentorIds: [], attachmentUids: [], textHash: prev?.textHash ?? '', unsharedAt: res.unsharedAt ?? Date.now() } })
+      setConfirmUnshare(null)
+      setCommand(null)
+      setDraft({ msg: 'Unshared. Mentors can no longer open this pack or its files in the portal. Copies they already downloaded are not recalled.' })
+    } catch (e) {
+      setDraft({ msg: e instanceof Error ? e.message : 'Could not unshare the pack.' })
+    } finally {
+      setBusy(false)
+    }
+  }
+  const deletePack = (p: ReviewPackRec) => {
+    setUndo(p)
+    setConfirmDelete(null)
+    setCommand(null)
+    onUpdateAdmin((prev) => ({ ...prev, reviewPacks: prev.reviewPacks.filter((x) => x.id !== p.id) }))
+    setSelectedId(admin.reviewPacks.find((x) => x.id !== p.id)?.id ?? null)
   }
   const checkInbox = async () => {
     if (!space) return
@@ -249,8 +299,10 @@ export function ReviewPackSheet({ admin, profileId, todayISO, settings, onUpdate
             </ul>
           )}
           <FieldGroup label="Attachments from your wallet (listed by name; a file only leaves this device when you share this pack with a mentor)">
-            {wallet === null ? (
-              <p className="filter-hint">Reading your wallet…</p>
+            {walletState.status === 'loading' ? (
+              <p className="filter-hint" aria-busy="true">Reading your wallet…</p>
+            ) : walletState.status === 'error' || wallet === null ? (
+              <p className="filter-hint" role="alert">{walletState.status === 'error' ? walletState.message : 'Could not read your wallet.'} <button type="button" className="travel-link" onClick={() => setWalletTick((n) => n + 1)}>Retry</button></p>
             ) : attachmentRows.length === 0 ? (
               <p className="filter-hint">No wallet files on this device.</p>
             ) : (
@@ -288,18 +340,59 @@ export function ReviewPackSheet({ admin, profileId, todayISO, settings, onUpdate
                 <button type="button" className="btn-today-reset" onClick={() => setPack(pack.id, { state: 'discussed', discussedISO })}>Mark as discussed</button>
               </>
             )}
-            <button type="button" className="btn-today-reset" onClick={() => onUpdateAdmin((prev) => ({ ...prev, reviewPacks: prev.reviewPacks.filter((p) => p.id !== pack.id) }))}>Delete local pack</button>
+            <button type="button" className="btn-today-reset" aria-expanded={confirmDelete === pack.id} onClick={() => setConfirmDelete(confirmDelete === pack.id ? null : pack.id)}>Delete local pack</button>
           </div>
+          {confirmDelete === pack.id && (
+            <div className="callout callout--amber" aria-label="Confirm pack deletion">
+              <p>
+                Delete “{pack.title}” from this device and your synced copies?{' '}
+                {pack.sharing && pack.sharing.mentorIds.length > 0
+                  ? `It is still shared (version ${pack.sharing.revision}) with ${pack.sharing.mentorIds.length} mentor${pack.sharing.mentorIds.length === 1 ? '' : 's'}${pack.sharing.attachmentUids.length ? ` and ${pack.sharing.attachmentUids.length} file${pack.sharing.attachmentUids.length === 1 ? '' : 's'}` : ''} — deleting here does not take it out of the portal; use Unshare for that.`
+                  : pack.sharing
+                    ? 'It is not shared with anyone at the moment.'
+                    : 'It has never been shared.'}{' '}
+                You can undo straight after.
+              </p>
+              <div className="btn-row">
+                <button type="button" className="btn-primary" onClick={() => deletePack(pack)}>Delete pack</button>
+                <button type="button" className="btn-ghost" onClick={() => setConfirmDelete(null)}>Keep</button>
+              </div>
+            </div>
+          )}
           <h3 className="subheading">Exactly what leaves the device</h3>
           <pre className="plan-pre pack-preview-text" aria-label="Pack preview">{text}</pre>
           <div className="btn-row"><button type="button" className="btn-primary" onClick={() => downloadFile(`review-pack-${pack.title.replace(/[^\w-]+/g, '-').toLowerCase()}.txt`, text, 'text/plain')}>Export this text</button></div>
 
           <h3 className="subheading">Share with a mentor</h3>
-          {pack.sharing && <p className="filter-hint">Shared version {pack.sharing.revision} on {new Date(pack.sharing.sharedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} with {pack.sharing.mentorIds.length} mentor{pack.sharing.mentorIds.length === 1 ? '' : 's'}{pack.sharing.attachmentUids.length ? ` and ${pack.sharing.attachmentUids.length} file${pack.sharing.attachmentUids.length === 1 ? '' : 's'}` : ''}.</p>}
+          {pack.sharing && (pack.sharing.mentorIds.length > 0 ? (
+            <p className="filter-hint">Shared version {pack.sharing.revision} on {new Date(pack.sharing.sharedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} with {pack.sharing.mentorIds.length} mentor{pack.sharing.mentorIds.length === 1 ? '' : 's'}{pack.sharing.attachmentUids.length ? ` and ${pack.sharing.attachmentUids.length} file${pack.sharing.attachmentUids.length === 1 ? '' : 's'}` : ''}.</p>
+          ) : (
+            <p className="filter-hint">Not shared with anyone at the moment{pack.sharing.unsharedAt ? ` (unshared ${new Date(pack.sharing.unsharedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})` : ''}.</p>
+          ))}
+          {space && pack.sharing && pack.sharing.mentorIds.length > 0 && !paused && (
+            <div className="btn-row">
+              <button type="button" className="btn-today-reset" disabled={busy} aria-expanded={confirmUnshare === pack.id} onClick={() => setConfirmUnshare(confirmUnshare === pack.id ? null : pack.id)}>Unshare from mentors</button>
+            </div>
+          )}
+          {confirmUnshare === pack.id && (
+            <div className="callout callout--amber" aria-label="Confirm unshare">
+              <p>Take “{pack.title}” away from all {pack.sharing?.mentorIds.length ?? 0} mentor{(pack.sharing?.mentorIds.length ?? 0) === 1 ? '' : 's'}? They can no longer open it or its files in the portal. Copies already downloaded are not recalled, and feedback already collected stays in your PGCE file.</p>
+              <div className="btn-row">
+                <button type="button" className="btn-primary" disabled={busy} onClick={() => void unshare()}>Unshare now</button>
+                <button type="button" className="btn-ghost" onClick={() => setConfirmUnshare(null)}>Keep sharing</button>
+              </div>
+            </div>
+          )}
           {!space ? (
             <p className="filter-hint">Turn on mentor access in Settings → Data &amp; devices to share this pack with a mentor through the portal.</p>
-          ) : !mentors ? (
-            <p className="filter-hint">Loading your mentors…</p>
+          ) : paused ? (
+            <p className="filter-hint">Mentor access is paused on this device — resume it in Settings → Data &amp; devices → Mentor access to share from here. Mentors keep what they already have.</p>
+          ) : mentorsState.status === 'loading' || mentorsState.status === 'idle' ? (
+            <p className="filter-hint" aria-busy="true">Loading your mentors…</p>
+          ) : mentorsState.status === 'error' || !mentors ? (
+            <p className="filter-hint" role="alert">{mentorsState.status === 'error' ? mentorsState.message : 'Could not load your mentors.'} <button type="button" className="travel-link" onClick={() => setMentorsTick((n) => n + 1)}>Retry</button></p>
+          ) : mentors.closedAt ? (
+            <p className="filter-hint">Mentor access is ended for every mentor — reopen it in Settings → Data &amp; devices → Mentor access to share again.</p>
           ) : activeMentors.length === 0 ? (
             <p className="filter-hint">No active mentor yet — create an invitation in Settings → Data &amp; devices → Mentor access.</p>
           ) : (
@@ -341,6 +434,26 @@ export function ReviewPackSheet({ admin, profileId, todayISO, settings, onUpdate
           )}
           {draft.msg && <p className="filter-hint" role="status">{draft.msg}</p>}
         </section>
+      )}
+      {undo && (
+        <StatusMessage tone="info">
+          <span>
+            Pack “{undo.title}” deleted.{' '}
+            <button
+              type="button"
+              className="travel-link"
+              onClick={() => {
+                // Undo writes a revision NEWER than the tombstone (same rule as the PGCE file).
+                const restored = { ...undo, at: Date.now() }
+                onUpdateAdmin((prev) => ({ ...prev, reviewPacks: [...prev.reviewPacks.filter((p) => p.id !== restored.id), restored] }))
+                setSelectedId(restored.id)
+                setUndo(null)
+              }}
+            >
+              Undo
+            </button>
+          </span>
+        </StatusMessage>
       )}
     </Dialog>
   )

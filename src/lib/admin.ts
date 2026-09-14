@@ -420,7 +420,7 @@ export interface ReviewPackRec {
   attachments?: { id: string; uid?: string; name: string; size?: number; state: 'local-only' | 'missing' }[]
   notes?: string
   /** B01/B02: what the portal last received — the diff base for the next share */
-  sharing?: { revision: number; sharedAt: number; mentorIds: string[]; attachmentUids: string[]; textHash: string }
+  sharing?: { revision: number; sharedAt: number; mentorIds: string[]; attachmentUids: string[]; textHash: string; unsharedAt?: number }
   at: number
 }
 

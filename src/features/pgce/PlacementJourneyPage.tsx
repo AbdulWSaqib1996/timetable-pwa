@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { utcToZonedParts, wallToUTC } from '../../../shared/calendar-time.js'
 import { requiredArrivalMs } from '../../../shared/journey.js'
+import { externalRouteUrl } from '../../../shared/routeUrl.js'
 import { courseZone } from '../../lib/course'
 import { useCourseClock } from '../../hooks/useCourseClock'
 import { useJourney } from '../../hooks/useJourney'
@@ -82,13 +83,16 @@ export function PlacementJourneyPage({ placement, school, leg, settings, coords,
     if (leg === 'back') return schoolOrigin?.id ?? originOptions.find((o) => o.basis === 'device' && o.coords)?.id ?? null
     return originOptions.find((o) => o.basis === 'home' && o.coords)?.id ?? originOptions.find((o) => o.basis === 'device' && o.coords)?.id ?? null
   })
+  // Keep a usable origin selected: when the chosen one is not on offer for this leg (the
+  // page is reused when the learner switches To school ↔ Back home), or none is chosen
+  // yet, prefer the leg's natural start (home outward, the school back), else the device.
   useEffect(() => {
-    if (originId === null) {
-      const device = originOptions.find((o) => o.basis === 'device' && o.coords)
-      if (device) setOriginId(device.id)
-    }
+    if (originId !== null && originOptions.some((o) => o.id === originId && o.coords)) return
+    const preferred = leg === 'back' ? schoolOrigin : originOptions.find((o) => o.basis === 'home' && o.coords) ?? null
+    const pick = preferred ?? originOptions.find((o) => o.basis === 'device' && o.coords) ?? null
+    if (pick && pick.id !== originId) setOriginId(pick.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originOptions.find((o) => o.basis === 'device')?.coords != null])
+  }, [originOptions, leg, schoolOrigin?.id])
   const origin = originOptions.find((o) => o.id === originId && o.coords) ?? null
   const originSelect = useRef<HTMLSelectElement>(null)
 
@@ -166,7 +170,10 @@ export function PlacementJourneyPage({ placement, school, leg, settings, coords,
   } else if (journey.status === 'error' && minutes !== null) basisLabel = "estimate from distance — couldn't reach TfL"
   const leaveLabel = journey.leaveByMs ? hhmm(journey.leaveByMs) : null
   const arriveLabel = minutes !== null && intent.kind === 'leave-now' ? hhmm(Date.now() + minutes * 60_000) : null
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}&travelmode=${travelMode === 'transit' ? 'transit' : travelMode}`
+  // B07: the planned link names the origin the learner chose; the device-origin link is a separate, labelled action.
+  const plannedOrigin = origin && origin.basis !== 'device' ? origin : null
+  const plannedUrl = plannedOrigin ? externalRouteUrl({ origin: plannedOrigin.coords, destination: dest, mode: travelMode }) : null
+  const deviceUrl = externalRouteUrl({ destination: dest, mode: travelMode })
   const tone = shown ? 'live' : journey.status === 'error' || journey.status === 'no-route' ? 'attention' : origin ? 'estimate' : 'missing'
   const whenLine =
     leg === 'out'
@@ -279,10 +286,15 @@ export function PlacementJourneyPage({ placement, school, leg, settings, coords,
         <p className="route-info">Best option: walk (no transit leg needed).</p>
       ) : null}
 
-      <a className={`${origin ? 'btn-primary' : 'btn-secondary'} btn-link external-nav`} href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={() => telemetryTrack('navigation_link_opened')}>
-        Open in Maps ↗
+      {plannedUrl && plannedOrigin && (
+        <a className="btn-primary btn-link external-nav" href={plannedUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open planned route from ${plannedOrigin.label} to ${destination!.label} in Maps`} onClick={() => telemetryTrack('navigation_link_opened')}>
+          Open planned route ↗
+        </a>
+      )}
+      <a className={`${plannedUrl ? 'btn-secondary' : origin ? 'btn-primary' : 'btn-secondary'} btn-link external-nav`} href={deviceUrl} target="_blank" rel="noopener noreferrer" aria-label={`Navigate from my location to ${destination!.label} in Maps`} onClick={() => telemetryTrack('navigation_link_opened')}>
+        Navigate from my location ↗
       </a>
-      <p className="filter-hint external-nav-caption">Opens navigation outside My Timetable — Maps may ask for your location when you start.</p>
+      <p className="filter-hint external-nav-caption">{plannedUrl ? `Planned route starts from ${plannedOrigin!.label}; ` : ''}Opens navigation outside My Timetable — Maps may ask for your location when you start from it.</p>
     </div>
   )
 }
