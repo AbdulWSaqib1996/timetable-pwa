@@ -1471,7 +1471,7 @@ Automated checks + results: `tests/unit/route-url.test.mjs` (3, new: origin + de
 
 Known limits (stated in the audit): downloaded copies cannot be recalled by unshare or close; the "2 items" affordance is a caption, not a collapsed group; pause is per device by design, so a second signed-in device is unaffected until it pauses too.
 
-Released 14 September 2026: workers deployed first (push `64740e3a-2c37-404f-8d42-c85a280c2783`, feed `65cd28c3-0f3a-4f4c-b910-dc5af4351da5`; live smoke on a throwaway space: unshare of an unknown pack 200, wrong owner token 403, close then login 403, reopen 200); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 14 September 2026: workers deployed first (push `64740e3a-2c37-404f-8d42-c85a280c2783`, feed `65cd28c3-0f3a-4f4c-b910-dc5af4351da5`; live smoke on a throwaway space: unshare of an unknown pack 200, wrong owner token 403, close then login 403, reopen 200); merge `0619718`, CI run 34823743457 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
