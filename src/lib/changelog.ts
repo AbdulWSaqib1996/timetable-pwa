@@ -7,6 +7,18 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 13,
+    dateISO: '2026-09-14',
+    title: 'A PGCE file that starts where you left off',
+    items: [
+      'PGCE file: your active placement, one recommended next action with its reason, and four destinations — Lessons & practice, Mentor & feedback, Evidence & reviews, Academic work & programme; every record type has its own address you can bookmark or refresh',
+      'Review packs: packs on the left, one pack on the right, in three steps — Content, People, Check & share — with a search over your records and a sharing state beside each pack',
+      'Schedule on a phone: one toolbar (view, Filters with a count and Clear, Today), a school-day card with the school, its hours and where they come from, and To school / Back home',
+      'Readability: 16px body text, 28px page titles, arrow keys on every tab strip, visible labels on every form, and reduced motion honoured; the mentor portal uses the same colours with accessible dark-mode buttons',
+      'Deleting a record asks first and can be undone; each record editor shows its type, placement, date and whether it is saved',
+    ],
+  },
+  {
     version: 12,
     dateISO: '2026-09-14',
     title: 'Recover, pause and take back',

@@ -72,7 +72,7 @@ async function walk(page: Page) {
   }, METADATA)
 }
 
-const SCREENS = ['today', 'schedule', 'tasks', 'pgce', 'settings', 'settings/timetable', 'settings/data', 'settings/reminders', 'settings/travel', 'settings/calendars', 'settings/appearance', 'settings/help', 'find', 'home']
+const SCREENS = ['today', 'schedule', 'tasks', 'pgce', 'pgce/lessons', 'pgce/mentor', 'settings', 'settings/timetable', 'settings/data', 'settings/reminders', 'settings/travel', 'settings/calendars', 'settings/appearance', 'settings/help', 'find', 'home']
 
 test('V-01/V-03: on every primary screen at 390px no ordinary control is under 44px and no ordinary text is under 14px', async ({ page }) => {
   test.setTimeout(120_000)
@@ -117,7 +117,12 @@ test('V-05: core controls carry line icons with visible labels or names — no e
     })
     expect(offenders, `${route}: emoji-only controls ${JSON.stringify(offenders)}`).toEqual([])
   }
+  // U03: on a phone the placements toggle lives in the labelled More menu; the iconed button shows from 1024px.
   await page.goto('./#/schedule')
+  await page.getByRole('button', { name: 'More' }).click()
+  await expect(page.getByRole('menuitem', { name: 'Show placements only' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 1100, height: 900 })
   await expect(page.getByRole('button', { name: 'Placements', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Placements' }).locator('svg')).toHaveCount(1)
   await page.goto('./#/tasks')

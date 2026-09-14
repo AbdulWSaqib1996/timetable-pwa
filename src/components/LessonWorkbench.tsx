@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { KeyboardEvent } from 'react'
-import { Dialog, Field, FieldGroup, IconClose } from './ui'
+import { Dialog, Field, FieldGroup, IconClose, tabKeys } from './ui'
 import { LESSON_TEMPLATES, activateCycle, nextAttempt, provenanceLabel, withPlanRevision } from '../../shared/practice.js'
 import { newAdminId } from '../lib/admin'
 import type { AdminFile, Lesson, LessonStage, Observation, PracticeCycleRec } from '../lib/admin'
@@ -127,11 +126,8 @@ export function LessonWorkbench({ lessonId: initialId, admin, sessions, placemen
     setStage('plan')
     setSaved(`Next attempt started — attempt ${rec.attempt}`)
   }
-  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
-    const i = STAGES.findIndex((s) => s.id === stage)
-    if (e.key === 'ArrowRight') setStage(STAGES[(i + 1) % STAGES.length].id)
-    if (e.key === 'ArrowLeft') setStage(STAGES[(i + STAGES.length - 1) % STAGES.length].id)
-  }
+  // U04: the shared tab-key rule — Left/Right wrap, Home/End jump, focus follows selection.
+  const onTabKey = tabKeys(STAGES.map((s) => s.id), stage, setStage)
   const title = `${lesson.subject || 'Lesson'}${lesson.classGroup ? ` · ${lesson.classGroup}` : ''}`
 
   return (

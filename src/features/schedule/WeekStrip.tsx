@@ -10,6 +10,8 @@ interface Props {
   busyDays: Set<string>
   onSelect: (dateISO: string) => void
   onShiftWeek: (deltaDays: number) => void
+  /** U03: "Today" lives on the week navigator row — the date row — so the toolbar stays one row on a phone */
+  onToday?: () => void
 }
 
 const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) => {
@@ -25,7 +27,7 @@ const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) => {
  * Right move a day (crossing into the next week), Home / End jump to Monday /
  * Sunday. Every button's accessible name is the full spoken date.
  */
-export function WeekStrip({ anchorISO, todayISO, busyDays, onSelect, onShiftWeek }: Props) {
+export function WeekStrip({ anchorISO, todayISO, busyDays, onSelect, onShiftWeek, onToday }: Props) {
   const monday = mondayOfISO(anchorISO)
   const days = Array.from({ length: 7 }, (_, i) => addDaysISO(monday, i))
   const label = `${fmt(monday, { day: 'numeric', month: 'short' })}–${fmt(addDaysISO(monday, 6), { day: 'numeric', month: 'short' })}`
@@ -58,6 +60,11 @@ export function WeekStrip({ anchorISO, todayISO, busyDays, onSelect, onShiftWeek
         <button type="button" className="btn-icon" onClick={() => onShiftWeek(7)} aria-label="Next week">
           <IconChevronRight />
         </button>
+        {onToday && (
+          <button type="button" className="btn-filters week-nav-today" onClick={onToday} title="Back to today" aria-current={anchorISO === todayISO ? 'date' : undefined}>
+            Today
+          </button>
+        )}
       </div>
       <div ref={stripRef} className="week-strip" role="listbox" aria-label={`Pick a day, ${label}`} onKeyDown={onKey}>
         {days.map((iso) => {

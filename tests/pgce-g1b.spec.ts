@@ -137,10 +137,9 @@ test('full cycle offline: plan → rehearsal block → teach (no attendance) →
   // The quick retrospective lesson form in the PGCE file still works unchanged.
   await wb.getByRole('button', { name: 'Close' }).click()
   await page.goto('./#/pgce')
-  await page.getByRole('button', { name: /Add or open a record/ }).click()
-  await page.getByRole('menuitem', { name: /^Lessons/ }).click()
+  await page.getByRole('button', { name: /^Lessons \(/ }).click()
   const sheet = page.getByRole('dialog')
-  await sheet.getByPlaceholder('Subject (e.g. Maths — fractions)').fill('Quick retro')
+  await sheet.getByLabel('Subject', { exact: true }).fill('Quick retro')
   await sheet.getByRole('button', { name: 'Log lesson' }).click()
   const quick = (await admin(page)).lessons.find((l: { subject: string }) => l.subject === 'Quick retro')
   expect(quick.stage).toBeUndefined()
@@ -186,8 +185,7 @@ test('mentor preparation: agenda with referenced examples and open actions; "hel
   a.meetings = [{ id: 'm0', dateISO: '2026-09-04', discussed: 'Earlier', actions: [{ id: 'act0', text: 'Read the marking policy', done: false }], at: 1 }]
   await seed(page, a)
   await page.goto('./#/pgce')
-  await page.getByRole('button', { name: /Add or open a record/ }).click()
-  await page.getByRole('menuitem', { name: /^Mentor preparation/ }).click()
+  await page.getByRole('button', { name: /^Mentor preparation/ }).click()
   const sheet = page.getByRole('dialog', { name: 'Mentor preparation' })
   await sheet.getByLabel('Meeting date').fill('2026-09-16')
   await sheet.getByRole('button', { name: 'New agenda' }).click()
@@ -215,8 +213,7 @@ test('mentor preparation: agenda with referenced examples and open actions; "hel
 test('practice focus: one active at a time (the other pauses, never fails), resume, review decision, archive', async ({ page }) => {
   await seed(page)
   await page.goto('./#/pgce')
-  await page.getByRole('button', { name: /Add or open a record/ }).click()
-  await page.getByRole('menuitem', { name: /^Practice focus/ }).click()
+  await page.getByRole('button', { name: /^Practice focus/ }).click()
   const sheet = page.getByRole('dialog', { name: 'Practice focus' })
   await sheet.getByLabel('Focus', { exact: true }).fill('Cold-call every learner')
   await sheet.getByRole('button', { name: 'Start focus' }).click()
@@ -235,8 +232,7 @@ test('practice focus: one active at a time (the other pauses, never fails), resu
   await cycles.filter({ hasText: 'Clear instructions' }).getByRole('button', { name: 'Archive' }).click()
   const file = await admin(page)
   expect(file.cycles.map((c: { focus: string; state: string; reviewDecision?: string }) => [c.focus, c.state, c.reviewDecision ?? null]).sort()).toEqual([['Clear instructions in three steps', 'archived', 'close'], ['Cold-call every learner', 'active', null]])
-  // The PGCE menu counts only live focuses.
+  // The PGCE landing counts only live focuses.
   await sheet.getByRole('button', { name: 'Close' }).click()
-  await page.getByRole('button', { name: /Add or open a record/ }).click()
-  await expect(page.getByRole('menuitem', { name: 'Practice focus (1)' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Practice focus (1)' })).toBeVisible()
 })

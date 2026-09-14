@@ -426,14 +426,36 @@ export function SegmentedControl<T extends string>({
           type="button"
           role="tab"
           aria-selected={value === opt.value}
+          tabIndex={value === opt.value ? 0 : -1}
           className={`segment${value === opt.value ? ' segment-on' : ''}`}
           onClick={() => onChange(opt.value)}
+          onKeyDown={tabKeys(options.map((o) => o.value), value, onChange)}
         >
           {opt.label}
         </button>
       ))}
     </div>
   )
+}
+
+/**
+ * U04: every tab widget answers the arrow keys (Left/Right wrap, Home/End
+ * jump) with a roving tabindex — the focused tab is selected and focused.
+ */
+export function tabKeys<T extends string>(ids: readonly T[], current: T, select: (id: T) => void) {
+  return (e: KeyboardEvent<HTMLButtonElement>) => {
+    const i = Math.max(0, ids.indexOf(current))
+    let next: T | null = null
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = ids[(i + 1) % ids.length]
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = ids[(i + ids.length - 1) % ids.length]
+    else if (e.key === 'Home') next = ids[0]
+    else if (e.key === 'End') next = ids[ids.length - 1]
+    if (next === null) return
+    e.preventDefault()
+    select(next)
+    const list = (e.currentTarget.parentElement?.querySelectorAll('[role="tab"]') ?? []) as NodeListOf<HTMLButtonElement>
+    list[ids.indexOf(next)]?.focus()
+  }
 }
 
 export function Field({

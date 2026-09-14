@@ -66,8 +66,9 @@ const card = (page: Page, code: string) => page.getByRole('list', { name: 'Your 
 test('chooser states; setting up SE2 through the flow leaves SE1 and SE3 byte-for-byte unchanged and writes nothing to the legacy map', async ({ page, context }) => {
   await context.route('**/api.postcodes.io/**', (route: Route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 200, result: { latitude: 51.52, longitude: -0.09 } }) }))
   await seed(page)
-  await page.goto('./#/pgce')
-  await expect(page.getByRole('heading', { level: 1, name: 'PGCE file' })).toBeVisible()
+  // Pass 79 (U01): the three placement cards live under All placements (`#/placement`).
+  await page.goto('./#/placement')
+  await expect(page.getByRole('heading', { level: 1, name: 'Placement' })).toBeVisible()
   await expect(card(page, 'SE1')).toContainText('Ready to plan')
   await expect(card(page, 'SE1')).toContainText('Current')
   await expect(card(page, 'SE1')).toContainText('Riverside Primary')
@@ -127,7 +128,7 @@ test('chooser states; setting up SE2 through the flow leaves SE1 and SE3 byte-fo
 
 test('the SE1 workspace lists its lesson and open action, its next school days carry "SE1 · Riverside Primary", and the session detail shows the same label', async ({ page }) => {
   await seed(page)
-  await page.goto('./#/pgce')
+  await page.goto('./#/placement')
   await card(page, 'SE1').getByRole('button', { name: 'Open placement' }).click()
   await expect(page).toHaveURL(/#\/placement\/pl-se1$/)
   await expect(page.getByRole('heading', { level: 1, name: 'SE1 · Riverside Primary' })).toBeVisible()
@@ -143,13 +144,13 @@ test('the SE1 workspace lists its lesson and open action, its next school days c
   await page.goto('./#/placement/pl-se1')
   await page.getByRole('button', { name: 'Lessons →' }).click()
   const sheet = page.getByRole('dialog')
-  await sheet.getByPlaceholder('Subject (e.g. Maths — fractions)').fill('Phonics')
+  await sheet.getByLabel('Subject', { exact: true }).fill('Phonics')
   await sheet.getByRole('combobox', { name: 'Placement' }).selectOption('pl-se1')
   await sheet.getByRole('button', { name: 'Log lesson' }).click()
   const file = await admin(page)
   expect(file.lessons.find((l: { subject: string }) => l.subject === 'Phonics').placementId).toBe('pl-se1')
   // A record without a placement stays Unassigned (no empty-string link on the wire).
-  await sheet.getByPlaceholder('Subject (e.g. Maths — fractions)').fill('Unlinked')
+  await sheet.getByLabel('Subject', { exact: true }).fill('Unlinked')
   await sheet.getByRole('combobox', { name: 'Placement' }).selectOption('')
   await sheet.getByRole('button', { name: 'Log lesson' }).click()
   expect('placementId' in (await admin(page)).lessons.find((l: { subject: string }) => l.subject === 'Unlinked')).toBe(false)
@@ -212,7 +213,8 @@ test('without a home the return journey asks for a destination instead of guessi
 
 test('programme: profile, pack import with diff preview, learner confirmation, milestones, and the roadmap card', async ({ page }) => {
   await seed(page)
-  await page.goto('./#/pgce')
+  // Pass 79 (U01): the roadmap lives with Academic work & programme.
+  await page.goto('./#/pgce/academic')
   await expect(page.getByText('Requirements not yet confirmed.')).toBeVisible()
   await page.goto('./#/settings/timetable')
   await page.getByRole('button', { name: 'Programme', exact: true }).click()
@@ -274,7 +276,7 @@ test('programme: profile, pack import with diff preview, learner confirmation, m
   await expect(early).toContainText('done')
   await page.keyboard.press('Escape')
 
-  await page.goto('./#/pgce')
+  await page.goto('./#/pgce/academic')
   const roadmap = page.getByRole('list', { name: 'Roadmap' })
   await expect(roadmap).toContainText('Assignment 1 · 2026-11-20')
   await expect(roadmap).toContainText('Progress review 1 · 2026-12-11')

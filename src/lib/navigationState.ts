@@ -11,6 +11,11 @@ import type { Route } from './router'
 export const MAX_SESSION_KEY_LENGTH = 512
 export const SETTINGS_SECTIONS = ['timetable', 'calendars', 'reminders', 'travel', 'appearance', 'data', 'help'] as const
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
+/** U01/U05 (Pass 79): the PGCE landing's four destinations and the record tabs, each a URL. */
+export const PGCE_SECTIONS = ['lessons', 'mentor', 'evidence', 'academic'] as const
+export type PgceSection = (typeof PGCE_SECTIONS)[number]
+export const PGCE_TABS = ['overview', 'reflect', 'targets', 'meetings', 'obs', 'lessons', 'audits', 'wallet'] as const
+export type PgceTab = (typeof PGCE_TABS)[number]
 
 export type ParsedRoute =
   | { ok: true; route: Route; notice?: string }
@@ -25,6 +30,13 @@ export function safeDecode(segment: string): string | null {
   }
 }
 
+const recordId = (segment: string | undefined): string | null | undefined => {
+  if (segment === undefined || segment === '') return undefined
+  if (segment.length > 300) return null
+  const id = safeDecode(segment)
+  return id !== null && /^[\w-]{1,100}$/.test(id) ? id : null
+}
+
 export function parseRouteSafe(hash: string): ParsedRoute {
   const raw = typeof hash === 'string' ? hash : ''
   if (raw.length > 4096) return { ok: false, reason: 'oversized' }
@@ -37,8 +49,31 @@ export function parseRouteSafe(hash: string): ParsedRoute {
       return { ok: true, route: { name: 'schedule' } }
     case 'tasks':
       return { ok: true, route: { name: 'tasks' } }
-    case 'pgce':
-      return { ok: true, route: { name: 'pgce' } }
+    case 'pgce': {
+      // #/pgce, #/pgce/<section>, #/pgce/records/<tab>[/<id>], #/pgce/lesson/<id>, #/pgce/packs[/<id>]
+      if (!parts[1]) return { ok: true, route: { name: 'pgce' } }
+      const notice = 'That PGCE page does not exist — showing the PGCE file.'
+      if ((PGCE_SECTIONS as readonly string[]).includes(parts[1]) && parts.length === 2) return { ok: true, route: { name: 'pgce', section: parts[1] as PgceSection } }
+      if (parts[1] === 'records') {
+        if (!parts[2] || !(PGCE_TABS as readonly string[]).includes(parts[2]) || parts.length > 4) return { ok: true, route: { name: 'pgce' }, notice }
+        const id = recordId(parts[3])
+        if (id === null) return { ok: false, reason: 'malformed' }
+        return { ok: true, route: { name: 'pgce', tab: parts[2] as PgceTab, ...(id ? { recordId: id } : {}) } }
+      }
+      if (parts[1] === 'lesson') {
+        const id = recordId(parts[2])
+        if (id === null) return { ok: false, reason: 'malformed' }
+        if (!id || parts.length !== 3) return { ok: true, route: { name: 'pgce', section: 'lessons' }, notice }
+        return { ok: true, route: { name: 'pgce', lessonId: id } }
+      }
+      if (parts[1] === 'packs') {
+        const id = recordId(parts[2])
+        if (id === null) return { ok: false, reason: 'malformed' }
+        if (parts.length > 3) return { ok: true, route: { name: 'pgce', packs: true }, notice }
+        return { ok: true, route: { name: 'pgce', packs: true, ...(id ? { packId: id } : {}) } }
+      }
+      return { ok: true, route: { name: 'pgce' }, notice }
+    }
     case 'home':
       return { ok: true, route: { name: 'homeJourney' } }
     case 'placement': {

@@ -184,6 +184,7 @@ test('B06: a failed mentor list and a blocked wallet are errors with Retry — n
   await expect(walletAlert).toBeVisible()
   await expect(sheet).not.toContainText('No wallet files on this device.')
   await expect(walletAlert.getByRole('button', { name: 'Retry' })).toBeVisible()
+  await sheet.getByRole('tab', { name: 'People' }).click()
   const mentorAlert = sheet.getByRole('alert').filter({ hasText: 'status 503' })
   await expect(mentorAlert).toBeVisible()
   await expect(sheet).not.toContainText('No active mentor yet')
@@ -217,6 +218,7 @@ test('B08: pausing on this device keeps the credential and can still revoke; End
   await page.getByRole('button', { name: /^Review packs/ }).click()
   const sheet = page.getByRole('dialog', { name: 'Review packs' })
   await sheet.getByRole('button', { name: /Progress review 1/ }).click()
+  await sheet.getByRole('tab', { name: 'People' }).click()
   await expect(sheet).toContainText('Mentor access is paused on this device')
   await expect(sheet.getByRole('button', { name: 'Review share' })).toHaveCount(0)
   await sheet.getByRole('button', { name: 'Close' }).click()
@@ -258,7 +260,8 @@ test('B10: Delete local pack shows the share summary and asks first with Undo; U
   await expect(confirm).toContainText('use Unshare for that')
   await confirm.getByRole('button', { name: 'Keep' }).click()
   await expect(confirm).toHaveCount(0)
-  // Unshare: reviewed, owner-authorised, recorded on the pack, and honest about downloaded copies.
+  // Unshare: reviewed, owner-authorised, recorded on the pack, and honest about downloaded copies (Check & share step).
+  await sheet.getByRole('tab', { name: 'Check & share' }).click()
   await sheet.getByRole('button', { name: 'Unshare from mentors' }).click()
   await expect(sheet.getByLabel('Confirm unshare')).toContainText('Copies already downloaded are not recalled')
   await sheet.getByLabel('Confirm unshare').getByRole('button', { name: 'Unshare now' }).click()
@@ -271,6 +274,7 @@ test('B10: Delete local pack shows the share summary and asks first with Undo; U
   await expect(sheet).toContainText('Not shared with anyone at the moment')
   await expect(sheet.getByRole('button', { name: 'Unshare from mentors' })).toHaveCount(0)
   // Delete now says it is not shared; deletion is undoable.
+  await sheet.getByRole('tab', { name: 'Content' }).click()
   await sheet.getByRole('button', { name: 'Delete local pack' }).click()
   await expect(sheet.getByLabel('Confirm pack deletion')).toContainText('not shared with anyone at the moment')
   await sheet.getByLabel('Confirm pack deletion').getByRole('button', { name: 'Delete pack' }).click()

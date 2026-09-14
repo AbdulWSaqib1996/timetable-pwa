@@ -91,7 +91,9 @@ export function TasksPage({
   useEffect(() => {
     if (!justCompleted) return
     setCompletedOpen(true)
-    const t1 = setTimeout(() => completedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50)
+    // U04: honour reduced motion — the reveal still happens, without the animated scroll.
+    const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    const t1 = setTimeout(() => completedRef.current?.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' }), 50)
     const t2 = setTimeout(() => setJustCompleted(null), 8000)
     return () => {
       clearTimeout(t1)

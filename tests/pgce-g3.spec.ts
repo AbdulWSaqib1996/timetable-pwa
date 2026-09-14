@@ -94,6 +94,8 @@ test('review pack: pins snapshots, stays readable after the source edits, shows 
     raw.lessons[0] = { ...raw.lessons[0], evaluation: 'Rewritten later', at: Date.now() }
     localStorage.setItem('timetable.admin.v1.fx', JSON.stringify(raw))
   })
+  // Pass 79 (U05): closing the packs goes Back to the landing; reopening is by its URL.
+  await expect(page).toHaveURL(/#\/pgce$/)
   await page.reload()
   await page.getByRole('button', { name: /^Review packs/ }).click()
   await sheet.getByRole('button', { name: /Progress review 1/ }).click()
@@ -108,9 +110,9 @@ test('review pack: pins snapshots, stays readable after the source edits, shows 
     localStorage.setItem('timetable.admin.v1.fx', JSON.stringify(raw))
   })
   await page.reload()
-  await page.getByRole('button', { name: /^Review packs/ }).click()
+  await expect(sheet).toBeVisible()
   await sheet.getByRole('button', { name: /Progress review 1/ }).click()
-  await expect(sheet.getByRole('list', { name: 'Attachments' })).toContainText('Missing on this device')
+  await expect(sheet.getByRole('list', { name: 'Attachments', exact: true })).toContainText('Missing on this device')
   await expect(sheet.getByLabel('Pack preview')).toContainText('lesson-plan.pdf — missing on this device')
   // Export == preview, byte for byte.
   const preview = await sheet.getByLabel('Pack preview').textContent()
@@ -184,8 +186,7 @@ test('reviews: a provider judgement needs its source; the handover pack leaves o
   ;(a as { examples: unknown[] }).examples = [{ id: 'e1', title: 'Cold-calling', context: 'practice-cycle', refs: [], ittecf: ['classroom-practice'], standards: ['TS4'], partTwo: [], narrative: { changedNext: 'Wait longer' }, at: 1 }]
   await seed(page, a)
   await page.goto('./#/pgce')
-  await page.getByRole('button', { name: /Add or open a record/ }).click()
-  await page.getByRole('menuitem', { name: /^Reviews & handover/ }).click()
+  await page.getByRole('button', { name: /^Reviews & handover/ }).click()
   const sheet = page.getByRole('dialog', { name: 'Reviews & handover' })
   await sheet.getByLabel('Review date').fill('2026-12-11')
   await sheet.getByLabel('Participants').fill('A Mentor, tutor')

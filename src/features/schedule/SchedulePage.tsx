@@ -15,6 +15,7 @@ import type { Filters, MetaMap, Session, SessionMeta, Settings, ViewMode } from 
 import { DayList } from './DayList'
 import { SessionPanel } from './SessionPanel'
 import { WeekStrip } from './WeekStrip'
+import type { SchoolDayInfo } from './DayList'
 
 interface Props {
   settings: Settings
@@ -54,6 +55,9 @@ interface Props {
   onPlanWeek: () => void
   /** the local Find anything page (R4 / NF-01) */
   onFindAnything: () => void
+  /** U03: the school-day card's school, hours and provenance for a block tag */
+  schoolDayFor?: (tag: string) => SchoolDayInfo | null
+  onJourney?: (placementId: string, leg: 'out' | 'back') => void
   /** a study block just added from a suggestion — Undo removes it */
   planUndo: PlanChildRec | null
   onUndoPlan: (block: PlanChildRec) => void
@@ -114,6 +118,8 @@ export function SchedulePage({
   onOpenSettings,
   onPlanWeek,
   onFindAnything,
+  schoolDayFor,
+  onJourney,
   planUndo,
   onUndoPlan,
   placementDetails,
@@ -237,9 +243,6 @@ export function SchedulePage({
             >
               <IconSearch />
             </button>
-            <button type="button" className="btn-today-reset" onClick={() => onSelectDate(null)} title="Back to today">
-              Today
-            </button>
             <SettingsAction onOpen={onOpenSettings} />
           </>
         }
@@ -272,20 +275,28 @@ export function SchedulePage({
             ]}
             onChange={(v) => onView(v)}
           />
-          <button
-            type="button"
-            className={`btn-filters btn-placements${filters.placementsOnly ? ' on' : ''}`}
-            aria-pressed={filters.placementsOnly === true}
-            title={filters.placementsOnly ? 'Showing placements only — tap to show everything' : 'Show placements only'}
-            onClick={onTogglePlacements}
-          >
-            <IconSchool />
-            <span>Placements</span>
-          </button>
-          <button type="button" className="btn-filters" onClick={onOpenFilters}>
+          {wide && (
+            <button
+              type="button"
+              className={`btn-filters btn-placements${filters.placementsOnly ? ' on' : ''}`}
+              aria-pressed={filters.placementsOnly === true}
+              title={filters.placementsOnly ? 'Showing placements only — tap to show everything' : 'Show placements only'}
+              onClick={onTogglePlacements}
+            >
+              <IconSchool />
+              <span>Placements</span>
+            </button>
+          )}
+          {/* U03: ONE row — view, Filters with its active count and a Clear beside it, More; Today sits on the week navigator (the date row). */}
+          <button type="button" className="btn-filters" onClick={onOpenFilters} aria-label={activeCount > 0 ? `Filters, ${activeCount} active` : 'Filters'}>
             Filters
             {activeCount > 0 && <span className="filter-count">{activeCount}</span>}
           </button>
+          {activeCount > 0 && (
+            <button type="button" className="btn-filters btn-clear-filters" aria-label="Clear filters" onClick={onClearFilters}>
+              Clear
+            </button>
+          )}
           {wide ? (
             <button type="button" className="btn-filters" onClick={onPlanWeek} title="Suggested gaps this week">
               Plan week
@@ -297,6 +308,7 @@ export function SchedulePage({
               label="More"
               tone="secondary"
               items={[
+                { label: filters.placementsOnly ? 'Show everything' : 'Show placements only', onSelect: onTogglePlacements },
                 { label: 'Plan week', onSelect: onPlanWeek },
                 { label: 'Search everything', onSelect: onFindAnything },
                 { label: 'Add a personal event', onSelect: () => onAddPersonal(anchorISO) },
@@ -351,6 +363,7 @@ export function SchedulePage({
               const next = addDaysISO(anchorISO, delta)
               onSelectDate(next === todayISO ? null : next)
             }}
+            onToday={() => onSelectDate(null)}
           />
           <p className="filter-hint search-scope-note">
             Every day from {longDay(anchorISO)} onward, with your display filters applied
@@ -459,6 +472,7 @@ export function SchedulePage({
               const next = addDaysISO(anchorISO, delta)
               onSelectDate(next === todayISO ? null : next)
             }}
+            onToday={() => onSelectDate(null)}
           />
           <section aria-live="polite">
             {dayHeading}
@@ -471,14 +485,18 @@ export function SchedulePage({
                 coords={coords}
                 travelMode={travelMode}
                 placements={placementDetails ?? settings.placements}
+                schoolDayFor={schoolDayFor}
+                onJourney={onJourney}
                 emptyMessage="No sessions on this day."
                 onSelect={onSelect}
               />
             )}
             {!wide && (
-              <button type="button" className="btn-secondary btn-wide schedule-plan-cta" onClick={onPlanWeek}>
-                Plan study time this week
-              </button>
+              <p className="schedule-plan-cta">
+                <button type="button" className="travel-link" onClick={onPlanWeek}>
+                  Plan study time this week
+                </button>
+              </p>
             )}
           </section>
         </>

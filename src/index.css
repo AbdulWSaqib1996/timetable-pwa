@@ -6062,3 +6062,101 @@ button.workspace-row { cursor: pointer; }
 .mentor-manage > summary > span:first-child {
   font-weight: 600;
 }
+
+/* ---------- Pass 79 (audit U01–U05) ---------- */
+
+/* U04 type scale: 16px/1.5 body, 28px page titles, 20px section headings, 17px item titles. */
+body { font-size: 16px; line-height: 1.45; }
+.page-title { font-size: 28px; line-height: 1.2; }
+.pgce-section-head h2 { font-size: 20px; line-height: 1.3; }
+.pgce-section-head h2 .pgce-section-link { font: inherit; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; text-align: left; }
+.pgce-section-head h2 .pgce-section-link:hover { color: var(--accent); }
+.pgce-active-school { margin: 6px 0 2px; display: flex; align-items: center; gap: 6px; font-size: 17px; font-weight: 600; }
+.pgce-active-state { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pgce-active-label { font-weight: 500; color: var(--text-supporting); }
+.pgce-next-label { margin: 6px 0 0; font-size: 17px; }
+.pgce-next-reason { margin: 2px 0 0; }
+.pgce-grid--one { grid-template-columns: 1fr; }
+
+/* U05: record header inside an editor */
+.record-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; }
+.record-head .travel-link { margin-left: auto; }
+
+/* B10/U05: labelled Delete with an inline confirm group */
+.admin-delete { min-height: 44px; }
+.admin-confirm { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 12px; background: rgba(245, 158, 11, 0.14); }
+.btn-small { min-height: 36px; padding: 6px 12px; }
+.admin-label > .note-input, .admin-label > .placement-input, .admin-label > select { width: 100%; box-sizing: border-box; margin-top: 4px; }
+.field-error { color: var(--error-text); font-weight: 600; }
+
+/* U02: packs as list/detail */
+.packs-layout { display: grid; gap: 12px; }
+.packs-list-items { margin: 8px 0 0; }
+.packs-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.packs-detail-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.packs-detail-head .subheading { margin: 0; }
+.packs-search { display: grid; gap: 6px; grid-template-columns: 1fr; margin-bottom: 6px; }
+.packs-candidates { max-height: 40vh; overflow: auto; }
+.packs-detail--empty { padding: 12px 0; }
+@media (max-width: 767px) {
+  .packs-list-items { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; }
+  .packs-list-items > li { flex: 0 0 auto; max-width: 78vw; scroll-snap-align: start; }
+  .packs-list-items .workspace-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+}
+@media (min-width: 768px) {
+  .sheet-packs { max-width: 960px; }
+  .packs-layout { grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); align-items: start; }
+  .packs-list { position: sticky; top: 0; }
+  .packs-search { grid-template-columns: 1fr 1fr; }
+  .packs-search input[type='search'] { grid-column: 1 / -1; }
+}
+
+/* U03: one-row schedule toolbar and the school-day card */
+.schedule-toolbar .filterbar { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none; }
+.schedule-toolbar .filterbar::-webkit-scrollbar { display: none; }
+.schedule-toolbar .filterbar > * { flex: 0 0 auto; }
+.btn-clear-filters { color: var(--accent); }
+.school-day-card { display: grid; gap: 6px; padding: 10px 12px; }
+.school-day-card .placement-day { width: 100%; margin: 0; }
+.school-day-school { font-weight: 600; }
+.school-day-actions { margin-top: 0; }
+.schedule-plan-cta { margin: 12px 0 0; text-align: center; }
+
+/* U04: reduced motion covers the completed-task reveal and every scroll-into-view */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .task-card-just-completed { transition: none; }
+}
+/* U04 (V1 rule): no 13px tag text on a primary screen — the PGCE landing's state tags read at 14px. */
+.page-pgce .tag { font-size: 14px; }
+/* U03 at 200% text: the toolbar reflows onto a second row rather than escaping the viewport. */
+.schedule-toolbar .filterbar { flex-wrap: wrap; overflow-x: visible; }
+/* U03: the phone toolbar stays one row at 390px even with Filters + Clear + Today + More. */
+@media (max-width: 1023px) {
+  .schedule-toolbar .filterbar { gap: 4px; }
+  .schedule-toolbar .filterbar .segment { padding: 0 9px; }
+  .schedule-toolbar .filterbar .btn-filters { padding: 0 10px; }
+}
+.week-nav-today { margin-left: 4px; min-height: 40px; padding: 0 10px; }
+@media (max-width: 1023px) {
+  .schedule-toolbar .filterbar .segment { padding: 0 8px; }
+}
+/* U03 phone toolbar: tighter paddings so view + Filters + Clear + More share one 390px row; Today keeps 44px on the navigator. */
+@media (max-width: 1023px) {
+  .schedule-toolbar .filterbar .segment { padding: 0 6px; }
+  .schedule-toolbar .filterbar .btn-filters { padding: 0 8px; }
+  .schedule-toolbar .filterbar .quick-menu > button { padding: 0 8px; }
+}
+.week-nav { flex-wrap: wrap; }
+.week-nav-today { min-height: var(--control-min); }
+.page-subtitle { line-height: 1.3; }
+@media (max-width: 1023px) {
+  .schedule-toolbar .filterbar .segmented { padding: 2px; }
+  .schedule-toolbar .filterbar .segment { padding: 0 5px; }
+  .schedule-toolbar .filterbar .btn-filters { gap: 4px; }
+  .schedule-toolbar .filterbar .btn-clear-filters,
+  .schedule-toolbar .filterbar .quick-menu > button { padding: 0 6px; }
+}
+/* Pass 79: month cells may shrink below their content at 320px (the 16px/1.45 text made the 7-column grid 2px too wide). */
+.month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.month-cell, .month-dow { min-width: 0; overflow: hidden; }

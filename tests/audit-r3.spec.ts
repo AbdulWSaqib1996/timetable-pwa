@@ -273,39 +273,27 @@ test('TT-20: tasks group Overdue / Today / Upcoming / Completed with explicit st
   await expect(page.getByText('No tasks match “nothing-here”.')).toBeVisible()
 })
 
-test('TT-20: PGCE shows four section cards, one dominant action each, record types behind an accessible menu', async ({ page }) => {
+test('TT-20 (as reshaped by U01): PGCE shows the active placement, one next action, four destinations with one dominant action each, and every record type as a labelled control', async ({ page }) => {
   await seed(page, [{ id: 'd', name: 'Demo learner', settings: DEMO }])
   await page.goto('./#/pgce')
-  for (const name of ['Placement', 'Evidence & reflections', 'Development', 'Documents']) {
-    await expect(page.getByRole('heading', { level: 2, name })).toBeVisible()
+  for (const name of ['Lessons & practice', 'Mentor & feedback', 'Evidence & reviews', 'Academic work & programme', 'Documents & records', 'Next']) {
+    await expect(page.getByRole('heading', { level: 2, name: new RegExp(`^${name}`) })).toBeVisible()
   }
-  // G1a: five cards — Placements (one primary per SE card inside it), Programme roadmap, and the original three.
+  // Pass 79: placement card + Next + four destinations + Documents = seven cards, one primary each.
   const cards = page.locator('.pgce-section')
-  await expect(cards).toHaveCount(5)
-  for (let i = 0; i < 5; i++) {
-    const primaries = await cards.nth(i).locator('.btn-primary').count()
-    const placementCards = await cards.nth(i).locator('.placement-card').count()
-    expect(primaries === 1 || primaries === placementCards, `card ${i}: ${primaries} primaries`).toBe(true)
-  }
+  await expect(cards).toHaveCount(7)
+  for (let i = 0; i < 7; i++) await expect(cards.nth(i).locator('.btn-primary'), `card ${i}`).toHaveCount(1)
   // V4: destination-named links replaced the four vague "View all" controls.
   await expect(page.getByRole('button', { name: /View all/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'All development records →' })).toBeVisible()
-  // Every record type stays one tap away, now inside Development's menu.
-  const trigger = page.getByRole('button', { name: /Add or open a record/ })
-  await trigger.click()
-  const menu = page.getByRole('menu', { name: 'Add or open a record' })
-  // G1b added Practice focus and Mentor preparation; G2 added Subject knowledge, Academic work and Workload & support.
-  await expect(menu.getByRole('menuitem')).toHaveText([/^Targets/, /^Mentor meetings/, /^Observations/, /^Lessons/, /^Audits/, /^Practice focus/, /^Mentor preparation/, /^Subject knowledge/, /^Academic work/, /^Workload/, /^Reviews & handover/])
-  await expect(menu.getByRole('menuitem').first()).toBeFocused()
-  await page.keyboard.press('ArrowDown')
-  await expect(menu.getByRole('menuitem').nth(1)).toBeFocused()
-  await page.keyboard.press('Escape')
-  await expect(menu).toHaveCount(0)
-  await expect(trigger).toBeFocused()
-  await trigger.click()
-  await menu.getByRole('menuitem', { name: /^Targets/ }).click()
+  // Every one of the eleven record functions is a labelled destination (no menu to open first).
+  for (const name of [/^Targets \(/, /^Mentor meetings \(/, /^Observations \(/, /^Lessons \(/, /^Audits \(/, /^Practice focus \(/, /^Mentor preparation \(/, /^Subject knowledge \(/, /^Academic work \(/, /^Workload & support/, /^Reviews & handover \(/]) {
+    await expect(page.getByRole('button', { name })).toBeVisible()
+  }
+  await page.getByRole('button', { name: /^Targets \(/ }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByRole('dialog')).toContainText(/Targets|Add target/)
+  await expect(page).toHaveURL(/#\/pgce\/records\/targets$/)
   // Legacy accessible names still reachable (phase-five relies on them).
   await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: 'Evidence journal' })).toBeVisible()

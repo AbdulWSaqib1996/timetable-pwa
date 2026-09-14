@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Dialog, Field, IconClose } from './ui'
+import { Dialog, Field, IconClose, tabKeys } from './ui'
 import { applyProgrammePack, diffProgrammePack, milestoneKinds, packOwners, programmeModes, programmePhases, programmeRoutes, validateProgrammePack } from '../../shared/programme.js'
 import type { ProgrammePack } from '../../shared/programme.js'
 import { newAdminId } from '../lib/admin'
@@ -98,7 +98,7 @@ export function ProgrammeSheet({ admin, todayISO, onUpdateAdmin, onClose }: Prop
             ['milestones', `Milestones (${admin.milestones.length})`],
           ] as [Tab, string][]
         ).map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} className={`segment${tab === id ? ' segment-on' : ''}`} onClick={() => setTab(id)}>
+          <button key={id} type="button" role="tab" aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} className={`segment${tab === id ? ' segment-on' : ''}`} onClick={() => setTab(id)} onKeyDown={tabKeys(['profile', 'packs', 'requirements', 'milestones'] as const, tab, setTab)}>
             {label}
           </button>
         ))}

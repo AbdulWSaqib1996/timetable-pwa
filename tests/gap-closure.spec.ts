@@ -104,7 +104,7 @@ test('No emoji controls or labels on any learner screen or sheet (weather glyphs
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.waitForTimeout(300) // let any history change from the sheet settle before the next route
   }
-  for (const route of ['today', 'schedule', 'tasks', 'pgce', 'find', 'home', 'placement', 'settings/data', 'settings/reminders']) {
+  for (const route of ['today', 'schedule', 'tasks', 'pgce', 'pgce/lessons', 'pgce/mentor', 'pgce/evidence', 'pgce/academic', 'find', 'home', 'placement', 'settings/data', 'settings/reminders']) {
     await page.goto(`./#/${route}`)
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await check(route)

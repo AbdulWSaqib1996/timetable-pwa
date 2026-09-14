@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Dialog, Field, IconClose } from './ui'
+import { Dialog, Field, IconClose, tabKeys } from './ui'
 import { formatMins, planWorkload } from '../../shared/workload.js'
 import type { WorkloadProposal } from '../../shared/workload.js'
 import type { PlanBusyInterval } from '../../shared/planWeek.js'
@@ -68,7 +68,7 @@ export function WorkloadSheet({ admin, busy, deadlines, settings, todayISO, last
       </div>
       <div className="segmented" role="tablist" aria-label="Workload sections">
         {([['plan', 'Next two weeks'], ['protected', `Protected time (${admin.protected.length})`], ['support', 'Support']] as const).map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} className={`segment${tab === id ? ' segment-on' : ''}`} onClick={() => setTab(id)}>{label}</button>
+          <button key={id} type="button" role="tab" aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} className={`segment${tab === id ? ' segment-on' : ''}`} onClick={() => setTab(id)} onKeyDown={tabKeys(['plan', 'protected', 'support'] as const, tab, setTab)}>{label}</button>
         ))}
       </div>
 

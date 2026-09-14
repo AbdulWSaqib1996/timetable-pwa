@@ -74,6 +74,47 @@ test('the dark themes declare the same semantic tokens as light', () => {
   assert.deepEqual(vars(block(":root[data-theme='dark'] {")), vars(block(":root:not([data-theme='light']) {")))
 })
 
+/**
+ * U04 (Pass 79): the mentor portal shares the semantic palette; its primary
+ * button text, links, error and success text must reach 4.5:1 on their real
+ * surfaces in BOTH themes — the audit measured ~2.4:1 for the old dark accent.
+ */
+const mentorCss = readFileSync(new URL('../../src/mentor-portal/mentor.css', import.meta.url), 'utf8')
+const mentorBlock = (start) => {
+  const i = mentorCss.indexOf(start)
+  assert.ok(i >= 0, `mentor.css missing ${start}`)
+  const open = mentorCss.indexOf('{', i)
+  let depth = 0
+  for (let j = open; j < mentorCss.length; j++) {
+    if (mentorCss[j] === '{') depth++
+    if (mentorCss[j] === '}') depth--
+    if (depth === 0) return mentorCss.slice(open + 1, j)
+  }
+  throw new Error('unbalanced block')
+}
+const mentorLight = vars(mentorBlock(':root {'))
+const mentorDark = { ...mentorLight, ...vars(mentorBlock('@media (prefers-color-scheme: dark)')) }
+const MENTOR_PAIRS = [
+  ['m-text', 'm-bg'],
+  ['m-text', 'm-card'],
+  ['m-muted', 'm-card'],
+  ['m-on-accent', 'm-accent'],
+  ['m-link', 'm-card'],
+  ['m-error', 'm-card'],
+  ['m-error', 'm-bg'],
+  ['m-success', 'm-card'],
+  ['m-success', 'm-bg'],
+]
+for (const [name, theme] of [['mentor light', mentorLight], ['mentor dark', mentorDark]]) {
+  test(`${name}: portal text, button, link, error and success colours reach 4.5:1`, () => {
+    for (const [fg, bg] of MENTOR_PAIRS) {
+      assert.ok(theme[fg] && theme[bg], `${name}: missing token ${fg}/${bg}`)
+      const ratio = contrast(theme[fg], theme[bg])
+      assert.ok(ratio >= 4.5, `${name}: --${fg} ${theme[fg]} on --${bg} ${theme[bg]} = ${ratio.toFixed(2)}:1`)
+    }
+  })
+}
+
 test('legacy hard-coded status colours are gone from the stylesheet', () => {
   for (const hex of ['#e64980', '#f08c00', '#e8590c', '#c2255c', '#b02a37', '#37b24d', '#0ca678', '#4ad3a5', '#0a7a58']) {
     assert.ok(!css.toLowerCase().includes(hex), `${hex} still present`)

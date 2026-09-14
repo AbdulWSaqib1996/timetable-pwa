@@ -1,4 +1,4 @@
-import { IconClock, IconSchool } from './ui'
+import { IconClock, IconSchool, tabKeys } from './ui'
 import type { ViewMode } from '../types'
 
 interface Props {
@@ -29,8 +29,10 @@ export function FilterBar({ view, activeCount, placementsOnly, historyOn, onTogg
             type="button"
             role="tab"
             aria-selected={view === value}
+            tabIndex={view === value ? 0 : -1}
             className={`segment${view === value ? ' segment-on' : ''}`}
             onClick={() => onView(value)}
+            onKeyDown={tabKeys(VIEWS.map((x) => x.value), view, onView)}
           >
             {label}
           </button>

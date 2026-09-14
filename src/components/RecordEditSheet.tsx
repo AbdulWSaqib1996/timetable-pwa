@@ -176,6 +176,16 @@ export function RecordEditSheet({ profileId, kind, record, latest, onSave, onDel
           <IconClose />
         </button>
       </div>
+      {/* U05: the record header names type, placement and date, says where the input stands, and offers Back. */}
+      <p className="record-head" aria-label="Record">
+        <span className="tag">{schema.title.charAt(0).toUpperCase() + schema.title.slice(1)}</span>
+        {placementOptions && typeof v.placementId === 'string' && v.placementId ? <span className="tag tag--teal">{placementOptions.find((o) => o.value === v.placementId)?.label ?? 'Unassigned placement'}</span> : null}
+        {typeof v.dateISO === 'string' && v.dateISO ? <span className="tag">{v.dateISO}</span> : typeof v.weekISO === 'string' && v.weekISO ? <span className="tag">w/c {v.weekISO}</span> : null}
+        <span className={`tag${draft.draftStatus === 'failed' ? ' tag--amber' : ''}`} role="status">
+          {draft.draftStatus === 'saving' ? 'Keeping your draft…' : draft.draftStatus === 'failed' ? 'Draft could not be kept on this device' : draft.draftStatus === 'saved' ? 'Draft kept on this device — not saved to the record yet' : 'No unsaved changes'}
+        </span>
+        <button type="button" className="travel-link" onClick={onClose}>Back</button>
+      </p>
 
       {draft.pendingDraft && (
         <StatusMessage tone="info">

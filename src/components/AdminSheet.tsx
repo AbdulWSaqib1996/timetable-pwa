@@ -31,8 +31,14 @@ interface Props {
   schools?: SchoolLocationRec[]
   /** G1b: open a lesson in the Plan → Rehearse → Teach → Review workbench */
   onOpenWorkbench?: (lessonId: string) => void
+  /** U05: a deep link straight to one record of the initial tab (`#/pgce/records/<tab>/<id>`) */
+  initialRecordId?: string
+  /** U05: "Add new" — land with the quick-add form focused, not the list */
+  focusAdd?: boolean
   onClose: () => void
 }
+
+const TAB_KIND: Partial<Record<Tab, RecordKind>> = { reflect: 'reflection', targets: 'target', meetings: 'meeting', obs: 'observation', lessons: 'lesson', audits: 'audit' }
 
 type PlacementOption = { value: string; label: string }
 
@@ -95,10 +101,27 @@ const toggleIn = (list: string[], id: string) =>
 
 /* ---------- tab components (each owns its add-form state) ---------- */
 
-function ReflectionsTab({ admin, todayISO, onUpdate, onEdit, onDelete }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; onDelete: (kind: RecordKind, record: { id: string; at: number }) => void }) {
+type OnDelete = (kind: RecordKind, record: { id: string; at: number }) => void
+
+/**
+ * B10/U05: every destructive control is a labelled text button, never a bare
+ * icon beside Edit; it asks first (inline, named for the record) and the
+ * sheet offers Undo afterwards.
+ */
+function DeleteControl({ what, summary, kind, record, onDelete }: { what: string; summary: string; kind: RecordKind; record: { id: string; at: number }; onDelete: OnDelete }) {
+  const [open, setOpen] = useState(false)
+  if (!open) return <button type="button" className="travel-link admin-delete" aria-label={`Delete ${what}`} aria-expanded={false} onClick={() => setOpen(true)}>Delete</button>
+  return (
+    <span className="admin-confirm" role="group" aria-label="Confirm deletion">
+      <span>Delete {summary}? You can undo straight after.</span>
+      <button type="button" className="btn-primary btn-small" onClick={() => { setOpen(false); onDelete(kind, record) }}>Delete {what}</button>
+      <button type="button" className="btn-ghost btn-small" onClick={() => setOpen(false)}>Keep</button>
+    </span>
+  )
+}
+
+function ReflectionsTab({ admin, todayISO, onUpdate, onEdit, onDelete }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; onDelete: OnDelete }) {
   const [week, setWeek] = useState(todayISO)
-  // B10: deletion is reviewable — a confirm step on the row, then Undo from the sheet.
-  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [wentWell, setWentWell] = useState('')
   const [challenges, setChallenges] = useState('')
   const [focus, setFocus] = useState('')
@@ -115,9 +138,9 @@ function ReflectionsTab({ admin, todayISO, onUpdate, onEdit, onDelete }: { admin
           Week of
           <input type="date" className="date-input" value={week} onChange={(e) => setWeek(e.target.value)} />
         </label>
-        <textarea className="note-input" rows={2} placeholder="What went well…" value={wentWell} onChange={(e) => setWentWell(e.target.value)} />
-        <textarea className="note-input" rows={2} placeholder="Challenges…" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
-        <textarea className="note-input" rows={2} placeholder="Focus for next week…" value={focus} onChange={(e) => setFocus(e.target.value)} />
+        <label className="admin-label">Went well<textarea className="note-input" rows={2} placeholder="What went well…" value={wentWell} onChange={(e) => setWentWell(e.target.value)} /></label>
+        <label className="admin-label">Hard this week<textarea className="note-input" rows={2} placeholder="Challenges…" value={challenges} onChange={(e) => setChallenges(e.target.value)} /></label>
+        <label className="admin-label">Next week’s focus<textarea className="note-input" rows={2} placeholder="Focus for next week…" value={focus} onChange={(e) => setFocus(e.target.value)} /></label>
         <TSChips selected={standards} onToggle={(id) => setStandards((s) => toggleIn(s, id))} />
         <button
           type="button"
@@ -153,18 +176,9 @@ function ReflectionsTab({ admin, todayISO, onUpdate, onEdit, onDelete }: { admin
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
                 <button type="button" className="btn-icon" aria-label="Edit reflection" onClick={() => onEdit('reflection', r.id)}><IconEdit /></button>
-                <button type="button" className="btn-icon" aria-label="Delete reflection" aria-expanded={confirmId === r.id} onClick={() => setConfirmId(confirmId === r.id ? null : r.id)}><IconClose /></button>
+                <DeleteControl what="reflection" summary={`the reflection for w/c ${fmt(r.weekISO)}`} kind="reflection" record={r} onDelete={onDelete} />
               </span>
             </div>
-            {confirmId === r.id && (
-              <div className="callout callout--amber" aria-label="Confirm deletion">
-                <p>Delete the reflection for w/c {fmt(r.weekISO)}? You can undo straight after; it is removed from this device and your synced copies.</p>
-                <div className="btn-row">
-                  <button type="button" className="btn-primary" onClick={() => { setConfirmId(null); onDelete('reflection', r) }}>Delete reflection</button>
-                  <button type="button" className="btn-ghost" onClick={() => setConfirmId(null)}>Keep</button>
-                </div>
-              </div>
-            )}
             {r.wentWell && <p><strong>Went well:</strong> {r.wentWell}</p>}
             {r.challenges && <p><strong>Challenges:</strong> {r.challenges}</p>}
             {r.focus && <p><strong>Focus:</strong> {r.focus}</p>}
@@ -175,7 +189,7 @@ function ReflectionsTab({ admin, todayISO, onUpdate, onEdit, onDelete }: { admin
   )
 }
 
-function TargetsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
+function TargetsTab({ admin, todayISO, onUpdate, onEdit, onDelete }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; onDelete: OnDelete }) {
   const [text, setText] = useState('')
   const [standards, setStandards] = useState<string[]>([])
   const cycle = (t: TargetItem): TargetItem =>
@@ -192,7 +206,7 @@ function TargetsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
         targets are evidence.
       </p>
       <div className="admin-form">
-        <textarea className="note-input" rows={2} placeholder="e.g. Use cold-calling to check understanding in maths" value={text} onChange={(e) => setText(e.target.value)} />
+        <label className="admin-label">Target<textarea className="note-input" rows={2} placeholder="e.g. Use cold-calling to check understanding in maths" value={text} onChange={(e) => setText(e.target.value)} /></label>
         <TSChips selected={standards} onToggle={(id) => setStandards((s) => toggleIn(s, id))} />
         <button
           type="button"
@@ -220,7 +234,7 @@ function TargetsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
                   <span className="badge badge-standard" key={ts}>{ts}</span>
                 ))}
                 <button type="button" className="btn-icon" aria-label="Edit target" onClick={() => onEdit('target', t.id)}><IconEdit /></button>
-                <button type="button" className="btn-icon" aria-label="Delete target" onClick={() => onUpdate((prev) => ({ ...prev, targets: prev.targets.filter((x) => x.id !== t.id) }))}><IconClose /></button>
+                <DeleteControl what="target" summary={`the target “${t.text.slice(0, 40)}${t.text.length > 40 ? '…' : ''}”`} kind="target" record={t} onDelete={onDelete} />
               </span>
             </div>
             <p>{t.text}</p>
@@ -232,7 +246,7 @@ function TargetsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; t
   )
 }
 
-function MeetingsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; placementOptions: PlacementOption[] }) {
+function MeetingsTab({ admin, todayISO, onUpdate, onEdit, onDelete, placementOptions }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; onDelete: OnDelete; placementOptions: PlacementOption[] }) {
   const [date, setDate] = useState(todayISO)
   const [discussed, setDiscussed] = useState('')
   const [actionsText, setActionsText] = useState('')
@@ -249,8 +263,8 @@ function MeetingsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { 
           Date
           <input type="date" className="date-input" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        <textarea className="note-input" rows={2} placeholder="What was discussed…" value={discussed} onChange={(e) => setDiscussed(e.target.value)} />
-        <textarea className="note-input" rows={2} placeholder="Actions agreed (one per line)…" value={actionsText} onChange={(e) => setActionsText(e.target.value)} />
+        <label className="admin-label">What was discussed<textarea className="note-input" rows={2} placeholder="What was discussed…" value={discussed} onChange={(e) => setDiscussed(e.target.value)} /></label>
+        <label className="admin-label">Actions agreed (one per line)<textarea className="note-input" rows={2} placeholder="Actions agreed (one per line)…" value={actionsText} onChange={(e) => setActionsText(e.target.value)} /></label>
         <PlacementSelect options={placementOptions} value={placementId} onChange={setPlacementId} />
         <button
           type="button"
@@ -281,7 +295,7 @@ function MeetingsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { 
               <strong>{fmt(m.dateISO)}</strong>
               <span className="journal-tags">
                 <button type="button" className="btn-icon" aria-label="Edit meeting" onClick={() => onEdit('meeting', m.id)}><IconEdit /></button>
-                <button type="button" className="btn-icon" aria-label="Delete meeting" onClick={() => onUpdate((prev) => ({ ...prev, meetings: prev.meetings.filter((x) => x.id !== m.id) }))}><IconClose /></button>
+                <DeleteControl what="meeting" summary={`the meeting on ${fmt(m.dateISO)}`} kind="meeting" record={m} onDelete={onDelete} />
               </span>
             </div>
             {m.discussed && <p>{m.discussed}</p>}
@@ -311,7 +325,7 @@ function MeetingsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { 
   )
 }
 
-function ObservationsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; placementOptions: PlacementOption[] }) {
+function ObservationsTab({ admin, todayISO, onUpdate, onEdit, onDelete, placementOptions }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; onDelete: OnDelete; placementOptions: PlacementOption[] }) {
   const [date, setDate] = useState(todayISO)
   const [placementId, setPlacementId] = useState('')
   const [observer, setObserver] = useState('')
@@ -331,11 +345,11 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }
           Date
           <input type="date" className="date-input" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        <input type="text" className="placement-input" placeholder="Observer (mentor / tutor)" value={observer} onChange={(e) => setObserver(e.target.value)} />
-        <input type="text" className="placement-input" placeholder="Lesson / subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
-        <input type="text" className="placement-input" placeholder="Observation focus" value={focus} onChange={(e) => setFocus(e.target.value)} />
-        <textarea className="note-input" rows={2} placeholder="Strengths…" value={strengths} onChange={(e) => setStrengths(e.target.value)} />
-        <textarea className="note-input" rows={2} placeholder="Development points…" value={development} onChange={(e) => setDevelopment(e.target.value)} />
+        <label className="admin-label">Observer<input type="text" className="placement-input" placeholder="Mentor / tutor" value={observer} onChange={(e) => setObserver(e.target.value)} /></label>
+        <label className="admin-label">Lesson / subject<input type="text" className="placement-input" placeholder="e.g. Maths — fractions" value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
+        <label className="admin-label">Observation focus<input type="text" className="placement-input" placeholder="e.g. questioning" value={focus} onChange={(e) => setFocus(e.target.value)} /></label>
+        <label className="admin-label">Strengths<textarea className="note-input" rows={2} placeholder="Strengths…" value={strengths} onChange={(e) => setStrengths(e.target.value)} /></label>
+        <label className="admin-label">Development points<textarea className="note-input" rows={2} placeholder="Development points…" value={development} onChange={(e) => setDevelopment(e.target.value)} /></label>
         <PlacementSelect options={placementOptions} value={placementId} onChange={setPlacementId} />
         <label className="toggle-row">
           <input type="checkbox" checked={makeTarget} onChange={(e) => setMakeTarget(e.target.checked)} />
@@ -374,7 +388,7 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }
                 ) : (
                   <button type="button" className="btn-icon" aria-label="Edit observation" onClick={() => onEdit('observation', o.id)}><IconEdit /></button>
                 )}
-                <button type="button" className="btn-icon" aria-label="Delete observation" onClick={() => onUpdate((prev) => ({ ...prev, observations: prev.observations.filter((x) => x.id !== o.id) }))}><IconClose /></button>
+                <DeleteControl what="observation" summary={`the observation on ${fmt(o.dateISO)}${o.observer ? ` by ${o.observer}` : ''}`} kind="observation" record={o} onDelete={onDelete} />
               </span>
             </div>
             {o.observer && <p className="admin-dates">observed by {o.observer}{o.focus ? ` · focus: ${o.focus}` : ''}</p>}
@@ -387,7 +401,7 @@ function ObservationsTab({ admin, todayISO, onUpdate, onEdit, placementOptions }
   )
 }
 
-function LessonsTab({ admin, todayISO, onUpdate, onEdit, placementOptions, onOpenWorkbench }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; placementOptions: PlacementOption[]; onOpenWorkbench?: (lessonId: string) => void }) {
+function LessonsTab({ admin, todayISO, onUpdate, onEdit, onDelete, placementOptions, onOpenWorkbench }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; onDelete: OnDelete; placementOptions: PlacementOption[]; onOpenWorkbench?: (lessonId: string) => void }) {
   const [date, setDate] = useState(todayISO)
   const [placementId, setPlacementId] = useState('')
   const [subject, setSubject] = useState('')
@@ -406,9 +420,9 @@ function LessonsTab({ admin, todayISO, onUpdate, onEdit, placementOptions, onOpe
           Date
           <input type="date" className="date-input" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        <input type="text" className="placement-input" placeholder="Subject (e.g. Maths — fractions)" value={subject} onChange={(e) => setSubject(e.target.value)} />
-        <input type="text" className="placement-input" placeholder="Class (e.g. Year 2)" value={classGroup} onChange={(e) => setClassGroup(e.target.value)} />
-        <textarea className="note-input" rows={2} placeholder="How did it go? What would you change?…" value={evaluation} onChange={(e) => setEvaluation(e.target.value)} />
+        <label className="admin-label">Subject<input type="text" className="placement-input" placeholder="e.g. Maths — fractions" value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
+        <label className="admin-label">Class<input type="text" className="placement-input" placeholder="e.g. Year 2" value={classGroup} onChange={(e) => setClassGroup(e.target.value)} /></label>
+        <label className="admin-label">Evaluation<textarea className="note-input" rows={2} placeholder="How did it go? What would you change?…" value={evaluation} onChange={(e) => setEvaluation(e.target.value)} /></label>
         <TSChips selected={standards} onToggle={(id) => setStandards((s) => toggleIn(s, id))} />
         <PlacementSelect options={placementOptions} value={placementId} onChange={setPlacementId} />
         <button
@@ -436,7 +450,7 @@ function LessonsTab({ admin, todayISO, onUpdate, onEdit, placementOptions, onOpe
                 ))}
                 {onOpenWorkbench && <button type="button" className="travel-link" aria-label={`Open workbench: ${l.subject}`} onClick={() => onOpenWorkbench(l.id)}>Workbench{l.stage ? ` · ${l.stage}` : ''}</button>}
                 <button type="button" className="btn-icon" aria-label="Edit lesson" onClick={() => onEdit('lesson', l.id)}><IconEdit /></button>
-                <button type="button" className="btn-icon" aria-label="Delete lesson" onClick={() => onUpdate((prev) => ({ ...prev, lessons: prev.lessons.filter((x) => x.id !== l.id) }))}><IconClose /></button>
+                <DeleteControl what="lesson" summary={`the lesson “${l.subject}” on ${fmt(l.dateISO)}`} kind="lesson" record={l} onDelete={onDelete} />
               </span>
             </div>
             {l.evaluation && <p>{l.evaluation}</p>}
@@ -447,7 +461,7 @@ function LessonsTab({ admin, todayISO, onUpdate, onEdit, placementOptions, onOpe
   )
 }
 
-function AuditsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void }) {
+function AuditsTab({ admin, todayISO, onUpdate, onEdit, onDelete }: { admin: AdminFile; todayISO: string; onUpdate: Props['onUpdateAdmin']; onEdit: (kind: RecordKind, id: string) => void; onDelete: OnDelete }) {
   const [subject, setSubject] = useState('')
   const [stage, setStage] = useState<AuditStage>('baseline')
   const [note, setNote] = useState('')
@@ -460,13 +474,15 @@ function AuditsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; to
         story lives in one place.
       </p>
       <div className="admin-form">
-        <input type="text" className="placement-input" placeholder="Subject (e.g. Maths)" value={subject} onChange={(e) => setSubject(e.target.value)} />
-        <select className="absent-reason" value={stage} onChange={(e) => setStage(e.target.value as AuditStage)} aria-label="Audit stage">
-          <option value="baseline">Baseline</option>
-          <option value="revisited">Revisited</option>
-          <option value="secure">Secure</option>
-        </select>
-        <textarea className="note-input" rows={2} placeholder="Score / gaps / what to work on…" value={note} onChange={(e) => setNote(e.target.value)} />
+        <label className="admin-label">Subject<input type="text" className="placement-input" placeholder="e.g. Maths" value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
+        <label className="admin-label">Audit stage
+          <select className="absent-reason" value={stage} onChange={(e) => setStage(e.target.value as AuditStage)}>
+            <option value="baseline">Baseline</option>
+            <option value="revisited">Revisited</option>
+            <option value="secure">Secure</option>
+          </select>
+        </label>
+        <label className="admin-label">Notes<textarea className="note-input" rows={2} placeholder="Score / gaps / what to work on…" value={note} onChange={(e) => setNote(e.target.value)} /></label>
         <button
           type="button"
           className="btn-primary"
@@ -493,7 +509,7 @@ function AuditsTab({ admin, todayISO, onUpdate, onEdit }: { admin: AdminFile; to
               <p key={e.id}>
                 {e.stage} ({fmt(e.dateISO)}){e.note ? `: ${e.note}` : ''}{' '}
                 <button type="button" className="btn-icon" aria-label="Edit audit entry" onClick={() => onEdit('audit', e.id)}><IconEdit /></button>
-                <button type="button" className="btn-icon" aria-label="Delete audit entry" onClick={() => onUpdate((prev) => ({ ...prev, audits: prev.audits.filter((x) => x.id !== e.id) }))}><IconClose /></button>
+                <DeleteControl what="audit entry" summary={`the ${e.stage} entry for ${subj} (${fmt(e.dateISO)})`} kind="audit" record={e} onDelete={onDelete} />
               </p>
             ))}
           </li>
@@ -652,7 +668,17 @@ export function AdminSheet(props: Props) {
   const placementOptions: PlacementOption[] = (props.placements ?? []).map((p) => ({ value: p.id, label: placementLabel(p, props.schools ?? []) }))
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
   const [tab, setTab] = useState<Tab>(props.initialTab ?? 'overview')
-  const [editing, setEditing] = useState<{ kind: RecordKind; id: string } | null>(null)
+  const [editing, setEditing] = useState<{ kind: RecordKind; id: string } | null>(() => {
+    const kind = props.initialTab ? TAB_KIND[props.initialTab] : undefined
+    return kind && props.initialRecordId ? { kind, id: props.initialRecordId } : null
+  })
+  // U05: "Add new" lands in the form; "Open" lands in the list.
+  useEffect(() => {
+    if (!props.focusAdd) return
+    const t = setTimeout(() => (dialogRef.current?.querySelector('.admin-form input, .admin-form textarea') as HTMLElement | null)?.focus(), 30)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [undoRec, setUndoRec] = useState<{ kind: RecordKind; record: { id: string; at: number } } | null>(null)
   const [binderPreview, setBinderPreview] = useState(false)
   const onEdit = (kind: RecordKind, id: string) => setEditing({ kind, id })
@@ -695,11 +721,11 @@ export function AdminSheet(props: Props) {
           <Overview admin={admin} sessions={sessions} metaMap={metaMap} keyDates={keyDates} placementTargetDays={placementTargetDays} todayISO={todayISO} />
         )}
         {tab === 'reflect' && <ReflectionsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} onDelete={deleteWithUndo} />}
-        {tab === 'targets' && <TargetsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
-        {tab === 'meetings' && <MeetingsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}
-        {tab === 'obs' && <ObservationsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} />}
-        {tab === 'lessons' && <LessonsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} placementOptions={placementOptions} onOpenWorkbench={props.onOpenWorkbench} />}
-        {tab === 'audits' && <AuditsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} />}
+        {tab === 'targets' && <TargetsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} onDelete={deleteWithUndo} />}
+        {tab === 'meetings' && <MeetingsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} onDelete={deleteWithUndo} placementOptions={placementOptions} />}
+        {tab === 'obs' && <ObservationsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} onDelete={deleteWithUndo} placementOptions={placementOptions} />}
+        {tab === 'lessons' && <LessonsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} onDelete={deleteWithUndo} placementOptions={placementOptions} onOpenWorkbench={props.onOpenWorkbench} />}
+        {tab === 'audits' && <AuditsTab admin={admin} todayISO={todayISO} onUpdate={onUpdateAdmin} onEdit={onEdit} onDelete={deleteWithUndo} />}
         {tab === 'wallet' && <WalletTab profileId={profileId} />}
         {undoRec && (
           <StatusMessage tone="info">
