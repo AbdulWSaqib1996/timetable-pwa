@@ -125,8 +125,10 @@ test('CSV export carries definitions and denominators, neutralises formulas and 
   const text = await (await import('node:fs/promises')).readFile(await download.path(), 'utf8')
   expect(text).toContain('period_from')
   expect(text).toContain('schema_version')
-  expect(text).toContain('distinct tokens, fixed last 7 UTC days')
-  expect(text).toContain('standalone_today')
+  expect(text).toContain('fixed last 7 UTC days')
+  expect(text).toContain('standaloneToday')
+  // One dataset: no row can claim the legacy receipt-day source.
+  expect(text).not.toContain('legacy-receipt-day')
   expect(text).not.toContain('test-key')
   // Every value cell that could start a formula is neutralised.
   for (const line of text.split('\r\n').slice(4)) {

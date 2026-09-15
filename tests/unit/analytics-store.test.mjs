@@ -233,3 +233,34 @@ test('releases: latest observed build per token, Unknown category, comparison on
   assert.equal(oldB.comparison.opensPerToken, Math.round(((20 * 3 + 2) / 21) * 10) / 10)
   assert.equal(list.find((b) => b.buildId === 'unknown'), undefined, 'no unknown row without unknown tokens')
 })
+
+test('the snapshot carries setup coverage, return frequency and a tokens-ever count, so the panel needs no legacy dataset', async () => {
+  const { store } = makeStore()
+  await post(store, '/v2/batch', batch({
+    token: 'aaaa1111aaaa2222',
+    batchId: 'b222222222222222',
+    days: [
+      { date: dayISO(1), opens: 1, counts: {}, setup: { push: false, sync: true } },
+      { date: dayISO(0), opens: 2, counts: { detail: 3 }, setup: { push: true, sync: true } },
+    ],
+  }))
+  await post(store, '/v2/batch', batch({
+    token: 'bbbb1111bbbb1111',
+    batchId: 'b333333333333333',
+    days: [{ date: dayISO(0), opens: 1, counts: {}, setup: { push: false } }],
+  }))
+  const snap = await (await post(store, '/v2/aggregate', {})).json()
+  // Each token counts once, with its most recent value; unknown is never "off".
+  assert.equal(snap.setup.tokens, 2)
+  assert.deepEqual(snap.setup.known, { push: 2, sync: 1 })
+  assert.deepEqual(snap.setup.on, { push: 1, sync: 1 })
+  // Return frequency replaces the legacy retention buckets.
+  assert.equal(snap.frequency.tokens, 2)
+  assert.equal(snap.frequency.oneDay, 1, 'the second token was seen on one day')
+  assert.equal(snap.frequency.twoToFourDays, 1)
+  assert.equal(snap.frequency.fivePlusDays, 0)
+  // The totals the overview needs, all counted by the v2 token.
+  assert.equal(snap.metrics.tokensEver.value, 2)
+  assert.equal(snap.metrics.newTokensWindow.value, 2)
+  assert.equal(snap.metrics.activeTokens7.value, 2)
+})

@@ -7,6 +7,16 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 16,
+    dateISO: '2026-09-16',
+    title: 'Deadlines behave like deadlines, and sessions know where they are',
+    items: [
+      'A timetable row that is really a deadline never shows an attendance register: if it matches a key date it opens as one, and any row can be marked “not a session I attend” — it then completes like a key date on Tasks and the Schedule',
+      'Your first session of a day is a real session — a deadline is never counted as one, today or tomorrow',
+      'A session whose room says something like “In School” takes its own address: set it on the session, locate it, and its travel, map and directions use that place. Every session keeps its own',
+    ],
+  },
+  {
     version: 15,
     dateISO: '2026-09-16',
     title: 'Homework on any session, quieter sync, placements to hand',

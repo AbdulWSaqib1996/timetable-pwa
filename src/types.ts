@@ -198,6 +198,19 @@ export interface SessionMeta {
   photos?: number
   /** assignment status for key dates */
   status?: 'todo' | 'doing' | 'done'
+  /**
+   * The learner marked this timetable row as a deadline, not a session they
+   * attend (owner request, 16 Sep 2026): no attendance register, no attendance
+   * prompt, and it is shown and completed as a key date everywhere.
+   */
+  deadlineOnly?: boolean
+  /**
+   * Where THIS session actually is (owner request, 16 Sep 2026). A timetable
+   * room like "In School" that is not one of the mapped placements names no
+   * place the app can route to, so the learner sets it per session; travel,
+   * the map and the external directions use it ahead of any room match.
+   */
+  location?: { label?: string; address: string; lat?: number; lng?: number }
   /** Teachers' Standards this note/photo evidences (e.g. ["TS1","TS4"]) */
   standards?: string[]
   /** flagged for the evidence review queue (R5a / NF-08) — organisational, never a judgement */

@@ -4,7 +4,7 @@ import type { AdminFile, HomeworkRec, Lesson } from '../lib/admin'
 import { reportPersistenceFailure } from '../lib/persistence'
 import { useEffect, useRef, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
-import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords } from '../lib/campus'
+import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords, matchBuilding } from '../lib/campus'
 import { geocodeAddress } from '../lib/geocode'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import type { Coords, TravelMode } from '../lib/campus'
@@ -176,20 +176,55 @@ export function SessionDetail({
   const gcalUrl = googleCalendarUrl(session)
 
   // Placement sessions with a geocoded school address target the school;
-  // everything else targets the matched campus building.
+  // everything else targets the matched campus building — unless the learner
+  // set a place for THIS session (16 Sep 2026), which wins over a room string
+  // the app cannot resolve.
   const schoolCoords =
     isPlacementSession(session) && placementInfo?.lat != null && placementInfo?.lng != null
       ? { lat: placementInfo.lat, lng: placementInfo.lng }
       : null
+  const ownLocation = meta?.location
+  const ownCoords = ownLocation?.lat != null && ownLocation?.lng != null ? { lat: ownLocation.lat, lng: ownLocation.lng } : null
+  // The room only names a place when it matches a campus building; "In School" does not.
+  const roomBuilding = !session.isSelfStudy && session.room ? matchBuilding(session.room) : null
+  const canSetLocation = !isTask && !session.isFreeTime && !isPlacementSession(session) && (!roomBuilding || !!ownLocation)
   const travel = isTask
     ? null
-    : schoolCoords
-      ? estimateTravelToCoords(schoolCoords, coords, travelMode, placementInfo?.school || 'Placement school')
-      : session.room && !session.isSelfStudy
-        ? estimateTravel(session.room, coords, travelMode)
-        : null
+    : ownCoords
+      ? estimateTravelToCoords(ownCoords, coords, travelMode, ownLocation?.label || ownLocation?.address || 'This session')
+      : schoolCoords
+        ? estimateTravelToCoords(schoolCoords, coords, travelMode, placementInfo?.school || 'Placement school')
+        : session.room && !session.isSelfStudy
+          ? estimateTravel(session.room, coords, travelMode)
+          : null
 
   const [geoStatus, setGeoStatus] = useState<'working' | 'ok' | 'fail' | null>(null)
+
+  // This session's own place (16 Sep 2026). Edited locally and committed on blur or
+  // on Locate, so a new address never keeps the previous pin.
+  const [placeLabel, setPlaceLabel] = useState(meta?.location?.label ?? '')
+  const [placeAddress, setPlaceAddress] = useState(meta?.location?.address ?? '')
+  const sessionIdentity = sessionKey(session)
+  useEffect(() => {
+    setPlaceLabel(meta?.location?.label ?? '')
+    setPlaceAddress(meta?.location?.address ?? '')
+    setGeoStatus(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionIdentity])
+  const savePlace = () => {
+    const address = placeAddress.trim()
+    const label = placeLabel.trim() || undefined
+    const current = meta?.location
+    if (!address) {
+      if (current) onMeta({ location: undefined })
+      return
+    }
+    if (current?.address === address && current?.label === label) return
+    // A changed address invalidates the old pin rather than pointing at the wrong place.
+    const keepPin = current?.address === address
+    onMeta({ location: { label, address, lat: keepPin ? current?.lat : undefined, lng: keepPin ? current?.lng : undefined } })
+    if (!keepPin) setGeoStatus(null)
+  }
 
   // Photo notes (stored locally in IndexedDB, downscaled on save).
   const [photos, setPhotos] = useState<StoredPhoto[]>([])
@@ -444,11 +479,25 @@ export function SessionDetail({
                 value={meta?.note ?? ''}
                 onChange={(e) => onMeta({ note: e.target.value })}
               />
-              <p className="filter-hint">
-                From your key-dates sheet — the title and due date are corrected in the sheet itself;
-                whether it is done, and your notes, live here and are never overwritten by it. The same
-                state shows on Tasks.
-              </p>
+              {meta?.deadlineOnly ? (
+                <>
+                  <p className="filter-hint">
+                    You marked this timetable row as a deadline, so attendance is not recorded for it. It sits
+                    with your other deadlines on Tasks and leads its day on the Schedule.
+                  </p>
+                  <div className="btn-row">
+                    <button type="button" className="btn-today-reset" onClick={() => onMeta({ deadlineOnly: false })}>
+                      Record attendance instead
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="filter-hint">
+                  From your key-dates sheet — the title and due date are corrected in the sheet itself;
+                  whether it is done, and your notes, live here and are never overwritten by it. The same
+                  state shows on Tasks.
+                </p>
+              )}
             </>
           )}
         </section>
@@ -604,7 +653,101 @@ export function SessionDetail({
               )}
             </div>
             )}
+            {/* Not everything on a timetable is a session you attend: a submission or a
+                plan deadline imported on the main tab is tracked as a key date instead
+                (owner report, 16 Sep 2026). */}
+            {!session.isSelfStudy && (
+              <p className="filter-hint detail-deadline-switch">
+                <button type="button" className="travel-link" onClick={() => onMeta({ deadlineOnly: true, attended: false, absent: false, absentReason: undefined })}>
+                  Not a session I attend — track it as a deadline
+                </button>
+              </p>
+            )}
           </section>
+          {canSetLocation && (
+            <section className="ui-card detail-card detail-section" aria-labelledby="detail-place-heading">
+              <div className="section-title">
+                <span className="ui-tile ui-tile--blue" aria-hidden="true">
+                  <IconPin />
+                </span>
+                <h3 id="detail-place-heading">Where is this session?</h3>
+              </div>
+              <p className="filter-hint">
+                The timetable says “{session.room || 'no room'}”, which does not name a place this app can route to. Set it for this
+                session — each session keeps its own.
+              </p>
+              <p className="detail-state">
+                {ownLocation
+                  ? `${ownLocation.label ? `${ownLocation.label} · ` : ''}${ownLocation.address}${ownCoords ? ' — located' : ' — not located yet'}`
+                  : 'No place set for this session yet'}
+              </p>
+              <div className="task-edit-row">
+                <input
+                  type="text"
+                  className="placement-input"
+                  aria-label="Place name"
+                  placeholder="Place name (e.g. Oakfield Primary)"
+                  value={placeLabel}
+                  onChange={(e) => setPlaceLabel(e.target.value)}
+                  onBlur={() => savePlace()}
+                />
+              </div>
+              <input
+                type="text"
+                className="placement-input"
+                aria-label="Address"
+                placeholder="Address or postcode"
+                value={placeAddress}
+                onChange={(e) => setPlaceAddress(e.target.value)}
+                onBlur={() => savePlace()}
+              />
+              <div className="btn-row">
+                <button
+                  type="button"
+                  className="btn-today-reset"
+                  disabled={!placeAddress.trim()}
+                  onClick={() => {
+                    const address = placeAddress.trim()
+                    if (!address) return
+                    savePlace()
+                    setGeoStatus('working')
+                    void geocodeAddress(address).then((located) => {
+                      if (located) {
+                        onMeta({ location: { label: placeLabel.trim() || undefined, address, lat: located.lat, lng: located.lng } })
+                        setGeoStatus('ok')
+                      } else {
+                        setGeoStatus('fail')
+                      }
+                    })
+                  }}
+                >
+                  {ownCoords ? 'Locate again' : 'Locate on map'}
+                </button>
+                <button
+                  type="button"
+                  className="travel-link"
+                  disabled={!ownLocation && !placeAddress.trim()}
+                  onClick={() => {
+                    setPlaceLabel('')
+                    setPlaceAddress('')
+                    onMeta({ location: undefined })
+                    setGeoStatus(null)
+                  }}
+                >
+                  Clear this location
+                </button>
+              </div>
+              <p className="filter-hint" role={geoStatus === 'fail' ? 'alert' : undefined}>
+                {geoStatus === 'working'
+                  ? 'Locating the address…'
+                  : geoStatus === 'fail'
+                    ? 'That address could not be located. Travel times need a pin; the address still shows here.'
+                    : ownCoords
+                      ? 'Travel time, the map and the directions for this session use this place.'
+                      : 'Locate the address to get travel times and directions to it.'}
+              </p>
+            </section>
+          )}
           {(dueHomework.length > 0 || canSetHomework) && (
             <section className="ui-card detail-card detail-section" aria-labelledby="detail-homework-heading">
               <div className="section-title">

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ACTION_CATALOGUE } from '../../../shared/analytics-contracts.js'
-import type { LegacyStats, StatsV2 } from '../lib/client'
+import type { StatsV2 } from '../lib/client'
 import { buildCsv, downloadCsv } from '../lib/csv'
 import type { CsvRow } from '../lib/csv'
 import { Kpi, StatePanel } from '../components/bits'
@@ -13,30 +13,36 @@ import { IconAlert, IconLock } from '../components/icons'
  */
 const SMALL_COHORT = 10
 
-export function Returning({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | null }) {
+export function Returning({ v2 }: { v2: StatsV2 }) {
   const cohorts = v2?.cohorts ?? []
-  const r = legacy.retention
-  const total = r.oneDay + r.twoToFourDays + r.fivePlusDays
+  const f = v2.frequency
+  const total = f?.tokens ?? 0
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}%` : '—')
   return (
     <>
-      <div className="kpis">
-        <Kpi value={total === 0 ? '—' : `${r.oneDay} (${pct(r.oneDay)})`} label="Observed on 1 day" support={`of ${total} tokens in this window — not lifetime trial`} />
-        <Kpi value={total === 0 ? '—' : `${r.twoToFourDays} (${pct(r.twoToFourDays)})`} label="Observed 2–4 days" support="distinct observed days per token, this window" />
-        <Kpi value={total === 0 ? '—' : `${r.fivePlusDays} (${pct(r.fivePlusDays)})`} label="Observed 5+ days" support="distinct observed days per token, this window" />
-      </div>
-      {total === 0 && <StatePanel title="No observations">No tokens were observed in this window.</StatePanel>}
+      {f ? (
+        <div className="kpis">
+          <Kpi value={total === 0 ? '—' : `${f.oneDay} (${pct(f.oneDay)})`} label="Observed on 1 day" support={`of ${total} tokens in this window — not lifetime trial`} />
+          <Kpi value={total === 0 ? '—' : `${f.twoToFourDays} (${pct(f.twoToFourDays)})`} label="Observed 2–4 days" support="distinct observed days per token, this window" />
+          <Kpi value={total === 0 ? '—' : `${f.fivePlusDays} (${pct(f.fivePlusDays)})`} label="Observed 5+ days" support="distinct observed days per token, this window" />
+        </div>
+      ) : (
+        <StatePanel title="Return frequency — not in this snapshot yet">
+          Distinct observed days per token appear after the next aggregation. No older dataset is
+          shown in its place.
+        </StatePanel>
+      )}
+      {f && total === 0 && <StatePanel title="No observations">No tokens were observed in this window.</StatePanel>}
       {cohorts.length === 0 ? (
-        <StatePanel title="Weekly cohorts — no v2 observations yet">
-          Cohort membership is a token's first OBSERVED week under v2 event-day collection (UTC
-          Monday boundaries); rows appear as clients report under the new contract. Nothing is
-          backfilled from legacy receipt-day data.
+        <StatePanel title="Weekly cohorts — no observations yet">
+          Cohort membership is a token's first OBSERVED week under event-day collection (UTC Monday
+          boundaries); rows appear as clients report. Nothing is backfilled.
         </StatePanel>
       ) : (
         <div className="card section-gap">
-          <h2>Weekly cohorts (v2 event-day)</h2>
+          <h2>Weekly cohorts (event-day)</h2>
           <p className="support">
-            Membership: first v2-observed week, UTC Monday boundaries, under the retained-identity
+            Membership: first observed week, UTC Monday boundaries, under the retained-identity
             policy. A week-N return means at least one observation in that EXACT calendar week —
             not “returned at any later date”. Open weeks show a dash; cohorts under {SMALL_COHORT}
             tokens show counts without a headline percentage.
@@ -98,14 +104,14 @@ export function Returning({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | n
  * are suppressed below the denominator minimum; nothing here is a service
  * health claim, and unobserved offline failures are never "zero failures".
  */
-export function Reliability({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | null }) {
+export function Reliability({ v2 }: { v2: StatsV2 }) {
   const rel = v2?.reliability
-  if (!v2 || !rel) {
+  if (!rel) {
     return (
-      <StatePanel title="Reliability — v2 aggregate unavailable">
-        Worker-side acceptance counters and freshness diagnostics come from the published v2
-        snapshot, which has not been served yet. Nothing is shown in its place, because an
-        unobserved failure is not a zero failure rate.
+      <StatePanel title="Reliability — diagnostics not in this snapshot">
+        Worker-side acceptance counters and freshness diagnostics come from the published snapshot,
+        which has not carried them yet. Nothing is shown in its place, because an unobserved failure
+        is not a zero failure rate.
       </StatePanel>
     )
   }
@@ -118,8 +124,8 @@ export function Reliability({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 |
   if (stale) issues.push(`Stale aggregate: the v2 snapshot is ${ageMin} min old (threshold ${rel.thresholds.staleAfterMinutes} min).`)
   if (lcd.status === 'alert') issues.push(`Schema rejections above ${rel.thresholds.rejectRatePct}% on ${lcd.date} (${lcd.refused}/${lcd.attempts}).`)
   if (unknownBuild && unknownBuild.tokens > 0) issues.push(`${unknownBuild.tokens} active token(s) report no build id (unknown build coverage).`)
-  if (legacy.completeness && !legacy.completeness.scanComplete) issues.push('Legacy scan incomplete — legacy totals are lower bounds.')
-  if (v2.completeness.status !== 'complete') issues.push(`v2 completeness: ${v2.completeness.status}${v2.completeness.reasons.length ? ` (${v2.completeness.reasons.join(', ')})` : ''}.`)
+  if (!v2.completeness.scanComplete) issues.push('Storage scan incomplete — totals are lower bounds.')
+  if (v2.completeness.status !== 'complete') issues.push(`Completeness: ${v2.completeness.status}${v2.completeness.reasons.length ? ` (${v2.completeness.reasons.join(', ')})` : ''}.`)
   return (
     <>
       {issues.length > 0 ? (
@@ -203,14 +209,13 @@ export function Reliability({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 |
  * builds with enough eligible tokens over a complete equal period — no
  * deltas, no significance badges, no causal claims.
  */
-export function Releases({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | null }) {
-  const versions = Object.entries(legacy.todayVersions).sort((a, b) => Number(b[0]) - Number(a[0]))
+export function Releases({ v2 }: { v2: StatsV2 }) {
   const builds = v2?.builds
   return (
     <>
       {builds && builds.list.length > 0 ? (
         <div className="card section-gap">
-          <h2>Build coverage (v2, latest observed build per active token, 7 days)</h2>
+          <h2>Build coverage (latest observed build per active token, 7 days)</h2>
           <p className="support">
             {builds.activeTokens} active tokens attributed once each. Comparisons show opens per
             token over the last complete 7 UTC days for builds with at least 20 eligible tokens —
@@ -247,38 +252,22 @@ export function Releases({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
           </div>
         </div>
       ) : (
-        <StatePanel title="Build coverage — no v2 observations yet">
-          v2 batches carry an immutable build id (the git commit). Rows appear as clients report;
+        <StatePanel title="Build coverage — no observations yet">
+          Every batch carries an immutable build id (the git commit). Rows appear as clients report;
           a new build without a complete period shows “Comparison unavailable”, never a delta.
         </StatePanel>
       )}
-      <div className="card section-gap">
-        <h2>Release-note markers seen today (legacy)</h2>
-        {versions.length === 0 ? (
-          <p className="support">No reports today yet.</p>
-        ) : (
-          versions.map(([v, n]) => (
-            <p key={v}>
-              <strong>marker {v}</strong> × {n} tokens
-            </p>
-          ))
-        )}
-        <p className="support">
-          These are “What’s new” note markers, NOT build identities — the same marker spans many
-          deploys and cannot support release comparisons.
-        </p>
-      </div>
     </>
   )
 }
 
 const GLOSSARY: [string, string][] = [
-  ['Active tokens', 'Distinct random browser identities with a valid observation in the stated period. Legacy uses the receipt date; v2 uses the observed UTC date. Tokens are browsers, not people.'],
+  ['Active tokens', 'Distinct random browser identities with a valid observation in the stated period, dated by the observed UTC day. Tokens are browsers, not people.'],
   ['Active today', 'Same, for the current UTC date — always partial until the day closes.'],
-  ['New tokens', 'First observed date falls on that date under the declared identity policy. v2 first-seen starts at v2 measurement start; nothing is backdated.'],
+  ['New tokens', 'First observed date falls on that date under the declared identity policy. The first-seen ledger starts at measurement start; nothing is backdated.'],
   ['Standalone share', 'Tokens reporting standalone display mode / tokens with a known mode. Self-reported; not confirmed installs.'],
   ['Feature adoption', 'Distinct eligible active tokens with a positive valid count / eligible active tokens. Unknown eligibility is excluded, not counted as no.'],
-  ['Feature uses', 'Sum of deduplicated counts. Legacy “received uses” are dated by arrival, not use.'],
+  ['Feature uses', 'Sum of deduplicated counts by observed UTC day.'],
   ['Return frequency', 'Distinct observed days per token in the stated window — not lifetime trial or cohort retention.'],
   ['Foreground opens', 'Mount/resume observations — not sessions and not time spent.'],
 ]
@@ -288,35 +277,43 @@ const GLOSSARY: [string, string][] = [
  * the aggregate CSV export (definitions included, formula-safe, disabled
  * only by lock — this page IS behind the lock).
  */
-export function DataAccess({ legacy, v2, onLock }: { legacy: LegacyStats; v2: StatsV2 | null; onLock: () => void }) {
+export function DataAccess({ v2, onLock }: { v2: StatsV2; onLock: () => void }) {
   const [exported, setExported] = useState(false)
   const csv = useMemo(() => {
     const rows: CsvRow[] = []
-    const completeness = legacy.completeness?.scanComplete === false ? 'incomplete-scan' : 'complete'
-    const push = (metric: string, label: string, definition: string, value: number | string | null, source: string, numerator?: number | null, denominator?: number | null) =>
+    const completeness = v2.completeness.scanComplete === false ? 'incomplete-scan' : v2.completeness.status
+    const source = v2.source
+    const push = (metric: string, label: string, definition: string, value: number | string | null, numerator?: number | null, denominator?: number | null) =>
       rows.push({ metric, label, definition, value, numerator, denominator, source, completeness })
-    push('active_7d', 'Active tokens (7d)', 'distinct tokens, fixed last 7 UTC days incl. partial today', legacy.activeLast7Days, 'legacy-receipt-day')
-    push('active_30d', 'Active tokens (30d)', 'distinct tokens, fixed last 30 UTC days incl. partial today', legacy.activeLast30Days, 'legacy-receipt-day')
-    const today = legacy.daily[0]
-    push('active_today', 'Active today', 'distinct tokens on the current UTC date (partial)', today?.active ?? null, 'legacy-receipt-day')
-    push('standalone_today', 'Standalone reports today', 'self-reported standalone mode / active today', today && today.active > 0 ? Math.round(((today.installed ?? 0) / today.active) * 100) : null, 'legacy-receipt-day', today?.installed ?? null, today?.active ?? null)
-    push('tokens_ever', 'Tokens ever recorded', 'first-seen ledger size (no expiry at present)', legacy.totalDevicesEver, 'legacy-receipt-day')
-    for (const d of legacy.daily) push(`daily_active_${d.date}`, `Daily active ${d.date}`, 'distinct tokens with a report received that UTC date', d.active, 'legacy-receipt-day', d.newDevices, undefined)
-    for (const [id, f] of Object.entries(legacy.features)) {
-      push(`feature_${id}`, ACTION_CATALOGUE[id]?.label ?? id, 'distinct tokens with a positive count, fixed last 7 days / weekly active', legacy.activeLast7Days > 0 ? Math.round((f.devices / legacy.activeLast7Days) * 100) : null, 'legacy-receipt-day', f.devices, legacy.activeLast7Days)
+    // One dataset in, one dataset out (16 Sep 2026): every exported row is a v2 metric,
+    // with the definition the snapshot itself published.
+    for (const [id, m] of Object.entries(v2.metrics)) {
+      const ratio = m as { numerator?: number | null; denominator?: number | null }
+      push(id, id, m.definition, m.value, ratio.numerator ?? null, ratio.denominator ?? null)
+    }
+    for (const d of v2.daily) {
+      push(`daily_active_${d.date}`, `Daily active ${d.date}`, d.active.definition, d.active.value, d.new.value, null)
+    }
+    for (const f of v2.features) {
+      push(`feature_${f.id}`, ACTION_CATALOGUE[f.id]?.label ?? f.id, f.adoption.definition, f.adoption.value, f.adoption.numerator, f.adoption.denominator)
+    }
+    if (v2.setup) {
+      for (const [flag, known] of Object.entries(v2.setup.known)) {
+        push(`setup_${flag}`, `Setup: ${flag}`, v2.setup.definition ?? 'setup flag coverage', known > 0 ? Math.round(((v2.setup.on[flag] ?? 0) / known) * 100) : null, v2.setup.on[flag] ?? 0, known)
+      }
     }
     return buildCsv(
       {
-        periodFrom: legacy.daily[legacy.daily.length - 1]?.date ?? '',
-        periodTo: legacy.daily[0]?.date ?? '',
-        generatedAt: legacy.generatedAt,
-        observedThrough: v2?.observedThrough ?? null,
+        periodFrom: v2.period.from,
+        periodTo: v2.period.to,
+        generatedAt: v2.generatedAt,
+        observedThrough: v2.observedThrough ?? null,
         schemaVersion: 2,
-        partial: true,
+        partial: v2.period.includesPartialToday,
       },
       rows
     )
-  }, [legacy, v2])
+  }, [v2])
 
   return (
     <>
@@ -339,7 +336,7 @@ export function DataAccess({ legacy, v2, onLock }: { legacy: LegacyStats; v2: St
             Aggregate CSV of the loaded snapshot: period, UTC boundaries, generation and
             observed-through times, per-metric definitions, numerators and denominators. No tokens,
             no raw events, no secrets; spreadsheet formula prefixes are neutralised.
-            {legacy.completeness?.scanComplete === false && ' The current snapshot is INCOMPLETE — the file says so on every row.'}
+            {v2.completeness.scanComplete === false && ' The current snapshot is INCOMPLETE — the file says so on every row.'}
           </p>
           <button
             type="button"
@@ -377,7 +374,7 @@ export function DataAccess({ legacy, v2, onLock }: { legacy: LegacyStats; v2: St
       </div>
       <div className="card section-gap">
         <h2>Collection start dates</h2>
-        {v2 ? (
+        {v2.features.length > 0 ? (
           <dl className="glossary">
             {[...new Map(v2.features.map((f) => [f.contractVersion, f.collectionStartedAt])).entries()]
               .sort((a, b) => a[0] - b[0])
@@ -389,7 +386,7 @@ export function DataAccess({ legacy, v2, onLock }: { legacy: LegacyStats; v2: St
               ))}
           </dl>
         ) : (
-          <p className="support">Available once the v2 snapshot is served.</p>
+          <p className="support">Available once the snapshot carries per-capability starts.</p>
         )}
       </div>
       <div className="card">

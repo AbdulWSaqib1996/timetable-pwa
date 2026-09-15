@@ -1,8 +1,13 @@
 import { useMemo, useState } from 'react'
-import type { LegacyDaily } from '../lib/client'
+interface Day {
+  date: string
+  active: number
+  newTokens: number
+  returning: number
+}
 
 interface Props {
-  daily: LegacyDaily[] // oldest → newest
+  daily: Day[] // oldest → newest
 }
 
 /**
@@ -55,8 +60,8 @@ export function ActivityChart({ daily }: Props) {
         <div className="chart-axis" style={{ bottom: 0 }}>0</div>
         <div className="chart-bars">
           {daily.map((d, i) => {
-            const newH = Math.round((d.newDevices / max) * 100)
-            const retH = Math.round(((d.active - d.newDevices) / max) * 100)
+            const newH = Math.round((d.newTokens / max) * 100)
+            const retH = Math.round((d.returning / max) * 100)
             return (
               <div
                 key={d.date}
@@ -85,7 +90,7 @@ export function ActivityChart({ daily }: Props) {
       </p>
       <p className="chart-readout" role="status">
         {sel
-          ? `${sel.date}${sel.date === today ? ' (today, partial)' : ''}: ${sel.active} active — ${sel.newDevices} new, ${sel.active - sel.newDevices} returning, ${sel.installed} standalone reports`
+          ? `${sel.date}${sel.date === today ? ' (today, partial)' : ''}: ${sel.active} active — ${sel.newTokens} new, ${sel.returning} returning`
           : 'No day selected.'}
       </p>
       <button type="button" onClick={() => setTableOpen((v) => !v)} aria-expanded={tableOpen}>
@@ -101,7 +106,6 @@ export function ActivityChart({ daily }: Props) {
                 <th scope="col">Active</th>
                 <th scope="col">New</th>
                 <th scope="col">Returning</th>
-                <th scope="col">Standalone reports</th>
               </tr>
             </thead>
             <tbody>
@@ -109,9 +113,8 @@ export function ActivityChart({ daily }: Props) {
                 <tr key={d.date}>
                   <th scope="row">{d.date}</th>
                   <td>{d.active}</td>
-                  <td>{d.newDevices}</td>
-                  <td>{d.active - d.newDevices}</td>
-                  <td>{d.installed}</td>
+                  <td>{d.newTokens}</td>
+                  <td>{d.returning}</td>
                 </tr>
               ))}
             </tbody>

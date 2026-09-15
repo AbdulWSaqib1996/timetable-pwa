@@ -42,8 +42,20 @@ export const v2Fixture = () => {
     period: { from: new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10), to: today, timezone: 'UTC', includesPartialToday: true },
     source: 'event-day-v2',
     completeness: { status: 'complete', missingRows: 0, invalidRows: 0, scanComplete: true, reasons: [] },
-    metrics: { activeTokens7: count(3), activeTokens30: count(3), activeToday: { ...count(2), status: 'partial' } },
-    daily: [{ date: today, active: count(2), new: count(1), returning: count(1) }],
+    metrics: {
+      activeTokens7: count(124, 'distinct tokens, fixed last 7 UTC days incl. partial today'),
+      activeTokens30: count(131, 'distinct tokens, fixed last 30 UTC days incl. partial today'),
+      tokensEver: count(140, 'tokens ever observed under v2 collection'),
+      newTokensWindow: count(9),
+      activeToday: { ...count(38), status: 'partial' },
+      standaloneToday: { value: 63, status: 'partial', definition: 'x', numerator: 24, denominator: 38, eligibleCoverage: { eligible: 38, active: 38 } },
+    },
+    daily: Array.from({ length: 31 }, (_, i) => {
+      const date = new Date(Date.now() - (30 - i) * 86400000).toISOString().slice(0, 10)
+      return { date, active: count(i === 30 ? 38 : 20 + (i % 9)), new: count(i % 5), returning: count(i === 30 ? 34 : 18) }
+    }),
+    setup: { tokens: 30, known: { push: 26, location: 20 }, on: { push: 18, location: 5 }, definition: 'setup coverage' },
+    frequency: { tokens: 124, oneDay: 41, twoToFourDays: 52, fivePlusDays: 31, definition: 'distinct observed days per token' },
     reliability: {
       thresholds: { staleAfterMinutes: 30, rejectRatePct: 2, minAttempts: 100 },
       lastAcceptedAt: Date.now() - 5 * 60_000,
@@ -67,6 +79,14 @@ export const v2Fixture = () => {
     },
     features: [
       {
+        id: 'detail',
+        contractVersion: 1,
+        collectionStartedAt: new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10),
+        measurement: 'available',
+        adoption: { value: 74, status: 'complete', definition: 'x', numerator: 92, denominator: 124, eligibleCoverage: { eligible: 124, active: 124 } },
+        uses: { value: 384, status: 'complete', definition: 'x' },
+      },
+      {
         id: 'task_created',
         contractVersion: 2,
         collectionStartedAt: null,
@@ -81,16 +101,18 @@ export const v2Fixture = () => {
 export async function mockStats(
   context: BrowserContext,
   opts: { legacy?: () => { status: number; body: unknown }; v2?: () => { status: number; body: unknown } } = {}
-): Promise<{ legacyCalls: string[] }> {
+): Promise<{ legacyCalls: string[]; v2Calls: string[] }> {
   const legacyCalls: string[] = []
+  const v2Calls: string[] = []
   await context.route(/timetable-push\.ics-feed\.workers\.dev\/stats\?/, (route: Route) => {
     legacyCalls.push(route.request().url())
     const r = opts.legacy?.() ?? { status: 200, body: legacyFixture() }
     return route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.body) })
   })
   await context.route(/timetable-push\.ics-feed\.workers\.dev\/stats\/v2/, (route: Route) => {
+    v2Calls.push(route.request().url())
     const r = opts.v2?.() ?? { status: 200, body: v2Fixture() }
     return route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.body) })
   })
-  return { legacyCalls }
+  return { legacyCalls, v2Calls }
 }

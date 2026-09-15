@@ -76,21 +76,21 @@ Before planning, each P1/P2 finding was checked against `main`:
 
 **Gate**: matrix at 320/390/768/1440, light/dark, 200% text, keyboard; two-action reach for the current lesson and mentor prep; nothing lost from the eleven functions; `v1-foundations`, `v5-matrix`, `gap-closure` suites extended rather than relaxed.
 
-### Batch D1 — connected teaching (Pass 82) — E01, E04
+### Batch D1 — connected teaching (Pass 83) — E01, E04
 
-> **Renumbered**: two owner requests of 15 September 2026 (key dates completed rather than attended; lessons setting homework due in a later occurrence) shipped first as Pass 80, and their follow-ups as Pass 81, so D1 is Pass 82, D2 Pass 83 and D3 Pass 84. E01 should build on the `homework` collection that pass added rather than a second store.
+> **Renumbered**: two owner requests of 15 September 2026 (key dates completed rather than attended; lessons setting homework due in a later occurrence) shipped first as Passes 80–82 (key dates, homework, sync status, placement access, deadline rows, per-session places and the single analytics dataset), so D1 is Pass 83, D2 Pass 84 and D3 Pass 85. E01 should build on the `homework` collection that pass added rather than a second store.
 
 **In**: `learningThreads` collection (refs only: placementId, lessonIds, observationIds, cycleId, chosen next action, state, revision) with a "This teaching cycle" view Plan → Teach → Feedback → Try next and a compact timeline atop the lesson workbench; placement transition record + checklist (School & travel, Teaching context, Mentor & access, Carry forward) with outward/return endpoint preview and an optional per-placement return destination with a labelled global-home fallback.
 **Out**: any automatic target or judgement from feedback; pupil data.
 **Gate**: thread round-trips reload/sync/backup; one observation informs many threads without cloning; finishing SE1 keeps its history; starting SE2 cannot overwrite SE1 fields; changed SE2 coordinates invalidate the travel check.
 
-### Batch D2 — academic and weekly flow (Pass 83) — E02, E03
+### Batch D2 — academic and weekly flow (Pass 84) — E02, E03
 
 **In**: weekly review over the existing workload planner (this week planned/logged/open; next week fixed/free; diff of moved/added/untouched blocks; accept individually or as a batch; stale proposals invalidated by timetable changes) and the assignment workspace (outline sections, draft references by wallet uid or link, submission record with learner-recorded receipt, feedback refs, source list) built on projects/readings/tasks.
 **Out**: LMS or provider connections; any wellbeing or QTS score.
 **Gate**: accepting twice never duplicates; Undo touches only its batch; a deadline change updates the linked view without a duplicate pin; receipts survive backup by uid; resubmission adds history.
 
-### Batch D3 — data confidence (Pass 84) — E05
+### Batch D3 — data confidence (Pass 85) — E05
 
 **In**: the data & sharing centre — On this device / Synced / Backed up / Shared with mentors from confirmed receipts, per-record/file table (where stored, bytes in backup?, share revision, remote expiry), restore preview (adds/replaces/missing) before applying, relink for missing files, a plain-language recovery guide that never includes secrets.
 **Out**: cloud providers (Pass 58 decision stands).

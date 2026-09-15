@@ -71,11 +71,18 @@ export function validatePayload(data) {
         for (const entry of Object.values(value)) {
           assert(object(entry), 'Invalid session record.')
           if (entry.note !== undefined) assert(typeof entry.note === 'string', 'Invalid note.')
-          for (const key of ['attended','absent','deleted']) if (entry[key] !== undefined) assert(typeof entry[key] === 'boolean', 'Invalid attendance.')
+          for (const key of ['attended','absent','deleted','deadlineOnly']) if (entry[key] !== undefined) assert(typeof entry[key] === 'boolean', 'Invalid attendance.')
           if (entry.at !== undefined) assert(Number.isFinite(entry.at), 'Invalid record revision.')
           if (entry.photos !== undefined) assert(Number.isInteger(entry.photos) && entry.photos >= 0, 'Invalid photo count.')
           if (entry.standards !== undefined) assert(Array.isArray(entry.standards) && entry.standards.every(x => typeof x === 'string'), 'Invalid standards.')
           if (entry.reviewLater !== undefined) assert(typeof entry.reviewLater === 'boolean', 'Invalid review flag.')
+          if (entry.location !== undefined) {
+            // Per-session place (16 Sep 2026): an address the learner typed, optionally located.
+            const loc = entry.location
+            assert(object(loc) && typeof loc.address === 'string' && loc.address.length <= 300, 'Invalid session location.')
+            if (loc.label !== undefined) assert(typeof loc.label === 'string' && loc.label.length <= 120, 'Invalid session location label.')
+            for (const f of ['lat', 'lng']) if (loc[f] !== undefined) assert(Number.isFinite(loc[f]), 'Invalid session location pin.')
+          }
         }
       }
       if (group === 'admin') {

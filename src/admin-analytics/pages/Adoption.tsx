@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ACTION_CATALOGUE } from '../../../shared/analytics-contracts.js'
-import type { LegacyStats, StatsV2 } from '../lib/client'
+import type { StatsV2 } from '../lib/client'
 
 type SortKey = 'tokens' | 'name' | 'share' | 'uses'
 
@@ -8,7 +8,7 @@ interface Row {
   id: string
   label: string
   semantics: string
-  measurement: 'legacy' | 'v2' | 'not-collected'
+  measurement: 'v2' | 'not-collected'
   tokens: number | null
   denominator: number | null
   share: number | null
@@ -22,20 +22,18 @@ interface Row {
  * collected" instead of a fake 0%. Sortable (announced via aria-sort),
  * searchable over the local catalogue only.
  */
-export function Adoption({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | null }) {
+export function Adoption({ v2 }: { v2: StatsV2 }) {
   const [sort, setSort] = useState<SortKey>('tokens')
   const [dir, setDir] = useState<-1 | 1>(-1)
   const [query, setQuery] = useState('')
-  const wau = legacy.activeLast7Days
 
   const rows = useMemo<Row[]>(() => {
-    const v2ByFeature = new Map((v2?.features ?? []).map((f) => [f.id, f]))
+    const v2ByFeature = new Map((v2.features ?? []).map((f) => [f.id, f]))
     return Object.entries(ACTION_CATALOGUE).map(([id, def]) => {
-      const leg = legacy.features[id]
       const v2f = v2ByFeature.get(id)
-      // v2 numbers take over per feature once real v2 observations exist;
-      // legacy received counters stay separately labelled until then.
-      if (v2f && v2f.measurement === 'available' && (v2f.uses.value ?? 0) > 0) {
+      // One dataset (16 Sep 2026): a feature is measured under v2 or it is not
+      // collected — no legacy received-day counters stand in for it.
+      if (v2f && v2f.measurement === 'available') {
         return {
           id,
           label: def.label,
@@ -46,19 +44,6 @@ export function Adoption({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
           share: v2f.adoption.value,
           uses: v2f.uses.value,
           startedAt: v2f.collectionStartedAt,
-        }
-      }
-      if (leg) {
-        return {
-          id,
-          label: def.label,
-          semantics: def.semantics,
-          measurement: 'legacy',
-          tokens: leg.devices,
-          denominator: wau,
-          share: wau > 0 ? Math.round((leg.devices / wau) * 100) : null,
-          uses: leg.uses,
-          startedAt: null,
         }
       }
       return {
@@ -73,7 +58,7 @@ export function Adoption({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
         startedAt: v2f?.collectionStartedAt ?? null,
       }
     })
-  }, [legacy, v2, wau])
+  }, [v2])
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -122,9 +107,9 @@ export function Adoption({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
       <div className="table-wrap">
         <table>
           <caption>
-            Feature adoption — distinct tokens with a positive count in the fixed last 7 UTC days.
-            Legacy rows use received-day counters over active tokens; “Not collected” means no
-            instrumentation exists yet, never zero use.
+            Feature adoption — distinct tokens with a positive count in the fixed last 7 UTC days,
+            counted under the v2 event contract. “Not collected” means no instrumentation exists
+            yet, never zero use.
           </caption>
           <thead>
             <tr>
@@ -154,10 +139,9 @@ export function Adoption({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
                     </span>
                   )}
                 </td>
-                <td>{r.uses === null ? '—' : `${r.uses}${r.measurement === 'legacy' ? ' received' : ''}`}</td>
+                <td>{r.uses === null ? '—' : r.uses}</td>
                 <td>
-                  {r.measurement === 'legacy' && <span className="badge">legacy received-day</span>}
-                  {r.measurement === 'v2' && <span className="badge ok">v2 event-day{r.startedAt ? ` since ${r.startedAt}` : ''}</span>}
+                  {r.measurement === 'v2' && <span className="badge ok">event-day{r.startedAt ? ` since ${r.startedAt}` : ''}</span>}
                   {r.measurement === 'not-collected' && <span className="badge accent">Not collected</span>}
                 </td>
               </tr>
@@ -167,7 +151,7 @@ export function Adoption({ legacy, v2 }: { legacy: LegacyStats; v2: StatsV2 | nu
       </div>
       <p className="support" style={{ marginTop: 10 }}>
         Attempt names (photo, exports) mean the action was started — they never prove a file saved
-        or a printer printed. Planned v2 events appear here the moment instrumentation ships, with
+        or a printer printed. Planned events appear here the moment instrumentation ships, with
         their collection start date.
       </p>
     </>
