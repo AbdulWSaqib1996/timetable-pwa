@@ -1502,7 +1502,7 @@ Automated checks + results: `tests/unit/homework.test.mjs` (5, new: title famili
 
 Known limits: the family rule is textual (a trailing occurrence number), so a course that names lessons without numbers falls back to "any upcoming session" plus the plain-date option; homework is not yet a source for the workload planner or the evidence journal.
 
-Released 15 September 2026: workers deployed first (push `5e1b061b-0ee8-45ff-a25b-816a85ec0b44`, feed `60686197-3e83-4997-a858-fbf96ea312a5`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 15 September 2026: workers deployed first (push `5e1b061b-0ee8-45ff-a25b-816a85ec0b44`, feed `60686197-3e83-4997-a858-fbf96ea312a5`); merge `1ba5365`, CI run 35022009496 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
