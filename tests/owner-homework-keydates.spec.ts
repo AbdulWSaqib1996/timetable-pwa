@@ -89,6 +89,36 @@ test('a key date is completed, not attended: the Schedule keeps it and shows Com
   await expect(taskCard).toContainText('Your task')
 })
 
+test('homework is set from the session detail and assigned to a later occurrence of that session', async ({ page }) => {
+  await seed(page)
+  // Open Maths 1 from the Schedule — the session detail is where homework is recorded.
+  await page.goto('./#/schedule')
+  await page.getByRole('option', { name: /Tuesday 15 September/ }).click()
+  await page.locator('.day-list .session-card').filter({ hasText: 'Maths 1' }).click()
+  const panel = page.getByRole('group', { name: 'Homework set in this session' })
+  await expect(panel).toBeVisible()
+  await panel.getByLabel('Homework', { exact: true }).fill('Read chapter 3')
+  const due = panel.getByLabel('Due in')
+  const later = due.locator('optgroup[label="Later occurrences of this lesson"] option')
+  await expect(later).toHaveText([/^Maths 2 · Tue 22 Sep/, /^Maths 3 · Tue 29 Sep/])
+  await due.selectOption((await later.first().getAttribute('value'))!)
+  await panel.getByRole('button', { name: 'Add homework' }).click()
+  const file = await admin(page)
+  expect(file.homework).toHaveLength(1)
+  expect(file.homework[0]).toMatchObject({ title: 'Read chapter 3', dueTitle: 'Maths 2', dueISO: '2026-09-22', status: 'todo' })
+  expect(file.homework[0].setSessionRef).toBeTruthy()
+  expect(file.homework[0].lessonId).toBeUndefined() // no lesson record is linked to this occurrence
+  await expect(panel.getByRole('list', { name: 'Homework set' })).toContainText('due in Maths 2')
+  // It is due in Maths 2: that session lists it, and Tasks carries it on the 22nd.
+  await page.goto('./#/schedule')
+  await page.getByRole('button', { name: 'Next week' }).click()
+  await page.getByRole('option', { name: /Tuesday 22 September/ }).click()
+  await page.locator('.day-list .session-card').filter({ hasText: 'Maths 2' }).click()
+  await expect(page.getByRole('list', { name: 'Homework due' })).toContainText('Read chapter 3')
+  await page.goto('./#/tasks')
+  await expect(page.locator('.task-card').filter({ hasText: 'Read chapter 3' })).toContainText('Homework')
+})
+
 test('homework set in Maths 1 is scheduled against Maths 2, and one tick covers the lesson, that session, Tasks and the Schedule', async ({ page }) => {
   await seed(page)
   // 1. Record it in the lesson that set it.

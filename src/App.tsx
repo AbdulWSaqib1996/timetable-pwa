@@ -1,4 +1,3 @@
-import { SyncNotice } from './components/SyncNotice'
 import { DATA_CHANGED_EVENT } from './lib/persistence'
 import { SYNC_APPLIED_EVENT, setSyncStatus } from './lib/sync'
 import { reportPersistenceFailure } from './lib/persistence'
@@ -1237,7 +1236,6 @@ export default function App() {
       hideNav={(route.name === 'session' || route.name === 'homeJourney' || (route.name === 'placement' && !!route.leg)) && !detailAsSheet}
     >
       <PersistenceNotice />
-      <SyncNotice />
 
       {identityReview.length > 0 && (
         <button
@@ -1814,6 +1812,11 @@ export default function App() {
             const hw = (adminFile.homework ?? []).find((h) => h.id === id)
             if (hw) setHomeworkStatus(hw, hw.status === 'done' ? 'todo' : 'done')
           }}
+          courseSessions={courseSessions}
+          homeworkAll={adminFile.homework ?? []}
+          homeworkLesson={adminFile.lessons.find((l) => l.sessionRef === sessionKey(selected)) ?? null}
+          onUpdateAdmin={updateAdmin}
+          todayISO={todayISO}
           coords={coords}
           locationEnabled={locationEnabled}
           travelMode={travelMode}

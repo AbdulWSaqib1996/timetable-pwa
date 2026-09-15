@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { useModalA11y } from '../lib/a11y'
 import { useAttention } from '../lib/attention'
+import { SyncStatusIcon } from './SyncStatusIcon'
 
 /**
  * Phase 4 shared primitives (P4-01). Small, semantic and token-driven — one
@@ -260,7 +261,12 @@ export function PageHeader({
         <h1 className="page-title" tabIndex={-1}>
           {title}
         </h1>
-        {actions && <div className="page-actions">{actions}</div>}
+        {/* Sync lives here as a small status control on every page (owner request,
+            16 Sep 2026) instead of a banner above the page. */}
+        <div className="page-actions">
+          <SyncStatusIcon />
+          {actions}
+        </div>
       </div>
       {subtitle && <p className="page-subtitle">{subtitle}</p>}
     </header>
