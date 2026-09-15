@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { LegacyStats, StatsV2 } from '../lib/client'
+import type { StatsV2 } from '../lib/client'
 import { IconAlert, IconClock, IconRefresh } from './icons'
 
 /** Small shared pieces: KPI card, status strip, explicit state panels, notices. */
@@ -16,7 +16,7 @@ export function Kpi({
   support?: string
   /** optional tile icon (V4): identity, never a status claim */
   icon?: ReactNode
-  tone?: 'neutral' | 'legacy' | 'v2'
+  tone?: 'neutral' | 'v2'
 }) {
   return (
     <div className={`card kpi kpi--${tone}`}>
@@ -52,17 +52,15 @@ export const STALE_AFTER_MS = 30 * 60_000
  * control. The dot means "a snapshot is loaded" — never a service-health claim.
  */
 export function StatusStrip({
-  legacy,
   v2,
   onRefresh,
   refreshing,
 }: {
-  legacy: LegacyStats | null
   v2: StatsV2 | null
   onRefresh: () => void
   refreshing: boolean
 }) {
-  const generated = legacy ? new Date(legacy.generatedAt) : null
+  const generated = v2 ? new Date(v2.generatedAt) : null
   const stale = generated !== null && Date.now() - generated.getTime() > STALE_AFTER_MS
   return (
     <div className="status-strip">
@@ -79,10 +77,9 @@ export function StatusStrip({
       <span className="badge attention">
         <IconAlert size={14} /> Today is partial
       </span>
-      <span>
-        v2 observed through: {v2 ? (v2.observedThrough ?? 'no v2 data yet') : 'unavailable'}
-      </span>
-      {legacy?.completeness && !legacy.completeness.scanComplete && <span className="badge warn">scan incomplete</span>}
+      <span>Observed through: {v2 ? (v2.observedThrough ?? 'no observations yet') : 'unavailable'}</span>
+      <span className="badge ok">Event dataset (v2 tokens)</span>
+      {v2 && !v2.completeness.scanComplete && <span className="badge warn">scan incomplete</span>}
       <button type="button" onClick={onRefresh} disabled={refreshing} style={{ marginLeft: 'auto' }}>
         <IconRefresh size={16} /> {refreshing ? 'Refreshing…' : 'Refresh'}
       </button>
@@ -100,13 +97,14 @@ export function StatePanel({ tone = 'info', title, children }: { tone?: 'info' |
   )
 }
 
-export function CompletenessWarnings({ legacy }: { legacy: LegacyStats }) {
-  const c = legacy.completeness
+export function CompletenessWarnings({ v2 }: { v2: StatsV2 }) {
+  const c = v2.completeness
   if (!c) return null
   const warnings: string[] = []
   if (!c.scanComplete) warnings.push('The storage scan hit its page cap — totals are INCOMPLETE lower bounds.')
   if (c.missingRows > 0) warnings.push(`${c.missingRows} listed row(s) could not be read and were excluded, not guessed.`)
   if (c.invalidRows > 0) warnings.push(`${c.invalidRows} row(s) failed validation and were excluded.`)
+  if (c.status !== 'complete' && c.reasons.length > 0) warnings.push(`Completeness ${c.status}: ${c.reasons.join(', ')}.`)
   if (warnings.length === 0) return null
   return (
     <div className="alertbox" role="alert">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { StatsError, fetchLegacyStats, fetchV2Stats } from './lib/client'
-import type { LegacyStats, StatsFailure, StatsV2 } from './lib/client'
+import { StatsError, fetchV2Stats } from './lib/client'
+import type { StatsFailure, StatsV2 } from './lib/client'
 import { useAdminSession } from './lib/session'
 import { StatePanel, StatusStrip } from './components/bits'
 import { Overview } from './pages/Overview'
@@ -28,7 +28,7 @@ const sectionFromHash = (): SectionId => {
 type LoadState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; legacy: LegacyStats; v2: StatsV2 | null }
+  | { status: 'ready'; v2: StatsV2 }
   | { status: 'error'; failure: StatsFailure }
 
 /**
@@ -37,6 +37,11 @@ type LoadState =
  * shows the locked state first because the key never persists). Every
  * response is generation-checked — nothing loaded before a Lock can render
  * after it.
+ *
+ * ONE dataset (owner request, 16 September 2026): every figure comes from the
+ * v2 event-day snapshot under the current token contract. The legacy
+ * receipt-day dataset is not read or displayed anywhere, so no two numbers on
+ * this panel are counted differently.
  */
 export function AdminApp() {
   const session = useAdminSession()
@@ -76,9 +81,9 @@ export function AdminApp() {
       const controller = new AbortController()
       session.controllerRef.current = controller
       setData({ status: 'loading' })
-      let legacy: LegacyStats
+      let v2: StatsV2
       try {
-        legacy = await fetchLegacyStats(key, 31, controller.signal)
+        v2 = await fetchV2Stats(key, controller.signal)
       } catch (err) {
         if (!session.isCurrent(gen)) return
         const failure: StatsFailure = err instanceof StatsError ? err.failure : { kind: 'network' }
@@ -93,16 +98,8 @@ export function AdminApp() {
         }
         return
       }
-      // v2 is additive: its absence (aggregate not yet published) must not
-      // block the legacy view — it renders as an explicit state instead.
-      let v2: StatsV2 | null = null
-      try {
-        v2 = await fetchV2Stats(key, controller.signal)
-      } catch {
-        v2 = null
-      }
       if (!session.isCurrent(gen)) return
-      setData({ status: 'ready', legacy, v2 })
+      setData({ status: 'ready', v2 })
     },
     [session]
   )
@@ -229,20 +226,20 @@ export function AdminApp() {
         </>
       )
     }
-    const { legacy, v2 } = data
+    const { v2 } = data
     switch (section) {
       case 'overview':
-        return <Overview legacy={legacy} v2={v2} />
+        return <Overview v2={v2} />
       case 'adoption':
-        return <Adoption legacy={legacy} v2={v2} />
+        return <Adoption v2={v2} />
       case 'returning':
-        return <Returning legacy={legacy} v2={v2} />
+        return <Returning v2={v2} />
       case 'reliability':
-        return <Reliability legacy={legacy} v2={v2} />
+        return <Reliability v2={v2} />
       case 'releases':
-        return <Releases legacy={legacy} v2={v2} />
+        return <Releases v2={v2} />
       case 'access':
-        return <DataAccess legacy={legacy} v2={v2} onLock={() => lock()} />
+        return <DataAccess v2={v2} onLock={() => lock()} />
     }
   }
 
@@ -280,12 +277,7 @@ export function AdminApp() {
           </button>
         </div>
         {data.status === 'ready' && (
-          <StatusStrip
-            legacy={data.legacy}
-            v2={data.v2}
-            refreshing={false}
-            onRefresh={() => session.key && void load(session.key)}
-          />
+          <StatusStrip v2={data.v2} refreshing={false} onRefresh={() => session.key && void load(session.key)} />
         )}
         {body()}
       </main>

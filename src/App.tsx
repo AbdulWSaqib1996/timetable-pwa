@@ -19,7 +19,7 @@ import { JourneyHomePage } from './features/today/JourneyHomePage'
 import { TodayPage } from './features/today/TodayPage'
 import { parseRoute, useRoute } from './lib/router'
 import { hasInternalPredecessor } from './lib/navigationState'
-import { buildProjection, dedupeKeyDates, byDayKeyDateFirst } from './lib/scheduleProjection'
+import { buildProjection, dedupeKeyDates, byDayKeyDateFirst, sameDayTitle } from './lib/scheduleProjection'
 import { InvalidLinkPage } from './components/InvalidLinkPage'
 import type { Route } from './lib/router'
 
@@ -740,6 +740,8 @@ export default function App() {
         !entry.absent &&
         !entry.note &&
         !entry.photos &&
+        !entry.deadlineOnly &&
+        !entry.location &&
         (!entry.status || entry.status === 'todo') &&
         (entry.standards ?? []).length === 0
       ) {
@@ -798,9 +800,12 @@ export default function App() {
   const allKeyDates = useMemo(() => {
     const custom = adminFile.tasks.map(taskToSession)
     const hw = (adminFile.homework ?? []).map(homeworkToSession)
+    // A timetable row the learner marked as a deadline (16 Sep 2026) becomes a key
+    // date everywhere: highlighted first on its day, on Tasks, completed not attended.
+    const flagged = courseSessions.filter((s) => !s.isKeyDate && metaMap[sessionKey(s)]?.deadlineOnly).map((s) => ({ ...s, isKeyDate: true }))
     // Sheet key dates first so they win a same-day/same-title dedupe over a task pin.
-    return dedupeKeyDates([...keyDates, ...custom, ...hw]).sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
-  }, [keyDates, adminFile.tasks, adminFile.homework])
+    return dedupeKeyDates([...keyDates, ...flagged, ...custom, ...hw]).sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
+  }, [keyDates, courseSessions, metaMap, adminFile.tasks, adminFile.homework])
 
   // Task and homework status/notes overlaid on session metadata for display
   // consumers — writes always go through the records, never these entries, so
@@ -885,8 +890,14 @@ export default function App() {
   const selected = useMemo(() => {
     if (route.name !== 'session' || sessions === null) return null
     const all = [...sessions, ...allKeyDates, ...personalSessions]
-    return all.find((x) => sessionKey(x) === route.key) ?? all.find((x) => legacyKey(x) === route.key) ?? null
-  }, [route, sessions, allKeyDates, personalSessions])
+    const found = all.find((x) => sessionKey(x) === route.key) ?? all.find((x) => legacyKey(x) === route.key) ?? null
+    if (!found || found.isKeyDate) return found
+    // A deadline never opens as an attendance session (owner report, 16 Sep 2026): a row
+    // marked as a deadline opens as one, and a row that duplicates a key date on the same
+    // day opens as that key date — the rule the day list already applies.
+    if (metaMap[sessionKey(found)]?.deadlineOnly) return { ...found, isKeyDate: true }
+    return allKeyDates.find((k) => sameDayTitle(k) === sameDayTitle(found)) ?? found
+  }, [route, sessions, allKeyDates, personalSessions, metaMap])
   // A session link that no longer resolves gets a safe notice, not a blank page.
   useEffect(() => {
     if (route.name === 'session' && sessions !== null && !selected) {

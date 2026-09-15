@@ -25,32 +25,6 @@ export class StatsError extends Error {
   }
 }
 
-export interface LegacyDaily {
-  date: string
-  active: number
-  listed?: number
-  installed: number
-  newDevices: number
-  platforms: Record<string, number>
-}
-
-export interface LegacyStats {
-  generatedAt: string
-  windowDays: number
-  timezone?: string
-  includesPartialToday?: boolean
-  completeness?: { scanComplete: boolean; missingRows: number; invalidRows: number }
-  totalDevicesEver: number
-  activeLast7Days: number
-  activeLast30Days: number
-  todayVersions: Record<string, number>
-  retention: { oneDay: number; twoToFourDays: number; fivePlusDays: number }
-  features: Record<string, { uses: number; devices: number }>
-  opensLast7Days: number
-  setup: { devices: number; counts: Record<string, number>; known?: Record<string, number> }
-  daily: LegacyDaily[]
-}
-
 async function request(path: string, key: string, signal: AbortSignal | undefined): Promise<unknown> {
   const timeout = new AbortController()
   const timer = setTimeout(() => timeout.abort(), TIMEOUT_MS)
@@ -86,30 +60,6 @@ async function request(path: string, key: string, signal: AbortSignal | undefine
   }
 }
 
-const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n)
-
-function validateLegacy(d: unknown): LegacyStats {
-  const o = d as LegacyStats
-  if (
-    !o ||
-    typeof o !== 'object' ||
-    !Array.isArray(o.daily) ||
-    !isNum(o.activeLast7Days) ||
-    !isNum(o.activeLast30Days) ||
-    !isNum(o.totalDevicesEver) ||
-    !o.retention ||
-    typeof o.features !== 'object' ||
-    o.daily.some((x) => typeof x.date !== 'string' || !isNum(x.active) || x.active < 0)
-  ) {
-    throw new StatsError({ kind: 'invalid' })
-  }
-  return o
-}
-
-export async function fetchLegacyStats(key: string, days: number, signal?: AbortSignal): Promise<LegacyStats> {
-  return validateLegacy(await request(`/stats?days=${days}`, key, signal))
-}
-
 export interface StatsV2Count {
   value: number | null
   status: 'complete' | 'partial' | 'unavailable'
@@ -130,6 +80,10 @@ export interface StatsV2 {
   completeness: { status: string; missingRows: number; invalidRows: number; scanComplete: boolean; reasons: string[] }
   metrics: Record<string, StatsV2Count | StatsV2Ratio>
   daily: { date: string; active: StatsV2Count; new: StatsV2Count; returning: StatsV2Count }[]
+  /** setup coverage under v2 (16 Sep 2026); absent from older snapshots */
+  setup?: { tokens: number; known: Record<string, number>; on: Record<string, number>; definition?: string }
+  /** return frequency under v2 (16 Sep 2026); absent from older snapshots */
+  frequency?: { tokens: number; oneDay: number; twoToFourDays: number; fivePlusDays: number; definition?: string }
   features: {
     id: string
     contractVersion: number

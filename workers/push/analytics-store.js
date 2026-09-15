@@ -145,6 +145,14 @@ export class AnalyticsStore {
     let standaloneTodayYes = 0
     let standaloneTodayKnown = 0
     let activeToday = 0
+    // Setup coverage under v2 (16 Sep 2026), so the dashboard has no reason to read the
+    // legacy dataset: each active token of the last 7 days counts ONCE, with its most
+    // recent reported value per flag. Unknown is never counted as "off".
+    const setupSeen = new Set()
+    const setupKnown = {}
+    const setupOn = {}
+    // Return frequency under v2: distinct observed days per token inside this window.
+    const daysPerToken = new Map()
 
     for (let i = 0; i < AGGREGATE_WINDOW_DAYS; i++) {
       const date = dayISO(now - i * 86400000)
@@ -156,6 +164,7 @@ export class AnalyticsStore {
         const token = key.slice(`day:${date}:`.length)
         if (isTestToken(token)) continue
         active++
+        daysPerToken.set(token, (daysPerToken.get(token) ?? 0) + 1)
         if (firstSeen.get(token) === date) newTokens++
         else if (firstSeen.has(token)) returning++
         if (i < 7) {
@@ -165,6 +174,15 @@ export class AnalyticsStore {
             if (!(Number(n) > 0)) continue
             featureUses[f] = (featureUses[f] ?? 0) + Number(n)
             ;(featureTokens[f] = featureTokens[f] ?? new Set()).add(token)
+          }
+          // Days are walked newest first, so a token's first row here is its latest.
+          if (!setupSeen.has(token) && row.setup && typeof row.setup === 'object') {
+            setupSeen.add(token)
+            for (const [flag, on] of Object.entries(row.setup)) {
+              if (typeof on !== 'boolean') continue
+              setupKnown[flag] = (setupKnown[flag] ?? 0) + 1
+              if (on) setupOn[flag] = (setupOn[flag] ?? 0) + 1
+            }
           }
         }
         if (i < 30) active30.add(token)
@@ -360,6 +378,8 @@ export class AnalyticsStore {
       metrics: {
         activeTokens7: count(active7.size, 'distinct tokens with a v2 event-day observation in the fixed last 7 UTC days (incl. partial today)'),
         activeTokens30: count(active30.size, 'distinct tokens with a v2 event-day observation in the fixed last 30 UTC days (incl. partial today)'),
+        tokensEver: count(firstSeen.size, 'tokens ever observed under v2 collection (first-seen ledger; reserved test tokens excluded)'),
+        newTokensWindow: count(daily.reduce((n, d) => n + (d.new.value ?? 0), 0), 'tokens first observed under v2 collection inside this window'),
         activeToday: { ...count(activeToday, 'distinct tokens observed on the current UTC date'), status: 'partial' },
         standaloneToday: {
           value: standaloneTodayKnown > 0 ? Math.round((standaloneTodayYes / standaloneTodayKnown) * 100) : null,
@@ -371,6 +391,19 @@ export class AnalyticsStore {
         },
       },
       daily,
+      setup: {
+        tokens: setupSeen.size,
+        known: setupKnown,
+        on: setupOn,
+        definition: 'active tokens of the fixed last 7 UTC days, each counted once with its most recent reported value per setup flag',
+      },
+      frequency: {
+        tokens: daysPerToken.size,
+        oneDay: [...daysPerToken.values()].filter((n) => n === 1).length,
+        twoToFourDays: [...daysPerToken.values()].filter((n) => n >= 2 && n <= 4).length,
+        fivePlusDays: [...daysPerToken.values()].filter((n) => n >= 5).length,
+        definition: 'distinct observed UTC days per token inside this window — not lifetime trial and not cohort retention',
+      },
       features,
       cohorts,
       reliability: { thresholds, lastAcceptedAt, days: relDays, lastCompleteDay },

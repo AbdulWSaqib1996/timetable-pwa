@@ -153,10 +153,20 @@ export function TodayPage({
   // course sessions and personal events on the course day.
   // Deduplicated by owner id: the caller may already fold personal events
   // into `courseSessions`; identity, not position, decides membership.
+  /**
+   * A deadline is never "a session" here (owner report, 16 Sep 2026): a row the
+   * learner marked as a deadline, or a timetable row that duplicates a key date on
+   * the same day, counts as a deadline — so the first session of a day is a real
+   * session, never a submission.
+   */
+  const dayTitle = (s: Session) => `${s.dateISO}|${s.title.trim().toLowerCase().replace(/\s+/g, ' ')}`
+  const keyDateTitles = new Set(allKeyDates.map(dayTitle))
+  const isDeadlineRow = (s: Session) =>
+    s.isKeyDate === true || metaMap[sessionKey(s)]?.deadlineOnly === true || keyDateTitles.has(dayTitle(s))
   const todays = (() => {
     const seen = new Set<string>()
     return [...courseSessions, ...personalSessions].filter((s) => {
-      if (s.dateISO !== todayISO || s.isKeyDate || seen.has(s.id)) return false
+      if (s.dateISO !== todayISO || isDeadlineRow(s) || seen.has(s.id)) return false
       seen.add(s.id)
       return true
     })
@@ -221,8 +231,12 @@ export function TodayPage({
     .sort((a, b) => a.dateISO.localeCompare(b.dateISO))[0]
 
   // Tomorrow preview: the next date with sessions after today.
-  const nextDay = courseSessions.find((s) => s.dateISO > todayISO && !s.isKeyDate)
-  const nextDaySessions = nextDay ? courseSessions.filter((s) => s.dateISO === nextDay.dateISO && !s.isKeyDate) : []
+  const nextDay = courseSessions.find((s) => s.dateISO > todayISO && !isDeadlineRow(s))
+  const nextDaySessions = nextDay
+    ? courseSessions
+        .filter((s) => s.dateISO === nextDay.dateISO && !isDeadlineRow(s))
+        .sort((a, b) => (a.start || '99').localeCompare(b.start || '99'))
+    : []
   const tomorrowISO = addDaysISO(todayISO, 1)
   const nextDayLine = nextDay
     ? nextDay.dateISO === tomorrowISO

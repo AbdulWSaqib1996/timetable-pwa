@@ -55,8 +55,10 @@ test('releases: latest-build attribution, Unknown kept visible, comparison only 
   await expect(table.getByRole('row', { name: /Unknown/ })).toContainText('Comparison unavailable')
   // No deltas, arrows or significance badges anywhere.
   await expect(page.getByText(/significan|▲|▼|\+\d+%/)).toHaveCount(0)
-  // Legacy markers stay labelled as NOT build identities.
-  await expect(page.getByText(/NOT build identities/)).toBeVisible()
+  // One dataset (16 Sep 2026): the legacy "release-note markers" card is gone, so
+  // nothing on this page can be mistaken for a build identity.
+  await expect(page.getByText(/release-note markers/i)).toHaveCount(0)
+  await expect(page.getByText(/marker \d/)).toHaveCount(0)
 })
 
 test('data & access: retention names the dormant policy honestly and lists per-capability collection starts', async ({ page, context }) => {

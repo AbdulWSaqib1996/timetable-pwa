@@ -161,9 +161,10 @@ test('adoption takes v2 numbers per feature once real observations exist', async
   await page.getByRole('button', { name: 'Unlock' }).click()
   await expect(page.getByRole('heading', { name: 'Feature adoption' })).toBeVisible()
   const row = page.getByRole('row', { name: /Task created/ })
-  await expect(row).toContainText('v2 event-day since')
+  await expect(row).toContainText('event-day since')
   await expect(row).toContainText('3/4')
   await expect(row).toContainText('75%')
-  // Legacy rows keep their received-day labelling alongside.
-  await expect(page.getByRole('row', { name: /Session details/ })).toContainText('received')
+  // One dataset: a feature with no v2 observations is "Not collected", never a legacy count.
+  await expect(page.getByRole('row', { name: /Session details/ })).toContainText('Not collected')
+  await expect(page.getByText(/received-day|legacy/i)).toHaveCount(0)
 })

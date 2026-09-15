@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures'
-import { legacyFixture, mockStats } from './admin-fixtures'
+import { mockStats, v2Fixture } from './admin-fixtures'
 
 /**
  * A1 invariants (Pass 45), running against the A3 React shell: in-memory
@@ -8,13 +8,13 @@ import { legacyFixture, mockStats } from './admin-fixtures'
  * metric copy. All worker traffic is mocked.
  */
 
-test('legacy key/cache are purged, nothing loads before unlock, and no credential travels in a URL', async ({ page, context }) => {
-  const { legacyCalls } = await mockStats(context)
+test('legacy key/cache are purged, the legacy dataset is never requested, nothing loads before unlock, and no credential travels in a URL', async ({ page, context }) => {
+  const { legacyCalls, v2Calls } = await mockStats(context)
   const authHeaders: (string | undefined)[] = []
-  await context.route(/timetable-push\.ics-feed\.workers\.dev\/stats\?/, (route) => {
+  await context.route(/timetable-push\.ics-feed\.workers\.dev\/stats\/v2/, (route) => {
     authHeaders.push(route.request().headers()['authorization'])
-    legacyCalls.push(route.request().url())
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(legacyFixture()) })
+    v2Calls.push(route.request().url())
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(v2Fixture()) })
   })
   await page.addInitScript(() => {
     localStorage.setItem('tt.statskey', 'legacy-persisted-key')
@@ -22,22 +22,24 @@ test('legacy key/cache are purged, nothing loads before unlock, and no credentia
   })
   await page.goto('./analytics.html')
   await expect(page.getByLabel('Owner key')).toBeVisible()
-  expect(legacyCalls.length, 'a stats request fired before unlock').toBe(0)
+  expect(v2Calls.length, 'a stats request fired before unlock').toBe(0)
   const legacy = await page.evaluate(() => [localStorage.getItem('tt.statskey'), localStorage.getItem('tt.statscache')])
   expect(legacy).toEqual([null, null])
   await page.getByLabel('Owner key').fill('test-key')
   await page.getByRole('button', { name: 'Unlock' }).click()
   await expect(page.getByText('Active tokens — last 7 days')).toBeVisible()
   expect(authHeaders[0]).toBe('Bearer test-key')
-  expect(legacyCalls.every((u) => !u.includes('key='))).toBe(true)
+  expect(v2Calls.every((u) => !u.includes('key='))).toBe(true)
+  // One dataset (16 Sep 2026): the legacy receipt-day endpoint is never called.
+  expect(legacyCalls, 'the dashboard must not read the legacy dataset').toEqual([])
 })
 
 test('Lock clears everything and a late response cannot repopulate the page', async ({ page, context }) => {
   let delayMs = 0
   await mockStats(context)
-  await context.route(/timetable-push\.ics-feed\.workers\.dev\/stats\?/, async (route) => {
+  await context.route(/timetable-push\.ics-feed\.workers\.dev\/stats\/v2/, async (route) => {
     if (delayMs) await new Promise((r) => setTimeout(r, delayMs))
-    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(legacyFixture()) })
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(v2Fixture()) })
   })
   await page.goto('./analytics.html')
   await page.getByLabel('Owner key').fill('test-key')
@@ -59,7 +61,7 @@ test('Lock clears everything and a late response cannot repopulate the page', as
 
 test('401 relocks with an honest message; 503 names configuration, not emptiness', async ({ page, context }) => {
   let status = 401
-  await mockStats(context, { legacy: () => ({ status, body: { error: 'x' } }), v2: () => ({ status: 503, body: { error: 'aggregate unavailable' } }) })
+  await mockStats(context, { v2: () => ({ status, body: status === 503 ? { error: 'x' } : { error: 'x' } }) })
   await page.goto('./analytics.html')
   await page.getByLabel('Owner key').fill('wrong')
   await page.getByRole('button', { name: 'Unlock' }).click()
@@ -73,7 +75,7 @@ test('401 relocks with an honest message; 503 names configuration, not emptiness
 
 test('nonzero data draws visibly nonzero bars; honest labels; completeness cap is loudly flagged', async ({ page, context }) => {
   await mockStats(context, {
-    legacy: () => ({ status: 200, body: legacyFixture({ completeness: { scanComplete: false, missingRows: 3, invalidRows: 0 } }) }),
+    v2: () => ({ status: 200, body: { ...v2Fixture(), completeness: { status: 'partial', missingRows: 3, invalidRows: 0, scanComplete: false, reasons: [] } } }),
   })
   await page.goto('./analytics.html')
   await page.getByLabel('Owner key').fill('test-key')
@@ -84,8 +86,8 @@ test('nonzero data draws visibly nonzero bars; honest labels; completeness cap i
   expect(Math.max(...heights)).toBeGreaterThan(10)
   expect(heights.filter((h) => h > 0).length).toBeGreaterThan(20)
   // Honest copy on the overview.
-  await expect(page.getByText('self-reported display mode, not confirmed installs')).toBeVisible()
-  await expect(page.getByText(/first-seen ledger, currently no expiry/)).toBeVisible()
+  await expect(page.getByText(/self-reported, not confirmed installs/)).toBeVisible()
+  await expect(page.getByText(/first-seen ledger under this contract, currently no expiry/)).toBeVisible()
   await expect(page.getByText(/INCOMPLETE lower bounds/)).toBeVisible()
   await expect(page.getByText(/3 listed row\(s\) could not be read/)).toBeVisible()
   // Return-frequency naming lives on its own section now — never "tried it once".
