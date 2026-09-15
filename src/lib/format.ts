@@ -113,7 +113,8 @@ export function weekNumber(dateISO: string, termStartISO: string): number | null
  * guessed from the title. Text always identifies the kind; colour is extra.
  */
 export function sessionKindLabel(s: Session): string {
-  if (s.isKeyDate) return 'Key date'
+  if (s.id.startsWith('hw-')) return 'Homework'
+  if (s.isKeyDate) return s.id.startsWith('custom-') ? 'Your task' : 'Key date'
   if (s.id.startsWith('cmt-')) return s.isFreeTime ? 'Personal · free time' : 'Personal'
   if (s.id.startsWith('plan-')) return s.isFreeTime ? 'Study block · done' : 'Study block'
   if (s.isSelfStudy) return 'Self study'

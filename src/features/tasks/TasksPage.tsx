@@ -157,7 +157,7 @@ export function TasksPage({
                 {dueBadge(days, status)}
                 {soon && days > 1 ? ` · ${weekday(k.dateISO)}` : ''}
               </span>
-              <span className="badge badge-source">{record ? 'Your task' : 'Key date'}</span>
+              <span className="badge badge-source">{k.id.startsWith('hw-') ? 'Homework' : record ? 'Your task' : 'Key date'}</span>
             </span>
             <span className="change-title task-card-title">{k.title}</span>
             <span className="change-meta">

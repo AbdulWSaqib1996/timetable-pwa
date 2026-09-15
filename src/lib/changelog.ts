@@ -7,6 +7,16 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 14,
+    dateISO: '2026-09-15',
+    title: 'Homework, and key dates you tick off',
+    items: [
+      'Key dates are never marked attended — you mark them done. A completed key date stays on the schedule, shown as completed, and the tick is the same on Tasks and on the Schedule',
+      'Lessons can record homework and schedule it against a later occurrence of that lesson: homework from Maths 1 can be due in Maths 2',
+      'Homework shows on the session it is due in, on Tasks with its due date and on the Schedule — one tick anywhere marks it done everywhere',
+    ],
+  },
+  {
     version: 13,
     dateISO: '2026-09-14',
     title: 'A PGCE file that starts where you left off',

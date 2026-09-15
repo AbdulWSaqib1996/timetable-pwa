@@ -53,10 +53,13 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
         : shortenRoom(session.room)
     : null
   const photos = meta?.photos ?? 0
+  // A key date is completed, never attended (owner request, 15 Sep 2026): it stays
+  // on the schedule and carries a Completed badge instead of an attendance state.
+  const done = session.isKeyDate === true && meta?.status === 'done'
   return (
     <button
       type="button"
-      className={`session-card${session.isSelfStudy ? ' self-study' : ''}${session.isKeyDate ? ' key-date' : ''}${placement ? ' placement-session' : ''}`}
+      className={`session-card${session.isSelfStudy ? ' self-study' : ''}${session.isKeyDate ? ' key-date' : ''}${done ? ' key-date-done' : ''}${placement ? ' placement-session' : ''}`}
       style={color ? { borderLeft: `4px solid ${color}` } : undefined}
       onClick={() => onSelect(session)}
     >
@@ -97,8 +100,17 @@ export function SessionCard({ session, meta, coords, travelMode = 'walking', con
         {(session.identityCandidates?.length || session.identityWarning) && (
           <span className="badge badge-conflict">Identity review</span>
         )}
-        {meta?.attended && <span className="badge badge-attended">Attended</span>}
-        {meta?.absent && <span className="badge badge-absent">Absent</span>}
+        {session.isKeyDate ? (
+          <>
+            {done && <span className="badge badge-attended badge-done">Completed</span>}
+            {meta?.status === 'doing' && <span className="badge badge-note">In progress</span>}
+          </>
+        ) : (
+          <>
+            {meta?.attended && <span className="badge badge-attended">Attended</span>}
+            {meta?.absent && <span className="badge badge-absent">Absent</span>}
+          </>
+        )}
         {meta?.note && <span className="badge badge-note">Note</span>}
         {photos > 0 && (
           <span className="badge badge-note">
