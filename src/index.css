@@ -6172,3 +6172,32 @@ body { font-size: 16px; line-height: 1.45; }
 .session-card.key-date-done {
   opacity: 0.85;
 }
+
+/* ---------- Pass 81 (owner requests 16 Sep 2026) ---------- */
+
+/* Sync status as a header control, never a banner. */
+.sync-chip-wrap { position: relative; display: inline-flex; }
+.sync-chip .attention-dot { position: absolute; top: 6px; right: 6px; }
+.sync-chip--busy { opacity: 0.7; }
+.sync-chip--ok { color: var(--saved-text); }
+.sync-chip--waiting, .sync-chip--failed { color: var(--attention-text); }
+.sync-chip--failed { color: var(--error-text); }
+.sync-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  width: min(280px, 78vw);
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 8px 24px var(--shadow);
+  text-align: left;
+}
+.sync-pop p { margin: 0; }
+.sync-pop-state { font-weight: 600; }
+/* Every placement stays reachable from the PGCE landing. */
+.pgce-other-placements { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }

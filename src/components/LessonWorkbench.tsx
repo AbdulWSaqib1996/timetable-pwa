@@ -267,7 +267,7 @@ export function LessonWorkbench({ lessonId: initialId, admin, sessions, placemen
           )}
         </div>
         <p className="filter-hint">Works offline. Teaching a lesson never records attendance or a judgement — those are yours to enter separately.</p>
-        <HomeworkPanel lesson={lesson} sessions={sessions} homework={admin.homework ?? []} todayISO={todayISO} onUpdateAdmin={onUpdateAdmin} />
+        <HomeworkPanel lesson={lesson} sessions={sessions} homework={admin.homework ?? []} todayISO={todayISO} onUpdateAdmin={onUpdateAdmin} label="Homework set in this lesson" />
       </div>
 
       <div id="wb-panel-review" role="tabpanel" aria-labelledby="wb-tab-review" hidden={stage !== 'review'}>

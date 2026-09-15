@@ -7,12 +7,17 @@ import { sessionKey } from '../lib/diff'
 import type { Session } from '../types'
 
 interface Props {
-  lesson: Lesson
+  /** the lesson record that set it, when there is one */
+  lesson?: Lesson | null
+  /** the timetable occurrence it was set in — the session detail always has one */
+  session?: Session | null
   /** course sessions (all dates) — the occurrences homework can be due in */
   sessions: Session[]
   homework: HomeworkRec[]
   todayISO: string
   onUpdateAdmin: (updater: (prev: AdminFile) => AdminFile) => void
+  /** group label: "…in this lesson" in the workbench, "…in this session" on a session */
+  label?: string
 }
 
 const fmtDay = (iso: string) => {
@@ -22,15 +27,17 @@ const fmtDay = (iso: string) => {
 const label = (s: Session) => `${s.title} · ${fmtDay(s.dateISO)}${s.start ? ` ${s.start}` : ''}`
 
 /**
- * Homework set in one lesson (owner request, 15 September 2026): recorded
- * here and scheduled against a LATER OCCURRENCE of the same lesson — "Maths 1
- * gave me homework; it is due in Maths 2". Later occurrences of this lesson's
- * own title family are offered first, then any other upcoming session, then a
- * plain date for homework with no lesson to hand it in at. The record owns its
- * completion, so the tick here, on the Tasks screen, on the Schedule and on
- * the session it is due in are all the same state.
+ * Homework set in one lesson or in one timetable session (owner request, 15
+ * September 2026, extended 16 September): recorded here and scheduled against
+ * a LATER OCCURRENCE of the same lesson — "Maths 1 gave me homework; it is due
+ * in Maths 2". Later occurrences of this session's own title family are
+ * offered first, then any other upcoming session, then a plain date for
+ * homework with no lesson to hand it in at. The record owns its completion, so
+ * the tick here, on the Tasks screen, on the Schedule and on the session it is
+ * due in are all the same state — and homework set on a session shows in the
+ * lesson linked to that occurrence, and the other way round.
  */
-export function HomeworkPanel({ lesson, sessions, homework, todayISO, onUpdateAdmin }: Props) {
+export function HomeworkPanel({ lesson, session, sessions, homework, todayISO, onUpdateAdmin, label: groupLabel }: Props) {
   const [title, setTitle] = useState('')
   const [details, setDetails] = useState('')
   const [target, setTarget] = useState('')
@@ -38,19 +45,22 @@ export function HomeworkPanel({ lesson, sessions, homework, todayISO, onUpdateAd
   const [error, setError] = useState<string | null>(null)
 
   const source = useMemo(() => {
-    const byRef = lesson.sessionRef ? sessions.find((s) => sessionKey(s) === lesson.sessionRef) : undefined
+    if (session) return session
+    const byRef = lesson?.sessionRef ? sessions.find((s) => sessionKey(s) === lesson.sessionRef) : undefined
     return byRef ?? null
-  }, [lesson.sessionRef, sessions])
-  const family = titleFamily(source?.title ?? lesson.subject ?? '')
-  // With the exact occurrence linked, a later slot the same day counts. Without it we
+  }, [session, lesson?.sessionRef, sessions])
+  const sourceRef = source ? sessionKey(source) : lesson?.sessionRef
+  const family = titleFamily(source?.title ?? lesson?.subject ?? '')
+  // With the exact occurrence known, a later slot the same day counts. Without it we
   // only know the lesson's date, so the whole of that day is behind us.
-  const after = source ? { dateISO: source.dateISO, start: source.start } : { dateISO: lesson.dateISO, start: '23:59' }
+  const after = source ? { dateISO: source.dateISO, start: source.start } : { dateISO: lesson?.dateISO ?? todayISO, start: '23:59' }
   const later = useMemo(() => laterOccurrences(sessions, family, after), [sessions, family, after.dateISO, after.start])
   const others = useMemo(
     () => upcomingOccurrences(sessions, family, after).filter((o) => !o.sameFamily).slice(0, 40),
     [sessions, family, after.dateISO, after.start]
   )
-  const mine = homework.filter((h) => h.lessonId === lesson.id)
+  // Everything this lesson OR this occurrence set — the two surfaces show the same list.
+  const mine = homework.filter((h) => (lesson && h.lessonId === lesson.id) || (sourceRef && h.setSessionRef === sourceRef))
   const chosen = target && target !== 'date' ? sessions.find((s) => sessionKey(s) === target) ?? null : null
 
   const add = () => {
@@ -60,8 +70,8 @@ export function HomeworkPanel({ lesson, sessions, homework, todayISO, onUpdateAd
         id: newAdminId(),
         title,
         details,
-        lesson,
-        sourceRef: lesson.sessionRef,
+        lesson: lesson ?? null,
+        sourceRef,
         target: chosen ? { key: sessionKey(chosen), session: chosen } : null,
         dueISO: target === 'date' || !chosen ? dueISO : undefined,
         todayISO,
@@ -85,7 +95,7 @@ export function HomeworkPanel({ lesson, sessions, homework, todayISO, onUpdateAd
   const remove = (h: HomeworkRec) => onUpdateAdmin((prev) => ({ ...prev, homework: (prev.homework ?? []).filter((x) => x.id !== h.id) }))
 
   return (
-    <FieldGroup label="Homework set in this lesson" hint="Schedule it against a later occurrence of this lesson — it then shows on that session, on Tasks and on the Schedule.">
+    <FieldGroup label={groupLabel ?? 'Homework set in this lesson'} hint="Schedule it against a later occurrence of this lesson — it then shows on that session, on Tasks and on the Schedule.">
       {mine.length > 0 && (
         <ul className="setup-list" aria-label="Homework set">
           {mine.map((h) => (

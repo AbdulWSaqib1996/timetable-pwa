@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, IconArrowRight, IconBook, IconCalendar, IconChart, IconChevronLeft, IconNote, IconPin, IconPrint, IconSchool, IconShield, IconUser, PageHeader, SettingsAction } from '../../components/ui'
-import { PLACEMENT_STATE_LABEL, PLACEMENT_TIMING_LABEL } from '../../lib/admin'
+import { PLACEMENT_CODES, PLACEMENT_STATE_LABEL, PLACEMENT_TIMING_LABEL, placementSetupState, schoolOf } from '../../lib/admin'
 import type { AdminFile, PlacementCode } from '../../lib/admin'
 import { SECTION_LABEL, activePlacement, loadLastSection, recommendNext, saveLastSection } from '../../lib/pgceNext'
 import type { Recommendation } from '../../lib/pgceNext'
@@ -93,6 +93,12 @@ export function PGCEPage(props: Props) {
   const active = activePlacement(admin, todayISO)
   const rec = recommendNext(admin, todayISO, profileId, blocks.length > 0)
   const roadmap = roadmapSummary(admin.requirements ?? [], admin.milestones ?? [], todayISO)
+  // The placements that are not the active one — listed so none disappears once set up.
+  const otherPlacements = PLACEMENT_CODES.filter((code) => code !== active.code).map((code) => {
+    const placement = (admin.placements ?? []).find((p) => p.code === code)
+    const school = schoolOf(placement, admin.schools ?? [])
+    return { code, placement, school, state: placementSetupState(placement, school) }
+  })
   const act = (r: Recommendation) => {
     if (r.kind === 'setup') props.onSetUpPlacement((r.placementCode as PlacementCode) ?? 'SE1', r.placementId)
     else if (r.kind === 'lesson' && r.lessonId) props.onOpenLesson(r.lessonId, r.stage)
@@ -244,17 +250,46 @@ export function PGCEPage(props: Props) {
             {active.placement?.startISO && active.placement?.endISO ? <span className="filter-hint"> {fmt(active.placement.startISO)} – {fmt(active.placement.endISO)}</span> : null}
           </p>
           <div className="btn-row">
-            <button type="button" className="btn-today-reset" onClick={props.onOpenPlacements}>All placements</button>
-            {blocks.length > 0 && <button type="button" className="btn-today-reset" onClick={props.onOpenPlacementSetup}>Review block mapping</button>}
+            {/* A placement you have set up must stay openable and editable from here
+                (owner request, 16 Sep 2026) — it used to offer only the journeys. */}
             {active.state === 'ready' && active.placement ? (
+              <button type="button" className="btn-primary" onClick={() => props.onOpenPlacement(active.placement!.id)}>Open {active.code}</button>
+            ) : (
+              <button type="button" className="btn-primary" onClick={() => props.onSetUpPlacement(active.code as PlacementCode, active.placement?.id)}>Set up {active.code}</button>
+            )}
+            {active.placement && (
+              <button type="button" className="btn-today-reset" onClick={() => props.onSetUpPlacement(active.code as PlacementCode, active.placement!.id)}>
+                {active.state === 'ready' ? `Edit ${active.code} setup` : 'Continue setup'}
+              </button>
+            )}
+            {active.placement && active.state !== 'ready' && (
+              <button type="button" className="btn-today-reset" onClick={() => props.onOpenPlacement(active.placement!.id)}>Open {active.code}</button>
+            )}
+            {active.state === 'ready' && active.placement && (
               <>
                 <button type="button" className="btn-today-reset" onClick={() => props.onJourney(active.placement!.id, 'out')}>To school</button>
                 <button type="button" className="btn-today-reset" onClick={() => props.onJourney(active.placement!.id, 'back')}>Back home</button>
               </>
-            ) : (
-              <button type="button" className="btn-primary" onClick={() => props.onSetUpPlacement(active.code as PlacementCode, active.placement?.id)}>Set up {active.code}</button>
             )}
+            <button type="button" className="btn-today-reset" onClick={props.onOpenPlacements}>All placements</button>
+            {blocks.length > 0 && <button type="button" className="btn-today-reset" onClick={props.onOpenPlacementSetup}>Review block mapping</button>}
           </div>
+          {/* Every placement stays one tap away, so setting one up never hides the others. */}
+          {otherPlacements.length > 0 && (
+            <ul className="pgce-other-placements" aria-label="Your other placements">
+              {otherPlacements.map((p) => (
+                <li key={p.code}>
+                  <button
+                    type="button"
+                    className="travel-link"
+                    onClick={() => (p.placement ? props.onOpenPlacement(p.placement.id) : props.onSetUpPlacement(p.code as PlacementCode))}
+                  >
+                    {p.code} · {p.school?.name ?? PLACEMENT_STATE_LABEL[p.state]}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       )}
 

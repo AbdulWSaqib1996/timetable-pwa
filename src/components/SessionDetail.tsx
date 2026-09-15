@@ -1,4 +1,6 @@
 import { IdentityReview } from './IdentityReview'
+import { HomeworkPanel } from './HomeworkPanel'
+import type { AdminFile, HomeworkRec, Lesson } from '../lib/admin'
 import { reportPersistenceFailure } from '../lib/persistence'
 import { useEffect, useRef, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
@@ -70,6 +72,16 @@ interface Props {
   /** homework due IN this teaching session */
   homeworkDue?: { id: string; title: string; details?: string; status: 'todo' | 'doing' | 'done'; dueTitle?: string }[]
   onToggleHomework?: (id: string) => void
+  /**
+   * Setting homework FROM this session (owner follow-up, 16 Sep 2026): the
+   * course timetable to pick a later occurrence from, every homework record,
+   * the lesson linked to this occurrence when there is one, and the writer.
+   */
+  courseSessions?: Session[]
+  homeworkAll?: HomeworkRec[]
+  homeworkLesson?: Lesson | null
+  onUpdateAdmin?: (updater: (prev: AdminFile) => AdminFile) => void
+  todayISO?: string
   onClose: () => void
   /** the Journey home screen (V3 design: the return trip is a separate destination) */
   onOpenHomeJourney?: () => void
@@ -140,6 +152,11 @@ export function SessionDetail({
   homework,
   homeworkDue,
   onToggleHomework,
+  courseSessions,
+  homeworkAll,
+  homeworkLesson,
+  onUpdateAdmin,
+  todayISO,
   onClose,
   onOpenHomeJourney,
 }: Props) {
@@ -147,6 +164,8 @@ export function SessionDetail({
   const status = meta?.status ?? 'todo'
   const setStatus = (next: 'todo' | 'doing' | 'done') => (onStatus ? onStatus(next) : onMeta({ status: next }))
   const dueHomework = homeworkDue ?? []
+  // Homework can be set from any real teaching occurrence (never from a deadline pin).
+  const canSetHomework = !isTask && !session.isFreeTime && !!onUpdateAdmin && !!courseSessions && !!homeworkAll && !!todayISO
   const titleSplit = splitTitle(session.title)
   const [tab, setTab] = useState<'overview' | 'travel'>('overview')
   useEffect(() => {
@@ -586,28 +605,44 @@ export function SessionDetail({
             </div>
             )}
           </section>
-          {dueHomework.length > 0 && (
+          {(dueHomework.length > 0 || canSetHomework) && (
             <section className="ui-card detail-card detail-section" aria-labelledby="detail-homework-heading">
               <div className="section-title">
                 <span className="ui-tile ui-tile--amber" aria-hidden="true">
                   <IconCheck />
                 </span>
-                <h3 id="detail-homework-heading">Homework due in this session</h3>
+                <h3 id="detail-homework-heading">Homework</h3>
               </div>
-              <ul className="setup-list" aria-label="Homework due">
-                {dueHomework.map((h) => (
-                  <li key={h.id} className="setup-row">
-                    <label className="toggle-row">
-                      <input type="checkbox" checked={h.status === 'done'} onChange={() => onToggleHomework?.(h.id)} />
-                      <span>
-                        <span className={h.status === 'done' ? 'action-done' : undefined}>{h.title}</span>
-                        {h.details && <span className="filter-hint"> — {h.details}</span>}
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-              <p className="filter-hint">Set in an earlier lesson and scheduled against this one. The same tick shows on Tasks and on the Schedule.</p>
+              {dueHomework.length > 0 && (
+                <>
+                  <p className="detail-state">Due in this session</p>
+                  <ul className="setup-list" aria-label="Homework due">
+                    {dueHomework.map((h) => (
+                      <li key={h.id} className="setup-row">
+                        <label className="toggle-row">
+                          <input type="checkbox" checked={h.status === 'done'} onChange={() => onToggleHomework?.(h.id)} />
+                          <span>
+                            <span className={h.status === 'done' ? 'action-done' : undefined}>{h.title}</span>
+                            {h.details && <span className="filter-hint"> — {h.details}</span>}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="filter-hint">Set in an earlier session and scheduled against this one. The same tick shows on Tasks and on the Schedule.</p>
+                </>
+              )}
+              {canSetHomework && (
+                <HomeworkPanel
+                  session={session}
+                  lesson={homeworkLesson ?? null}
+                  sessions={courseSessions!}
+                  homework={homeworkAll!}
+                  todayISO={todayISO!}
+                  onUpdateAdmin={onUpdateAdmin!}
+                  label="Homework set in this session"
+                />
+              )}
             </section>
           )}
           <section className="ui-card detail-card detail-section" aria-labelledby="detail-notes-heading">

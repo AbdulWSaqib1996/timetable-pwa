@@ -7,6 +7,16 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 15,
+    dateISO: '2026-09-16',
+    title: 'Homework on any session, quieter sync, placements to hand',
+    items: [
+      'Open a session and record homework there, scheduled against a later occurrence of it — no need to open the lesson first',
+      'Sync no longer takes a banner above the page: a small status control in the header shows it, and holds the message and Retry when something fails',
+      'A placement you have set up stays on the PGCE file with Open and Edit, and your other placements are listed beside it',
+    ],
+  },
+  {
     version: 14,
     dateISO: '2026-09-15',
     title: 'Homework, and key dates you tick off',
