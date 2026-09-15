@@ -1517,7 +1517,7 @@ Automated checks + results: `tests/owner-followups.spec.ts` (2, new: with sync u
 
 Known limits: the sync control is per page header, so a full-screen dialog covers it until closed; homework set on a session with no lesson record is linked to the occurrence only, so it appears in a lesson's workbench later only if that lesson is linked to the same occurrence.
 
-Released 16 September 2026: no worker change; merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 16 September 2026: no worker change; merge `2f7487c`, CI run 35023871787 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
