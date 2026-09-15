@@ -80,6 +80,9 @@ import { subscribePush } from './lib/push'
 import { EMPTY_ADMIN, loadAdminFile, saveAdminFile } from './lib/admin'
 import type { AdminFile, CommitmentRec, PlanChildRec, TaskRecord } from './lib/admin'
 import { duplicateTask, migrateCustomKeyDates, overlayTaskMeta, taskEventKey, taskToSession } from './lib/tasks'
+import { homeworkIdOf, homeworkToSession, overlayHomeworkMeta } from './lib/homework'
+import { homeworkForSession } from '../shared/homework.js'
+import type { HomeworkRec } from './lib/admin'
 import { applyPlacementExceptions } from './lib/placement'
 import { availableOrigins } from './lib/origins'
 import { busyCommitmentSessions, commitmentToSession, remindableCommitmentSessions } from './lib/commitments'
@@ -790,17 +793,54 @@ export default function App() {
     [sessions, settings, adminFile.exceptions]
   )
 
-  // Sheet key dates + the user's personal tasks (task records), merged into
-  // the shared key-date pipeline (calendar, reminders, Today strip).
+  // Sheet key dates + the user's personal tasks (task records) + homework due
+  // dates, merged into the shared key-date pipeline (calendar, reminders,
+  // Today strip, Tasks screen).
   const allKeyDates = useMemo(() => {
     const custom = adminFile.tasks.map(taskToSession)
+    const hw = (adminFile.homework ?? []).map(homeworkToSession)
     // Sheet key dates first so they win a same-day/same-title dedupe over a task pin.
-    return dedupeKeyDates([...keyDates, ...custom]).sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
-  }, [keyDates, adminFile.tasks])
+    return dedupeKeyDates([...keyDates, ...custom, ...hw]).sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))
+  }, [keyDates, adminFile.tasks, adminFile.homework])
 
-  // Task status/notes overlaid on session metadata for display consumers —
-  // writes always go through the task records, never these entries.
-  const effectiveMeta = useMemo(() => overlayTaskMeta(metaMap, adminFile.tasks), [metaMap, adminFile.tasks])
+  // Task and homework status/notes overlaid on session metadata for display
+  // consumers — writes always go through the records, never these entries, so
+  // the Tasks screen and the Schedule always show the same state.
+  const effectiveMeta = useMemo(
+    () => overlayHomeworkMeta(overlayTaskMeta(metaMap, adminFile.tasks), adminFile.homework ?? []),
+    [metaMap, adminFile.tasks, adminFile.homework]
+  )
+
+  /**
+   * One writer for "this deadline is done" (owner request, 15 September 2026).
+   * A key date is never attended — it is completed, and completion has exactly
+   * one owner per kind: the task record, the homework record, or the session
+   * metadata for a sheet key date. Every screen reads the same state back.
+   */
+  function setKeyDateStatus(session: Session, next: 'todo' | 'doing' | 'done') {
+    const taskId = session.id.startsWith('custom-') ? session.id.slice('custom-'.length) : null
+    const task = taskId ? adminFile.tasks.find((t) => t.id === taskId) : null
+    if (task) {
+      setTaskStatus(task, next)
+      return
+    }
+    const hwId = homeworkIdOf(session)
+    const hw = hwId ? (adminFile.homework ?? []).find((h) => h.id === hwId) : null
+    if (hw) {
+      setHomeworkStatus(hw, next)
+      return
+    }
+    handleMeta(session, { status: next })
+  }
+  function setHomeworkStatus(hw: HomeworkRec, next: 'todo' | 'doing' | 'done') {
+    if (hw.status === next) return
+    updateAdmin((prev) => ({
+      ...prev,
+      homework: (prev.homework ?? []).map((h) =>
+        h.id === hw.id ? { ...h, status: next, completedISO: next === 'done' ? localTodayISO() : h.completedISO, at: Date.now() } : h
+      ),
+    }))
+  }
 
   // Personal commitments as clearly-marked sessions (P5-06): all of them for
   // display; the busy subset for clashes and group availability; the
@@ -1507,7 +1547,7 @@ export default function App() {
             setTaskUndo(null)
           }}
           onSelect={openSession}
-          onSetStatus={(kd, status) => handleMeta(kd, { status })}
+          onSetStatus={(kd, status) => setKeyDateStatus(kd, status ?? 'todo')}
           onEditTask={(t) => setTaskEdit({ task: t })}
           onSetTaskStatus={setTaskStatus}
           onToggleAction={(meetingId, actionId) =>
@@ -1591,7 +1631,7 @@ export default function App() {
           allKeyDates={allKeyDates}
           keyDateDays={keyDateDays}
           monthExtras={monthExtras}
-          metaMap={metaMap}
+          metaMap={effectiveMeta}
           coords={coords}
           travelMode={travelMode}
           activeCount={activeFilterCount(settings)}
@@ -1755,7 +1795,25 @@ export default function App() {
           origins={journeyOrigins}
           arrivalBufferMins={settings.arrivalBufferMins ?? 10}
           onSetArrivalBuffer={(mins) => updateSettings({ arrivalBufferMins: mins })}
-          meta={metaMap[sessionKey(selected)]}
+          meta={effectiveMeta[sessionKey(selected)]}
+          onStatus={(next) => setKeyDateStatus(selected, next)}
+          homework={(() => {
+            const hwId = homeworkIdOf(selected)
+            const hw = hwId ? (adminFile.homework ?? []).find((h) => h.id === hwId) : null
+            if (!hw) return undefined
+            const lesson = hw.lessonId ? adminFile.lessons.find((l) => l.id === hw.lessonId) : undefined
+            return {
+              details: hw.details,
+              setIn: lesson ? `${lesson.subject || 'Lesson'}${lesson.dateISO ? ` · ${lesson.dateISO}` : ''}` : undefined,
+              dueIn: hw.dueTitle,
+              onOpenLesson: lesson ? () => navigate({ name: 'pgce', lessonId: lesson.id }) : undefined,
+            }
+          })()}
+          homeworkDue={homeworkForSession(adminFile.homework ?? [], sessionKey(selected))}
+          onToggleHomework={(id) => {
+            const hw = (adminFile.homework ?? []).find((h) => h.id === id)
+            if (hw) setHomeworkStatus(hw, hw.status === 'done' ? 'todo' : 'done')
+          }}
           coords={coords}
           locationEnabled={locationEnabled}
           travelMode={travelMode}

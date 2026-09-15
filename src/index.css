@@ -6160,3 +6160,15 @@ body { font-size: 16px; line-height: 1.45; }
 /* Pass 79: month cells may shrink below their content at 320px (the 16px/1.45 text made the 7-column grid 2px too wide). */
 .month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .month-cell, .month-dow { min-width: 0; overflow: hidden; }
+
+/* ---------- Pass 80 (owner request 15 Sep 2026): key dates completed, lesson homework ---------- */
+
+/* A completed key date stays on the schedule, visibly done — never removed. */
+.session-card.key-date-done .session-title {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  color: var(--text-supporting);
+}
+.session-card.key-date-done {
+  opacity: 0.85;
+}

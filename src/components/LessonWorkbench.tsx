@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Dialog, Field, FieldGroup, IconClose, tabKeys } from './ui'
+import { HomeworkPanel } from './HomeworkPanel'
 import { LESSON_TEMPLATES, activateCycle, nextAttempt, provenanceLabel, withPlanRevision } from '../../shared/practice.js'
 import { newAdminId } from '../lib/admin'
 import type { AdminFile, Lesson, LessonStage, Observation, PracticeCycleRec } from '../lib/admin'
@@ -266,6 +267,7 @@ export function LessonWorkbench({ lessonId: initialId, admin, sessions, placemen
           )}
         </div>
         <p className="filter-hint">Works offline. Teaching a lesson never records attendance or a judgement — those are yours to enter separately.</p>
+        <HomeworkPanel lesson={lesson} sessions={sessions} homework={admin.homework ?? []} todayISO={todayISO} onUpdateAdmin={onUpdateAdmin} />
       </div>
 
       <div id="wb-panel-review" role="tabpanel" aria-labelledby="wb-tab-review" hidden={stage !== 'review'}>

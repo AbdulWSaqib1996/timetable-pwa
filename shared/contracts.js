@@ -1,17 +1,18 @@
 import { validAttestation } from './mentor.js'
 import { MAX_EFFORT_MINS } from './planValidation.js'
+import { HOMEWORK_DETAILS_MAX, HOMEWORK_STATES, HOMEWORK_TITLE_MAX } from './homework.js'
 /** Runtime-neutral input contracts, shared by browser and workers. */
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 export const MAX_SYNC_BYTES = 2 * 1024 * 1024
-export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews']
+export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework']
 /** Collections added in Phase 5 and G0 — absent in older payloads/backups, so their
  *  arrays are optional on read and treated as empty. */
-export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews']
+export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework']
 /** Feedback provenance (G0): a client may only record its own account; an
  *  authenticated reviewer state needs the (future) portal. */
 export const clientSourceTypes = ['personal-reflection', 'learner-entered']
 /** AdminFile schema version written by this client; unknown newer fields are preserved, never dropped. */
-export const ADMIN_SCHEMA_VERSION = 8
+export const ADMIN_SCHEMA_VERSION = 9
 export function assert(condition, message) { if (!condition) throw new Error(message) }
 export function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 export function safeURL(value) {
@@ -88,7 +89,7 @@ export function validatePayload(data) {
           for (const item of value[key]) {
             assert(object(item) && typeof item.id === 'string' && !seen.has(item.id) && Number.isFinite(item.at), 'Invalid admin record.')
             seen.add(item.id)
-            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text'],examples:['title','context'],reviewPacks:['title','state','createdISO'],experience:['dateISO','type','layer'],reviews:['dateISO']}
+            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text'],examples:['title','context'],reviewPacks:['title','state','createdISO'],experience:['dateISO','type','layer'],reviews:['dateISO'],homework:['title','status','dueISO','setISO']}
             for (const field of strings[key]) assert(typeof item[field] === 'string', 'Invalid admin field: ' + field)
             for (const field of ['dateISO','weekISO','setISO','metISO','dueISO','completedISO','startISO','endISO','effectiveFromISO','effectiveToISO','doneISO']) if (item[field]) assert(validDate(item[field]), 'Invalid admin date.')
             // G0: typed placement links and feedback provenance are additive and format-checked;
@@ -235,6 +236,15 @@ export function validatePayload(data) {
             for (const field of ['dueTime','startTime','endTime']) if (item[field] !== undefined) assert(validTime(item[field]), 'Invalid admin time.')
             if (key === 'meetings') assert(Array.isArray(item.actions) && item.actions.every(a => object(a) && typeof a.id === 'string' && typeof a.text === 'string' && typeof a.done === 'boolean'), 'Invalid meeting actions.')
             if (key === 'tasks') assert(['todo','doing','done'].includes(item.status), 'Invalid task status.')
+            if (key === 'homework') {
+              // Homework a lesson set, due in a later occurrence (owner request, 15 Sep 2026).
+              assert(typeof item.title === 'string' && item.title.trim() !== '' && item.title.length <= HOMEWORK_TITLE_MAX, 'Invalid homework title.')
+              assert(HOMEWORK_STATES.includes(item.status), 'Invalid homework status.')
+              assert(validDate(item.dueISO) && validDate(item.setISO), 'Invalid homework date.')
+              if (item.completedISO !== undefined) assert(validDate(item.completedISO), 'Invalid homework completion date.')
+              if (item.details !== undefined) assert(typeof item.details === 'string' && item.details.length <= HOMEWORK_DETAILS_MAX, 'Invalid homework details.')
+              for (const f of ['lessonId','setSessionRef','dueSessionRef','dueTitle']) if (item[f] !== undefined) assert(typeof item[f] === 'string' && item[f].length <= 600, 'Invalid homework field: ' + f)
+            }
             if (key === 'exceptions') assert(['holiday','inset','part-day','cancelled','hours'].includes(item.kind), 'Invalid placement exception.')
             if (key === 'exceptions' && item.loggedMins !== undefined) assert(Number.isInteger(item.loggedMins) && item.loggedMins >= 0 && item.loggedMins <= 1440, 'Invalid logged minutes.')
             if (key === 'plans') assert(['subtask','milestone','block'].includes(item.kind), 'Invalid plan item.')

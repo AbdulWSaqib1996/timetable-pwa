@@ -127,6 +127,31 @@ export interface AuditEntry {
 
 /** A personal task (P5-01). Source-imported deadlines stay source-owned
  *  sessions with progress metadata — these records are user-owned only. */
+/**
+ * Homework a lesson set, scheduled against a LATER OCCURRENCE of the same
+ * timetable session (owner request, 15 September 2026). The link is the
+ * occurrence's session key; `dueTitle` is the title at the time of linking and
+ * is display only. Completion lives here — the same state the Tasks screen and
+ * the Schedule show.
+ */
+export interface HomeworkRec {
+  id: string
+  title: string
+  details?: string
+  /** the lesson record that set it */
+  lessonId?: string
+  /** the occurrence it was set in (session key) */
+  setSessionRef?: string
+  setISO: string
+  /** the later occurrence it is due in (session key) */
+  dueSessionRef?: string
+  dueTitle?: string
+  dueISO: string
+  status: 'todo' | 'doing' | 'done'
+  completedISO?: string
+  at: number
+}
+
 export interface TaskRecord {
   id: string
   title: string
@@ -488,6 +513,7 @@ export interface AdminFile {
   reviewPacks: ReviewPackRec[]
   experience: ExperienceLogRec[]
   reviews: ReviewRecordRec[]
+  homework: HomeworkRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -521,6 +547,7 @@ export const EMPTY_ADMIN: AdminFile = {
   reviewPacks: [],
   experience: [],
   reviews: [],
+  homework: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`

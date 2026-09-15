@@ -58,6 +58,18 @@ interface Props {
     lng?: number
   }) => void
   onMeta: (patch: Partial<SessionMeta>) => void
+  /**
+   * Completion of a key date (owner request, 15 Sep 2026). A key date is never
+   * attended — it is completed, and the writer routes to whichever record owns
+   * it (task, homework, or this session's metadata) so Tasks and the Schedule
+   * always agree. Without it the status falls back to session metadata.
+   */
+  onStatus?: (next: 'todo' | 'doing' | 'done') => void
+  /** this key date IS a piece of homework: where it came from and where it is due */
+  homework?: { details?: string; setIn?: string; dueIn?: string; onOpenLesson?: () => void }
+  /** homework due IN this teaching session */
+  homeworkDue?: { id: string; title: string; details?: string; status: 'todo' | 'doing' | 'done'; dueTitle?: string }[]
+  onToggleHomework?: (id: string) => void
   onClose: () => void
   /** the Journey home screen (V3 design: the return trip is a separate destination) */
   onOpenHomeJourney?: () => void
@@ -124,10 +136,17 @@ export function SessionDetail({
   onOpenPlacementSetup,
   onPlacementInfo,
   onMeta,
+  onStatus,
+  homework,
+  homeworkDue,
+  onToggleHomework,
   onClose,
   onOpenHomeJourney,
 }: Props) {
   const isTask = session.isKeyDate === true
+  const status = meta?.status ?? 'todo'
+  const setStatus = (next: 'todo' | 'doing' | 'done') => (onStatus ? onStatus(next) : onMeta({ status: next }))
+  const dueHomework = homeworkDue ?? []
   const titleSplit = splitTitle(session.title)
   const [tab, setTab] = useState<'overview' | 'travel'>('overview')
   useEffect(() => {
@@ -367,31 +386,52 @@ export function SessionDetail({
             </span>
             <h3>Status &amp; notes</h3>
           </div>
-          <div className="chip-grid attendance-chips" role="group" aria-label="Task status">
-            {(['todo', 'doing', 'done'] as const).map((status) => (
+          <p className="detail-state">
+            {status === 'done' ? 'Completed' : status === 'doing' ? 'In progress' : 'Not done yet'} · attendance is not recorded for key dates
+          </p>
+          <div className="chip-grid attendance-chips" role="group" aria-label="Key date status">
+            {(['todo', 'doing', 'done'] as const).map((option) => (
               <button
-                key={status}
+                key={option}
                 type="button"
-                className={`chip${(meta?.status ?? 'todo') === status ? ' chip-on' : ''}`}
-                aria-pressed={(meta?.status ?? 'todo') === status}
-                onClick={() => onMeta({ status })}
+                className={`chip${status === option ? ' chip-on' : ''}`}
+                aria-pressed={status === option}
+                onClick={() => setStatus(option)}
               >
-                {status === 'done' && <IconCheck />}
-                {status === 'todo' ? 'To do' : status === 'doing' ? 'In progress' : 'Done'}
+                {option === 'done' && <IconCheck />}
+                {option === 'todo' ? 'To do' : option === 'doing' ? 'In progress' : 'Done'}
               </button>
             ))}
           </div>
-          <textarea
-            className="note-input"
-            placeholder="Notes for this task (saved on this device)…"
-            rows={2}
-            value={meta?.note ?? ''}
-            onChange={(e) => onMeta({ note: e.target.value })}
-          />
-          <p className="filter-hint">
-            From your key-dates sheet — the title and due date are corrected in the sheet itself;
-            your status and notes live here and are never overwritten by it.
-          </p>
+          {homework ? (
+            <>
+              {homework.details && <p className="detail-note-text">{homework.details}</p>}
+              <p className="filter-hint">
+                Homework{homework.setIn ? ` set in ${homework.setIn}` : ''}
+                {homework.dueIn ? ` · due in ${homework.dueIn}` : ''}. Marking it done here is the same tick as on Tasks and on the session it is due in.
+              </p>
+              {homework.onOpenLesson && (
+                <div className="btn-row">
+                  <button type="button" className="btn-today-reset" onClick={homework.onOpenLesson}>Open the lesson that set it</button>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <textarea
+                className="note-input"
+                placeholder="Notes for this key date (saved on this device)…"
+                rows={2}
+                value={meta?.note ?? ''}
+                onChange={(e) => onMeta({ note: e.target.value })}
+              />
+              <p className="filter-hint">
+                From your key-dates sheet — the title and due date are corrected in the sheet itself;
+                whether it is done, and your notes, live here and are never overwritten by it. The same
+                state shows on Tasks.
+              </p>
+            </>
+          )}
         </section>
       ) : (
         <>
@@ -546,6 +586,30 @@ export function SessionDetail({
             </div>
             )}
           </section>
+          {dueHomework.length > 0 && (
+            <section className="ui-card detail-card detail-section" aria-labelledby="detail-homework-heading">
+              <div className="section-title">
+                <span className="ui-tile ui-tile--amber" aria-hidden="true">
+                  <IconCheck />
+                </span>
+                <h3 id="detail-homework-heading">Homework due in this session</h3>
+              </div>
+              <ul className="setup-list" aria-label="Homework due">
+                {dueHomework.map((h) => (
+                  <li key={h.id} className="setup-row">
+                    <label className="toggle-row">
+                      <input type="checkbox" checked={h.status === 'done'} onChange={() => onToggleHomework?.(h.id)} />
+                      <span>
+                        <span className={h.status === 'done' ? 'action-done' : undefined}>{h.title}</span>
+                        {h.details && <span className="filter-hint"> — {h.details}</span>}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <p className="filter-hint">Set in an earlier lesson and scheduled against this one. The same tick shows on Tasks and on the Schedule.</p>
+            </section>
+          )}
           <section className="ui-card detail-card detail-section" aria-labelledby="detail-notes-heading">
             <div className="section-title">
               <span className="ui-tile ui-tile--violet" aria-hidden="true">
