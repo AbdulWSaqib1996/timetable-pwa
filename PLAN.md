@@ -1533,7 +1533,7 @@ Automated checks + results: `tests/unit/analytics-store.test.mjs` (10, +1: setup
 
 Known limits: the twin rule matches on day + normalised title, so a genuinely taught session sharing a deadline's exact title on the same day opens as the deadline; `setup` and `frequency` appear only in snapshots published after this worker deploy, and the pages say so rather than showing an older number.
 
-Released 16 September 2026: workers deployed first (push `93597f2d-8045-4f2c-80f6-ecf8efc25d4e`, feed `11c717fd-bc4b-4458-868c-c841eb159d1d`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 16 September 2026: workers deployed first (push `93597f2d-8045-4f2c-80f6-ecf8efc25d4e`, feed `11c717fd-bc4b-4458-868c-c841eb159d1d`); merge `deac06d`, CI run 35027304324 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
