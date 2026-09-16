@@ -6,6 +6,9 @@ import { sessionKey } from '../../lib/diff'
 import type { AdminFile, HomeworkRec } from '../../lib/admin'
 import type { Session } from '../../types'
 import { DueChooser } from '../../components/DueChooser'
+import { ResourceLinks } from '../../components/ResourceLinks'
+import { newAdminId } from '../../lib/admin'
+import { openChangesFor } from '../../../shared/homework.js'
 
 interface Props {
   homework: HomeworkRec
@@ -20,6 +23,9 @@ interface Props {
   /** remove with Undo — the caller keeps the record for the undo window */
   onRemove: () => void
   onBack: () => void
+  /** NF-02/NF-05: the wallet owner, the plan children of this homework, and the planner */
+  profileId: string
+  onOpenWorkload: () => void
 }
 
 const fmtDay = (iso: string) => {
@@ -37,7 +43,7 @@ const STATE_LABEL: Record<DueResolution['state'], string> = { fixed: 'Fixed date
  * session is a question here — Follow this session or Keep the original date
  * — never an automatic move. Removing offers Undo through the caller.
  */
-export function HomeworkDetailPage({ homework: hw, admin, sessions, todayISO, onUpdateAdmin, onSetStatus, onOpenSession, onOpenLesson, onRemove, onBack }: Props) {
+export function HomeworkDetailPage({ homework: hw, admin, sessions, todayISO, onUpdateAdmin, onSetStatus, onOpenSession, onOpenLesson, onRemove, onBack, profileId, onOpenWorkload }: Props) {
   const due = resolveDue(hw, sessions, sessionKey)
   const source = resolveSource(hw, sessions, sessionKey)
   const lesson = hw.lessonId ? admin.lessons.find((l) => l.id === hw.lessonId) ?? null : null
@@ -47,6 +53,12 @@ export function HomeworkDetailPage({ homework: hw, admin, sessions, todayISO, on
   const [rescheduling, setRescheduling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
+  const [subtask, setSubtask] = useState({ title: '', effort: '' })
+  const children = admin.plans.filter((p) => p.parentId === hw.id && p.parentKind === 'homework')
+  const subtasks = children.filter((p) => p.kind !== 'block')
+  const blocks = children.filter((p) => p.kind === 'block').sort((a, b) => (a.dateISO ?? '').localeCompare(b.dateISO ?? ''))
+  const plannedMins = blocks.reduce((n, b) => n + (b.effortMins ?? 0), 0)
+  const openChanges = openChangesFor(admin.homeworkChanges ?? [], hw.id)
   const write = (fn: (h: HomeworkRec) => HomeworkRec) => onUpdateAdmin((prev) => ({ ...prev, homework: (prev.homework ?? []).map((h) => (h.id === hw.id ? fn(h) : h)) }))
   const family = titleFamily(source.session?.title ?? source.snapshot?.title ?? hw.dueTitle ?? hw.title)
   const after = useMemo(() => (source.session ? { dateISO: source.session.dateISO, start: source.session.start } : { dateISO: todayISO, start: '00:00' }), [source.session, todayISO])
@@ -193,6 +205,65 @@ export function HomeworkDetailPage({ homework: hw, admin, sessions, todayISO, on
         </div>
         <p className="filter-hint">The same tick as on Tasks, on the Schedule and on the session it is due in{hw.completedISO && hw.status === 'done' ? ` · completed ${fmtDay(hw.completedISO)}` : ''}. No attendance is recorded for homework.</p>
       </Card>
+
+      <Card className="pgce-section">
+        <div className="section-title"><h2 className="subheading">Study plan</h2></div>
+        <p className="filter-hint">Optional. An estimate here lets Workload & support propose study time before the deadline; accepting a proposal never completes the homework — that is your tick.</p>
+        <div className="task-edit-row">
+          <label className="ui-field">
+            <span className="ui-field-label">Effort (minutes)</span>
+            <input type="number" className="date-input" min={0} max={1440} value={hw.effortMins ?? ''} onChange={(e) => write((h) => { const next = { ...h, at: Date.now() }; const v = e.target.value === '' ? undefined : Math.max(0, Math.min(1440, parseInt(e.target.value, 10) || 0)); if (v === undefined) delete next.effortMins; else next.effortMins = v; return next })} />
+          </label>
+        </div>
+        {subtasks.length > 0 && (
+          <ul className="workspace-list" aria-label="Homework subtasks">
+            {subtasks.map((st) => (
+              <li key={st.id} className="workspace-row requirement-row">
+                <label className="cycle-obs">
+                  <input type="checkbox" checked={!!st.done} aria-label={`Subtask done: ${st.title}`} onChange={(e) => onUpdateAdmin((prev) => ({ ...prev, plans: prev.plans.map((p) => (p.id === st.id ? { ...p, done: e.target.checked, at: Date.now() } : p)) }))} />
+                  <span>{st.title}{st.effortMins ? <span className="filter-hint"> · {st.effortMins} min</span> : null}</span>
+                </label>
+                <button type="button" className="travel-link" onClick={() => onUpdateAdmin((prev) => ({ ...prev, plans: prev.plans.filter((p) => p.id !== st.id) }))}>Remove</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="task-edit-row">
+          <input type="text" className="placement-input" aria-label="Subtask" placeholder="Subtask" value={subtask.title} onChange={(e) => setSubtask({ ...subtask, title: e.target.value })} />
+          <input type="number" className="date-input" aria-label="Subtask effort (minutes)" placeholder="min" min={0} value={subtask.effort} onChange={(e) => setSubtask({ ...subtask, effort: e.target.value })} />
+          <button type="button" className="btn-today-reset" disabled={!subtask.title.trim()} onClick={() => { const effort = parseInt(subtask.effort, 10); onUpdateAdmin((prev) => ({ ...prev, plans: [...prev.plans, { id: newAdminId(), parentId: hw.id, parentKind: 'homework', kind: 'subtask', title: subtask.title.trim(), ...(Number.isFinite(effort) && effort > 0 ? { effortMins: effort } : {}), at: Date.now() }] })); setSubtask({ title: '', effort: '' }) }}>Add subtask</button>
+        </div>
+        {blocks.length > 0 ? (
+          <ul className="workspace-list" aria-label="Study blocks">
+            {blocks.map((b) => (
+              <li key={b.id} className="workspace-row"><span>{b.dateISO ? fmtDay(b.dateISO) : 'Unscheduled'}{b.startTime ? ` ${b.startTime}–${b.endTime}` : ''}</span><span className={`tag${b.done ? ' tag--ready' : ''}`}>{b.done ? 'done' : `${b.effortMins ?? 0} min`}</span></li>
+            ))}
+          </ul>
+        ) : (
+          <p className="filter-hint">No study blocks planned for this homework yet.</p>
+        )}
+        {openChanges.length > 0 && blocks.length > 0 && <p className="filter-hint" role="status">The due session changed — review your study blocks once you decide above.</p>}
+        <div className="btn-row">
+          <button type="button" className="btn-today-reset" onClick={onOpenWorkload}>Review study times</button>
+          {plannedMins > 0 ? <span className="filter-hint">{plannedMins} min planned in blocks</span> : null}
+        </div>
+      </Card>
+
+      <Card className="pgce-section">
+        <div className="section-title"><h2 className="subheading">Resources</h2></div>
+        <ResourceLinks resources={hw.resources ?? []} profileId={profileId} label="Homework resources" onChange={(resources) => write((h) => ({ ...h, resources, at: Date.now() }))} />
+      </Card>
+
+      {(hw.statusHistory ?? []).length > 0 && (
+        <Card className="pgce-section">
+          <div className="section-title"><h2 className="subheading">History</h2></div>
+          <ul className="workspace-list" aria-label="Status history">
+            {[...(hw.statusHistory ?? [])].reverse().map((h, i) => (
+              <li key={i} className="workspace-row"><span>{h.reopened ? 'Reopened' : h.status === 'done' ? 'Done' : h.status === 'doing' ? 'In progress' : 'To do'}</span><span className="filter-hint">{fmtAt(h.at)}</span></li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <div className="btn-row">
         <button type="button" className="btn-ghost" onClick={onRemove}>Remove this homework</button>

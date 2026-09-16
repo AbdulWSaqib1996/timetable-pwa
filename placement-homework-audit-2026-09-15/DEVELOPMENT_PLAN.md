@@ -1,6 +1,6 @@
 # Placement & homework review — phased implementation plan
 
-**Source:** [PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md](PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md) (baseline `3429667`). **Planned:** 16 September 2026, after Passes 83–85 (audit Batch D) shipped. **Status:** Batches 1–3 shipped as Passes 86–88 (16 September 2026); Batch 4 is planned only. Each batch below becomes one release pass under the runbook in `AGENTS.md` (branch, both validation gates, workers first when `shared/` or a worker changes, PLAN.md record, What's new entry).
+**Source:** [PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md](PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md) (baseline `3429667`). **Planned:** 16 September 2026, after Passes 83–85 (audit Batch D) shipped. **Status:** all four batches shipped as Passes 86–89 (16 September 2026); the package is archived per §3 Completion. Each batch below becomes one release pass under the runbook in `AGENTS.md` (branch, both validation gates, workers first when `shared/` or a worker changes, PLAN.md record, What's new entry).
 
 ## 1. What the review found, checked against the code as of `0283fe6`
 
@@ -95,6 +95,8 @@ The review's findings were re-read against the current tree. Everything it repor
 **Size**: L (five screens).
 
 ### Batch 4 — connected learner workflows (Pass 89 onward) — NF-02, NF-03, NF-04, NF-05 remainder
+
+> **Status (16 September 2026): implemented as Pass 89** — see PLAN.md. Deviations: the plan parent is `parentKind` beside the existing `parentId` (absent = task) rather than a `parentRef` object, so no migration was needed; a changed due session raises an inbox item that names the study blocks rather than a separate plan-review flow (the learner reviews the blocks from the homework page); preparation notifications are not built (opt-in reminders stay in the backlog); placement-scoped record creation (deferred from Batch 3) and resource sharing to mentors remain deferred and are listed in the archive README.
 
 **In**, in this order, each shippable alone:
 - **NF-02** homework as a plan owner: `PlanChildRec.parentRef: { kind: 'task' | 'homework', id }` with a backward-compatible migration from `parentId`; the workload planner and the Pass 84 weekly review count homework effort once; completing a study block records effort without completing the homework; a changed due session prompts a plan review rather than moving edited blocks.

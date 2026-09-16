@@ -32,6 +32,10 @@ interface Props {
   /** HW-02: a removed homework record the learner can put back */
   undoHomework?: { title: string } | null
   onUndoHomework?: () => void
+  /** NF-04: pending questions about homework whose due session changed */
+  homeworkChanges?: { id: string; homeworkId: string; title: string; kind: 'moved' | 'retitled' | 'deadline' | 'missing'; previous: { dateISO: string; start?: string; title: string }; current?: { dateISO: string; start?: string; title: string }; blocks: number }[]
+  onDecideChange?: (changeId: string, decision: 'follow' | 'keep') => void
+  onOpenHomework?: (homeworkId: string) => void
 }
 
 function formatDate(dateISO: string): string {
@@ -86,6 +90,9 @@ export function TasksPage({
   attention,
   undoHomework,
   onUndoHomework,
+  homeworkChanges,
+  onDecideChange,
+  onOpenHomework,
   onAddTask,
   onOpenSettings,
 }: Props) {
@@ -277,6 +284,30 @@ export function TasksPage({
 
       {nothingMatches && <p className="filter-hint">No tasks match “{query.trim()}”.</p>}
 
+      {homeworkChanges && homeworkChanges.length > 0 && (
+        <section aria-label="Needs review" className="homework-inbox">
+          <h3 className="subheading">Needs review</h3>
+          <p className="filter-hint">The session this homework was due in changed. The deadline stays where you last confirmed it until you decide.</p>
+          <ul className="workspace-list" aria-label="Homework changes">
+            {homeworkChanges.map((c) => (
+              <li key={c.id} className="workspace-row requirement-row homework-change">
+                <span>
+                  <strong>{c.title}</strong>{' '}
+                  <span className="filter-hint">
+                    · {c.kind === 'moved' ? `${c.previous.title} moved: ${formatDate(c.previous.dateISO)}${c.previous.start ? ` ${c.previous.start}` : ''} → ${c.current ? `${formatDate(c.current.dateISO)}${c.current.start ? ` ${c.current.start}` : ''}` : '?'}` : c.kind === 'retitled' ? `${c.previous.title} is now called “${c.current?.title ?? ''}”` : c.kind === 'deadline' ? `${c.previous.title} is now marked as a deadline, not a session` : `${c.previous.title} is no longer in the timetable`}
+                    {c.blocks > 0 ? ` · ${c.blocks} study block${c.blocks === 1 ? '' : 's'} planned against it` : ''}
+                  </span>
+                </span>
+                <span className="requirement-confirm">
+                  {c.kind === 'moved' || c.kind === 'retitled' ? <button type="button" className="travel-link" onClick={() => onDecideChange?.(c.id, 'follow')}>Follow this session</button> : null}
+                  <button type="button" className="travel-link" onClick={() => onDecideChange?.(c.id, 'keep')}>Keep the original date</button>
+                  <button type="button" className="travel-link" onClick={() => onOpenHomework?.(c.homeworkId)}>Open</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {overdue.length > 0 && (
         <section aria-label="Overdue tasks">
           <h3 className="subheading">Needs attention</h3>

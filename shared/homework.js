@@ -188,3 +188,71 @@ export function editHomework(hw, { title, details }, now) {
   else delete next.details
   return next
 }
+
+/** NF-02: homework as a planning item for the workload engine — one owner, no duplicate task. */
+export function homeworkPlanItem(hw, due) {
+  return { id: hw.id, planKind: 'homework', title: `Homework: ${hw.title}`, dueISO: due.effectiveISO, status: hw.status, ...(Number.isFinite(hw.effortMins) ? { effortMins: hw.effortMins } : {}) }
+}
+
+/** NF-04: record a status change with its history (done / reopened / in progress). */
+export function withStatus(hw, next, todayISO, now) {
+  if (hw.status === next) return hw
+  const entry = { at: now, status: next, ...(hw.status === 'done' && next !== 'done' ? { reopened: true } : {}) }
+  return { ...hw, status: next, completedISO: next === 'done' ? todayISO : hw.completedISO, statusHistory: [...(hw.statusHistory ?? []), entry].slice(-200), at: now }
+}
+
+const changeSignature = (c) => `${c.kind}|${c.current?.dateISO ?? ''}|${c.current?.start ?? ''}|${norm(c.current?.title ?? '')}`
+
+/**
+ * NF-04: the pending questions — one open change per homework per situation.
+ * `targets` are the eligible occurrences (a row marked as a deadline is not
+ * one), `all` every course occurrence, so "became a deadline" is told apart
+ * from "left the timetable". An existing open change for the same situation
+ * is kept; a decided change for a situation that recurs is not reopened.
+ */
+export function detectHomeworkChanges({ homework, changes, targets, all, keyOf, makeId, now }) {
+  const out = []
+  for (const hw of homework ?? []) {
+    if (hw.status === 'done') continue
+    const due = resolveDue(hw, targets, keyOf)
+    if (due.state !== 'changed' && due.state !== 'missing') continue
+    const inAll = due.state === 'missing' ? findByKey(all, hw.dueSessionRef, keyOf) : null
+    const kind = due.state === 'changed' ? (due.change.moved ? 'moved' : 'retitled') : inAll ? 'deadline' : 'missing'
+    const current = due.state === 'changed' ? { dateISO: due.session.dateISO, ...(due.session.start ? { start: due.session.start } : {}), title: due.session.title } : inAll ? { dateISO: inAll.dateISO, ...(inAll.start ? { start: inAll.start } : {}), title: inAll.title } : undefined
+    const candidate = { id: makeId(), homeworkId: hw.id, kind, previous: { dateISO: due.confirmed.dateISO, ...(due.confirmed.start ? { start: due.confirmed.start } : {}), title: due.confirmed.title }, ...(current ? { current } : {}), ...(due.session?.identityAt ? { sourceRevision: due.session.identityAt } : {}), at: now }
+    const same = (changes ?? []).find((c) => c.homeworkId === hw.id && changeSignature(c) === changeSignature(candidate))
+    if (same) continue
+    out.push(candidate)
+  }
+  return out
+}
+
+/** NF-04: decide a change exactly once; a later attempt on a decided change is a no-op. */
+export function decideChange(change, decision, now) {
+  if (change.decidedAt) return change
+  return { ...change, decision, decidedAt: now, at: now }
+}
+
+/** Open (undecided) changes for a homework record. */
+export function openChangesFor(changes, homeworkId) {
+  return (changes ?? []).filter((c) => c.homeworkId === homeworkId && !c.decidedAt)
+}
+
+/**
+ * NF-04: once a record no longer reports the situation a change asked about
+ * (the learner followed or kept it elsewhere, or the timetable settled), the
+ * open change is closed with the decision the record now shows. Idempotent.
+ */
+export function reconcileChanges({ homework, changes, targets, keyOf, now }) {
+  let touched = false
+  const out = (changes ?? []).map((c) => {
+    if (c.decidedAt) return c
+    const hw = (homework ?? []).find((h) => h.id === c.homeworkId)
+    if (!hw) { touched = true; return { ...c, decision: 'keep', decidedAt: now, at: now } }
+    const due = resolveDue(hw, targets, keyOf)
+    if (due.state === 'changed' || due.state === 'missing') return c
+    touched = true
+    return { ...c, decision: (hw.dueMode ?? 'session') === 'date' ? 'keep' : 'follow', decidedAt: now, at: now }
+  })
+  return touched ? out : changes ?? []
+}

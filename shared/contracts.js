@@ -7,15 +7,16 @@ import { validateWorkingHours } from './placement.js'
 /** Runtime-neutral input contracts, shared by browser and workers. */
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 export const MAX_SYNC_BYTES = 2 * 1024 * 1024
-export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions', 'weeklyReviews']
+const validResources = (list) => Array.isArray(list) && list.length <= 100 && list.every((r) => object(r) && typeof r.id === 'string' && ['wallet','link'].includes(r.kind) && typeof r.label === 'string' && r.label.length <= 300 && Number.isFinite(r.at) && (r.uid === undefined || (typeof r.uid === 'string' && r.uid.length <= 200)) && (r.url === undefined || (typeof r.url === 'string' && /^https?:\/\//.test(r.url) && r.url.length <= 1000)))
+export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions', 'weeklyReviews', 'homeworkChanges', 'preparations']
 /** Collections added in Phase 5 and G0 — absent in older payloads/backups, so their
  *  arrays are optional on read and treated as empty. */
-export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions', 'weeklyReviews']
+export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions', 'weeklyReviews', 'homeworkChanges', 'preparations']
 /** Feedback provenance (G0): a client may only record its own account; an
  *  authenticated reviewer state needs the (future) portal. */
 export const clientSourceTypes = ['personal-reflection', 'learner-entered']
 /** AdminFile schema version written by this client; unknown newer fields are preserved, never dropped. */
-export const ADMIN_SCHEMA_VERSION = 12
+export const ADMIN_SCHEMA_VERSION = 13
 export function assert(condition, message) { if (!condition) throw new Error(message) }
 export function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 export function safeURL(value) {
@@ -99,7 +100,7 @@ export function validatePayload(data) {
           for (const item of value[key]) {
             assert(object(item) && typeof item.id === 'string' && !seen.has(item.id) && Number.isFinite(item.at), 'Invalid admin record.')
             seen.add(item.id)
-            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text'],examples:['title','context'],reviewPacks:['title','state','createdISO'],experience:['dateISO','type','layer'],reviews:['dateISO'],homework:['title','status','dueISO','setISO'],learningThreads:['state'],transitions:['toPlacementId','state'],weeklyReviews:['weekISO']}
+            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text'],examples:['title','context'],reviewPacks:['title','state','createdISO'],experience:['dateISO','type','layer'],reviews:['dateISO'],homework:['title','status','dueISO','setISO'],learningThreads:['state'],transitions:['toPlacementId','state'],weeklyReviews:['weekISO'],homeworkChanges:['homeworkId','kind'],preparations:['sessionRef']}
             for (const field of strings[key]) assert(typeof item[field] === 'string', 'Invalid admin field: ' + field)
             for (const field of ['dateISO','weekISO','setISO','metISO','dueISO','completedISO','startISO','endISO','effectiveFromISO','effectiveToISO','doneISO']) if (item[field]) assert(validDate(item[field]), 'Invalid admin date.')
             // G0: typed placement links and feedback provenance are additive and format-checked;
@@ -119,6 +120,7 @@ export function validatePayload(data) {
               if (item.workingHours !== undefined) assert(object(item.workingHours) && validTime(item.workingHours.start) && validTime(item.workingHours.end) && validateWorkingHours(item.workingHours) === null, 'Invalid placement hours.')
               if (item.arrivalBufferMins !== undefined) assert(Number.isInteger(item.arrivalBufferMins) && item.arrivalBufferMins >= 0 && item.arrivalBufferMins <= 180, 'Invalid arrival buffer.')
               for (const field of ['mentorName','mentorContact','notes','returnPlaceId']) if (item[field] !== undefined) assert(typeof item[field] === 'string' && item[field].length <= 2000, 'Invalid placement field: ' + field)
+              if (item.resources !== undefined) assert(validResources(item.resources), 'Invalid placement resources.')
               if (item.returnPlace !== undefined) {
                 // E04: an optional return destination for THIS placement (e.g. temporary accommodation); home stays the fallback.
                 const r = item.returnPlace
@@ -275,6 +277,24 @@ export function validatePayload(data) {
               if (item.feedbackRefs !== undefined) assert(Array.isArray(item.feedbackRefs) && item.feedbackRefs.length <= 100 && item.feedbackRefs.every((x) => object(x) && typeof x.id === 'string' && ['wallet','link','text'].includes(x.kind) && typeof x.source === 'string' && x.source.length <= 300 && Number.isFinite(x.at) && (x.uid === undefined || idStr(x.uid)) && (x.url === undefined || (typeof x.url === 'string' && x.url.length <= 1000)) && (x.text === undefined || (typeof x.text === 'string' && x.text.length <= 8000))), 'Invalid project feedback references.')
               if (item.sources !== undefined) assert(Array.isArray(item.sources) && item.sources.length <= 300 && item.sources.every((x) => object(x) && typeof x.id === 'string' && typeof x.title === 'string' && x.title.length <= 500 && Number.isFinite(x.at) && (x.url === undefined || (typeof x.url === 'string' && x.url.length <= 1000)) && (x.author === undefined || (typeof x.author === 'string' && x.author.length <= 300)) && (x.note === undefined || (typeof x.note === 'string' && x.note.length <= 4000))), 'Invalid project sources.')
             }
+            if (key === 'homeworkChanges') {
+              // NF-04: a pending question about a moved/renamed/deadline/missing due session, decided at most once.
+              assert(['moved','retitled','deadline','missing'].includes(item.kind), 'Invalid homework change kind.')
+              assert(/^[\w-]{1,100}$/.test(item.homeworkId), 'Invalid homework change link.')
+              const snap = (x) => object(x) && validDate(x.dateISO) && typeof x.title === 'string' && x.title.length <= 600 && (x.start === undefined || x.start === '' || validTime(x.start))
+              assert(snap(item.previous), 'Invalid homework change snapshot.')
+              if (item.current !== undefined) assert(snap(item.current), 'Invalid homework change snapshot.')
+              if (item.sourceRevision !== undefined) assert(Number.isFinite(item.sourceRevision), 'Invalid homework change revision.')
+              if (item.decision !== undefined) assert(['follow','keep','reschedule'].includes(item.decision), 'Invalid homework change decision.')
+              if (item.decidedAt !== undefined) assert(Number.isFinite(item.decidedAt), 'Invalid homework change time.')
+            }
+            if (key === 'preparations') {
+              // NF-03: the learner's own checklist for a session; ready is a statement, never a score.
+              assert(typeof item.sessionRef === 'string' && item.sessionRef.length <= 600, 'Invalid preparation link.')
+              assert(Array.isArray(item.items) && item.items.length <= 100 && item.items.every((x) => object(x) && typeof x.id === 'string' && typeof x.text === 'string' && x.text.length <= 500 && typeof x.done === 'boolean' && Number.isFinite(x.at)), 'Invalid preparation items.')
+              if (item.readyAt !== undefined) assert(Number.isFinite(item.readyAt), 'Invalid preparation time.')
+              if (item.followUp !== undefined) assert(typeof item.followUp === 'string' && item.followUp.length <= 4000, 'Invalid preparation note.')
+            }
             if (key === 'learningThreads') {
               // E01: references only — ids of lessons/observations, a cycle, the learner's next action.
               assert(THREAD_STATES.includes(item.state), 'Invalid thread state.')
@@ -294,6 +314,7 @@ export function validatePayload(data) {
               if (item.sharesReviewed !== undefined) assert(object(item.sharesReviewed) && Number.isFinite(item.sharesReviewed.at) && Array.isArray(item.sharesReviewed.packIds) && item.sharesReviewed.packIds.length <= 200 && item.sharesReviewed.packIds.every((x) => typeof x === 'string' && x.length <= 100), 'Invalid transition share review.')
               if (item.carryTargetIds !== undefined) assert(Array.isArray(item.carryTargetIds) && item.carryTargetIds.length <= 200 && item.carryTargetIds.every((x) => typeof x === 'string' && x.length <= 100), 'Invalid transition carry-forward list.')
               if (item.confirmedStartISO !== undefined) assert(validDate(item.confirmedStartISO), 'Invalid transition date.')
+              if (item.deferred !== undefined) assert(object(item.deferred) && Object.entries(item.deferred).every(([k, v]) => /^[\w-]{1,40}$/.test(k) && object(v) && Number.isFinite(v.at) && (v.followUpISO === undefined || validDate(v.followUpISO)) && (v.note === undefined || (typeof v.note === 'string' && v.note.length <= 500))), 'Invalid transition deferral.')
               if (item.doneAt !== undefined) assert(Number.isFinite(item.doneAt), 'Invalid transition time.')
             }
             if (key === 'homework') {
@@ -308,10 +329,15 @@ export function validatePayload(data) {
               if (item.dueMode !== undefined) assert(['session','date'].includes(item.dueMode), 'Invalid homework due mode.')
               for (const f of ['dueSnapshot','sourceSnapshot']) if (item[f] !== undefined) assert(object(item[f]) && validDate(item[f].dateISO) && typeof item[f].title === 'string' && item[f].title.length <= 600 && Number.isFinite(item[f].at) && (item[f].start === undefined || item[f].start === '' || validTime(item[f].start)), 'Invalid homework snapshot: ' + f)
               if (item.dueHistory !== undefined) assert(Array.isArray(item.dueHistory) && item.dueHistory.length <= 100 && item.dueHistory.every((h) => object(h) && Number.isFinite(h.at) && validDate(h.fromISO) && validDate(h.toISO) && ['follow','keep','edit'].includes(h.reason)), 'Invalid homework history.')
+              // NF-02/NF-04/NF-05 (Pass 89): effort, status history and resources.
+              if (item.effortMins !== undefined) assert(Number.isInteger(item.effortMins) && item.effortMins >= 0 && item.effortMins <= MAX_EFFORT_MINS, 'Invalid homework effort.')
+              if (item.statusHistory !== undefined) assert(Array.isArray(item.statusHistory) && item.statusHistory.length <= 200 && item.statusHistory.every((h) => object(h) && Number.isFinite(h.at) && HOMEWORK_STATES.includes(h.status) && (h.reopened === undefined || typeof h.reopened === 'boolean')), 'Invalid homework status history.')
+              if (item.resources !== undefined) assert(validResources(item.resources), 'Invalid homework resources.')
             }
             if (key === 'exceptions') assert(['holiday','inset','part-day','cancelled','hours'].includes(item.kind), 'Invalid placement exception.')
             if (key === 'exceptions' && item.loggedMins !== undefined) assert(Number.isInteger(item.loggedMins) && item.loggedMins >= 0 && item.loggedMins <= 1440, 'Invalid logged minutes.')
             if (key === 'plans') assert(['subtask','milestone','block'].includes(item.kind), 'Invalid plan item.')
+            if (key === 'plans' && item.parentKind !== undefined) assert(['task','homework'].includes(item.parentKind), 'Invalid plan parent kind.')
             if (key === 'plans' && item.effortMins !== undefined) assert(Number.isInteger(item.effortMins) && item.effortMins >= 0 && item.effortMins <= MAX_EFFORT_MINS, 'Invalid effort.')
             // Timed blocks must be real intervals; a legacy record that fails
             // stays stored and is shown as "Needs scheduling" — the wire refuses

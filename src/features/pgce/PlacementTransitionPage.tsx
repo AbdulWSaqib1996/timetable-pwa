@@ -4,7 +4,7 @@ import { newAdminId, placementLabel, placementSetupState, schoolOf } from '../..
 import type { AdminFile, PlacementRec, PlacementTransitionRec } from '../../lib/admin'
 import type { Settings } from '../../types'
 import { geocodeAddress } from '../../lib/geocode'
-import { TRANSITION_CONTEXT_MAX, TRANSITION_GROUPS, makeTransition, sharedPackIds, transitionItems, transitionProgress } from '../../../shared/transitions.js'
+import { TRANSITION_CONTEXT_MAX, TRANSITION_GROUPS, makeTransition, sharedPackIds, transitionItems, transitionProgress, withDeferral } from '../../../shared/transitions.js'
 
 interface Props {
   /** the placement being prepared for */
@@ -22,7 +22,7 @@ interface Props {
   onBack: () => void
 }
 
-const STATE_LABEL: Record<string, string> = { done: 'Done', todo: 'To do', stale: 'Needs another look' }
+const STATE_LABEL: Record<string, string> = { done: 'Done', todo: 'To do', stale: 'Needs another look', deferred: 'Not known yet' }
 
 /**
  * Prepare for the next placement (audit E04, Pass 83). Four checklist groups
@@ -49,6 +49,16 @@ export function PlacementTransitionPage({ placement, fromPlacement, admin, setti
   const [firstDay, setFirstDay] = useState(transition?.confirmedStartISO ?? placement.startISO ?? '')
   const [carry, setCarry] = useState<string[]>(transition?.carryTargetIds ?? [])
   const [ret, setRet] = useState({ label: placement.returnPlace?.label ?? '', address: placement.returnPlace?.address ?? '' })
+  const [deferDate, setDeferDate] = useState<Record<string, string>>({})
+  /** NF-01: "not known yet" with a follow-up date — recorded on the transition, never blocking anything. */
+  const defer = (itemId: string, on: boolean) =>
+    onUpdateAdmin((prev) => {
+      const list = prev.transitions ?? []
+      const now = Date.now()
+      const current = list.find((t) => t.toPlacementId === placement.id) ?? (makeTransition(fromPlacement?.id, placement.id, newAdminId(), now) as PlacementTransitionRec)
+      const next = withDeferral(current, itemId, on ? { ...(deferDate[itemId] ? { followUpISO: deferDate[itemId] } : {}) } : null, now) as PlacementTransitionRec
+      return { ...prev, transitions: list.some((t) => t.id === current.id) ? list.map((t) => (t.id === current.id ? next : t)) : [...list, next] }
+    })
   const [retStatus, setRetStatus] = useState<'working' | 'fail' | null>(null)
 
   /** Upsert THIS placement's transition record; the record never copies placement fields. */
@@ -98,7 +108,7 @@ export function PlacementTransitionPage({ placement, fromPlacement, admin, setti
       </button>
       <PageHeader title={`Prepare for ${placement.code}`} subtitle={fromPlacement ? `From ${placementLabel(fromPlacement, admin.schools ?? [])} to ${placementLabel(placement, admin.schools ?? [])}` : placementLabel(placement, admin.schools ?? [])} />
       <p className="pgce-active-state">
-        <span className={`tag ${progress.complete && !progress.stale ? 'tag--ready' : 'tag--amber'}`} aria-label="Checklist progress">{progress.done} of {progress.total} done{progress.stale ? ` · ${progress.stale} need${progress.stale === 1 ? 's' : ''} another look` : ''}</span>
+        <span className={`tag ${progress.complete && !progress.stale ? 'tag--ready' : 'tag--amber'}`} aria-label="Checklist progress">{progress.done} of {progress.total} done{progress.deferred ? ` · ${progress.deferred} not known yet` : ''}{progress.stale ? ` · ${progress.stale} need${progress.stale === 1 ? 's' : ''} another look` : ''}</span>
         {transition?.state === 'done' ? <span className="tag tag--ready">Marked ready</span> : null}
       </p>
       {fromPlacement ? (
@@ -146,9 +156,21 @@ export function PlacementTransitionPage({ placement, fromPlacement, admin, setti
                 <li key={def.id} className={`transition-item transition-item--${it.state}`} data-state={it.state}>
                   <div className="cycle-step-head">
                     <span>{def.label}</span>
-                    <span className={`tag ${it.state === 'done' ? 'tag--ready' : 'tag--amber'}`}>{STATE_LABEL[it.state]}</span>
+                    <span className={`tag ${it.state === 'done' ? 'tag--ready' : it.state === 'deferred' ? '' : 'tag--amber'}`}>{STATE_LABEL[it.state]}</span>
                   </div>
                   <p className="filter-hint">{it.detail}</p>
+                  {it.state !== 'done' && (
+                    <div className="task-edit-row transition-defer">
+                      {it.state === 'deferred' ? (
+                        <button type="button" className="travel-link" onClick={() => defer(def.id, false)}>I know this now</button>
+                      ) : (
+                        <>
+                          <input type="date" className="date-input" aria-label={`Follow up on: ${def.label}`} value={deferDate[def.id] ?? ''} onChange={(e) => setDeferDate({ ...deferDate, [def.id]: e.target.value })} />
+                          <button type="button" className="travel-link" onClick={() => defer(def.id, true)}>Not known yet</button>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {(def.id === 'school-confirmed' || def.id === 'hours-set' || def.id === 'mentor-recorded') && (
                     <div className="btn-row"><button type="button" className="travel-link" onClick={onEditPlacement}>Edit {placement.code} setup</button></div>
                   )}

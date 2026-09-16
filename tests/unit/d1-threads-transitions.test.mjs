@@ -101,11 +101,13 @@ test('E04: checklist items are derived from the placement, school and packs; tic
 
   // Review the journeys against the current pin, then move the pin: the tick goes stale.
   const reviewed = { ...t0, travelReviewed: { at: 101, lat: 51.5, lng: -0.1 }, sharesReviewed: { at: 102, packIds: sharedPackIds(packs) }, carryTargetIds: [], contextNote: 'Year 4, maths and science', confirmedStartISO: '2027-01-11' }
-  const all = transitionItems(reviewed, ctx)
+  // Pass 89 added a resources item; give the placement one so the checklist can complete.
+  const withResources = { ...ctx, placement: { ...placement, resources: [{ id: 'r', kind: 'link', url: 'https://x.example', label: 'Handbook', at: 1 }] } }
+  const all = transitionItems(reviewed, withResources)
   assert.equal(state(all, 'travel-reviewed'), 'done')
   assert.equal(state(all, 'shares-reviewed'), 'done')
   assert.equal(transitionProgress(all).complete, true)
-  const moved = transitionItems(reviewed, { ...ctx, school: { ...school, lat: 51.6 } })
+  const moved = transitionItems(reviewed, { ...withResources, school: { ...school, lat: 51.6 } })
   assert.equal(state(moved, 'travel-reviewed'), 'stale')
   assert.match(moved.find((i) => i.id === 'travel-reviewed').detail, /pin changed/)
   // Sharing another pack after the review makes that tick stale too.

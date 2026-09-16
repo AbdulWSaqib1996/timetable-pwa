@@ -24,7 +24,7 @@ type LocalFile = { uid: string; name: string; kind: 'photo' | 'wallet'; size?: n
 
 const fmtAt = (ms: number) => new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 const fmtDay = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-const REF_LABEL: Record<string, string> = { pack: 'review pack', 'project-draft': 'assignment draft', 'project-receipt': 'submission receipt', 'project-feedback': 'assignment feedback' }
+const REF_LABEL: Record<string, string> = { pack: 'review pack', 'project-draft': 'assignment draft', 'project-receipt': 'submission receipt', 'project-feedback': 'assignment feedback', 'homework-resource': 'homework resource', 'placement-resource': 'placement resource' }
 
 /**
  * Data & sharing centre (audit E05, Pass 85). Four states from CONFIRMED
