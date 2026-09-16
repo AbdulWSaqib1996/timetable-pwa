@@ -1,6 +1,6 @@
 # Placement & homework review — phased implementation plan
 
-**Source:** [PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md](PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md) (baseline `3429667`). **Planned:** 16 September 2026, after Passes 83–85 (audit Batch D) shipped. **Status:** all four batches shipped as Passes 86–89 (16 September 2026); the package is archived per §3 Completion. Each batch below becomes one release pass under the runbook in `AGENTS.md` (branch, both validation gates, workers first when `shared/` or a worker changes, PLAN.md record, What's new entry).
+**Source:** [PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md](PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md) (baseline `3429667`). **Planned:** 16 September 2026, after Passes 83–85 (audit Batch D) shipped. **Status:** all four batches shipped as Passes 86–89 (16 September 2026); the package is archived here per §3 Completion (see [README.md](README.md)). Each batch below becomes one release pass under the runbook in `AGENTS.md` (branch, both validation gates, workers first when `shared/` or a worker changes, PLAN.md record, What's new entry).
 
 ## 1. What the review found, checked against the code as of `0283fe6`
 
