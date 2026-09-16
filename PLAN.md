@@ -1644,7 +1644,7 @@ Owner, with screenshots from an iPhone: "The adding homework view is messed up. 
 
 Automated checks + results: `homework-batch2` HW-05 now clicks a match from the list, checks the empty state and that the list goes away with the query; `placement-batch3` UX-01 asserts the open editor never widens the page and the Travel & map tab stays in view at 390px. `npm run validate` AND `VERCEL=1 npm run validate` green — **234 unit and 211 browser tests** (a first run with the dev preview server still open timed out thirteen unrelated tests over 20 minutes; on a quiet machine every one passes).
 
-Released 16 September 2026: merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 16 September 2026: merge `ab334af`, CI run 35100393601 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
