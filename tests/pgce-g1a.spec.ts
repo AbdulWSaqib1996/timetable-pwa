@@ -129,7 +129,7 @@ test('chooser states; setting up SE2 through the flow leaves SE1 and SE3 byte-fo
 test('the SE1 workspace lists its lesson and open action, its next school days carry "SE1 · Riverside Primary", and the session detail shows the same label', async ({ page }) => {
   await seed(page)
   await page.goto('./#/placement')
-  await card(page, 'SE1').getByRole('button', { name: 'Open placement' }).click()
+  await card(page, 'SE1').getByRole('button', { name: 'Open SE1' }).click()
   await expect(page).toHaveURL(/#\/placement\/pl-se1$/)
   await expect(page.getByRole('heading', { level: 1, name: 'SE1 · Riverside Primary' })).toBeVisible()
   await expect(page.getByText('Mentor A Mentor')).toBeVisible()

@@ -91,30 +91,29 @@ export function PlacementChooser({ placements, schools, settings, todayISO, bloc
                   <p className="filter-hint placement-card-hint">The school pin has not been confirmed yet — journeys need a confirmed location, not just an address.</p>
                 )}
                 <div className="btn-row">
+                  {/* PL-06 (Pass 88): every saved placement has the same Open / Edit pair whatever its readiness. */}
                   {!placement ? (
                     <button type="button" className="btn-primary" onClick={() => onSetUp(code)}>
                       Set up {code}
                     </button>
-                  ) : state === 'incomplete' ? (
-                    <>
-                      <button type="button" className="btn-primary" onClick={() => onSetUp(code, placement.id)}>
-                        Complete setup
-                      </button>
-                      <button type="button" className="btn-today-reset" onClick={() => onOpen(placement.id)}>
-                        Open placement
-                      </button>
-                    </>
                   ) : (
                     <>
                       <button type="button" className="btn-primary" onClick={() => onOpen(placement.id)}>
-                        Open placement
+                        Open {code}
                       </button>
-                      <button type="button" className="btn-today-reset" onClick={() => onJourney(placement.id, 'out')}>
-                        <IconPin size={16} /> To school
+                      <button type="button" className="btn-today-reset" onClick={() => onSetUp(code, placement.id)}>
+                        {state === 'incomplete' ? `Continue ${code} setup` : `Edit ${code}`}
                       </button>
-                      <button type="button" className="btn-today-reset" onClick={() => onJourney(placement.id, 'back')}>
-                        <IconHome size={16} /> Back home
-                      </button>
+                      {state === 'ready' && (
+                        <>
+                          <button type="button" className="btn-today-reset" onClick={() => onJourney(placement.id, 'out')}>
+                            <IconPin size={16} /> To school
+                          </button>
+                          <button type="button" className="btn-today-reset" onClick={() => onJourney(placement.id, 'back')}>
+                            <IconHome size={16} /> Back home
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>

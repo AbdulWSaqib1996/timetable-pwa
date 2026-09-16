@@ -6253,3 +6253,8 @@ body { font-size: 16px; line-height: 1.45; }
 .homework-row-details { display: block; }
 .homework-details { white-space: pre-wrap; }
 .due-chooser { display: grid; gap: 8px; }
+
+/* ---- Pass 88: the placements page fits 320px (its hours/policy row wraps instead of overflowing) ---- */
+.page-placement .task-edit-row { flex-wrap: wrap; }
+.page-placement .task-edit-row > * { min-width: 0; flex: 1 1 120px; }
+.placement-details .placement-card-facts dd { overflow-wrap: anywhere; }

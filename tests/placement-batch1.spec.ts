@@ -32,7 +32,7 @@ async function seed(page: Page, admin: Record<string, unknown> = base(), setting
     ({ SESSIONS, admin, settings }) => {
       localStorage.setItem('timetable.whatsnew.v1', '99')
       if (localStorage.getItem('timetable.store.v2')) return
-      localStorage.setItem('timetable.store.v2', JSON.stringify({ activeId: 'fx', profiles: [{ id: 'fx', name: 'My timetable', settings: { demo: false, sheetId: 'FIXTURESHEET-FIXTURESHEET-FIXTURESHEET-0001', gid: null, specialismsChosen: true, checklistDismissed: true, usagePing: false, ...settings } }] }))
+      localStorage.setItem('timetable.store.v2', JSON.stringify({ activeId: 'fx', profiles: [{ id: 'fx', name: 'My timetable', settings: { demo: false, sheetId: 'FIXTURESHEET-FIXTURESHEET-FIXTURESHEET-0001', gid: null, specialismsChosen: true, checklistDismissed: true, usagePing: false, placementReviewSeen: true, ...settings } }] }))
       localStorage.setItem('timetable.cache.v2.fx', JSON.stringify({ fetchedAt: Date.now(), sessions: SESSIONS }))
       localStorage.setItem('timetable.admin.v1.fx', JSON.stringify(admin))
     },

@@ -13,7 +13,7 @@ import type { Page } from '@playwright/test'
 test.use({ timezoneId: 'Europe/London' })
 
 const ADMIN = { reflections: [], targets: [], observations: [], lessons: [], audits: [], exceptions: [], plans: [], commitments: [], meetings: [], tasks: [{ id: 'late', title: 'Assessment essay draft', dueISO: '2026-09-05', status: 'todo', at: 1 }, { id: 'soon', title: 'Reading log', dueISO: '2026-09-10', status: 'todo', at: 1 }] }
-const ROUTES = ['today', 'schedule', 'tasks', 'pgce', 'pgce/lessons', 'pgce/evidence', 'settings', 'settings/data', 'settings/reminders', 'find', 'home']
+const ROUTES = ['today', 'schedule', 'tasks', 'pgce', 'pgce/lessons', 'pgce/evidence', 'placement', 'settings', 'settings/data', 'settings/reminders', 'find', 'home']
 const WIDTHS = [320, 390, 768, 1024, 1440] as const
 
 async function seed(page: Page) {

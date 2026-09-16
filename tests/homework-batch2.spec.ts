@@ -47,14 +47,19 @@ async function openSource(page: Page) {
   await page.goto('./#/schedule')
   await page.getByRole('option', { name: /Tuesday 15 September/ }).click()
   await page.locator('.day-list .session-card').filter({ hasText: 'Maths 1' }).click()
-  return page.getByRole('group', { name: 'Homework set in this session' })
+  // Pass 88 (UX-01): Homework is its own section; the editor opens on request (a kept draft opens it by itself).
+  await page.getByRole('tab', { name: /^Homework/ }).click()
+  const panel = page.getByRole('group', { name: 'Homework set in this session' })
+  const opener = panel.getByRole('button', { name: 'Add homework' })
+  if (await opener.count()) await opener.click()
+  return panel
 }
 async function add(page: Page, panel: ReturnType<Page['getByRole']>, title: string, details = '') {
   await panel.getByLabel('Homework', { exact: true }).fill(title)
   if (details) await panel.getByLabel('Details (optional)').fill(details)
   const due = panel.getByRole('combobox', { name: 'Due in', exact: true })
   await due.selectOption((await due.locator('optgroup[label="Later occurrences of this lesson"] option').first().getAttribute('value'))!)
-  await panel.getByRole('button', { name: 'Add homework' }).click()
+  await panel.getByRole('button', { name: 'Save homework' }).click()
 }
 const moveMaths2 = (page: Page) =>
   page.evaluate(() => {
@@ -85,6 +90,7 @@ test('HW-01: two same-title homework records stay separate everywhere; completin
   await page.getByRole('button', { name: 'Next week' }).click()
   await page.getByRole('option', { name: /Tuesday 22 September/ }).click()
   await page.locator('.day-list .session-card').filter({ hasText: 'Maths 2' }).click()
+  await page.getByRole('tab', { name: /^Homework/ }).click()
   await expect(page.getByRole('list', { name: 'Homework due' }).getByRole('checkbox')).toHaveCount(2)
 })
 
@@ -201,7 +207,7 @@ test('HW-05: validation instead of truncation, a searchable chooser that exclude
   await panel.getByLabel('Homework', { exact: true }).fill('x'.repeat(201))
   await expect(panel.getByText('201/200')).toBeVisible()
   await expect(panel.getByRole('alert')).toContainText('1 characters over the 200-character limit')
-  await expect(panel.getByRole('button', { name: 'Add homework' })).toBeDisabled()
+  await expect(panel.getByRole('button', { name: 'Save homework' })).toBeDisabled()
   await panel.getByLabel('Homework', { exact: true }).fill('Read chapter 3')
   // The chooser searches the whole timetable and never offers a row marked as a deadline.
   const due = panel.getByRole('combobox', { name: 'Due in', exact: true })
@@ -214,14 +220,14 @@ test('HW-05: validation instead of truncation, a searchable chooser that exclude
   // Keep the due target for the next item, on request.
   await due.selectOption((await due.locator('optgroup[label="Later occurrences of this lesson"] option').first().getAttribute('value'))!)
   await panel.getByRole('checkbox', { name: 'Use this due session for the next item too' }).check()
-  await panel.getByRole('button', { name: 'Add homework' }).click()
+  await panel.getByRole('button', { name: 'Save homework' }).click()
   await expect(due).not.toHaveValue('')
   await panel.getByLabel('Homework', { exact: true }).fill('Times tables')
-  await panel.getByRole('button', { name: 'Add homework' }).click()
+  await panel.getByRole('button', { name: 'Save homework' }).click()
   await panel.getByRole('checkbox', { name: 'Use this due session for the next item too' }).uncheck()
   await panel.getByLabel('Homework', { exact: true }).fill('Spelling list')
   await panel.getByLabel('Details (optional)').fill('Ten words')
-  await panel.getByRole('button', { name: 'Add homework' }).click()
+  await panel.getByRole('button', { name: 'Save homework' }).click()
   await expect(due).toHaveValue('')
   expect((await admin(page)).homework.map((h: { dueTitle: string }) => h.dueTitle)).toEqual(['Maths 2', 'Maths 2', 'Maths 2'])
   // A typed-but-not-added item is a draft for THIS source: it survives a reload and never leaks to another session.
@@ -234,5 +240,9 @@ test('HW-05: validation instead of truncation, a searchable chooser that exclude
   await page.getByRole('button', { name: 'Next week' }).click()
   await page.getByRole('option', { name: /Wednesday 23 September/ }).click()
   await page.locator('.day-list .session-card').filter({ hasText: 'English 1' }).click()
-  await expect(page.getByRole('group', { name: 'Homework set in this session' }).getByLabel('Homework', { exact: true })).toHaveValue('')
+  await page.getByRole('tab', { name: /^Homework/ }).click()
+  const other = page.getByRole('group', { name: 'Homework set in this session' })
+  await expect(other.getByRole('status').filter({ hasText: 'Draft from' })).toHaveCount(0)
+  await other.getByRole('button', { name: 'Add homework' }).click()
+  await expect(other.getByLabel('Homework', { exact: true })).toHaveValue('')
 })
