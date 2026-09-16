@@ -1563,7 +1563,7 @@ Automated checks + results: `tests/unit/d2-weekly-review.test.mjs` (4: weeks and
 
 Known limits: a review record exists only for weeks in which the learner accepted a batch or wrote a reflection; "logged" time is the blocks ticked done (no separate time log); moves are offered only when a session or commitment overlaps an existing block — a block the learner merely wants elsewhere is edited on the task as before; the receipt's survival through backup relies on the wallet export/import matching by uid, which Pass 77 established.
 
-Released 16 September 2026: workers deployed first (push `06e8e941-2abd-4c2d-ae76-0e7b114dc714`, feed `149aa34e-fa74-47b9-aace-e2a16cc4441b`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 16 September 2026: workers deployed first (push `06e8e941-2abd-4c2d-ae76-0e7b114dc714`, feed `149aa34e-fa74-47b9-aace-e2a16cc4441b`); merge `ed77e15`, CI run 35075615670 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
