@@ -515,7 +515,7 @@ export function SettingsSheet({
     const rows = [
       'Date,Block,School,Planned mins,Logged mins,Provenance,Exception,Inferred,Attended,Absent,Reason,Note',
     ]
-    const blocks = computePlacementBlocks(courseSessions, exceptions, settings, (s) => metaMap[sessionKey(s)])
+    const blocks = computePlacementBlocks(courseSessions, exceptions, settings, (s) => metaMap[sessionKey(s)], admin?.placements ?? [])
     for (const b of blocks) {
       const school = (settings.placements ?? {})[b.tag]?.school ?? ''
       for (const d of b.days) {

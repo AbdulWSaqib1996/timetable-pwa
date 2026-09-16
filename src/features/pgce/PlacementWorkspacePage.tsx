@@ -47,7 +47,7 @@ export function PlacementWorkspacePage({ placement, school, settings, admin, ses
   const label = `${placement.code}${school?.name ? ` · ${school.name}` : ''}`
   const mapped = new Set(placement.mappedBlockTags)
   const mine = sessions.filter((s) => !s.isKeyDate && isPlacementSession(s) && mapped.has(placementTag(s.title)))
-  const blocks = placementBlocks(mine, admin.exceptions, settings, (s) => metaMap[sessionKey(s)]).filter((b) => mapped.has(b.tag))
+  const blocks = placementBlocks(mine, admin.exceptions, settings, (s) => metaMap[sessionKey(s)], admin.placements ?? []).filter((b) => mapped.has(b.tag))
   const planned = blocks.reduce((n, b) => n + b.plannedDays, 0)
   const logged = blocks.reduce((n, b) => n + b.loggedDays, 0)
   const upcoming = [...mine].filter((s) => s.dateISO >= todayISO).sort((a, b) => (a.dateISO + a.start).localeCompare(b.dateISO + b.start))

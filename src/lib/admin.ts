@@ -1,6 +1,7 @@
 import { persistJSON, persistValue } from './persistence'
 import { ADMIN_SCHEMA_VERSION, collections } from '../../shared/contracts.js'
 import { canonical, mergeAdmin } from '../../shared/merge.js'
+import { locationCurrent } from '../../shared/placement.js'
 /**
  * The PGCE admin file: everything the course makes a student log — weekly
  * reflections, mentor-set targets, meeting records with actions, observation
@@ -227,6 +228,8 @@ export interface SchoolLocationRec {
   address?: string
   lat?: number
   lng?: number
+  /** PL-01 (Pass 86): the address the pin was located for — a later address edit makes the pin stale */
+  locatedFor?: string
   confirmedAt?: number
   entranceNote?: string
   at: number
@@ -708,7 +711,8 @@ export type PlacementTiming = 'undated' | 'upcoming' | 'current' | 'finished'
  *  address alone is never treated as verified. */
 export function placementSetupState(placement: PlacementRec | undefined, school: SchoolLocationRec | undefined): PlacementSetupState {
   if (!placement) return 'not-set-up'
-  if (!school?.name || school.lat == null || school.lng == null || !school.confirmedAt) return 'incomplete'
+  // PL-01: a pin located for a different address than the one now saved is not a confirmed location.
+  if (!school?.name || school.lat == null || school.lng == null || !school.confirmedAt || !locationCurrent(school)) return 'incomplete'
   return 'ready'
 }
 

@@ -3,6 +3,7 @@ import { MAX_EFFORT_MINS } from './planValidation.js'
 import { HOMEWORK_DETAILS_MAX, HOMEWORK_STATES, HOMEWORK_TITLE_MAX } from './homework.js'
 import { THREAD_NEXT_ACTION_MAX, THREAD_REFS_MAX, THREAD_STATES, THREAD_TITLE_MAX } from './threads.js'
 import { TRANSITION_CONTEXT_MAX, TRANSITION_STATES } from './transitions.js'
+import { validateWorkingHours } from './placement.js'
 /** Runtime-neutral input contracts, shared by browser and workers. */
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 export const MAX_SYNC_BYTES = 2 * 1024 * 1024
@@ -115,7 +116,7 @@ export function validatePayload(data) {
               if (item.schoolLocationId !== undefined) assert(typeof item.schoolLocationId === 'string' && /^[\w-]{1,100}$/.test(item.schoolLocationId), 'Invalid school link.')
               assert(Array.isArray(item.mappedBlockTags ?? []) && (item.mappedBlockTags ?? []).length <= 50 && (item.mappedBlockTags ?? []).every(t => typeof t === 'string' && t.length <= 40), 'Invalid placement block mapping.')
               if (item.startISO && item.endISO) assert(item.endISO >= item.startISO, 'A placement must end after it starts.')
-              if (item.workingHours !== undefined) assert(object(item.workingHours) && validTime(item.workingHours.start) && validTime(item.workingHours.end), 'Invalid placement hours.')
+              if (item.workingHours !== undefined) assert(object(item.workingHours) && validTime(item.workingHours.start) && validTime(item.workingHours.end) && validateWorkingHours(item.workingHours) === null, 'Invalid placement hours.')
               if (item.arrivalBufferMins !== undefined) assert(Number.isInteger(item.arrivalBufferMins) && item.arrivalBufferMins >= 0 && item.arrivalBufferMins <= 180, 'Invalid arrival buffer.')
               for (const field of ['mentorName','mentorContact','notes','returnPlaceId']) if (item[field] !== undefined) assert(typeof item[field] === 'string' && item[field].length <= 2000, 'Invalid placement field: ' + field)
               if (item.returnPlace !== undefined) {
@@ -244,7 +245,8 @@ export function validatePayload(data) {
               if (item.packVersion !== undefined) assert(Number.isInteger(item.packVersion) && item.packVersion >= 1, 'Invalid milestone pack version.')
             }
             if (key === 'schools') {
-              for (const field of ['address','entranceNote']) if (item[field] !== undefined) assert(typeof item[field] === 'string' && item[field].length <= 2000, 'Invalid school field: ' + field)
+              // PL-01: `locatedFor` is the address the pin was located for; a pin for another address is never current.
+              for (const field of ['address','entranceNote','locatedFor']) if (item[field] !== undefined) assert(typeof item[field] === 'string' && item[field].length <= 2000, 'Invalid school field: ' + field)
               for (const c of ['lat','lng']) if (item[c] !== undefined) assert(Number.isFinite(item[c]) && Math.abs(item[c]) <= (c === 'lat' ? 90 : 180), 'Invalid school coordinates.')
               if (item.confirmedAt !== undefined) assert(Number.isFinite(item.confirmedAt), 'Invalid confirmation time.')
             }

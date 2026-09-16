@@ -766,10 +766,11 @@ export default function App() {
         ? applyPlacementExceptions(
             applyFilters(sessions, settings, todayISO, { ignoreDateRange: true }),
             adminFile.exceptions,
-            settings
+            settings,
+            adminFile.placements ?? []
           )
         : [],
-    [sessions, settings, todayISO, adminFile.exceptions]
+    [sessions, settings, todayISO, adminFile.exceptions, adminFile.placements]
   )
 
   // Course membership only (specialisms + groups), all dates, BEFORE placement
@@ -782,8 +783,8 @@ export default function App() {
   // The agreed view everywhere else (schedule, stats, calendar, reminders):
   // placement exceptions applied after span expansion (P5-03).
   const courseSessions = useMemo(
-    () => (settings ? applyPlacementExceptions(rawCourseSessions, adminFile.exceptions, settings) : rawCourseSessions),
-    [rawCourseSessions, adminFile.exceptions, settings]
+    () => (settings ? applyPlacementExceptions(rawCourseSessions, adminFile.exceptions, settings, adminFile.placements ?? []) : rawCourseSessions),
+    [rawCourseSessions, adminFile.exceptions, settings, adminFile.placements]
   )
 
   // What notifications may fire for: membership plus the explicit optional/
@@ -791,9 +792,9 @@ export default function App() {
   const reminderSessions = useMemo(
     () =>
       sessions && settings
-        ? applyPlacementExceptions(selectReminderSessions(sessions, settings), adminFile.exceptions, settings)
+        ? applyPlacementExceptions(selectReminderSessions(sessions, settings), adminFile.exceptions, settings, adminFile.placements ?? [])
         : [],
-    [sessions, settings, adminFile.exceptions]
+    [sessions, settings, adminFile.exceptions, adminFile.placements]
   )
 
   // Sheet key dates + the user's personal tasks (task records) + homework due
@@ -1967,6 +1968,8 @@ export default function App() {
             updateAdmin((file) => ({ ...file, placements: next.placements, schools: next.schools }))
             setOpenSheet('none')
           }}
+          profileId={active.id}
+          onSetHome={(patch) => updateSettings(patch)}
           onOpenSettings={() => {
             setOpenSheet('none')
             navigate({ name: 'settings', section: 'travel' })

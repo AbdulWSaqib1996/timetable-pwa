@@ -48,7 +48,7 @@ export function ExperienceSheet({ admin, settings, sessions, metaMap, todayISO, 
     if (!placement) return null
     const mapped = new Set(placement.mappedBlockTags)
     const mine = sessions.filter((s) => !s.isKeyDate && isPlacementSession(s) && mapped.has(placementTag(s.title)))
-    const blocks = placementBlocks(mine, admin.exceptions, settings, (s) => metaMap[sessionKey(s)]).filter((b) => mapped.has(b.tag))
+    const blocks = placementBlocks(mine, admin.exceptions, settings, (s) => metaMap[sessionKey(s)], admin.placements ?? []).filter((b) => mapped.has(b.tag))
     const days = blocks.flatMap((b) => b.days)
     return { planned: days.filter((d) => !d.excluded).length, ticked: days.filter((d) => d.loggedFrom === 'day-tick').length, corrected: days.filter((d) => d.loggedFrom === 'correction').length, excluded: days.filter((d) => d.excluded).length, inset: days.filter((d) => d.exception?.kind === 'inset').length, policy: placementPolicy(settings) }
   }, [placement, sessions, admin.exceptions, settings, metaMap])

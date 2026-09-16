@@ -4,9 +4,12 @@ import {
   exceptionFor as exceptionForShared,
   isExcluded,
   placementPolicyOf,
+  validateWorkingHours,
+  locationCurrent,
+  normaliseAddress,
 } from '../../shared/placement.js'
 import type { PlacementBlockView, PlacementDayView, PlacementPolicy } from '../../shared/placement.js'
-import type { PlacementExceptionRec } from './admin'
+import type { PlacementExceptionRec, PlacementRec } from './admin'
 import type { Session, SessionMeta, Settings } from '../types'
 
 /** Typed adapters over the shared placement core (P5-03) — one implementation
@@ -14,7 +17,8 @@ import type { Session, SessionMeta, Settings } from '../types'
 
 export type { PlacementBlockView, PlacementDayView, PlacementPolicy }
 
-export const placementPolicy = (settings: Settings): PlacementPolicy => placementPolicyOf(settings)
+export const placementPolicy = (settings: Settings, placement?: PlacementRec | null): PlacementPolicy => placementPolicyOf(settings, placement)
+export { validateWorkingHours, locationCurrent, normaliseAddress }
 
 export const exceptionFor = (
   exceptions: PlacementExceptionRec[],
@@ -27,12 +31,14 @@ export { isExcluded }
 export const applyPlacementExceptions = (
   sessions: Session[],
   exceptions: PlacementExceptionRec[],
-  settings: Settings
-): Session[] => applyPlacementExceptionRules(sessions, exceptions, settings)
+  settings: Settings,
+  placements: PlacementRec[] = []
+): Session[] => applyPlacementExceptionRules(sessions, exceptions, settings, placements)
 
 export const placementBlocks = (
   sessions: Session[],
   exceptions: PlacementExceptionRec[],
   settings: Settings,
-  metaOf: (s: Session) => SessionMeta | undefined
-): PlacementBlockView[] => computePlacementBlocks(sessions, exceptions, settings, metaOf)
+  metaOf: (s: Session) => SessionMeta | undefined,
+  placements: PlacementRec[] = []
+): PlacementBlockView[] => computePlacementBlocks(sessions, exceptions, settings, metaOf, placements)
