@@ -1,4 +1,5 @@
 // Shared source parser: browser and both workers use these exact rules.
+import { isStudentRepTitle } from './eligibility.js'
 const HEADER_MAP = {
     title: 'title',
     day: 'day',
@@ -268,7 +269,8 @@ export function parseTimetable(table) {
             specialismName: specialismMatch ? specialismMatch[1].trim() : undefined,
             // Any title that says self study IS self study — e.g. "SE1a Briefing Self Study" (owner, 11 Sep 2026).
             isSelfStudy: /\bself[- ]?study\b/i.test(title) || /^self[- ]?study$/i.test(get('tutor')),
-            isOptional: /\(optional\)/i.test(title),
+            // Student Rep meetings are optional whatever the sheet says (owner, 16 Sep 2026).
+            isOptional: /\(optional\)/i.test(title) || isStudentRepTitle(title),
         });
     }
     if (sessions.length === 0) {

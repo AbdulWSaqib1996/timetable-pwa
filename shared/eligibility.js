@@ -13,6 +13,8 @@
 /** Self-study rows ("SE1a Briefing Self Study") prepare for a placement; they are never a school day. */
 export const isSelfStudyTitle = (t) => /\bself[- ]?study\b/i.test(t || '')
 export const isPlacementTitle = (t) => !isSelfStudyTitle(t) && /school experience|placement|\bSE ?\d[a-z]?\b/i.test(t || '')
+/** Student Rep meetings (owner, 16 Sep 2026): optional, never counted for attendance, hidden unless the learner says they are a rep. */
+export const isStudentRepTitle = (t) => /\bstudent[\s-]+rep(resentative)?s?\b/i.test(t || '')
 
 export const placementTagOf = (t) => {
   const m = (t || '').match(/SE ?\d[a-z]?/i)
@@ -25,7 +27,7 @@ const timeToMinutes = (t) => {
 }
 
 export function isEligibleSession(s) {
-  return !s.isKeyDate && !s.isSelfStudy && !isPlacementTitle(s.title)
+  return !s.isKeyDate && !s.isSelfStudy && !isPlacementTitle(s.title) && !isStudentRepTitle(s.title)
 }
 
 export function isCompleted(s, todayISO, nowMinutes = null) {

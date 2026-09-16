@@ -78,6 +78,8 @@ Before planning, each P1/P2 finding was checked against `main`:
 
 ### Batch D1 — connected teaching (Pass 83) — E01, E04
 
+> **Status (16 September 2026): implemented as Pass 83** — see PLAN.md. Deviations: the thread's "This teaching cycle" view is a routed page (`#/pgce/cycle/<id>`) rather than a tab inside the workbench, which keeps only the compact timeline; a transition record is created on the first tick rather than when the page opens; the per-placement return destination is stored on the placement record (`returnPlace`) as the audit's `returnPlaceId` hook had no store to point at.
+
 > **Renumbered**: two owner requests of 15 September 2026 (key dates completed rather than attended; lessons setting homework due in a later occurrence) shipped first as Passes 80–82 (key dates, homework, sync status, placement access, deadline rows, per-session places and the single analytics dataset), so D1 is Pass 83, D2 Pass 84 and D3 Pass 85. E01 should build on the `homework` collection that pass added rather than a second store.
 
 **In**: `learningThreads` collection (refs only: placementId, lessonIds, observationIds, cycleId, chosen next action, state, revision) with a "This teaching cycle" view Plan → Teach → Feedback → Try next and a compact timeline atop the lesson workbench; placement transition record + checklist (School & travel, Teaching context, Mentor & access, Carry forward) with outward/return endpoint preview and an optional per-placement return destination with a labelled global-home fallback.

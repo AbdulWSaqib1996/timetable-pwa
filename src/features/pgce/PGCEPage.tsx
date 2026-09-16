@@ -3,6 +3,7 @@ import { Card, IconArrowRight, IconBook, IconCalendar, IconChart, IconChevronLef
 import { PLACEMENT_CODES, PLACEMENT_STATE_LABEL, PLACEMENT_TIMING_LABEL, placementSetupState, schoolOf } from '../../lib/admin'
 import type { AdminFile, PlacementCode } from '../../lib/admin'
 import { SECTION_LABEL, activePlacement, loadLastSection, recommendNext, saveLastSection } from '../../lib/pgceNext'
+import { threadSteps } from '../../../shared/threads.js'
 import type { Recommendation } from '../../lib/pgceNext'
 import type { PgceSection, PgceTab } from '../../lib/navigationState'
 import type { Settings } from '../../types'
@@ -49,6 +50,10 @@ interface Props {
   onOpenExamples: () => void
   onOpenExperience: () => void
   onOpenReviews: () => void
+  /** E01: `#/pgce/cycle/<id>` */
+  onOpenThread: (threadId: string) => void
+  /** E04: `#/placement/<id>/prepare` */
+  onPrepare: (placementId: string) => void
 }
 
 const fmt = (iso: string) => {
@@ -125,6 +130,17 @@ export function PGCEPage(props: Props) {
     experience: (admin.experience ?? []).length,
   }
 
+  // E01: open threads first, then closed, newest edit first.
+  const threads = [...(admin.learningThreads ?? [])].sort((a, b) => (a.state === b.state ? b.at - a.at : a.state === 'open' ? -1 : 1))
+  // E04: the placement after the one in play (by start date), if it is not marked ready yet.
+  const nextPlacement = (() => {
+    const dated = (admin.placements ?? []).filter((p) => p.startISO).sort((a, b) => a.startISO!.localeCompare(b.startISO!))
+    const after = active.placement ? dated.filter((p) => p.id !== active.placement!.id && (p.startISO ?? '') > (active.placement!.startISO ?? '')) : dated
+    const candidate = active.timing === 'upcoming' ? active.placement : after[0]
+    if (!candidate) return null
+    const done = (admin.transitions ?? []).some((t) => t.toPlacementId === candidate.id && t.state === 'done')
+    return done ? null : candidate
+  })()
   const link = (label: string, onClick: () => void, primary = false) => (
     <button key={label} type="button" className={primary ? 'btn-primary' : 'btn-today-reset'} onClick={onClick}>
       {label}
@@ -138,7 +154,23 @@ export function PGCEPage(props: Props) {
       summary: n.lessons ? `${count(n.lessons, 'lesson')} · ${count(n.cycles, 'practice focus')}` : 'Plan, rehearse, teach and review — one lesson at a time.',
       primary: currentLesson ? link(`Open current lesson: ${currentLesson.subject || 'Lesson'} · ${fmt(currentLesson.dateISO)}`, () => props.onOpenLesson(currentLesson.id), true) : link('New lesson', () => props.onOpenRecords('lessons', { focusAdd: true }), true),
       links: [link(`Lessons (${n.lessons})`, () => props.onOpenRecords('lessons')), ...(currentLesson ? [link('New lesson', () => props.onOpenRecords('lessons', { focusAdd: true }))] : []), link(`Practice focus (${n.cycles})`, props.onOpenPractice)],
-      recent: sortedLessons.length ? (
+      recent: sortedLessons.length || threads.length ? (
+        <>
+        {threads.length ? (
+          <ul className="workspace-list" aria-label="Teaching cycles">
+            {threads.slice(0, 5).map((t) => {
+              const { steps } = threadSteps(t, admin)
+              const missing = steps.filter((s) => s.state !== 'done').length
+              return (
+                <li key={t.id} className="workspace-row requirement-row">
+                  <span><strong>{t.title || 'Teaching cycle'}</strong> <span className="filter-hint">· {t.state === 'closed' ? 'closed' : missing ? `${missing} step${missing === 1 ? '' : 's'} missing` : 'complete'}</span></span>
+                  <button type="button" className="travel-link" aria-label={`Open teaching cycle: ${t.title || 'Teaching cycle'}`} onClick={() => props.onOpenThread(t.id)}>Open</button>
+                </li>
+              )
+            })}
+          </ul>
+        ) : null}
+        {sortedLessons.length ? (
         <ul className="workspace-list" aria-label="Recent lessons">
           {[...sortedLessons].reverse().slice(0, 5).map((l) => (
             <li key={l.id} className="workspace-row requirement-row">
@@ -147,6 +179,8 @@ export function PGCEPage(props: Props) {
             </li>
           ))}
         </ul>
+        ) : null}
+        </>
       ) : null,
     },
     {
@@ -272,6 +306,7 @@ export function PGCEPage(props: Props) {
               </>
             )}
             <button type="button" className="btn-today-reset" onClick={props.onOpenPlacements}>All placements</button>
+            {nextPlacement ? <button type="button" className="btn-today-reset" onClick={() => props.onPrepare(nextPlacement.id)}>Prepare for {nextPlacement.code}</button> : null}
             {blocks.length > 0 && <button type="button" className="btn-today-reset" onClick={props.onOpenPlacementSetup}>Review block mapping</button>}
           </div>
           {/* Every placement stays one tap away, so setting one up never hides the others. */}

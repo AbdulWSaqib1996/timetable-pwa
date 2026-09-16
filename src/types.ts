@@ -62,6 +62,8 @@ export interface Settings {
   mySpecialisms?: string[]
   /** hide specialism sessions not in mySpecialisms (default true) */
   hideOtherSpecialisms?: boolean
+  /** the learner is a student rep: Student Rep meetings are shown (optional, never counted for attendance); off = hidden everywhere (owner, 16 Sep 2026) */
+  studentRep?: boolean
   filters?: Filters
   /** last-used view, restored on open */
   activeView?: ViewMode

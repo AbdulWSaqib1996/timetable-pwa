@@ -6,6 +6,7 @@
  *   gid       (optional) tab gid
  *   spec      (optional) comma-separated specialism names to keep; other specialisms are dropped
  *   selfstudy (optional) "0" to drop Self Study rows
+ *   rep (optional) "0" to drop Student Rep meetings (the subscriber is not a rep)
  *   kdid/kdgid (optional) key-dates tab — its rows are added as 📌 all-day events
  *   plc       (optional) placement details JSON {"SE1A":{"s":"School name","a":"Address"}} —
  *             placement marker rows expand into one event per school day, located at the school
@@ -15,6 +16,7 @@
 
 import { buildICSCalendar } from '../../shared/calendar-time.js'
 import { parseTimetable } from '../../shared/timetable.js'
+import { isStudentRepTitle } from '../../shared/eligibility.js'
 import { reconcileEvents, eventKey } from '../../shared/identity.js'
 const parseSessions = table => parseTimetable(table).sessions
 const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 }
@@ -175,6 +177,8 @@ export default {
     const gid = url.searchParams.get('gid')
     const spec = (url.searchParams.get('spec') || '').split(',').map((s) => s.trim()).filter(Boolean)
     const dropSelfStudy = url.searchParams.get('selfstudy') === '0'
+    // rep=0: the subscriber is not a student rep, so Student Rep meetings leave the feed (owner, 16 Sep 2026).
+    const dropStudentRep = url.searchParams.get('rep') === '0'
 
     const gvizUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:json&headers=0${gid ? `&gid=${encodeURIComponent(gid)}` : ''}`
     const res = await fetch(gvizUrl)
@@ -198,6 +202,7 @@ export default {
       sessions = sessions.filter((s) => !s.specialismName || spec.includes(s.specialismName))
     }
     if (dropSelfStudy) sessions = sessions.filter((s) => !s.isSelfStudy)
+    if (dropStudentRep) sessions = sessions.filter((s) => !isStudentRepTitle(s.title))
 
     // Placement spans expand into per-day events (school as location when provided).
     let plcMap = {}

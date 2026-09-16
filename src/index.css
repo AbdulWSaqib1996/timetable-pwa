@@ -6201,3 +6201,33 @@ body { font-size: 16px; line-height: 1.45; }
 .sync-pop-state { font-weight: 600; }
 /* Every placement stays reachable from the PGCE landing. */
 .pgce-other-placements { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+
+/* ---- E01 teaching cycle (Pass 83) ---- */
+.cycle-chip-row { margin: -4px 0 10px; }
+.cycle-steps { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
+.cycle-step { border-left: 3px solid var(--border, #d9dee7); padding: 4px 0 4px 12px; }
+.cycle-step--done { border-left-color: #0f766e; }
+.cycle-step--missing { border-left-color: #b45309; }
+.cycle-step--gone { border-left-color: #6b7280; }
+.cycle-step-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cycle-step-reason { margin: 2px 0 6px; }
+.cycle-obs { display: flex; gap: 8px; align-items: flex-start; }
+.cycle-timeline { margin: -2px 0 8px; }
+.cycle-timeline-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.cycle-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 2px 8px; border-radius: 999px; background: rgba(107, 114, 128, 0.12); }
+.cycle-dot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+.cycle-dot--done { background: rgba(13, 148, 136, 0.14); }
+.cycle-dot--done::before { background: #0f766e; }
+.cycle-dot--missing { background: rgba(217, 119, 6, 0.14); }
+.cycle-dot--missing::before { background: #b45309; }
+.cycle-timeline-why { margin: 6px 0 0; }
+/* ---- E04 placement transition ---- */
+.transition-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.transition-item { border-left: 3px solid #b45309; padding: 2px 0 2px 12px; }
+.transition-item--done { border-left-color: #0f766e; }
+.transition-item--stale { border-left-color: #b91c1c; }
+.transition-return { margin-top: 8px; }
+.transition-return > summary { cursor: pointer; font-weight: 600; }
+.placement-timeline { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.placement-timeline-item { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
+.journey-return-note { margin: -4px 0 8px; }

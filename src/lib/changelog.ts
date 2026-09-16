@@ -7,6 +7,17 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 17,
+    dateISO: '2026-09-16',
+    title: 'Teaching cycles, preparing for your next placement, student rep meetings',
+    items: [
+      'Start a teaching cycle from any lesson: Plan → Teach → Feedback → Try next as one thread, with a compact timeline at the top of the lesson workbench saying what is missing and why. Feedback is attached by reference — one observation can inform several cycles — and the next attempt can sit on a different placement without changing the original lesson',
+      'Prepare for SE2 or SE3 from the PGCE file: a checklist over School & travel, Teaching context, Mentor & access and Carry forward, with your outward and return journeys previewed before the first day. A tick goes stale if the school pin or what you share changes. Nothing is written to the placement you are leaving',
+      'A placement can have its own return destination (temporary accommodation, say); Back home uses it and says so, with your home address as the labelled fallback',
+      'Student Rep meetings are optional and never count towards attendance. They are hidden unless Settings → My timetable → Student rep says you are one',
+    ],
+  },
+  {
     version: 16,
     dateISO: '2026-09-16',
     title: 'Deadlines behave like deadlines, and sessions know where they are',
