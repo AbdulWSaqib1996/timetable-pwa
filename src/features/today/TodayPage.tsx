@@ -53,6 +53,8 @@ interface Props {
   travelMode: TravelMode
   locationEnabled: boolean
   onSelect: (s: Session) => void
+  /** NF-03: the learner's preparation for a session, if any */
+  preparationFor?: (s: Session) => { total: number; done: number; ready: boolean; dueHomework: number } | null
   onOpenChanges: () => void
   onOpenSettings: () => void
   /** quick attendance answer for a session that just ended (9 Sep 2026) */
@@ -133,6 +135,7 @@ export function TodayPage({
   travelMode,
   locationEnabled,
   onSelect,
+  preparationFor,
   onOpenChanges,
   onOpenSettings,
   onMarkAttendance,
@@ -438,6 +441,11 @@ export function TodayPage({
           {heroTravel?.minutes != null && locationEnabled && (
             <p className="filter-hint">≈ {formatRemaining(heroTravel.minutes)} from your location (estimate)</p>
           )}
+          {(() => { const heroPreparation = preparationFor?.(hero) ?? null; return heroPreparation && (heroPreparation.total > 0 || heroPreparation.dueHomework > 0) && (
+            <button type="button" className="today-prep travel-link" aria-label={`Preparation for this session: ${heroPreparation.done} of ${heroPreparation.total} items done${heroPreparation.dueHomework ? `, ${heroPreparation.dueHomework} homework due` : ''}${heroPreparation.ready ? ', you said you are ready' : ''}`} onClick={() => onSelect(hero)}>
+              Prepare: {heroPreparation.done}/{heroPreparation.total} items{heroPreparation.dueHomework ? ` · ${heroPreparation.dueHomework} homework due` : ''}{heroPreparation.ready ? ' · Ready' : ''}
+            </button>
+          ) })()}
         </section>
       )}
 

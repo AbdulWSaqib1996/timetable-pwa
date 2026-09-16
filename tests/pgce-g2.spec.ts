@@ -138,7 +138,7 @@ test('workload: protected time never filled, gap reported, accept adds plan bloc
   await expect(sheet.getByRole('list', { name: 'Protected windows' })).toContainText('Mon 16:00–20:00 · Family')
   await sheet.getByRole('tab', { name: 'Next two weeks' }).click()
   const summary = sheet.getByLabel('Workload summary')
-  await expect(summary).toContainText('5 h across 2 open tasks')
+  await expect(summary).toContainText('5 h across 2 open items')
   await expect(sheet).toContainText('No estimate, so unknown (not counted): Reading')
   await expect(sheet).toContainText('protected time kept free')
   const proposals = sheet.getByRole('list', { name: 'Proposed blocks' })

@@ -157,6 +157,48 @@ export interface HomeworkRec {
   dueHistory?: { at: number; fromISO: string; toISO: string; reason: 'follow' | 'keep' | 'edit' }[]
   status: 'todo' | 'doing' | 'done'
   completedISO?: string
+  /** NF-04: done / reopened / rescheduled, in order */
+  statusHistory?: { at: number; status: 'todo' | 'doing' | 'done'; reopened?: boolean }[]
+  /** NF-02: the learner's own effort estimate (subtasks and blocks live in `plans` with parentKind 'homework') */
+  effortMins?: number
+  /** NF-05: resources by wallet uid or link — never a copy of the bytes */
+  resources?: { id: string; kind: 'wallet' | 'link'; uid?: string; url?: string; label: string; at: number }[]
+  at: number
+}
+
+/**
+ * NF-04 (Pass 89): a pending question about homework whose due session moved,
+ * was retitled, was marked as a deadline or left the timetable. Created once
+ * per (homework, situation); resolving is an explicit, versioned decision that
+ * two devices cannot apply twice.
+ */
+export interface HomeworkChangeRec {
+  id: string
+  homeworkId: string
+  kind: 'moved' | 'retitled' | 'deadline' | 'missing'
+  /** what the learner last confirmed */
+  previous: { dateISO: string; start?: string; title: string }
+  /** what the timetable says now (absent when missing) */
+  current?: { dateISO: string; start?: string; title: string }
+  /** the identity stamp of the occurrence when the change was seen */
+  sourceRevision?: number
+  decision?: 'follow' | 'keep' | 'reschedule'
+  decidedAt?: number
+  at: number
+}
+
+/**
+ * NF-03 (Pass 89): the learner's own preparation for one timetable session —
+ * checklist items in their words, a "ready" statement, and a follow-up note
+ * after the session. Homework due here is derived, never copied.
+ */
+export interface PreparationRec {
+  id: string
+  sessionRef: string
+  items: { id: string; text: string; done: boolean; at: number }[]
+  /** the learner's statement, never a computed score */
+  readyAt?: number
+  followUp?: string
   at: number
 }
 
@@ -196,6 +238,8 @@ export interface PlanChildRec {
   id: string
   /** parent: a tasks-collection id, or an imported deadline's stable event key */
   parentId: string
+  /** NF-02 (Pass 89): the parent's kind — absent means a task; 'homework' means a homework record */
+  parentKind?: 'task' | 'homework'
   kind: 'subtask' | 'milestone' | 'block'
   title: string
   done?: boolean
@@ -268,6 +312,8 @@ export interface PlacementRec {
    * without it the saved home address is the clearly labelled fallback.
    */
   returnPlace?: { label: string; address?: string; lat: number; lng: number }
+  /** NF-05: school resources by wallet uid or link (handbook, entrance instructions) — no pupil data */
+  resources?: { id: string; kind: 'wallet' | 'link'; uid?: string; url?: string; label: string; at: number }[]
   notes?: string
   at: number
 }
@@ -567,6 +613,8 @@ export interface PlacementTransitionRec {
   /** open targets carried forward as references (evidence stays where it was) */
   carryTargetIds?: string[]
   confirmedStartISO?: string
+  /** NF-01: "not known yet" per item, with a personal follow-up date */
+  deferred?: Record<string, { followUpISO?: string; note?: string; at: number }>
   state: 'open' | 'done'
   doneAt?: number
   at: number
@@ -610,6 +658,8 @@ export interface AdminFile {
   learningThreads: LearningThreadRec[]
   transitions: PlacementTransitionRec[]
   weeklyReviews: WeeklyReviewRec[]
+  homeworkChanges: HomeworkChangeRec[]
+  preparations: PreparationRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -647,6 +697,8 @@ export const EMPTY_ADMIN: AdminFile = {
   learningThreads: [],
   transitions: [],
   weeklyReviews: [],
+  homeworkChanges: [],
+  preparations: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`

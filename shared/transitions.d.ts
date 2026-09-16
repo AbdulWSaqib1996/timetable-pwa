@@ -7,7 +7,7 @@ export interface TransitionItem {
   id: string
   group: string
   label: string
-  state: 'done' | 'todo' | 'stale'
+  state: 'done' | 'todo' | 'stale' | 'deferred'
   detail: string
 }
 
@@ -17,4 +17,5 @@ export function transitionItems(
   transition: any,
   ctx: { placement?: any; school?: any; reviewPacks?: any[]; hasHome: boolean; defaultHours?: { start: string; end: string } }
 ): TransitionItem[]
-export function transitionProgress(items: TransitionItem[]): { done: number; total: number; stale: number; complete: boolean }
+export function transitionProgress(items: TransitionItem[]): { done: number; deferred: number; total: number; stale: number; complete: boolean }
+export function withDeferral<T>(transition: T, itemId: string, deferral: { followUpISO?: string; note?: string } | null, now: number): T

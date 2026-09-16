@@ -26,11 +26,16 @@ const toMins = (t) => {
 const weekday = (iso) => new Date(iso + 'T00:00:00Z').getUTCDay()
 
 /** Remaining effort per open task: estimates on undone children minus future blocks; null = unknown. */
+/** NF-02 (Pass 89): a plan child belongs to a task unless it says 'homework'; a homework item carries planKind 'homework'. */
+export const childOf = (item, p) => p.parentId === item.id && (p.parentKind ?? 'task') === (item.planKind ?? 'task')
+
 export function remainingEffort(task, plans, todayISO) {
-  const children = plans.filter((p) => p.parentId === task.id)
+  const children = plans.filter((p) => childOf(task, p))
   const estimates = children.filter((p) => p.kind !== 'block' && !p.done && Number.isFinite(p.effortMins))
-  if (estimates.length === 0) return null
-  const needed = estimates.reduce((n, p) => n + p.effortMins, 0)
+  // The item's own estimate (homework carries one directly) counts alongside its undone children.
+  const own = Number.isFinite(task.effortMins) ? task.effortMins : null
+  if (estimates.length === 0 && own === null) return null
+  const needed = estimates.reduce((n, p) => n + p.effortMins, 0) + (own ?? 0)
   const scheduled = children.filter((p) => p.kind === 'block' && p.dateISO && p.dateISO >= todayISO && p.startTime && p.endTime).reduce((n, p) => n + Math.max(0, (toMins(p.endTime) ?? 0) - (toMins(p.startTime) ?? 0)), 0)
   return Math.max(0, needed - scheduled)
 }
@@ -88,7 +93,7 @@ export function planWorkload({ todayISO, days = WORKLOAD_HORIZON_DAYS, busy = []
   const unknown = items.filter((x) => x.remaining === null).map((x) => ({ taskId: x.task.id, title: x.task.title }))
   const queue = items.filter((x) => x.remaining !== null && x.remaining > 0).sort((a, b) => (a.task.dueISO || '9999').localeCompare(b.task.dueISO || '9999') || a.task.id.localeCompare(b.task.id))
   const needed = queue.reduce((n, x) => n + x.remaining, 0)
-  const alreadyScheduled = plans.filter((p) => p.kind === 'block' && p.dateISO && p.dateISO >= todayISO && p.dateISO <= endISO && open.some((t) => t.id === p.parentId)).reduce((n, p) => n + Math.max(0, (toMins(p.endTime) ?? 0) - (toMins(p.startTime) ?? 0)), 0)
+  const alreadyScheduled = plans.filter((p) => p.kind === 'block' && p.dateISO && p.dateISO >= todayISO && p.dateISO <= endISO && open.some((t) => childOf(t, p))).reduce((n, p) => n + Math.max(0, (toMins(p.endTime) ?? 0) - (toMins(p.startTime) ?? 0)), 0)
 
   // Earliest-deadline-first into the earliest slots; a task never lands after its due date.
   const proposals = []
@@ -101,7 +106,7 @@ export function planWorkload({ todayISO, days = WORKLOAD_HORIZON_DAYS, busy = []
       const mins = Math.min(pick.remaining, slot.to - cursor, WORKLOAD_BLOCK_MAX)
       if (mins < WORKLOAD_BLOCK_MIN && pick.remaining >= WORKLOAD_BLOCK_MIN) break
       const take = Math.max(mins, Math.min(WORKLOAD_BLOCK_MIN, slot.to - cursor))
-      proposals.push({ taskId: pick.task.id, title: pick.task.title, dateISO: slot.d, startTime: hhmm(cursor), endTime: hhmm(cursor + take), effortMins: take })
+      proposals.push({ taskId: pick.task.id, ...(pick.task.planKind ? { parentKind: pick.task.planKind } : {}), title: pick.task.title, dateISO: slot.d, startTime: hhmm(cursor), endTime: hhmm(cursor + take), effortMins: take })
       pick.remaining -= take
       cursor += take
     }
@@ -114,6 +119,6 @@ export function planWorkload({ todayISO, days = WORKLOAD_HORIZON_DAYS, busy = []
 
 /** Turn accepted proposals into plan blocks; returns the new children and their ids (for undo). */
 export function proposalsToBlocks(proposals, makeId, now) {
-  const blocks = proposals.map((p) => ({ id: makeId(), parentId: p.taskId, kind: 'block', title: p.title, dateISO: p.dateISO, startTime: p.startTime, endTime: p.endTime, effortMins: p.effortMins, at: now }))
+  const blocks = proposals.map((p) => ({ id: makeId(), parentId: p.taskId, ...(p.parentKind ? { parentKind: p.parentKind } : {}), kind: 'block', title: p.title, dateISO: p.dateISO, startTime: p.startTime, endTime: p.endTime, effortMins: p.effortMins, at: now }))
   return { blocks, ids: blocks.map((b) => b.id) }
 }

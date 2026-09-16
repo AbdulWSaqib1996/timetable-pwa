@@ -14,7 +14,10 @@ export const planEventKey = (block: Pick<PlanChildRec, 'id'>) => `plan:${block.i
 export const isPlanSession = (s: Pick<Session, 'id'>) => s.id.startsWith('plan-')
 export const planIdOf = (s: Pick<Session, 'id'>) => s.id.slice('plan-'.length)
 
-export function planBlockToSession(block: PlanChildRec, parent: TaskRecord): Session {
+/** A block's parent: a task, or (NF-02) a homework record presented with the same two fields. */
+export type PlanParent = Pick<TaskRecord, 'id' | 'title'> & { planKind?: 'task' | 'homework' }
+
+export function planBlockToSession(block: PlanChildRec, parent: PlanParent): Session {
   return {
     id: `plan-${block.id}`,
     calendarUid: `plan-${block.id}`,
@@ -37,12 +40,12 @@ export function planBlockToSession(block: PlanChildRec, parent: TaskRecord): Ses
 }
 
 /** Valid, scheduled blocks whose parent task still exists — invalid ones stay "Needs scheduling". */
-export function planBlockSessions(plans: PlanChildRec[], tasks: TaskRecord[]): Session[] {
-  const byId = new Map(tasks.map((t) => [t.id, t]))
+export function planBlockSessions(plans: PlanChildRec[], tasks: PlanParent[]): Session[] {
+  const byId = new Map(tasks.map((t) => [`${t.planKind ?? 'task'}:${t.id}`, t]))
   const out: Session[] = []
   for (const block of plans) {
     if (block.kind !== 'block') continue
-    const parent = byId.get(block.parentId)
+    const parent = byId.get(`${block.parentKind ?? 'task'}:${block.parentId}`)
     if (!parent || needsScheduling(block)) continue
     out.push(planBlockToSession(block, parent))
   }

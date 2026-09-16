@@ -7,6 +7,18 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 24,
+    dateISO: '2026-09-16',
+    title: 'Homework you can plan; a preparation list for every session',
+    items: [
+      'Give a homework an effort estimate and subtasks from its page, and Review study times plans it as itself — the study blocks belong to the homework, finishing a block never marks the homework done, and no duplicate task is created',
+      'When a homework’s due session moves, is renamed or disappears, Tasks shows a Needs review item naming its study blocks — Follow this session or Keep the original date, decided once',
+      'Every session has a Preparation list in its Overview — your own items, the homework due there, and a “Ready for this session” statement — and Today shows it for the next session; a follow-up note after the session is kept with it',
+      'Link wallet documents or web pages to a homework or a placement (School resources); each says On this device or Missing on this device, and a missing one is relinked from the data centre',
+      'On the Prepare-for-a-placement checklist, an item you do not know yet can wait with a follow-up date and never blocks Mark ready; “School resources to hand” joins the list',
+    ],
+  },
+  {
     version: 23,
     dateISO: '2026-09-16',
     title: 'Homework editor fits the screen; session search shows its matches',

@@ -6266,3 +6266,9 @@ body { font-size: 16px; line-height: 1.45; }
 /* Pass 88 fix: four detail sections fit a phone; on very narrow screens the strip scrolls rather than clipping. */
 .detail-tabs .segmented { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .detail-tabs .segment { flex: 1 1 auto; padding: 8px 10px; }
+
+/* ---- Pass 89: homework planning, change inbox, preparation, resources ---- */
+.homework-inbox .homework-change .requirement-confirm { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.today-prep { display: inline-block; margin-top: 6px; }
+.transition-defer { align-items: center; }
+.resource-links { display: grid; gap: 8px; }

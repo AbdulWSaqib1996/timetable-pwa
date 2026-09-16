@@ -35,6 +35,9 @@ export function referencedUids(admin) {
     for (const s of pr.submissions ?? []) add(s.receiptUid, { kind: 'project-receipt', id: pr.id, title: pr.title, name: `receipt (${s.channel})` })
     for (const f of pr.feedbackRefs ?? []) if (f.kind === 'wallet') add(f.uid, { kind: 'project-feedback', id: pr.id, title: pr.title, name: f.source })
   }
+  // NF-05 (Pass 89): homework and placement resources by uid.
+  for (const h of admin?.homework ?? []) for (const r of h.resources ?? []) if (r.kind === 'wallet') add(r.uid, { kind: 'homework-resource', id: h.id, title: h.title, name: r.label })
+  for (const p of admin?.placements ?? []) for (const r of p.resources ?? []) if (r.kind === 'wallet') add(r.uid, { kind: 'placement-resource', id: p.id, title: p.code, name: r.label })
   return out
 }
 
@@ -56,7 +59,10 @@ export function relinkUid(admin, fromUid, toUid, now) {
       at: now,
     }
   })
-  return { ...admin, reviewPacks: packs, projects }
+  const relinkList = (list) => (list ?? []).some((r) => r.uid === fromUid) ? list.map((r) => (r.uid === fromUid ? { ...r, uid: toUid } : r)) : list
+  const homework = (admin.homework ?? []).map((h) => ((h.resources ?? []).some((r) => r.uid === fromUid) ? { ...h, resources: relinkList(h.resources), at: now } : h))
+  const placements = (admin.placements ?? []).map((p) => ((p.resources ?? []).some((r) => r.uid === fromUid) ? { ...p, resources: relinkList(p.resources), at: now } : p))
+  return { ...admin, reviewPacks: packs, projects, homework, placements }
 }
 
 /**

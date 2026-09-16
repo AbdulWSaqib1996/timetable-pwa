@@ -6,11 +6,14 @@ import { isPlacementTitle } from '../../shared/eligibility.js'
 import type { WorkloadProposal } from '../../shared/workload.js'
 import type { PlanBusyInterval } from '../../shared/planWeek.js'
 import { newAdminId } from '../lib/admin'
-import type { AdminFile, ContactRec, CourseQuestionRec, ProtectedWindowRec, WeeklyReviewRec } from '../lib/admin'
+import type { AdminFile, ContactRec, CourseQuestionRec, ProtectedWindowRec, TaskRecord, WeeklyReviewRec } from '../lib/admin'
+export type PlanningItem = Pick<TaskRecord, 'id' | 'title' | 'dueISO' | 'status'> & { planKind?: 'task' | 'homework'; effortMins?: number }
 import type { Settings } from '../types'
 
 interface Props {
   admin: AdminFile
+  /** NF-02: what the planner plans for — open tasks plus homework as planning items (one owner each) */
+  planningTasks: PlanningItem[]
   busy: PlanBusyInterval[]
   deadlines: { d: string; title: string }[]
   settings: Settings
@@ -40,7 +43,7 @@ const fmt = (iso: string) => {
  * is what the learner writes: contacts, a private agenda, unanswered course
  * questions — no wellbeing score, no streaks, nothing sent to anyone.
  */
-export function WorkloadSheet({ admin, busy, deadlines, settings, todayISO, lastBatch, onUpdateAdmin, onAccept, onUndo, onClose }: Props) {
+export function WorkloadSheet({ admin, planningTasks, busy, deadlines, settings, todayISO, lastBatch, onUpdateAdmin, onAccept, onUndo, onClose }: Props) {
   const [tab, setTab] = useState<'plan' | 'review' | 'protected' | 'support'>('plan')
   const [selected, setSelected] = useState<string[] | null>(null)
   const [win, setWin] = useState({ day: '1', start: '18:00', end: '20:00', label: '' })
@@ -54,26 +57,26 @@ export function WorkloadSheet({ admin, busy, deadlines, settings, todayISO, last
         busy,
         deadlines,
         protectedWindows: admin.protected,
-        tasks: admin.tasks,
+        tasks: planningTasks,
         plans: admin.plans,
         options: { start: settings.planRangeStart, end: settings.planRangeEnd, quietFrom: settings.quietFrom, quietTo: settings.quietTo },
       }),
-    [todayISO, busy, deadlines, admin.protected, admin.tasks, admin.plans, settings.planRangeStart, settings.planRangeEnd, settings.quietFrom, settings.quietTo]
+    [todayISO, busy, deadlines, admin.protected, planningTasks, admin.plans, settings.planRangeStart, settings.planRangeEnd, settings.quietFrom, settings.quietTo]
   )
   // E02 weekly review: this week, next week's fixed time and free slots, and the diff of proposals against existing blocks.
   const weeks = reviewWeeks(todayISO)
   const review = (admin.weeklyReviews ?? []).find((r) => r.weekISO === weeks.fromISO) ?? null
   const planOptions = { start: settings.planRangeStart, end: settings.planRangeEnd, quietFrom: settings.quietFrom, quietTo: settings.quietTo }
-  const thisWeek = useMemo(() => thisWeekSummary({ todayISO, tasks: admin.tasks, plans: admin.plans }), [todayISO, admin.tasks, admin.plans])
+  const thisWeek = useMemo(() => thisWeekSummary({ todayISO, tasks: planningTasks, plans: admin.plans }), [todayISO, planningTasks, admin.plans])
   const fixed = useMemo(
     () => nextWeekFixed({ todayISO, busy, protectedWindows: admin.protected, options: planOptions, travel: { bufferMins: settings.arrivalBufferMins ?? 10, isPlacement: isPlacementTitle } }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [todayISO, busy, admin.protected, settings.planRangeStart, settings.planRangeEnd, settings.quietFrom, settings.quietTo, settings.arrivalBufferMins]
   )
   const nextWeek = useMemo(
-    () => weeklyReview({ todayISO, busy, protectedWindows: admin.protected, deadlines, tasks: admin.tasks, plans: admin.plans, options: planOptions }),
+    () => weeklyReview({ todayISO, busy, protectedWindows: admin.protected, deadlines, tasks: planningTasks, plans: admin.plans, options: planOptions }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [todayISO, busy, admin.protected, deadlines, admin.tasks, admin.plans, settings.planRangeStart, settings.planRangeEnd, settings.quietFrom, settings.quietTo]
+    [todayISO, busy, admin.protected, deadlines, planningTasks, admin.plans, settings.planRangeStart, settings.planRangeEnd, settings.quietFrom, settings.quietTo]
   )
   const diff = nextWeek
   const currentBasis = basisHash(busy)
@@ -186,7 +189,7 @@ export function WorkloadSheet({ admin, busy, deadlines, settings, todayISO, last
       {tab === 'plan' && (
         <div className="workload-plan">
           <dl className="kv workload-summary" aria-label="Workload summary">
-            <div><dt>Needed</dt><dd>{formatMins(result.needed)} across {admin.tasks.filter((t) => t.status !== 'done').length} open task{admin.tasks.filter((t) => t.status !== 'done').length === 1 ? '' : 's'} (estimates you entered)</dd></div>
+            <div><dt>Needed</dt><dd>{formatMins(result.needed)} across {planningTasks.filter((t) => t.status !== 'done').length} open item{planningTasks.filter((t) => t.status !== 'done').length === 1 ? '' : 's'} — tasks and homework (estimates you entered)</dd></div>
             <div><dt>Already planned</dt><dd>{formatMins(result.alreadyScheduled)} in blocks on the calendar</dd></div>
             <div><dt>Available</dt><dd>{formatMins(result.available)} free in {result.slots} gap{result.slots === 1 ? '' : 's'} to {fmt(result.endISO)}</dd></div>
             <div><dt>Proposed</dt><dd>{formatMins(result.proposedMins)}</dd></div>

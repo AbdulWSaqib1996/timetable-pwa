@@ -11,7 +11,7 @@
 
 import { addDaysISO } from './calendar-time.js'
 import { suggestPlanWeek } from './planWeek.js'
-import { planWorkload, remainingEffort } from './workload.js'
+import { childOf, planWorkload, remainingEffort } from './workload.js'
 
 const toMins = (t) => {
   const m = /^(\d{1,2}):(\d{2})$/.exec(t || '')
@@ -91,7 +91,7 @@ export function nextWeekProposals({ todayISO, busy, protectedWindows, deadlines,
   return { ...result, proposals: result.proposals.filter((p) => p.dateISO >= nextFromISO && p.dateISO <= nextToISO) }
 }
 
-const slotKey = (p) => `${p.taskId ?? p.parentId}|${p.dateISO}|${p.startTime}|${p.endTime}`
+const slotKey = (p) => `${p.parentKind ?? 'task'}:${p.taskId ?? p.parentId}|${p.dateISO}|${p.startTime}|${p.endTime}`
 const overlaps = (a, b) => a.from < b.to && b.from < a.to
 
 /**
@@ -107,7 +107,7 @@ const overlaps = (a, b) => a.from < b.to && b.from < a.to
 export function weeklyReview({ todayISO, busy, protectedWindows = [], deadlines = [], tasks, plans, options = {} }) {
   const { nextFromISO, nextToISO } = reviewWeeks(todayISO)
   const open = new Set(tasks.filter((t) => t.status !== 'done').map((t) => t.id))
-  const existing = plans.filter((p) => p.kind === 'block' && inWeek(p.dateISO, nextFromISO, nextToISO) && open.has(p.parentId))
+  const existing = plans.filter((p) => p.kind === 'block' && inWeek(p.dateISO, nextFromISO, nextToISO) && tasks.some((t) => t.status !== 'done' && childOf(t, p)))
   const hard = busy.filter((b) => b.kind === 'session' || b.kind === 'personal')
   const asInterval = (b) => ({ d: b.dateISO, from: toMins(b.startTime) ?? 0, to: toMins(b.endTime) ?? 0 })
   const clashing = existing.filter((b) => {
@@ -121,7 +121,7 @@ export function weeklyReview({ todayISO, busy, protectedWindows = [], deadlines 
   const claimed = new Set()
   const changes = []
   for (const p of result.proposals) {
-    const clash = clashing.find((b) => !claimed.has(b.id) && b.parentId === p.taskId)
+    const clash = clashing.find((b) => !claimed.has(b.id) && b.parentId === p.taskId && (b.parentKind ?? 'task') === (p.parentKind ?? 'task'))
     if (clash) {
       claimed.add(clash.id)
       changes.push({ kind: 'moved', key: slotKey(p), proposal: p, block: clash })
@@ -163,7 +163,7 @@ export function changesHash(changes) {
  */
 export function applyChanges({ changes, selectedKeys, makeId, now }) {
   const chosen = changes.filter((c) => (c.kind === 'added' || c.kind === 'moved') && selectedKeys.includes(c.key))
-  const added = chosen.map((c) => ({ id: makeId(), parentId: c.proposal.taskId, kind: 'block', title: c.proposal.title, dateISO: c.proposal.dateISO, startTime: c.proposal.startTime, endTime: c.proposal.endTime, effortMins: c.proposal.effortMins, at: now }))
+  const added = chosen.map((c) => ({ id: makeId(), parentId: c.proposal.taskId, ...(c.proposal.parentKind ? { parentKind: c.proposal.parentKind } : {}), kind: 'block', title: c.proposal.title, dateISO: c.proposal.dateISO, startTime: c.proposal.startTime, endTime: c.proposal.endTime, effortMins: c.proposal.effortMins, at: now }))
   const removed = chosen.filter((c) => c.kind === 'moved').map((c) => c.block)
   return { batch: { id: makeId(), at: now, addedIds: added.map((b) => b.id), removed, changesHash: changesHash(chosen) }, added, removedIds: removed.map((b) => b.id) }
 }

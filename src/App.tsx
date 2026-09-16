@@ -80,9 +80,9 @@ import { EMPTY_ADMIN, loadAdminFile, saveAdminFile } from './lib/admin'
 import type { AdminFile, CommitmentRec, PlanChildRec, TaskRecord } from './lib/admin'
 import { duplicateTask, migrateCustomKeyDates, overlayTaskMeta, taskEventKey, taskToSession } from './lib/tasks'
 import { homeworkIdOf, homeworkSessionId, homeworkToSession, overlayHomeworkMeta } from './lib/homework'
-import { followSession, homeworkForSession, keepDate, resolveDue, resolveSource } from '../shared/homework.js'
+import { decideChange, detectHomeworkChanges, followSession, homeworkForSession, homeworkPlanItem, keepDate, reconcileChanges, resolveDue, resolveSource, withStatus } from '../shared/homework.js'
 import { HomeworkDetailPage } from './features/tasks/HomeworkDetailPage'
-import type { HomeworkRec } from './lib/admin'
+import type { HomeworkRec, PreparationRec } from './lib/admin'
 import { applyPlacementExceptions } from './lib/placement'
 import { availableOrigins } from './lib/origins'
 import { busyCommitmentSessions, commitmentToSession, remindableCommitmentSessions } from './lib/commitments'
@@ -792,6 +792,9 @@ export default function App() {
     [rawCourseSessions, adminFile.exceptions, settings, adminFile.placements]
   )
 
+  // Homework can only be due in a real teaching occurrence — never a row marked as a deadline (HW-05).
+  const homeworkTargetsRaw = useMemo(() => courseSessions.filter((s) => !metaMap[sessionKey(s)]?.deadlineOnly), [courseSessions, metaMap])
+
   // What notifications may fire for: membership plus the explicit optional/
   // self-study reminder preferences — independent of any display filter.
   const reminderSessions = useMemo(
@@ -845,8 +848,7 @@ export default function App() {
     }
     handleMeta(session, { status: next })
   }
-  // HW-05: homework can only be due in a real teaching occurrence — never a row marked as a deadline.
-  const homeworkTargets = useMemo(() => courseSessions.filter((s) => !metaMap[sessionKey(s)]?.deadlineOnly), [courseSessions, metaMap])
+  const homeworkTargets = homeworkTargetsRaw
   // HW-03: homework whose due session moved, was retitled or vanished — a question for the learner, shown wherever the item is.
   const homeworkAttention = useMemo(() => {
     const out: Record<string, string> = {}
@@ -869,12 +871,48 @@ export default function App() {
   }
   function setHomeworkStatus(hw: HomeworkRec, next: 'todo' | 'doing' | 'done') {
     if (hw.status === next) return
+    // NF-04: done / reopened / in progress is history on the record.
+    updateAdmin((prev) => ({ ...prev, homework: (prev.homework ?? []).map((h) => (h.id === hw.id ? (withStatus(h, next, localTodayISO(), Date.now()) as HomeworkRec) : h)) }))
+  }
+  // NF-04: the change inbox — a pending question per homework whose due session moved, was renamed,
+  // became a deadline or left the timetable; closed once the record no longer asks it.
+  useEffect(() => {
+    if (!settings) return
+    const now = Date.now()
+    const existing = adminFile.homeworkChanges ?? []
+    const reconciled = reconcileChanges({ homework: adminFile.homework ?? [], changes: existing, targets: homeworkTargetsRaw, keyOf: sessionKey, now })
+    const fresh = detectHomeworkChanges({ homework: adminFile.homework ?? [], changes: reconciled, targets: homeworkTargetsRaw, all: courseSessions, keyOf: sessionKey, makeId: newAdminId, now })
+    if (reconciled === existing && fresh.length === 0) return
+    updateAdmin((prev) => ({ ...prev, homeworkChanges: [...reconciled, ...fresh] }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminFile.homework, adminFile.homeworkChanges, homeworkTargetsRaw, courseSessions])
+  function decideHomeworkChange(changeId: string, decision: 'follow' | 'keep') {
+    const change = (adminFile.homeworkChanges ?? []).find((c) => c.id === changeId)
+    const hw = change ? (adminFile.homework ?? []).find((h) => h.id === change.homeworkId) : null
+    if (!change || change.decidedAt || !hw) return
+    const now = Date.now()
+    const session = decision === 'follow' ? courseSessions.find((x) => sessionKey(x) === hw.dueSessionRef) ?? null : null
     updateAdmin((prev) => ({
       ...prev,
-      homework: (prev.homework ?? []).map((h) =>
-        h.id === hw.id ? { ...h, status: next, completedISO: next === 'done' ? localTodayISO() : h.completedISO, at: Date.now() } : h
-      ),
+      homework: (prev.homework ?? []).map((h) => (h.id !== hw.id ? h : decision === 'follow' && session ? (followSession(h, session, now) as HomeworkRec) : (keepDate(h, now) as HomeworkRec))),
+      homeworkChanges: (prev.homeworkChanges ?? []).map((c) => (c.id === changeId ? decideChange(c, decision === 'follow' && session ? 'follow' : 'keep', now) : c)),
     }))
+  }
+  const preparationFor = (session: Session) => {
+    const key = sessionKey(session)
+    const prep = (adminFile.preparations ?? []).find((p) => p.sessionRef === key)
+    const dueHomework = (adminFile.homework ?? []).filter((h) => h.dueSessionRef === key && h.status !== 'done').length
+    if (!prep && dueHomework === 0) return null
+    return { total: prep?.items.length ?? 0, done: prep?.items.filter((i) => i.done).length ?? 0, ready: !!prep?.readyAt, dueHomework }
+  }
+  const updatePreparation = (session: Session, fn: (prev: PreparationRec) => PreparationRec) => {
+    const key = sessionKey(session)
+    updateAdmin((prev) => {
+      const list = prev.preparations ?? []
+      const current = list.find((p) => p.sessionRef === key) ?? { id: newAdminId(), sessionRef: key, items: [], at: Date.now() }
+      const next = fn(current)
+      return { ...prev, preparations: list.some((p) => p.id === current.id) ? list.map((p) => (p.id === current.id ? next : p)) : [...list, next] }
+    })
   }
 
   // Personal commitments as clearly-marked sessions (P5-06): all of them for
@@ -883,7 +921,13 @@ export default function App() {
   // Work-plan blocks as read-only projections of their single stored record
   // (R4 / NF-02): shown with personal events, busy for clashes/availability,
   // never reminder-eligible here.
-  const planSessions = useMemo(() => planBlockSessions(adminFile.plans, adminFile.tasks), [adminFile.plans, adminFile.tasks])
+  // NF-02 (Pass 89): homework plans as ITSELF — one owner, no duplicate task behind it.
+  const planningItems = useMemo(
+    () => [...adminFile.tasks, ...(adminFile.homework ?? []).filter((h) => h.status !== 'done').map((h) => homeworkPlanItem(h, resolveDue(h, homeworkTargetsRaw, sessionKey)))],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [adminFile.tasks, adminFile.homework, homeworkTargetsRaw]
+  )
+  const planSessions = useMemo(() => planBlockSessions(adminFile.plans, planningItems), [adminFile.plans, planningItems])
   const personalSessions = useMemo(
     () => [...adminFile.commitments.map(commitmentToSession), ...planSessions],
     [adminFile.commitments, planSessions]
@@ -1536,6 +1580,8 @@ export default function App() {
             <PlacementWorkspacePage
               placement={placement}
               school={school}
+              profileId={active.id}
+              onUpdatePlacement={(fn) => updateAdmin((prev) => ({ ...prev, placements: (prev.placements ?? []).map((p) => (p.id === placement.id ? fn(p) : p)) }))}
               settings={settings}
               admin={adminFile}
               sessions={rawCourseSessions}
@@ -1620,6 +1666,8 @@ export default function App() {
                 navigate({ name: 'tasks' }, { replace: true })
               }}
               onBack={() => goBackOr({ name: 'tasks' })}
+              profileId={active.id}
+              onOpenWorkload={() => setOpenSheet('workload')}
             />
           )
         })()
@@ -1645,6 +1693,11 @@ export default function App() {
           attention={homeworkAttention}
           undoHomework={homeworkUndo}
           onUndoHomework={undoRemoveHomework}
+          homeworkChanges={(adminFile.homeworkChanges ?? [])
+            .filter((c) => !c.decidedAt)
+            .map((c) => ({ ...c, title: (adminFile.homework ?? []).find((h) => h.id === c.homeworkId)?.title ?? 'Homework', blocks: adminFile.plans.filter((p) => p.parentKind === 'homework' && p.parentId === c.homeworkId && p.kind === 'block' && !p.done).length }))}
+          onDecideChange={decideHomeworkChange}
+          onOpenHomework={(id) => navigate({ name: 'homework', id })}
           onSetStatus={(kd, status) => setKeyDateStatus(kd, status ?? 'todo')}
           onEditTask={(t) => setTaskEdit({ task: t })}
           onSetTaskStatus={setTaskStatus}
@@ -1808,6 +1861,7 @@ export default function App() {
           travelMode={travelMode}
           locationEnabled={locationEnabled}
           onSelect={openSession}
+          preparationFor={preparationFor}
           onOpenChanges={openChanges}
           onOpenSettings={() => navigate({ name: 'settings' })}
           onMarkAttendance={(s, answer) => handleMeta(s, { attended: answer === 'attended', absent: answer === 'absent' })}
@@ -1964,6 +2018,8 @@ export default function App() {
           onRemoveHomework={removeHomework}
           homeworkUndo={homeworkUndo}
           onUndoHomework={undoRemoveHomework}
+          preparation={(adminFile.preparations ?? []).find((p) => p.sessionRef === sessionKey(selected)) ?? null}
+          onUpdatePreparation={(fn) => updatePreparation(selected, fn)}
           coords={coords}
           locationEnabled={locationEnabled}
           travelMode={travelMode}
@@ -2142,6 +2198,7 @@ export default function App() {
       {openSheet === 'workload' && settings && (
         <WorkloadSheet
           admin={adminFile}
+          planningTasks={planningItems}
           busy={planWeekBusy.filter((b) => !b.label.startsWith('Protected: '))}
           deadlines={planWeekDeadlines}
           settings={settings}

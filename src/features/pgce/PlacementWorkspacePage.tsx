@@ -6,6 +6,7 @@ import { isPlacementSession, placementTag } from '../../lib/format'
 import { sessionKey } from '../../lib/diff'
 import type { MetaMap, Session, Settings } from '../../types'
 import type { AdminTab } from './PGCEPage'
+import { ResourceLinks } from '../../components/ResourceLinks'
 
 interface Props {
   placement: PlacementRec
@@ -17,6 +18,9 @@ interface Props {
   metaMap: MetaMap
   todayISO: string
   onBack: () => void
+  /** NF-05: school resources by wallet uid or link */
+  profileId: string
+  onUpdatePlacement: (fn: (prev: PlacementRec) => PlacementRec) => void
   /** PL-06: edit one section directly (or the whole setup when no section is given) */
   onEdit: (section?: 'school' | 'people' | 'pattern' | 'mapping') => void
   onJourney: (leg: 'out' | 'back') => void
@@ -40,7 +44,7 @@ const fmtDate = (iso: string) => {
  * each linking back to the record editors. Rows show `SE2 · <school>` from the
  * session's mapping, never from which placement happens to be open.
  */
-export function PlacementWorkspacePage({ placement, school, settings, admin, sessions, metaMap, todayISO, onBack, onEdit, onJourney, onOpenAdmin, onOpenJournal, onOpenLesson, onOpenSession, onAll }: Props) {
+export function PlacementWorkspacePage({ placement, school, settings, admin, sessions, metaMap, todayISO, onBack, profileId, onUpdatePlacement, onEdit, onJourney, onOpenAdmin, onOpenJournal, onOpenLesson, onOpenSession, onAll }: Props) {
   const state = placementSetupState(placement, school)
   const timing = placementTiming(placement, todayISO)
   const policy = placementPolicy(settings)
@@ -129,6 +133,15 @@ export function PlacementWorkspacePage({ placement, school, settings, admin, ses
           <button type="button" className="btn-today-reset" onClick={() => onEdit('pattern')}>Edit school day &amp; travel</button>
           <button type="button" className="btn-today-reset" onClick={() => onEdit('mapping')}>Edit timetable links</button>
         </div>
+      </Card>
+
+      {/* NF-05 (Pass 89): school resources by stable identity — handbook, entrance instructions, what to bring. No pupil data. */}
+      <Card className="pgce-section placement-resources">
+        <div className="pgce-section-head">
+          <span className="pgce-tile" aria-hidden="true"><IconSchool size={20} /></span>
+          <h2>School resources</h2>
+        </div>
+        <ResourceLinks resources={placement.resources ?? []} profileId={profileId} label="Placement resources" hint="Handbook, entrance instructions, what to bring — linked from your wallet or the web. Never pupil details." onChange={(resources) => onUpdatePlacement((prev) => ({ ...prev, resources, at: Date.now() }))} />
       </Card>
 
       <div className="pgce-grid">

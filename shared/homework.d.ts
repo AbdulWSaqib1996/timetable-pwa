@@ -63,3 +63,10 @@ export function followSession<H extends HomeworkLike>(hw: H, session: HomeworkSe
 export function keepDate<H extends HomeworkLike>(hw: H, now: number): H
 export function rescheduleHomework<H extends HomeworkLike>(hw: H, change: { target?: { key: string; session: HomeworkSessionLike } | null; dueISO?: string }, now: number): H
 export function editHomework<H extends HomeworkLike>(hw: H, words: { title: string; details?: string }, now: number): H
+export function homeworkPlanItem(hw: HomeworkLike & { effortMins?: number }, due: { effectiveISO: string }): { id: string; planKind: 'homework'; title: string; dueISO: string; status: 'todo' | 'doing' | 'done'; effortMins?: number }
+export function withStatus<H extends HomeworkLike>(hw: H, next: 'todo' | 'doing' | 'done', todayISO: string, now: number): H
+export interface HomeworkChangeLike { id: string; homeworkId: string; kind: 'moved' | 'retitled' | 'deadline' | 'missing'; previous: { dateISO: string; start?: string; title: string }; current?: { dateISO: string; start?: string; title: string }; sourceRevision?: number; decision?: 'follow' | 'keep' | 'reschedule'; decidedAt?: number; at: number }
+export function detectHomeworkChanges<T extends HomeworkSessionLike>(input: { homework: HomeworkLike[]; changes: HomeworkChangeLike[] | undefined; targets: T[]; all: T[]; keyOf: (s: T) => string; makeId: () => string; now: number }): HomeworkChangeLike[]
+export function decideChange<C extends HomeworkChangeLike>(change: C, decision: 'follow' | 'keep' | 'reschedule', now: number): C
+export function openChangesFor<C extends HomeworkChangeLike>(changes: C[] | undefined, homeworkId: string): C[]
+export function reconcileChanges<C extends HomeworkChangeLike, T extends HomeworkSessionLike>(input: { homework: HomeworkLike[]; changes: C[] | undefined; targets: T[]; keyOf: (s: T) => string; now: number }): C[]

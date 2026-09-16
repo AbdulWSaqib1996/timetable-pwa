@@ -30,6 +30,7 @@ export const TRANSITION_GROUPS = [
     items: [
       { id: 'context-noted', label: 'Teaching context noted — year group, subjects, timetable pattern (never pupil details)' },
       { id: 'hours-set', label: 'Working hours checked' },
+      { id: 'resources-ready', label: 'School resources to hand — handbook, entrance instructions, what to bring' },
     ],
   },
   {
@@ -76,7 +77,14 @@ export function transitionItems(transition, ctx) {
   const pin = school && school.lat != null && school.lng != null ? { lat: school.lat, lng: school.lng } : null
   const shared = sharedPackIds(reviewPacks)
   const out = []
-  const add = (id, state, detail) => out.push({ id, state, detail, group: TRANSITION_GROUPS.find((g) => g.items.some((i) => i.id === id)).id, label: TRANSITION_GROUPS.flatMap((g) => g.items).find((i) => i.id === id).label })
+  const deferredOf = (id) => (t.deferred ?? {})[id]
+  // NF-01 (Pass 89): "not known yet" with a follow-up date is its own state — it never blocks app use.
+  const add = (id, state, detail) => {
+    const d = deferredOf(id)
+    const final = state !== 'done' && d ? 'deferred' : state
+    const text = final === 'deferred' ? `Not known yet${d.followUpISO ? ` — follow up ${d.followUpISO}` : ''}${d.note ? ` · ${d.note}` : ''}` : detail
+    out.push({ id, state: final, detail: text, group: TRANSITION_GROUPS.find((g) => g.items.some((i) => i.id === id)).id, label: TRANSITION_GROUPS.flatMap((g) => g.items).find((i) => i.id === id).label })
+  }
 
   // School & travel
   if (school?.name && pin && school.confirmedAt) add('school-confirmed', 'done', `${school.name} · pin confirmed`)
@@ -100,6 +108,10 @@ export function transitionItems(transition, ctx) {
   else add('hours-set', 'todo', 'No working hours set')
 
   // Mentor & access
+  const resources = placement?.resources ?? []
+  if (resources.length) add('resources-ready', 'done', `${resources.length} resource${resources.length === 1 ? '' : 's'} on the placement`)
+  else add('resources-ready', 'todo', 'Add the handbook, entrance instructions or anything to bring on the placement page')
+
   if (placement?.mentorName) add('mentor-recorded', 'done', placement.mentorName)
   else add('mentor-recorded', 'todo', 'Add the mentor to the placement setup')
   if (t.sharesReviewed && sameSet(t.sharesReviewed.packIds ?? [], shared)) add('shares-reviewed', 'done', shared.length ? `${shared.length} pack${shared.length === 1 ? '' : 's'} still shared` : 'Nothing is shared with mentors')
@@ -117,6 +129,15 @@ export function transitionItems(transition, ctx) {
 
 export function transitionProgress(items) {
   const done = items.filter((i) => i.state === 'done').length
+  const deferred = items.filter((i) => i.state === 'deferred').length
   const stale = items.filter((i) => i.state === 'stale').length
-  return { done, total: items.length, stale, complete: done === items.length }
+  return { done, deferred, total: items.length, stale, complete: done + deferred === items.length }
+}
+
+/** NF-01: mark an item "not known yet" (with an optional follow-up date) or clear that. */
+export function withDeferral(transition, itemId, deferral, now) {
+  const next = { ...(transition.deferred ?? {}) }
+  if (deferral) next[itemId] = { ...deferral, at: now }
+  else delete next[itemId]
+  return { ...transition, deferred: next, at: now }
 }

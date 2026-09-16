@@ -1,7 +1,8 @@
 import { IdentityReview } from './IdentityReview'
 import { HomeworkPanel } from './HomeworkPanel'
-import type { AdminFile, HomeworkRec, Lesson } from '../lib/admin'
+import type { AdminFile, HomeworkRec, Lesson, PreparationRec } from '../lib/admin'
 import { reportPersistenceFailure } from '../lib/persistence'
+import { newAdminId } from '../lib/admin'
 import { useEffect, useRef, useState } from 'react'
 import { useModalA11y } from '../lib/a11y'
 import { TRAVEL_MODE_PHRASE, estimateTravel, estimateTravelToCoords, matchBuilding } from '../lib/campus'
@@ -87,6 +88,9 @@ interface Props {
   onRemoveHomework?: (h: HomeworkRec) => void
   homeworkUndo?: HomeworkRec | null
   onUndoHomework?: () => void
+  /** NF-03: the learner's own preparation for this session (items, a ready statement, a follow-up note) */
+  preparation?: PreparationRec | null
+  onUpdatePreparation?: (fn: (prev: PreparationRec) => PreparationRec) => void
   /** homework due IN this teaching session */
   homeworkDue?: { id: string; title: string; details?: string; status: 'todo' | 'doing' | 'done'; dueTitle?: string }[]
   onToggleHomework?: (id: string) => void
@@ -179,6 +183,8 @@ export function SessionDetail({
   onRemoveHomework,
   homeworkUndo,
   onUndoHomework,
+  preparation,
+  onUpdatePreparation,
   onClose,
   onOpenHomeJourney,
 }: Props) {
@@ -226,6 +232,7 @@ export function SessionDetail({
 
   // This session's own place (16 Sep 2026). Edited locally and committed on blur or
   // on Locate, so a new address never keeps the previous pin.
+  const [prepText, setPrepText] = useState('')
   const [placeLabel, setPlaceLabel] = useState(meta?.location?.label ?? '')
   const [placeAddress, setPlaceAddress] = useState(meta?.location?.address ?? '')
   const sessionIdentity = sessionKey(session)
@@ -698,6 +705,45 @@ export function SessionDetail({
               </p>
             )}
           </section>
+          {onUpdatePreparation && (
+            <section className="ui-card detail-card detail-section" aria-labelledby="detail-prep-heading">
+              <div className="section-title">
+                <span className="ui-tile ui-tile--teal" aria-hidden="true">
+                  <IconCheck />
+                </span>
+                <h3 id="detail-prep-heading">Preparation</h3>
+              </div>
+              <p className="detail-state">
+                {dueHomework.length ? `${dueHomework.length} homework due here (see the Homework section)` : 'No homework due here'}
+                {preparation?.readyAt ? ` · you said you are ready ${new Date(preparation.readyAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
+              </p>
+              {(preparation?.items ?? []).length > 0 && (
+                <ul className="setup-list" aria-label="Preparation items">
+                  {(preparation?.items ?? []).map((it) => (
+                    <li key={it.id} className="setup-row">
+                      <label className="toggle-row">
+                        <input type="checkbox" checked={it.done} onChange={(e) => onUpdatePreparation((prev) => ({ ...prev, items: prev.items.map((x) => (x.id === it.id ? { ...x, done: e.target.checked, at: Date.now() } : x)), at: Date.now() }))} />
+                        <span className={it.done ? 'action-done' : undefined}>{it.text}</span>
+                      </label>
+                      <button type="button" className="travel-link" aria-label={`Remove preparation item: ${it.text}`} onClick={() => onUpdatePreparation((prev) => ({ ...prev, items: prev.items.filter((x) => x.id !== it.id), at: Date.now() }))}>Remove</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="task-edit-row">
+                <input type="text" className="placement-input" aria-label="New preparation item" placeholder="e.g. Bring the reading, charge the laptop" value={prepText} onChange={(e) => setPrepText(e.target.value)} />
+                <button type="button" className="btn-today-reset" disabled={!prepText.trim()} onClick={() => { const text = prepText.trim(); onUpdatePreparation((prev) => ({ ...prev, items: [...prev.items, { id: newAdminId(), text, done: false, at: Date.now() }], at: Date.now() })); setPrepText('') }}>Add item</button>
+              </div>
+              <label className="toggle-row">
+                <input type="checkbox" checked={!!preparation?.readyAt} onChange={(e) => onUpdatePreparation((prev) => { const next = { ...prev, at: Date.now() }; if (e.target.checked) next.readyAt = Date.now(); else delete next.readyAt; return next })} />
+                Ready for this session (your own statement — nothing is scored)
+              </label>
+              <label className="ui-field">
+                <span className="ui-field-label">Follow-up after the session</span>
+                <textarea className="note-input" rows={2} defaultValue={preparation?.followUp ?? ''} onBlur={(e) => { const followUp = e.target.value; if (followUp !== (preparation?.followUp ?? '')) onUpdatePreparation((prev) => { const next = { ...prev, at: Date.now() }; if (followUp.trim()) next.followUp = followUp; else delete next.followUp; return next }) }} placeholder="New homework set, actions you chose, anything to carry to the next session" />
+              </label>
+            </section>
+          )}
           {canSetLocation && (
             <section className="ui-card detail-card detail-section" aria-labelledby="detail-place-heading">
               <div className="section-title">

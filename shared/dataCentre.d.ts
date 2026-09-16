@@ -1,6 +1,6 @@
 export const MENTOR_ATTACHMENT_TTL_MS: number
 export function attachmentExpiry(sharedAt: number, now: number): { expiresAt: number; expired: boolean; daysLeft: number }
-export interface FileRef { kind: 'pack' | 'project-draft' | 'project-receipt' | 'project-feedback'; id: string; title: string; name?: string }
+export interface FileRef { kind: 'pack' | 'project-draft' | 'project-receipt' | 'project-feedback' | 'homework-resource' | 'placement-resource'; id: string; title: string; name?: string }
 export function referencedUids(admin: any): Map<string, FileRef[]>
 export function relinkUid<T>(admin: T, fromUid: string, toUid: string, now: number): T
 export interface FileRow {
