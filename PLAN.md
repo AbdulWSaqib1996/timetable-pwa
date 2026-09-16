@@ -1549,7 +1549,7 @@ Automated checks + results: `tests/unit/d1-threads-transitions.test.mjs` (5: der
 
 Known limits: the "from" placement of a transition is the dated placement immediately before the one prepared (undated placements are not paired); the Find index and print binder do not yet list threads or transitions (they are reachable from the PGCE file and All placements); a student-rep row is recognised by its title ("Student Rep", "Student Representatives").
 
-Released 16 September 2026: workers deployed first (push `159a6ab8-3c61-46e2-9595-297f529eced6`, feed `36c2ba48-f450-4860-9583-6b97555215eb`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 16 September 2026: workers deployed first (push `159a6ab8-3c61-46e2-9595-297f529eced6`, feed `36c2ba48-f450-4860-9583-6b97555215eb`); merge `ef7205e`, CI run 35073228763 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
