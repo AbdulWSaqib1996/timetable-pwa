@@ -1615,7 +1615,7 @@ Automated checks + results: `tests/unit/homework-batch2.test.mjs` (5: resolver s
 
 Known limits: the change inbox (a list of every pending review) is Batch 4 — for now the flag sits on each item; the create form is still inline on the session and lesson (compact cards are Batch 3); reminders fire for the effective date and do not yet mention a pending change.
 
-Released 16 September 2026: workers deployed first (push `a7f43393-f9cb-4f22-80ce-b1c10cabc360`, feed `c082b89b-aa09-4409-bb49-a3804cb1fd5f`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 16 September 2026: workers deployed first (push `a7f43393-f9cb-4f22-80ce-b1c10cabc360`, feed `c082b89b-aa09-4409-bb49-a3804cb1fd5f`); merge `6b8185f`, CI run 35083652287 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
