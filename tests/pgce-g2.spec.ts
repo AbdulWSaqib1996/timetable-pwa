@@ -88,7 +88,7 @@ test('academic work: deadline references a key date, status moves only on confir
   await sheet.getByLabel('Project title').fill('Assignment 1 — Reflective account')
   await sheet.getByRole('combobox', { name: 'Deadline (key date)' }).selectOption({ index: 1 })
   await sheet.getByRole('button', { name: 'Add project' }).click()
-  await expect(sheet).toContainText('Deadline: 20 Nov 2026 12:00 · Assignment 1 hand-in (from your key dates)')
+  await expect(sheet.getByLabel('Assignment summary')).toContainText('20 Nov 2026 12:00 · Assignment 1 hand-in (from your key dates)')
   await sheet.getByLabel('Words', { exact: true }).fill('3000')
   await sheet.getByRole('button', { name: 'Ready to submit' }).click()
   await expect(sheet.getByRole('button', { name: 'Mark submitted' })).toBeDisabled()

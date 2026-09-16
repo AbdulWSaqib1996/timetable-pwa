@@ -6,15 +6,15 @@ import { TRANSITION_CONTEXT_MAX, TRANSITION_STATES } from './transitions.js'
 /** Runtime-neutral input contracts, shared by browser and workers. */
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 export const MAX_SYNC_BYTES = 2 * 1024 * 1024
-export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions']
+export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions', 'weeklyReviews']
 /** Collections added in Phase 5 and G0 — absent in older payloads/backups, so their
  *  arrays are optional on read and treated as empty. */
-export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions']
+export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions', 'weeklyReviews']
 /** Feedback provenance (G0): a client may only record its own account; an
  *  authenticated reviewer state needs the (future) portal. */
 export const clientSourceTypes = ['personal-reflection', 'learner-entered']
 /** AdminFile schema version written by this client; unknown newer fields are preserved, never dropped. */
-export const ADMIN_SCHEMA_VERSION = 10
+export const ADMIN_SCHEMA_VERSION = 11
 export function assert(condition, message) { if (!condition) throw new Error(message) }
 export function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 export function safeURL(value) {
@@ -98,7 +98,7 @@ export function validatePayload(data) {
           for (const item of value[key]) {
             assert(object(item) && typeof item.id === 'string' && !seen.has(item.id) && Number.isFinite(item.at), 'Invalid admin record.')
             seen.add(item.id)
-            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text'],examples:['title','context'],reviewPacks:['title','state','createdISO'],experience:['dateISO','type','layer'],reviews:['dateISO'],homework:['title','status','dueISO','setISO'],learningThreads:['state'],transitions:['toPlacementId','state']}
+            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text'],examples:['title','context'],reviewPacks:['title','state','createdISO'],experience:['dateISO','type','layer'],reviews:['dateISO'],homework:['title','status','dueISO','setISO'],learningThreads:['state'],transitions:['toPlacementId','state'],weeklyReviews:['weekISO']}
             for (const field of strings[key]) assert(typeof item[field] === 'string', 'Invalid admin field: ' + field)
             for (const field of ['dateISO','weekISO','setISO','metISO','dueISO','completedISO','startISO','endISO','effectiveFromISO','effectiveToISO','doneISO']) if (item[field]) assert(validDate(item[field]), 'Invalid admin date.')
             // G0: typed placement links and feedback provenance are additive and format-checked;
@@ -251,6 +251,28 @@ export function validatePayload(data) {
             for (const field of ['dueTime','startTime','endTime']) if (item[field] !== undefined) assert(validTime(item[field]), 'Invalid admin time.')
             if (key === 'meetings') assert(Array.isArray(item.actions) && item.actions.every(a => object(a) && typeof a.id === 'string' && typeof a.text === 'string' && typeof a.done === 'boolean'), 'Invalid meeting actions.')
             if (key === 'tasks') assert(['todo','doing','done'].includes(item.status), 'Invalid task status.')
+            if (key === 'weeklyReviews') {
+              // E02: reflection, a proposal revision, the busy basis fingerprint and the accepted batches (verbatim removed blocks for undo).
+              if (item.reflection !== undefined) assert(typeof item.reflection === 'string' && item.reflection.length <= 4000, 'Invalid review reflection.')
+              if (item.proposalRevision !== undefined) assert(Number.isInteger(item.proposalRevision) && item.proposalRevision >= 0, 'Invalid review revision.')
+              if (item.basisHash !== undefined) assert(typeof item.basisHash === 'string' && item.basisHash.length <= 20000, 'Invalid review basis.')
+              assert(Array.isArray(item.batches ?? []) && (item.batches ?? []).length <= 200, 'Invalid review batches.')
+              for (const b of item.batches ?? []) {
+                assert(object(b) && typeof b.id === 'string' && Number.isFinite(b.at) && Array.isArray(b.addedIds) && b.addedIds.every((x) => typeof x === 'string') && typeof b.changesHash === 'string', 'Invalid review batch.')
+                assert(Array.isArray(b.removed ?? []) && (b.removed ?? []).every((r) => object(r) && typeof r.id === 'string' && typeof r.parentId === 'string'), 'Invalid review batch.')
+              }
+            }
+            if (key === 'projects') {
+              // E03: outline, draft references, submission history, feedback references and sources — all learner-entered.
+              const idStr = (x) => typeof x === 'string' && x.length <= 200
+              if (item.outline !== undefined) assert(Array.isArray(item.outline) && item.outline.length <= 100 && item.outline.every((o) => object(o) && typeof o.id === 'string' && typeof o.title === 'string' && o.title.length <= 300 && (o.notes === undefined || (typeof o.notes === 'string' && o.notes.length <= 4000)) && (o.done === undefined || typeof o.done === 'boolean')), 'Invalid project outline.')
+              for (const f of ['outlineRevision']) if (item[f] !== undefined) assert(Number.isInteger(item[f]) && item[f] >= 0, 'Invalid project revision.')
+              if (item.outlineAt !== undefined) assert(Number.isFinite(item.outlineAt), 'Invalid project time.')
+              if (item.drafts !== undefined) assert(Array.isArray(item.drafts) && item.drafts.length <= 100 && item.drafts.every((d) => object(d) && typeof d.id === 'string' && ['wallet','link'].includes(d.kind) && typeof d.label === 'string' && d.label.length <= 300 && Number.isFinite(d.at) && (d.uid === undefined || idStr(d.uid)) && (d.url === undefined || (typeof d.url === 'string' && /^https?:\/\//.test(d.url) && d.url.length <= 1000))), 'Invalid project drafts.')
+              if (item.submissions !== undefined) assert(Array.isArray(item.submissions) && item.submissions.length <= 100 && item.submissions.every((x) => object(x) && typeof x.id === 'string' && Number.isFinite(x.submittedAt) && typeof x.channel === 'string' && x.channel.length <= 100 && (x.receiptUid === undefined || idStr(x.receiptUid)) && (x.note === undefined || (typeof x.note === 'string' && x.note.length <= 2000))), 'Invalid project submissions.')
+              if (item.feedbackRefs !== undefined) assert(Array.isArray(item.feedbackRefs) && item.feedbackRefs.length <= 100 && item.feedbackRefs.every((x) => object(x) && typeof x.id === 'string' && ['wallet','link','text'].includes(x.kind) && typeof x.source === 'string' && x.source.length <= 300 && Number.isFinite(x.at) && (x.uid === undefined || idStr(x.uid)) && (x.url === undefined || (typeof x.url === 'string' && x.url.length <= 1000)) && (x.text === undefined || (typeof x.text === 'string' && x.text.length <= 8000))), 'Invalid project feedback references.')
+              if (item.sources !== undefined) assert(Array.isArray(item.sources) && item.sources.length <= 300 && item.sources.every((x) => object(x) && typeof x.id === 'string' && typeof x.title === 'string' && x.title.length <= 500 && Number.isFinite(x.at) && (x.url === undefined || (typeof x.url === 'string' && x.url.length <= 1000)) && (x.author === undefined || (typeof x.author === 'string' && x.author.length <= 300)) && (x.note === undefined || (typeof x.note === 'string' && x.note.length <= 4000))), 'Invalid project sources.')
+            }
             if (key === 'learningThreads') {
               // E01: references only — ids of lessons/observations, a cycle, the learner's next action.
               assert(THREAD_STATES.includes(item.state), 'Invalid thread state.')

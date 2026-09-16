@@ -88,6 +88,8 @@ Before planning, each P1/P2 finding was checked against `main`:
 
 ### Batch D2 — academic and weekly flow (Pass 84) — E02, E03
 
+> **Status (16 September 2026): implemented as Pass 84** — see PLAN.md. Deviations: the weekly review is a tab of the existing Workload & support sheet rather than a separate screen; a review record is created on the first accepted batch or reflection; the rest of the current week is closed to proposals (reviewed, not replanned) so next week's plan still counts this week's remaining blocks; "logged" time is the blocks the learner ticked done (no separate time log was introduced); the assignment workspace extends the existing project record and Academic work sheet rather than adding a screen.
+
 **In**: weekly review over the existing workload planner (this week planned/logged/open; next week fixed/free; diff of moved/added/untouched blocks; accept individually or as a batch; stale proposals invalidated by timetable changes) and the assignment workspace (outline sections, draft references by wallet uid or link, submission record with learner-recorded receipt, feedback refs, source list) built on projects/readings/tasks.
 **Out**: LMS or provider connections; any wellbeing or QTS score.
 **Gate**: accepting twice never duplicates; Undo touches only its batch; a deadline change updates the linked view without a duplicate pin; receipts survive backup by uid; resubmission adds history.

@@ -403,6 +403,38 @@ export interface AcademicProjectRec {
   result?: { text: string; source: string }
   /** approval planning for a classroom enquiry — recorded, not a workflow */
   enquiry?: { context?: string; participants?: string; consent?: string; risks?: string; approval?: string }
+  // E03 (Pass 84): the assignment workflow beyond milestones — all learner-recorded.
+  /** versioned outline sections; the revision bumps on every change */
+  outline?: { id: string; title: string; notes?: string; done?: boolean }[]
+  outlineRevision?: number
+  outlineAt?: number
+  /** draft references: a wallet file by its stable uid, or an external link */
+  drafts?: { id: string; kind: 'wallet' | 'link'; uid?: string; url?: string; label: string; at: number }[]
+  /** submission history — a resubmission APPENDS; a receipt is a wallet uid, learner-recorded, never institution-verified */
+  submissions?: { id: string; submittedAt: number; channel: string; receiptUid?: string; note?: string }[]
+  /** feedback references: a wallet file, a link, or pasted text — each with its source */
+  feedbackRefs?: { id: string; kind: 'wallet' | 'link' | 'text'; uid?: string; url?: string; text?: string; source: string; at: number }[]
+  /** the source list — entered by the learner; nothing here is generated */
+  sources?: { id: string; title: string; url?: string; author?: string; note?: string; at: number }[]
+  at: number
+}
+
+/**
+ * E02 (Pass 84): a weekly review over the workload planner. Holds the
+ * learner's reflection and the batches of changes they accepted (what was
+ * added, what was removed verbatim) so Undo reverses exactly one batch and
+ * the same proposals are never accepted twice. `basisHash` fingerprints the
+ * timetable/commitment basis the last accepted proposals were computed
+ * against; a different basis is named as the reason for a recalculation.
+ */
+export interface WeeklyReviewRec {
+  id: string
+  /** Monday of the week reviewed */
+  weekISO: string
+  reflection?: string
+  proposalRevision: number
+  basisHash?: string
+  batches: { id: string; at: number; addedIds: string[]; removed: PlanChildRec[]; changesHash: string }[]
   at: number
 }
 
@@ -567,6 +599,7 @@ export interface AdminFile {
   homework: HomeworkRec[]
   learningThreads: LearningThreadRec[]
   transitions: PlacementTransitionRec[]
+  weeklyReviews: WeeklyReviewRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -603,6 +636,7 @@ export const EMPTY_ADMIN: AdminFile = {
   homework: [],
   learningThreads: [],
   transitions: [],
+  weeklyReviews: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`

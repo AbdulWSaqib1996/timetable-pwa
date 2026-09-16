@@ -2019,7 +2019,7 @@ export default function App() {
 
       {openSheet === 'knowledge' && <KnowledgeSheet admin={adminFile} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
 
-      {openSheet === 'academic' && <AcademicSheet admin={adminFile} keyDates={allKeyDates} todayISO={todayISO} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
+      {openSheet === 'academic' && <AcademicSheet admin={adminFile} keyDates={allKeyDates} todayISO={todayISO} profileId={active.id} onUpdateAdmin={updateAdmin} onClose={() => setOpenSheet('none')} />}
 
       {openSheet === 'workload' && settings && (
         <WorkloadSheet
