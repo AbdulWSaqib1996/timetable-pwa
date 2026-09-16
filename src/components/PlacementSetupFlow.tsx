@@ -29,6 +29,8 @@ interface Props {
   onSave: (next: PlacementSetupResult, mirror: PlacementMirror) => void
   /** PL-02: set the home address inline instead of leaving the flow */
   onSetHome?: (patch: Pick<Settings, 'homeAddress' | 'homeLat' | 'homeLng'>) => void
+  /** PL-06 (Pass 88): edit ONE section of a saved placement — review the changes, then apply */
+  section?: 'school' | 'people' | 'pattern' | 'mapping'
   onOpenSettings: () => void
   onClose: () => void
 }
@@ -77,7 +79,7 @@ const hhmm = (m: number) => {
  * end after it starts (PL-05); the return-destination action is a real button
  * with its own name (UX-02).
  */
-export function PlacementSetupFlow({ code, placementId, placements, schools, settings, blocks, profileId, onSave, onSetHome, onOpenSettings, onClose }: Props) {
+export function PlacementSetupFlow({ code, placementId, placements, schools, settings, blocks, profileId, onSave, onSetHome, onOpenSettings, onClose, section }: Props) {
   const existing = useMemo(
     () => (placementId ? placements.find((p) => p.id === placementId) : code ? placements.find((p) => p.code === code) : undefined),
     [placementId, code, placements]
@@ -87,7 +89,7 @@ export function PlacementSetupFlow({ code, placementId, placements, schools, set
   const proposalsFor = (c: string, current: string) => blocks.map((b) => b.tag).filter((t) => proposePlacementCode(t) === c && !(placementForTag(placements, t) && placementForTag(placements, t)!.id !== current))
   const fresh = (): FlowDraft => {
     const placement: PlacementRec = existing ?? { id: newAdminId(), code: code ?? 'SE1', mappedBlockTags: [], at: 0 }
-    return { step: existing ? 'school' : 'code', placement, school: existingSchool ?? null, tags: existing ? existing.mappedBlockTags : proposalsFor(placement.code, placement.id), tagsTouched: !!existing, hoursOn: !!existing?.workingHours }
+    return { step: existing ? section ?? 'school' : 'code', placement, school: existingSchool ?? null, tags: existing ? existing.mappedBlockTags : proposalsFor(placement.code, placement.id), tagsTouched: !!existing, hoursOn: !!existing?.workingHours }
   }
   const initial = useMemo(fresh, []) // eslint-disable-line react-hooks/exhaustive-deps
   const draftId = initial.placement.id
@@ -108,6 +110,9 @@ export function PlacementSetupFlow({ code, placementId, placements, schools, set
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [codeChoice, setCodeChoice] = useState<PlacementCode | null>(null)
   const [draftState, setDraftState] = useState<'none' | 'saved' | 'failed'>('none')
+  const [reviewing, setReviewing] = useState(false)
+  const sectionOnly = !!existing && !!section
+  const SECTION_TITLE: Record<Step, string> = { code: 'Placement', school: 'Edit school', people: 'Edit mentor & dates', pattern: 'Edit school day & travel', mapping: 'Edit timetable links' }
   const [home, setHome] = useState({ address: settings.homeAddress ?? '', status: 'idle' as 'idle' | 'working' | 'fail' })
   const geoRequest = useRef(0)
 
@@ -272,6 +277,27 @@ export function PlacementSetupFlow({ code, placementId, placements, schools, set
     })
   }
 
+  /** PL-06: what this section edit will change, old → new, so the learner reviews before applying. */
+  const changes = (() => {
+    const out: { label: string; from: string; to: string }[] = []
+    const str = (v: unknown) => (v === undefined || v === null || v === '' ? '—' : Array.isArray(v) ? v.join(', ') || '—' : typeof v === 'object' ? JSON.stringify(v) : String(v))
+    const cmp = (label: string, a: unknown, b: unknown) => { if (JSON.stringify(a ?? null) !== JSON.stringify(b ?? null)) out.push({ label, from: str(a), to: str(b) }) }
+    cmp('School name', existingSchool?.name, school?.name)
+    cmp('Address', existingSchool?.address, school?.address)
+    cmp('Pin', existingSchool?.lat != null && locationCurrent(existingSchool) ? 'confirmed' : 'not confirmed', school?.lat != null && locationCurrent(school) && school.confirmedAt ? 'confirmed' : 'not confirmed')
+    cmp('Entrance note', existingSchool?.entranceNote, school?.entranceNote)
+    cmp('Mentor', existing?.mentorName, placement.mentorName)
+    cmp('Mentor contact', existing?.mentorContact, placement.mentorContact)
+    cmp('Starts', existing?.startISO, placement.startISO)
+    cmp('Ends', existing?.endISO, placement.endISO)
+    cmp('Notes', existing?.notes, placement.notes)
+    cmp('Hours', existing?.workingHours ? `${existing.workingHours.start}–${existing.workingHours.end}` : 'default', hoursOn && placement.workingHours ? `${placement.workingHours.start}–${placement.workingHours.end}` : 'default')
+    cmp('Arrive early by', existing?.arrivalBufferMins, placement.arrivalBufferMins)
+    cmp('Inset days count', existing?.insetCountsAsSchoolDay, placement.insetCountsAsSchoolDay)
+    cmp('Timetable blocks', [...(existing?.mappedBlockTags ?? [])].sort(), [...tags].sort())
+    return out
+  })()
+
   const cancel = () => {
     if (dirty && profileId && !confirmCancel) {
       setConfirmCancel(true)
@@ -291,7 +317,7 @@ export function PlacementSetupFlow({ code, placementId, placements, schools, set
   return (
     <Dialog label={`Set up ${placement.code}`} onClose={cancel} className="sheet-placement-flow">
       <div className="sheet-header">
-        <h2>{existing ? `Edit ${placement.code}` : `Set up ${placement.code}`}</h2>
+        <h2>{sectionOnly ? `${SECTION_TITLE[step]} · ${placement.code}` : existing ? `Edit ${placement.code}` : `Set up ${placement.code}`}</h2>
         <button type="button" className="icon-btn" aria-label="Close" onClick={cancel}>
           <IconClose />
         </button>
@@ -308,6 +334,7 @@ export function PlacementSetupFlow({ code, placementId, placements, schools, set
           </div>
         </div>
       )}
+      {!sectionOnly && (
       <ol className="setup-steps" aria-label="Setup steps">
         {STEPS.map((s, i) => (
           <li key={s.id} className={s.id === step ? 'is-current' : i < idx ? 'is-done' : ''} aria-current={s.id === step ? 'step' : undefined}>
@@ -315,6 +342,7 @@ export function PlacementSetupFlow({ code, placementId, placements, schools, set
           </li>
         ))}
       </ol>
+      )}
 
       {step === 'code' && (
         <>
@@ -505,20 +533,51 @@ export function PlacementSetupFlow({ code, placementId, placements, schools, set
           </div>
         </div>
       )}
+      {reviewing && (
+        <div className="callout callout--amber" role="group" aria-label="Review changes">
+          {changes.length === 0 ? (
+            <p>Nothing has changed.</p>
+          ) : (
+            <>
+              <p>Applying {changes.length} change{changes.length === 1 ? '' : 's'} to {placement.code}. Everything else on this placement, and every other placement, stays as it is.</p>
+              <ul className="workspace-list" aria-label="Changes">
+                {changes.map((c) => (
+                  <li key={c.label} className="workspace-row"><span>{c.label}</span><span className="filter-hint">{c.from} → {c.to}</span></li>
+                ))}
+              </ul>
+            </>
+          )}
+          <div className="btn-row">
+            <button type="button" className="btn-primary" disabled={changes.length === 0} onClick={save}>Save changes</button>
+            <button type="button" className="btn-today-reset" onClick={() => setReviewing(false)}>Keep editing</button>
+          </div>
+        </div>
+      )}
       <div className="btn-row setup-nav">
-        {idx > 0 && (
-          <button type="button" className="btn-today-reset" onClick={() => setStep(STEPS[idx - 1].id)}>
-            Back
-          </button>
-        )}
-        {step !== 'mapping' ? (
-          <button type="button" className="btn-primary" onClick={next}>
-            Next
-          </button>
+        {sectionOnly ? (
+          !reviewing && (
+            <button type="button" className="btn-primary" onClick={() => { if (step === 'pattern') { const he = hoursCheck(); setHoursError(he); if (he) return } setReviewing(true) }}>
+              Review changes
+            </button>
+          )
         ) : (
-          <button type="button" className="btn-primary" onClick={save}>
-            Save placement
-          </button>
+          <>
+            {idx > 0 && (
+              <button type="button" className="btn-today-reset" onClick={() => setStep(STEPS[idx - 1].id)}>
+                Back
+              </button>
+            )}
+            {step !== 'mapping' ? (
+              <button type="button" className="btn-primary" onClick={next}>
+                Next
+              </button>
+            ) : (
+              <button type="button" className="btn-primary" onClick={save}>
+                Save placement
+              </button>
+            )}
+            {dirty && profileId && <button type="button" className="btn-today-reset" onClick={onClose}>Save draft &amp; close</button>}
+          </>
         )}
         <button type="button" className="btn-ghost" onClick={cancel}>
           Cancel

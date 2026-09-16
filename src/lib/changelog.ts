@@ -7,6 +7,17 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 22,
+    dateISO: '2026-09-16',
+    title: 'Placements you can edit in place; homework where you expect it',
+    items: [
+      'A session has four sections — Overview, Homework, Notes, Travel & map — with the homework count beside its name. Homework is a readable list; Add homework opens the editor when you want it',
+      'A saved placement is edited one part at a time from its page: Edit school, Edit mentor & dates, Edit school day & travel, Edit timetable links — you review the exact changes before they apply, and nothing else on that or any other placement moves',
+      'The placements page gives every school the same Open and Edit pair, with readiness shown separately; the guided setup keeps a draft with Save draft & close',
+      'When your timetable has placement blocks, an optional review of your three schools appears once after you choose your specialism — set one up now, or finish later; the timetable is never blocked',
+    ],
+  },
+  {
     version: 21,
     dateISO: '2026-09-16',
     title: 'Homework you can edit, reschedule and trust',

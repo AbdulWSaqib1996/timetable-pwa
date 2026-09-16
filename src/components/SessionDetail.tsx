@@ -186,10 +186,12 @@ export function SessionDetail({
   const status = meta?.status ?? 'todo'
   const setStatus = (next: 'todo' | 'doing' | 'done') => (onStatus ? onStatus(next) : onMeta({ status: next }))
   const dueHomework = homeworkDue ?? []
+  // UX-01: the count beside the Homework section — due here plus set here.
+  const homeworkCount = dueHomework.length + (homeworkAll ?? []).filter((h) => h.setSessionRef === sessionKey(session) || (homeworkLesson && h.lessonId === homeworkLesson.id)).length
   // Homework can be set from any real teaching occurrence (never from a deadline pin).
   const canSetHomework = !isTask && !session.isFreeTime && !!onUpdateAdmin && !!courseSessions && !!homeworkAll && !!todayISO
   const titleSplit = splitTitle(session.title)
-  const [tab, setTab] = useState<'overview' | 'travel'>('overview')
+  const [tab, setTab] = useState<'overview' | 'homework' | 'notes' | 'travel'>('overview')
   useEffect(() => {
     if (tab === 'travel') telemetryTrack('journey_session_opened')
   }, [tab])
@@ -780,6 +782,24 @@ export function SessionDetail({
               </p>
             </section>
           )}
+        </>
+      )}
+      {!isTask && homeworkCount > 0 && (
+        <p className="filter-hint detail-homework-pointer">
+          <button type="button" className="travel-link" onClick={() => setTab('homework')}>{homeworkCount} homework — open the Homework section</button>
+        </p>
+      )}
+      {!isTask && travel && (
+        <button type="button" className="btn-primary btn-wide detail-travel-cta" onClick={() => setTab('travel')}>
+          <IconPin size={18} /> Travel to this session
+        </button>
+      )}
+    </div>
+  )
+
+  // UX-01 (Pass 88): homework and notes are their own sections of the navigator, not buried under travel and place.
+  const homeworkPanel = !isTask ? (
+    <div className="detail-tabpanel" role="tabpanel" aria-label="Homework" hidden={tab !== 'homework'}>
           {(dueHomework.length > 0 || canSetHomework) && (
             <section className="ui-card detail-card detail-section" aria-labelledby="detail-homework-heading">
               <div className="section-title">
@@ -822,6 +842,7 @@ export function SessionDetail({
                   todayISO={todayISO!}
                   onUpdateAdmin={onUpdateAdmin!}
                   label="Homework set in this session"
+                  collapsed
                   profileId={profileId}
                   onOpenHomework={onOpenHomework}
                   onRemove={onRemoveHomework}
@@ -829,6 +850,11 @@ export function SessionDetail({
               )}
             </section>
           )}
+      {dueHomework.length === 0 && !canSetHomework && <p className="filter-hint">No homework is due in or set from this session.</p>}
+    </div>
+  ) : null
+  const notesPanel = !isTask ? (
+    <div className="detail-tabpanel" role="tabpanel" aria-label="Notes" hidden={tab !== 'notes'}>
           <section className="ui-card detail-card detail-section" aria-labelledby="detail-notes-heading">
             <div className="section-title">
               <span className="ui-tile ui-tile--violet" aria-hidden="true">
@@ -925,15 +951,8 @@ export function SessionDetail({
               </label>
             </div>
           </section>
-        </>
-      )}
-      {!isTask && travel && (
-        <button type="button" className="btn-primary btn-wide detail-travel-cta" onClick={() => setTab('travel')}>
-          <IconPin size={18} /> Travel to this session
-        </button>
-      )}
     </div>
-  )
+  ) : null
 
   // One status tone for the summary (V3): live plan / estimate / attention / waiting for an origin.
   const tone = journey.itinerary
@@ -1159,7 +1178,7 @@ export function SessionDetail({
     </div>
   )
 
-  const pageTitle = isTask ? 'Task details' : tab === 'travel' ? 'Travel to session' : 'Session details'
+  const pageTitle = isTask ? 'Task details' : tab === 'travel' ? 'Travel to session' : tab === 'homework' ? 'Session homework' : tab === 'notes' ? 'Session notes' : 'Session details'
   const subtitleLine = `${(titleSplit ? titleSplit.head : session.title).slice(0, 48)} · ${shortDate(session.dateISO)}`
   const body = (
     <>
@@ -1177,20 +1196,24 @@ export function SessionDetail({
         <PageHeader title={pageTitle} subtitle={subtitleLine} />
       )}
       <IdentityReview session={session} profileId={profileId} />
-      {!isTask && travel && (
+      {!isTask && (
         <div className="detail-tabs">
           <SegmentedControl
             label="Session detail sections"
             value={tab}
             options={[
               { value: 'overview', label: 'Overview' },
-              { value: 'travel', label: 'Travel & map' },
+              { value: 'homework', label: `Homework${homeworkCount ? ` (${homeworkCount})` : ''}` },
+              { value: 'notes', label: 'Notes' },
+              ...(travel ? [{ value: 'travel' as const, label: 'Travel & map' }] : []),
             ]}
             onChange={setTab}
           />
         </div>
       )}
       {overview}
+      {homeworkPanel}
+      {notesPanel}
       {travelPanel}
       {presentation === 'sheet' && (
         <div className="modal-actions">

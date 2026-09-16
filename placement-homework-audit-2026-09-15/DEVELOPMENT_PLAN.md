@@ -1,6 +1,6 @@
 # Placement & homework review — phased implementation plan
 
-**Source:** [PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md](PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md) (baseline `3429667`). **Planned:** 16 September 2026, after Passes 83–85 (audit Batch D) shipped. **Status:** Batches 1 and 2 shipped as Passes 86 and 87 (16 September 2026); Batches 3–4 are planned only. Each batch below becomes one release pass under the runbook in `AGENTS.md` (branch, both validation gates, workers first when `shared/` or a worker changes, PLAN.md record, What's new entry).
+**Source:** [PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md](PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md) (baseline `3429667`). **Planned:** 16 September 2026, after Passes 83–85 (audit Batch D) shipped. **Status:** Batches 1–3 shipped as Passes 86–88 (16 September 2026); Batch 4 is planned only. Each batch below becomes one release pass under the runbook in `AGENTS.md` (branch, both validation gates, workers first when `shared/` or a worker changes, PLAN.md record, What's new entry).
 
 ## 1. What the review found, checked against the code as of `0283fe6`
 
@@ -77,6 +77,8 @@ The review's findings were re-read against the current tree. Everything it repor
 **Size**: L.
 
 ### Batch 3 — visual and navigation improvements (Pass 88) — PL-06, UX-01, concepts A–F
+
+> **Status (16 September 2026): implemented as Pass 88** — see PLAN.md. Deviations: the section editor reuses the setup flow in a section mode (one step, a review of old → new values, Save changes) rather than a separate editor component; the permanent placements page is the existing `#/placement` chooser with an Open / Edit pair on every saved card; the onboarding review is a sheet offered once per profile after the specialism picker (only when the timetable has placement blocks and no placement exists) rather than a step inside the setup screen; placement-scoped record creation (preselecting the placement on new records) is deferred to Batch 4.
 
 **In**
 - **Placements page** as the permanent destination: every placement with the same Open / Edit pair, timing and readiness shown separately (concept B, building on Pass 83's timeline).

@@ -27,6 +27,8 @@ interface Props {
   onOpenHomework?: (id: string) => void
   /** HW-02: a removal the caller can offer Undo for */
   onRemove?: (h: HomeworkRec) => void
+  /** UX-01: start with the readable list only; "Add homework" opens the focused editor */
+  collapsed?: boolean
 }
 
 const fmtDay = (iso: string) => {
@@ -45,7 +47,7 @@ const DRAFT_KIND = 'homework-new'
  * its completion, so the tick here, on the Tasks screen, on the Schedule and
  * on the session it is due in are all the same state.
  */
-export function HomeworkPanel({ lesson, session, sessions, homework, todayISO, onUpdateAdmin, label: groupLabel, profileId, onOpenHomework, onRemove }: Props) {
+export function HomeworkPanel({ lesson, session, sessions, homework, todayISO, onUpdateAdmin, label: groupLabel, profileId, onOpenHomework, onRemove, collapsed = false }: Props) {
   const source = useMemo(() => {
     if (session) return session
     const byRef = lesson?.sessionRef ? sessions.find((s) => sessionKey(s) === lesson.sessionRef) : undefined
@@ -61,6 +63,8 @@ export function HomeworkPanel({ lesson, session, sessions, homework, todayISO, o
   const [resetKey, setResetKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [draftNote, setDraftNote] = useState<string | null>(pending ? `Draft from ${new Date(pending.savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} restored` : null)
+  // A kept draft reopens the editor by itself; otherwise a collapsed panel waits for "Add homework".
+  const [open, setOpen] = useState(!collapsed || !!pending)
   // HW-05: the draft follows the source — switching sessions never carries another source's words.
   useEffect(() => {
     if (!profileId) return
@@ -144,6 +148,13 @@ export function HomeworkPanel({ lesson, session, sessions, homework, todayISO, o
           })}
         </ul>
       )}
+      {mine.length === 0 && collapsed && !open && <p className="filter-hint">Nothing set from this session yet.</p>}
+      {!open ? (
+        <div className="btn-row">
+          <button type="button" className="btn-today-reset" onClick={() => setOpen(true)}>Add homework</button>
+        </div>
+      ) : (
+      <div className="homework-editor" role="group" aria-label="New homework">
       {draftNote && <p className="filter-hint" role="status">{draftNote}</p>}
       {/* Counters sit outside the label so the controls keep their plain names. */}
       <Field label="Homework">
@@ -161,10 +172,13 @@ export function HomeworkPanel({ lesson, session, sessions, homework, todayISO, o
       </label>
       {(error || (problem && title.trim())) && <p className="filter-hint field-error" role="alert">{error ?? problem}</p>}
       <div className="btn-row">
-        <button type="button" className="btn-today-reset" disabled={!!problem || !choice} onClick={add}>
-          Add homework
+        <button type="button" className="btn-primary" disabled={!!problem || !choice} onClick={add}>
+          Save homework
         </button>
+        {collapsed && <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>Close</button>}
       </div>
+      </div>
+      )}
     </FieldGroup>
   )
 }

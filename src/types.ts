@@ -157,6 +157,8 @@ export interface Settings {
   groupMinMeeting?: number
   /** setup checklist card permanently dismissed */
   checklistDismissed?: boolean
+  /** the optional onboarding placement review was shown or dismissed (Pass 88) */
+  placementReviewSeen?: boolean
   /** anonymous daily usage ping to the push worker (default on; off switch in Settings) */
   usagePing?: boolean
   /** user-entered placement details, keyed by placement tag (SE1B, SE2…) */

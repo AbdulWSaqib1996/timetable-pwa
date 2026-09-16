@@ -101,6 +101,7 @@ import { CommitmentSheet } from './components/CommitmentSheet'
 import { PlacementPage } from './features/pgce/PlacementPage'
 import { PlacementWorkspacePage } from './features/pgce/PlacementWorkspacePage'
 import { PlacementJourneyPage } from './features/pgce/PlacementJourneyPage'
+import { PlacementReviewSheet } from './components/PlacementReviewSheet'
 import { PlacementTransitionPage } from './features/pgce/PlacementTransitionPage'
 import { TeachingCyclePage } from './features/pgce/TeachingCyclePage'
 import { placementForTag, placementLabel, proposePlacementCode, schoolOf } from './lib/admin'
@@ -167,7 +168,7 @@ export default function App() {
   const [addingProfile, setAddingProfile] = useState(false)
   const [openSheet, setOpenSheet] = useState<SheetName>('none')
   /** which placement the setup flow edits (G1a): a code for a new one, an id for an existing one */
-  const [flowTarget, setFlowTarget] = useState<{ code?: PlacementCode; id?: string }>({})
+  const [flowTarget, setFlowTarget] = useState<{ code?: PlacementCode; id?: string; section?: 'school' | 'people' | 'pattern' | 'mapping' }>({})
   /** G1b: which lesson the workbench shows, and on which stage */
   const [workbench, setWorkbench] = useState<{ lessonId: string; stage?: LessonStage } | null>(null)
   const [stepPrefs, setStepPrefs] = useState<NextStepPrefs>({ dismissed: [], pinned: [] })
@@ -196,6 +197,8 @@ export default function App() {
   const [planUndo, setPlanUndo] = useState<PlanChildRec | null>(null)
   const [taskUndo, setTaskUndo] = useState<TaskRecord | null>(null)
   const [homeworkUndo, setHomeworkUndo] = useState<HomeworkRec | null>(null)
+  // Concept A (Pass 88): the placement review is an onboarding step — offered right after the specialism choice, never sprung on a later visit.
+  const [justChoseSpecialism, setJustChoseSpecialism] = useState(false)
   // Personal-event editor (P5-06): null closed; commitment null = create.
   const [commitmentEdit, setCommitmentEdit] = useState<{ commitment: CommitmentRec | null; dateISO: string; startTime?: string; endTime?: string; kind?: CommitmentRec['kind'] } | null>(null)
   const [commitmentUndo, setCommitmentUndo] = useState<CommitmentRec | null>(null)
@@ -1491,8 +1494,8 @@ export default function App() {
               </div>
             )
           const school = schoolOf(placement, adminFile.schools ?? [])
-          const openFlow = () => {
-            setFlowTarget({ id: placement.id })
+          const openFlow = (section?: 'school' | 'people' | 'pattern' | 'mapping') => {
+            setFlowTarget({ id: placement.id, section })
             setOpenSheet('placementFlow')
           }
           if (route.prepare) {
@@ -1527,7 +1530,7 @@ export default function App() {
               profileId={active.id}
               onBack={() => goBackOr({ name: 'placement', id: placement.id })}
               onOpenSettings={() => navigate({ name: 'settings', section: 'travel' })}
-              onEditPlacement={openFlow}
+              onEditPlacement={() => openFlow()}
             />
           ) : (
             <PlacementWorkspacePage
@@ -1998,7 +2001,30 @@ export default function App() {
               hideOtherSpecialisms: chosen.length > 0 ? true : settings.hideOtherSpecialisms,
             })
             setRechoosing(false)
+            if (!settings.specialismsChosen) setJustChoseSpecialism(true)
           }}
+        />
+      )}
+
+      {/* Concept A (Pass 88): an optional placement review once the specialism is chosen and the timetable has placement blocks. */}
+      {justChoseSpecialism && !showPicker && !settings.placementReviewSeen && !settings.demo && sessions !== null && placementStats.blocks.length > 0 && (adminFile.placements ?? []).length === 0 && openSheet === 'none' && (
+        <PlacementReviewSheet
+          placements={adminFile.placements ?? []}
+          schools={adminFile.schools ?? []}
+          blocks={placementStats.blocks}
+          onSetUp={(code, id) => {
+            updateSettings({ placementReviewSeen: true })
+            setJustChoseSpecialism(false)
+            setFlowTarget({ code, id })
+            setOpenSheet('placementFlow')
+          }}
+          onOpen={(id) => {
+            updateSettings({ placementReviewSeen: true })
+            setJustChoseSpecialism(false)
+            navigate({ name: 'placement', id })
+          }}
+          onLater={() => { updateSettings({ placementReviewSeen: true }); setJustChoseSpecialism(false) }}
+          onContinue={() => { updateSettings({ placementReviewSeen: true }); setJustChoseSpecialism(false) }}
         />
       )}
 
@@ -2042,6 +2068,7 @@ export default function App() {
         <PlacementSetupFlow
           code={flowTarget.code}
           placementId={flowTarget.id}
+          section={flowTarget.section}
           placements={adminFile.placements ?? []}
           schools={adminFile.schools ?? []}
           settings={settings}

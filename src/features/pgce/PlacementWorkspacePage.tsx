@@ -17,7 +17,8 @@ interface Props {
   metaMap: MetaMap
   todayISO: string
   onBack: () => void
-  onEdit: () => void
+  /** PL-06: edit one section directly (or the whole setup when no section is given) */
+  onEdit: (section?: 'school' | 'people' | 'pattern' | 'mapping') => void
   onJourney: (leg: 'out' | 'back') => void
   onOpenAdmin: (tab: AdminTab) => void
   onOpenJournal: () => void
@@ -102,15 +103,33 @@ export function PlacementWorkspacePage({ placement, school, settings, admin, ses
               </button>
             </>
           ) : (
-            <button type="button" className="btn-primary" onClick={onEdit}>
+            <button type="button" className="btn-primary" onClick={() => onEdit()}>
               Complete setup
             </button>
           )}
-          <button type="button" className="btn-today-reset" onClick={onEdit}>
-            Edit setup
-          </button>
         </div>
       </div>
+
+      {/* PL-06 (Pass 88): the school details lead, and each section is edited directly. */}
+      <Card className="pgce-section pgce-section--placement placement-details">
+        <div className="pgce-section-head">
+          <span className="pgce-tile" aria-hidden="true"><IconSchool size={20} /></span>
+          <h2>School details</h2>
+          <span className={`tag tag--${state}`}>{PLACEMENT_STATE_LABEL[state]}</span>
+        </div>
+        <dl className="kv placement-card-facts" aria-label="Placement details">
+          <div><dt>School</dt><dd>{school?.name || 'Not set'}{school?.address ? ` · ${school.address}` : ''}{school?.lat != null && school.confirmedAt ? ' · pin confirmed' : school?.address ? ' · pin not confirmed' : ''}</dd></div>
+          <div><dt>Mentor &amp; dates</dt><dd>{placement.mentorName || 'Mentor not set'}{placement.startISO && placement.endISO ? ` · ${fmtDate(placement.startISO)} – ${fmtDate(placement.endISO)}` : ' · dates not set'}</dd></div>
+          <div><dt>School day &amp; travel</dt><dd>{hours.start}–{hours.end}{placement.workingHours ? '' : ' (default)'} · arrive {placement.arrivalBufferMins ?? settings.arrivalBufferMins ?? 10} min early · inset days {(placement.insetCountsAsSchoolDay ?? policy.insetCounts) ? 'count' : 'do not count'}{placement.returnPlace ? ` · return to ${placement.returnPlace.label}` : ''}</dd></div>
+          <div><dt>Timetable links</dt><dd>{placement.mappedBlockTags.length ? placement.mappedBlockTags.join(', ') : 'No blocks mapped'}</dd></div>
+        </dl>
+        <div className="btn-row">
+          <button type="button" className="btn-today-reset" onClick={() => onEdit('school')}>Edit school</button>
+          <button type="button" className="btn-today-reset" onClick={() => onEdit('people')}>Edit mentor &amp; dates</button>
+          <button type="button" className="btn-today-reset" onClick={() => onEdit('pattern')}>Edit school day &amp; travel</button>
+          <button type="button" className="btn-today-reset" onClick={() => onEdit('mapping')}>Edit timetable links</button>
+        </div>
+      </Card>
 
       <div className="pgce-grid">
         <Card className="pgce-section pgce-section--placement">
@@ -206,7 +225,7 @@ export function PlacementWorkspacePage({ placement, school, settings, admin, ses
           </p>
           <div className="btn-row">
             <button type="button" className="btn-today-reset" onClick={onOpenJournal}>Evidence journal →</button>
-            <button type="button" className="btn-today-reset" onClick={onEdit}>Edit notes</button>
+            <button type="button" className="btn-today-reset" onClick={() => onEdit()}>Edit notes</button>
           </div>
         </Card>
       </div>

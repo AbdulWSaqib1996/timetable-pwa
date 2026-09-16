@@ -172,7 +172,10 @@ test('Session detail: tabs before content, attendance as one grouped 44px choice
   await attended.click()
   await expect(attended).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText('Recorded as attended')).toBeVisible()
+  // Pass 88 (UX-01): the saved line and the note editor live in the Notes section.
+  await tabs.getByRole('tab', { name: 'Notes' }).click()
   await expect(page.getByText(/Last saved on this device/)).toBeVisible()
+  await tabs.getByRole('tab', { name: 'Overview' }).click()
   await absent.click()
   await expect(absent).toHaveAttribute('aria-pressed', 'true')
   await expect(attended).toHaveAttribute('aria-pressed', 'false')
@@ -186,6 +189,7 @@ test('Session detail: tabs before content, attendance as one grouped 44px choice
     return before(tabs, attend) && before(attend, note)
   })
   expect(order).toBe(true)
+  await tabs.getByRole('tab', { name: 'Notes' }).click()
   await expect(page.getByRole('button', { name: 'Add photo' })).toHaveCount(0) // it is a labelled file control, not a button
   await expect(page.getByText('Add photo')).toBeVisible()
   await page.getByRole('tab', { name: 'Travel & map' }).click()
