@@ -1598,7 +1598,7 @@ Automated checks + results: `tests/unit/placement.test.mjs` (+3: per-placement i
 
 Known limits: a reviewed transfer of a block between placements is deferred to Batch 3's section editor (the tag stays disabled with the owner named); the draft is per device (drafts do not sync); the flow still opens on the School step for an existing placement — direct per-section editing is Batch 3.
 
-Released 16 September 2026: workers deployed first (push `8848a7db-1600-48c6-b40b-1eeacb1e3938`, feed `312df112-7830-4bed-9032-084ba8af20f3`); merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 16 September 2026: workers deployed first (push `8848a7db-1600-48c6-b40b-1eeacb1e3938`, feed `312df112-7830-4bed-9032-084ba8af20f3`); merge `c515da9`, CI run 35080417115 success, `deploy.sh verify` seven PASS.
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
