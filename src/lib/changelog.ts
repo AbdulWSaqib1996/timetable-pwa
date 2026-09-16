@@ -7,6 +7,17 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 20,
+    dateISO: '2026-09-16',
+    title: 'Placement setup you can trust',
+    items: [
+      'Changing a school’s address drops its old map pin and confirmation, so journeys never quietly use a location for a different address — locate and confirm again, and a slow reply for the old address can no longer confirm the new one',
+      'Your setup edits are kept as a draft: opening Settings, reloading or closing the sheet offers Resume or Discard rather than losing them, and Cancel asks first. Your home address can be set inside the flow',
+      'Each placement’s own choice about inset days and working hours now drives its school-day count, the Schedule and reminders; the profile default applies only where a placement has no override',
+      'Changing a new placement’s code regenerates its suggested timetable blocks, and asks before replacing links you edited; a school day must end after it starts',
+    ],
+  },
+  {
     version: 19,
     dateISO: '2026-09-16',
     title: 'One honest view of where your data is',

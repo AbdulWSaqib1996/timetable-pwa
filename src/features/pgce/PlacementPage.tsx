@@ -74,7 +74,7 @@ export function PlacementPage({
   chooser,
 }: Props) {
   const policy = placementPolicy(settings)
-  const blocks = placementBlocks(sessions, exceptions, settings, (s) => metaMap[sessionKey(s)])
+  const blocks = placementBlocks(sessions, exceptions, settings, (s) => metaMap[sessionKey(s)], placements)
   const [editDay, setEditDay] = useState<PlacementDayView | null>(null)
 
   const dayStatus = (d: PlacementDayView): string => {
