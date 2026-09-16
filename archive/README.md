@@ -11,5 +11,6 @@ Every planning package that has been fully delivered lives here, moved from the 
 | [enhancements/2026-09-10-visual-ui/](enhancements/2026-09-10-visual-ui/) | Visual UI audit V0–V5, `design.css`, gap audit, capture matrix | Passes 56–67 |
 | [enhancements/2026-09-11-pgce-student-experience/](enhancements/2026-09-11-pgce-student-experience/) | PGCE / QTS student-experience audit, batches G0–G4 | Passes 68–73 |
 | [enhancements/2026-09-13-project-audit/](enhancements/2026-09-13-project-audit/) | Whole-project audit of 13 September: bugs B01–B10, usability U01–U05, connected workflows E01–E05, with concepts and evidence | Passes 77–79 and 83–85 (owner requests in between as 80–82) |
+| [enhancements/2026-09-15-placement-homework/](enhancements/2026-09-15-placement-homework/) | Placement and session-homework review of 15 September: placement correctness PL-01–06, homework lifecycle HW-01–05, UX-01/02, connected workflows NF-01–05 | Passes 86–89 |
 
-Active packages stay at the repo root until they are complete (as of 16 September 2026: `placement-homework-audit-2026-09-15/`).
+Active packages stay at the repo root until they are complete (as of 16 September 2026: none).
