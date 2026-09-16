@@ -1634,6 +1634,18 @@ Known limits: placement-scoped creation of new records (preselecting the placeme
 
 Released 16 September 2026: merge `df943f5`, CI run 35086178126 success, `deploy.sh verify` seven PASS (app only — no worker deploy).
 
+### Pass 88 addendum — homework editor overflow and session search (owner report, 16 September 2026)
+
+Owner, with screenshots from an iPhone: "The adding homework view is messed up. It extends past the screen. The find session does not work. It doesn't display anything." Reproduced in the preview at 375px: `.due-chooser` was a CSS grid whose items kept `min-width: auto`, so the select's long option labels forced the fields to 412px inside a 305px card — the page scrolled sideways and iOS zoomed, which is the oversized text in the screenshot; and the search box only narrowed the options inside the closed native select, so on a phone nothing visibly changed. Branch `homework-chooser-fix`, app only.
+
+- `.due-chooser` uses `minmax(0, 1fr)` with `min-width: 0` on its children and full-width controls; the four-section strip lets its segments shrink and scrolls rather than clipping.
+- `DueChooser` renders the matches as a visible list (`Matching sessions`, up to 25, later occurrences tagged) — tapping one selects it in the chooser — with "No session matches …" and a "keep typing" line beyond 25.
+- What's new 23.
+
+Automated checks + results: `homework-batch2` HW-05 now clicks a match from the list, checks the empty state and that the list goes away with the query; `placement-batch3` UX-01 asserts the open editor never widens the page and the Travel & map tab stays in view at 390px. `npm run validate` AND `VERCEL=1 npm run validate` green — **234 unit and 211 browser tests** (a first run with the dev preview server still open timed out thirteen unrelated tests over 20 minutes; on a quiet machine every one passes).
+
+Released 16 September 2026: merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
 The owner asked for the deployment of `archive/enhancements/2026-09-11-pgce-student-experience/PGCE_QTS_STUDENT_EXPERIENCE_AUDIT.md` to be planned in batches. The plan is [archive/enhancements/2026-09-11-pgce-student-experience/DEVELOPMENT_PLAN.md](archive/enhancements/2026-09-11-pgce-student-experience/DEVELOPMENT_PLAN.md): G0 (Pass 68) placement/provenance foundations and a reviewable tag migration; G1a (Pass 69) P1/P2/P3 school workspaces with outward/return journeys plus the course-aware roadmap; G1b (Pass 70) lesson workbench, practice cycle and mentor preparation; G2 (Pass 71) knowledge goals, academic workspace, workload; G3 (Pass 72) evidence narratives, experience ledger, review packs; G4 (portal) only on a separate go-ahead. Owner questions are in its §5. G0–G3 shipped as Passes 68–72; the package is archived at [archive/enhancements/2026-09-11-pgce-student-experience/](archive/enhancements/2026-09-11-pgce-student-experience/README.md). G4 (mentor portal) shipped as Pass 73 on the owner's go-ahead.

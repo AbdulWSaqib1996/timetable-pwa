@@ -6252,9 +6252,17 @@ body { font-size: 16px; line-height: 1.45; }
 .homework-row .requirement-confirm { display: flex; gap: 10px; }
 .homework-row-details { display: block; }
 .homework-details { white-space: pre-wrap; }
-.due-chooser { display: grid; gap: 8px; }
+.due-chooser { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
+.due-chooser > * { min-width: 0; }
+.due-chooser input, .due-chooser select { width: 100%; max-width: 100%; box-sizing: border-box; }
+.due-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.due-results button { width: 100%; text-align: left; }
+.due-results .tag { margin-left: 6px; }
 
 /* ---- Pass 88: the placements page fits 320px (its hours/policy row wraps instead of overflowing) ---- */
 .page-placement .task-edit-row { flex-wrap: wrap; }
 .page-placement .task-edit-row > * { min-width: 0; flex: 1 1 120px; }
 .placement-details .placement-card-facts dd { overflow-wrap: anywhere; }
+/* Pass 88 fix: four detail sections fit a phone; on very narrow screens the strip scrolls rather than clipping. */
+.detail-tabs .segmented { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.detail-tabs .segment { flex: 1 1 auto; padding: 8px 10px; }

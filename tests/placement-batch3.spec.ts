@@ -64,6 +64,9 @@ test('UX-01: the session detail has Overview, Homework, Notes and Travel section
   await expect(panel).toContainText('Nothing set from this session yet.')
   await expect(panel.getByLabel('Homework', { exact: true })).toHaveCount(0)
   await panel.getByRole('button', { name: 'Add homework' }).click()
+  // The open editor never widens the page (owner report, 16 Sep 2026: the chooser overflowed and iOS zoomed).
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+  await expect(tabs.getByRole('tab', { name: 'Travel & map' })).toBeInViewport()
   await panel.getByLabel('Homework', { exact: true }).fill('Read chapter 3')
   const due = panel.getByRole('combobox', { name: 'Due in', exact: true })
   await due.selectOption((await due.locator('optgroup[label="Later occurrences of this lesson"] option').first().getAttribute('value'))!)

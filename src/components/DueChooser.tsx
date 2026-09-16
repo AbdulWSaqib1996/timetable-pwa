@@ -84,6 +84,20 @@ export function DueChooser({ sessions, family, after, onChange, onSubmit, submit
         </select>
       </Field>
       <p className="filter-hint">{suggested.length === 0 ? 'No later occurrence of this session in the timetable — choose another session or a date.' : `${suggested.length} later occurrence${suggested.length === 1 ? '' : 's'} of this session, then every other eligible session.`}</p>
+      {q && (
+        <ul className="due-results" aria-label="Matching sessions">
+          {[...shownSuggested.map((s) => ({ s, suggested: true })), ...shownAll.map((s) => ({ s, suggested: false }))].slice(0, 25).map(({ s, suggested }) => (
+            <li key={sessionKey(s)}>
+              <button type="button" className={`workspace-row${target === sessionKey(s) ? ' is-selected' : ''}`} aria-pressed={target === sessionKey(s)} onClick={() => setTarget(sessionKey(s))}>
+                <span>{occurrenceLabel(s)}</span>
+                {suggested ? <span className="tag tag--teal">later occurrence</span> : null}
+              </button>
+            </li>
+          ))}
+          {shownSuggested.length + shownAll.length === 0 && <li className="filter-hint">No session matches “{query.trim()}”.</li>}
+          {shownSuggested.length + shownAll.length > 25 && <li className="filter-hint">{shownSuggested.length + shownAll.length - 25} more — keep typing to narrow the list.</li>}
+        </ul>
+      )}
       {staleChoice && <p className="setup-error" role="alert">That session is no longer available — choose again.</p>}
       {target === 'date' && (
         <Field label="Due date">
