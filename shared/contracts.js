@@ -1,18 +1,20 @@
 import { validAttestation } from './mentor.js'
 import { MAX_EFFORT_MINS } from './planValidation.js'
 import { HOMEWORK_DETAILS_MAX, HOMEWORK_STATES, HOMEWORK_TITLE_MAX } from './homework.js'
+import { THREAD_NEXT_ACTION_MAX, THREAD_REFS_MAX, THREAD_STATES, THREAD_TITLE_MAX } from './threads.js'
+import { TRANSITION_CONTEXT_MAX, TRANSITION_STATES } from './transitions.js'
 /** Runtime-neutral input contracts, shared by browser and workers. */
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 export const MAX_SYNC_BYTES = 2 * 1024 * 1024
-export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework']
+export const collections = ['reflections', 'targets', 'meetings', 'observations', 'lessons', 'audits', 'tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions']
 /** Collections added in Phase 5 and G0 — absent in older payloads/backups, so their
  *  arrays are optional on read and treated as empty. */
-export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework']
+export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments', 'placements', 'schools', 'programmes', 'packs', 'requirements', 'milestones', 'cycles', 'preps', 'goals', 'resources', 'projects', 'readings', 'contacts', 'questions', 'protected', 'supportNotes', 'examples', 'reviewPacks', 'experience', 'reviews', 'homework', 'learningThreads', 'transitions']
 /** Feedback provenance (G0): a client may only record its own account; an
  *  authenticated reviewer state needs the (future) portal. */
 export const clientSourceTypes = ['personal-reflection', 'learner-entered']
 /** AdminFile schema version written by this client; unknown newer fields are preserved, never dropped. */
-export const ADMIN_SCHEMA_VERSION = 9
+export const ADMIN_SCHEMA_VERSION = 10
 export function assert(condition, message) { if (!condition) throw new Error(message) }
 export function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 export function safeURL(value) {
@@ -96,7 +98,7 @@ export function validatePayload(data) {
           for (const item of value[key]) {
             assert(object(item) && typeof item.id === 'string' && !seen.has(item.id) && Number.isFinite(item.at), 'Invalid admin record.')
             seen.add(item.id)
-            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text'],examples:['title','context'],reviewPacks:['title','state','createdISO'],experience:['dateISO','type','layer'],reviews:['dateISO'],homework:['title','status','dueISO','setISO']}
+            const strings = {reflections:['weekISO','wentWell','challenges','focus'],targets:['text','setISO','status'],meetings:['dateISO','discussed'],observations:['dateISO','observer','subject','focus','strengths','development'],lessons:['dateISO','classGroup','subject','evaluation'],audits:['subject','stage','note','dateISO'],tasks:['title','dueISO','status'],exceptions:['tag','dateISO','kind'],plans:['parentId','kind','title'],commitments:['title','dateISO','startTime','endTime','kind'],placements:['code'],schools:['name'],programmes:['route'],packs:['label','ownerSource'],requirements:['packId','section','title','verification'],milestones:['kind','title','dateISO','state'],cycles:['focus','state'],preps:['dateISO','state'],goals:['topic','state'],resources:['title'],projects:['title','status'],readings:['projectId','kind','text'],contacts:['name'],questions:['text'],protected:['start','end'],supportNotes:['text'],examples:['title','context'],reviewPacks:['title','state','createdISO'],experience:['dateISO','type','layer'],reviews:['dateISO'],homework:['title','status','dueISO','setISO'],learningThreads:['state'],transitions:['toPlacementId','state']}
             for (const field of strings[key]) assert(typeof item[field] === 'string', 'Invalid admin field: ' + field)
             for (const field of ['dateISO','weekISO','setISO','metISO','dueISO','completedISO','startISO','endISO','effectiveFromISO','effectiveToISO','doneISO']) if (item[field]) assert(validDate(item[field]), 'Invalid admin date.')
             // G0: typed placement links and feedback provenance are additive and format-checked;
@@ -116,6 +118,12 @@ export function validatePayload(data) {
               if (item.workingHours !== undefined) assert(object(item.workingHours) && validTime(item.workingHours.start) && validTime(item.workingHours.end), 'Invalid placement hours.')
               if (item.arrivalBufferMins !== undefined) assert(Number.isInteger(item.arrivalBufferMins) && item.arrivalBufferMins >= 0 && item.arrivalBufferMins <= 180, 'Invalid arrival buffer.')
               for (const field of ['mentorName','mentorContact','notes','returnPlaceId']) if (item[field] !== undefined) assert(typeof item[field] === 'string' && item[field].length <= 2000, 'Invalid placement field: ' + field)
+              if (item.returnPlace !== undefined) {
+                // E04: an optional return destination for THIS placement (e.g. temporary accommodation); home stays the fallback.
+                const r = item.returnPlace
+                assert(object(r) && typeof r.label === 'string' && r.label.trim() !== '' && r.label.length <= 120 && Number.isFinite(r.lat) && Number.isFinite(r.lng) && Math.abs(r.lat) <= 90 && Math.abs(r.lng) <= 180, 'Invalid placement return destination.')
+                if (r.address !== undefined) assert(typeof r.address === 'string' && r.address.length <= 300, 'Invalid placement return address.')
+              }
             }
             if (key === 'lessons') {
               // G1b workbench fields are additive text; a stage is a label, never an outcome.
@@ -243,6 +251,27 @@ export function validatePayload(data) {
             for (const field of ['dueTime','startTime','endTime']) if (item[field] !== undefined) assert(validTime(item[field]), 'Invalid admin time.')
             if (key === 'meetings') assert(Array.isArray(item.actions) && item.actions.every(a => object(a) && typeof a.id === 'string' && typeof a.text === 'string' && typeof a.done === 'boolean'), 'Invalid meeting actions.')
             if (key === 'tasks') assert(['todo','doing','done'].includes(item.status), 'Invalid task status.')
+            if (key === 'learningThreads') {
+              // E01: references only — ids of lessons/observations, a cycle, the learner's next action.
+              assert(THREAD_STATES.includes(item.state), 'Invalid thread state.')
+              for (const f of ['lessonIds','observationIds']) assert(Array.isArray(item[f] ?? []) && (item[f] ?? []).length <= THREAD_REFS_MAX && (item[f] ?? []).every((x) => typeof x === 'string' && /^[\w-]{1,100}$/.test(x)), 'Invalid thread references: ' + f)
+              for (const f of ['cycleId','nextLessonId']) if (item[f] !== undefined) assert(typeof item[f] === 'string' && /^[\w-]{1,100}$/.test(item[f]), 'Invalid thread link: ' + f)
+              if (item.title !== undefined) assert(typeof item.title === 'string' && item.title.length <= THREAD_TITLE_MAX, 'Invalid thread title.')
+              if (item.nextAction !== undefined) assert(typeof item.nextAction === 'string' && item.nextAction.length <= THREAD_NEXT_ACTION_MAX, 'Invalid thread next action.')
+              if (item.revision !== undefined) assert(Number.isInteger(item.revision) && item.revision >= 0, 'Invalid thread revision.')
+            }
+            if (key === 'transitions') {
+              // E04: checklist state and what was reviewed — never a copy of a placement.
+              assert(TRANSITION_STATES.includes(item.state), 'Invalid transition state.')
+              assert(/^[\w-]{1,100}$/.test(item.toPlacementId), 'Invalid transition placement link.')
+              if (item.fromPlacementId !== undefined) assert(typeof item.fromPlacementId === 'string' && /^[\w-]{1,100}$/.test(item.fromPlacementId), 'Invalid transition placement link.')
+              if (item.contextNote !== undefined) assert(typeof item.contextNote === 'string' && item.contextNote.length <= TRANSITION_CONTEXT_MAX, 'Invalid transition context.')
+              if (item.travelReviewed !== undefined) assert(object(item.travelReviewed) && Number.isFinite(item.travelReviewed.at) && Number.isFinite(item.travelReviewed.lat) && Number.isFinite(item.travelReviewed.lng), 'Invalid transition travel review.')
+              if (item.sharesReviewed !== undefined) assert(object(item.sharesReviewed) && Number.isFinite(item.sharesReviewed.at) && Array.isArray(item.sharesReviewed.packIds) && item.sharesReviewed.packIds.length <= 200 && item.sharesReviewed.packIds.every((x) => typeof x === 'string' && x.length <= 100), 'Invalid transition share review.')
+              if (item.carryTargetIds !== undefined) assert(Array.isArray(item.carryTargetIds) && item.carryTargetIds.length <= 200 && item.carryTargetIds.every((x) => typeof x === 'string' && x.length <= 100), 'Invalid transition carry-forward list.')
+              if (item.confirmedStartISO !== undefined) assert(validDate(item.confirmedStartISO), 'Invalid transition date.')
+              if (item.doneAt !== undefined) assert(Number.isFinite(item.doneAt), 'Invalid transition time.')
+            }
             if (key === 'homework') {
               // Homework a lesson set, due in a later occurrence (owner request, 15 Sep 2026).
               assert(typeof item.title === 'string' && item.title.trim() !== '' && item.title.length <= HOMEWORK_TITLE_MAX, 'Invalid homework title.')

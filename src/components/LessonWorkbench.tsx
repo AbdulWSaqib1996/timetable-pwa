@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { Dialog, Field, FieldGroup, IconClose, tabKeys } from './ui'
 import { HomeworkPanel } from './HomeworkPanel'
 import { LESSON_TEMPLATES, activateCycle, nextAttempt, provenanceLabel, withPlanRevision } from '../../shared/practice.js'
+import { THREAD_STAGE_LABEL, makeThread, threadOfLesson, threadSteps } from '../../shared/threads.js'
 import { newAdminId } from '../lib/admin'
-import type { AdminFile, Lesson, LessonStage, Observation, PracticeCycleRec } from '../lib/admin'
+import type { AdminFile, LearningThreadRec, Lesson, LessonStage, Observation, PracticeCycleRec } from '../lib/admin'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import { sessionKey } from '../lib/diff'
 import type { Session } from '../types'
@@ -19,6 +20,8 @@ interface Props {
   onAddRehearsalBlock: (lesson: Lesson, block: { dateISO: string; startTime: string; endTime: string }) => void
   /** open on a given stage (a Today next step); otherwise the lesson's own stage */
   initialStage?: LessonStage
+  /** E01: open "This teaching cycle" for the thread this lesson belongs to */
+  onOpenThread?: (threadId: string) => void
   onClose: () => void
 }
 
@@ -48,7 +51,7 @@ const fmt = (iso: string) => {
  * identity without copying outcomes. The quick retrospective lesson form in
  * the PGCE file is untouched.
  */
-export function LessonWorkbench({ lessonId: initialId, admin, sessions, placementOptions, todayISO, onUpdateAdmin, onAddRehearsalBlock, initialStage, onClose }: Props) {
+export function LessonWorkbench({ lessonId: initialId, admin, sessions, placementOptions, todayISO, onUpdateAdmin, onAddRehearsalBlock, initialStage, onOpenThread, onClose }: Props) {
   const [lessonId, setLessonId] = useState(initialId)
   const lesson = admin.lessons.find((l) => l.id === lessonId)
   const [stage, setStage] = useState<LessonStage>(initialStage ?? lesson?.stage ?? 'plan')
@@ -83,6 +86,14 @@ export function LessonWorkbench({ lessonId: initialId, admin, sessions, placemen
   const dayOptions = sessions.filter((s) => !s.isKeyDate && s.dateISO === (draft.dateISO || lesson.dateISO))
   const feedbackList = admin.observations.filter((o) => o.lessonId === lesson.id).sort((a, b) => b.at - a.at)
   const planStale = lesson.taughtPlanRevision !== undefined && (lesson.planRevision ?? 0) > lesson.taughtPlanRevision
+  // E01: the thread this lesson sits in (if any) and its four steps — what is missing and why.
+  const thread = threadOfLesson(admin.learningThreads ?? [], lesson.id) as LearningThreadRec | null
+  const timeline = thread ? threadSteps(thread, admin) : null
+  const startThread = () => {
+    const rec = makeThread(lesson, newAdminId(), Date.now()) as LearningThreadRec
+    onUpdateAdmin((prev) => ({ ...prev, learningThreads: [...(prev.learningThreads ?? []), rec] }))
+    setSaved('Teaching cycle started from this lesson')
+  }
 
   const savePlan = () => {
     const now = Date.now()
@@ -143,6 +154,27 @@ export function LessonWorkbench({ lessonId: initialId, admin, sessions, placemen
         {lesson.planRevision ? ` · plan rev ${lesson.planRevision}` : ' · no plan yet'}
         {cycle ? ` · focus: ${cycle.focus}` : ''}
       </p>
+      {/* E01 compact timeline: derived on every render from the canonical records. */}
+      {timeline ? (
+        <div className="cycle-timeline" role="group" aria-label="Teaching cycle timeline">
+          <ol className="cycle-timeline-steps">
+            {timeline.steps.map((s) => (
+              <li key={s.stage} className={`cycle-dot cycle-dot--${s.state}`} data-state={s.state} title={s.reason}>
+                <span className="cycle-dot-label">{THREAD_STAGE_LABEL[s.stage as keyof typeof THREAD_STAGE_LABEL]}</span>
+                <span className="visually-hidden">: {s.state === 'done' ? 'done' : s.state === 'gone' ? 'source no longer present' : 'missing'}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="filter-hint cycle-timeline-why">
+            {timeline.complete ? 'Every step of this cycle is in place.' : timeline.steps.find((s) => s.state !== 'done')?.reason}
+            {onOpenThread ? <> <button type="button" className="travel-link" onClick={() => onOpenThread(thread!.id)}>Open this teaching cycle</button></> : null}
+          </p>
+        </div>
+      ) : (
+        <p className="filter-hint cycle-timeline-why">
+          <button type="button" className="travel-link" onClick={startThread}>Start a teaching cycle from this lesson</button> — plan, teach, attach feedback, try next
+        </p>
+      )}
       <div className="segmented" role="tablist" aria-label="Lesson stages">
         {STAGES.map((s) => (
           <button key={s.id} id={`wb-tab-${s.id}`} type="button" role="tab" aria-selected={stage === s.id} aria-controls={`wb-panel-${s.id}`} tabIndex={stage === s.id ? 0 : -1} className={`segment${stage === s.id ? ' segment-on' : ''}`} onClick={() => setStage(s.id)} onKeyDown={onTabKey}>

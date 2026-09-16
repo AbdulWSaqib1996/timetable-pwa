@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Card, Dialog, EmptyState, Field, IconClose, PageHeader } from '../../components/ui'
-import { newAdminId, placementForTag, placementLabel } from '../../lib/admin'
-import type { PlacementCode, PlacementExceptionRec, PlacementRec, SchoolLocationRec } from '../../lib/admin'
+import { PLACEMENT_TIMING_LABEL, newAdminId, placementForTag, placementLabel, placementTiming } from '../../lib/admin'
+import type { PlacementCode, PlacementExceptionRec, PlacementRec, PlacementTransitionRec, SchoolLocationRec } from '../../lib/admin'
 import { PlacementChooser } from './PlacementChooser'
 import { placementBlocks, placementPolicy } from '../../lib/placement'
 import type { PlacementDayView } from '../../lib/placement'
@@ -31,6 +31,9 @@ interface Props {
     onSetUp: (code: PlacementCode, id?: string) => void
     onJourney: (id: string, leg: 'out' | 'back') => void
     onReviewMapping: () => void
+    /** E04: the transition checklist for moving into a placement */
+    onPrepare: (id: string) => void
+    transitions: PlacementTransitionRec[]
   }
 }
 
@@ -104,6 +107,25 @@ export function PlacementPage({
           <h2 className="subheading">All placements</h2>
           <p className="filter-hint">Three separately configured schools: set up each with its school, mentor and dates. Blocks from your timetable are mapped to SE1, SE2 and SE3 — proposed, then confirmed by you.</p>
           <PlacementChooser placements={placements} schools={schools} settings={settings} todayISO={todayISO} blocks={chooser.blocks} onOpen={chooser.onOpen} onSetUp={chooser.onSetUp} onJourney={chooser.onJourney} onAll={() => undefined} onReviewMapping={chooser.onReviewMapping} />
+          {/* E04: the three-school timeline — prepare for each placement you move into. */}
+          {placements.filter((p) => p.startISO).length > 0 && (
+            <ol className="placement-timeline" aria-label="Placement timeline">
+              {[...placements].filter((p) => p.startISO).sort((a, b) => a.startISO!.localeCompare(b.startISO!)).map((p) => {
+                const t = chooser.transitions.find((x) => x.toPlacementId === p.id)
+                const timing = placementTiming(p, todayISO)
+                return (
+                  <li key={p.id} className="placement-timeline-item">
+                    <span><strong>{placementLabel(p, schools)}</strong> <span className="filter-hint">· {fmt(p.startISO!)}{p.endISO ? ` – ${fmt(p.endISO)}` : ''} · {PLACEMENT_TIMING_LABEL[timing]}</span></span>
+                    {timing !== 'finished' ? (
+                      <button type="button" className="travel-link" onClick={() => chooser.onPrepare(p.id)}>
+                        {t?.state === 'done' ? `${p.code} ready — review` : t ? `Continue preparing for ${p.code}` : `Prepare for ${p.code}`}
+                      </button>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ol>
+          )}
         </Card>
       )}
 

@@ -100,6 +100,8 @@ import { CommitmentSheet } from './components/CommitmentSheet'
 import { PlacementPage } from './features/pgce/PlacementPage'
 import { PlacementWorkspacePage } from './features/pgce/PlacementWorkspacePage'
 import { PlacementJourneyPage } from './features/pgce/PlacementJourneyPage'
+import { PlacementTransitionPage } from './features/pgce/PlacementTransitionPage'
+import { TeachingCyclePage } from './features/pgce/TeachingCyclePage'
 import { placementForTag, placementLabel, proposePlacementCode, schoolOf } from './lib/admin'
 import { effectivePlacementMap, resolvePlacementForSession, resolvePlacementForTag } from './lib/placementResolve'
 import { placementPolicy } from './lib/placement'
@@ -1467,6 +1469,24 @@ export default function App() {
             setFlowTarget({ id: placement.id })
             setOpenSheet('placementFlow')
           }
+          if (route.prepare) {
+            const dated = (adminFile.placements ?? []).filter((p) => p.id !== placement.id && p.startISO && (p.startISO ?? '') < (placement.startISO ?? '9999')).sort((a, b) => b.startISO!.localeCompare(a.startISO!))
+            return (
+              <PlacementTransitionPage
+                placement={placement}
+                fromPlacement={dated[0]}
+                admin={adminFile}
+                settings={settings}
+                todayISO={todayISO}
+                onUpdateAdmin={updateAdmin}
+                onJourney={(leg) => navigate({ name: 'placement', id: placement.id, leg })}
+                onEditPlacement={openFlow}
+                onOpenMentorAccess={() => navigate({ name: 'settings', section: 'data' })}
+                onOpenTravelSettings={() => navigate({ name: 'settings', section: 'travel' })}
+                onBack={() => goBackOr({ name: 'placement' })}
+              />
+            )
+          }
           return route.leg ? (
             <PlacementJourneyPage
               placement={placement}
@@ -1539,6 +1559,8 @@ export default function App() {
             },
             onJourney: (id, leg) => navigate({ name: 'placement', id, leg }),
             onReviewMapping: () => setOpenSheet('placementSetup'),
+            onPrepare: (id) => navigate({ name: 'placement', id, prepare: true }),
+            transitions: adminFile.transitions ?? [],
           }}
         />
       ) : route.name === 'tasks' ? (
@@ -1576,6 +1598,32 @@ export default function App() {
           onAddTask={() => setTaskEdit({ task: null })}
           onOpenSettings={() => navigate({ name: 'settings' })}
         />
+      ) : route.name === 'pgce' && route.threadId ? (
+        (() => {
+          const thread = (adminFile.learningThreads ?? []).find((t) => t.id === route.threadId)
+          if (!thread)
+            return (
+              <div className="page">
+                <button type="button" className="page-back" onClick={() => goBackOr({ name: 'pgce', section: 'lessons' })}>‹ Lessons & practice</button>
+                <PageHeader title="Teaching cycle not found" subtitle="It may have been removed on another device." />
+              </div>
+            )
+          return (
+            <TeachingCyclePage
+              thread={thread}
+              admin={adminFile}
+              todayISO={todayISO}
+              placementOptions={placementOptions}
+              onUpdateAdmin={updateAdmin}
+              onOpenLesson={(lessonId, stage) => {
+                setRouteWorkbenchStage(stage)
+                navigate({ name: 'pgce', lessonId })
+              }}
+              onOpenObservation={(id) => navigate({ name: 'pgce', tab: 'obs', recordId: id })}
+              onBack={() => goBackOr({ name: 'pgce', section: 'lessons' })}
+            />
+          )
+        })()
       ) : route.name === 'pgce' ? (
         <PGCEPage
           profileId={active.id}
@@ -1622,6 +1670,8 @@ export default function App() {
           onOpenExamples={() => setOpenSheet('examples')}
           onOpenExperience={() => setOpenSheet('experience')}
           onOpenReviews={() => setOpenSheet('reviews')}
+          onOpenThread={(threadId) => navigate({ name: 'pgce', threadId })}
+          onPrepare={(id) => navigate({ name: 'placement', id, prepare: true })}
           onOpenSettings={() => navigate({ name: 'settings' })}
         />
       ) : route.name === 'schedule' ? (
@@ -1940,6 +1990,10 @@ export default function App() {
           todayISO={todayISO}
           onUpdateAdmin={updateAdmin}
           onAddRehearsalBlock={addRehearsalBlock}
+          onOpenThread={(threadId) => {
+            if (openSheet === 'workbench') setOpenSheet('none')
+            navigate({ name: 'pgce', threadId })
+          }}
           onClose={() => {
             if (openSheet === 'workbench') setOpenSheet('none')
             else goBackOr({ name: 'pgce', section: 'lessons' })

@@ -252,6 +252,12 @@ export interface PlacementRec {
   arrivalBufferMins?: number
   /** where the learner returns to after school (home by default) */
   returnPlaceId?: string
+  /**
+   * E04 (Pass 83): an optional return destination for THIS placement — e.g.
+   * temporary accommodation near the school. The Back home journey uses it;
+   * without it the saved home address is the clearly labelled fallback.
+   */
+  returnPlace?: { label: string; address?: string; lat: number; lng: number }
   notes?: string
   at: number
 }
@@ -479,6 +485,51 @@ export interface ReviewRecordRec {
   at: number
 }
 
+/**
+ * E01 (Pass 83): a learning thread — references from a lesson to its taught
+ * delivery, the feedback the learner attached, the improvement they chose and
+ * the next attempt. Never copies; one observation can inform many threads.
+ */
+export interface LearningThreadRec {
+  id: string
+  title?: string
+  placementId?: string
+  /** the lesson it started from, then any next attempts, in order */
+  lessonIds: string[]
+  /** observations the learner chose as informing this thread */
+  observationIds: string[]
+  cycleId?: string
+  /** the chosen improvement, in the learner's words — never derived from feedback */
+  nextAction?: string
+  nextLessonId?: string
+  state: 'open' | 'closed'
+  revision: number
+  at: number
+}
+
+/**
+ * E04 (Pass 83): moving to the next placement. Holds the learner's checklist
+ * state and what they reviewed; every item is re-derived from the canonical
+ * placement, school and packs, so a tick goes stale when its subject changes.
+ */
+export interface PlacementTransitionRec {
+  id: string
+  fromPlacementId?: string
+  toPlacementId: string
+  /** the school pin the journeys were previewed against */
+  travelReviewed?: { at: number; lat: number; lng: number }
+  /** the packs that were shared when the learner reviewed mentor access */
+  sharesReviewed?: { at: number; packIds: string[] }
+  /** learner-entered teaching context — classes, subjects, pattern; never pupil details */
+  contextNote?: string
+  /** open targets carried forward as references (evidence stays where it was) */
+  carryTargetIds?: string[]
+  confirmedStartISO?: string
+  state: 'open' | 'done'
+  doneAt?: number
+  at: number
+}
+
 export interface AdminFile {
   /** written by this client (contracts ADMIN_SCHEMA_VERSION); older files have none */
   schemaVersion?: number
@@ -514,6 +565,8 @@ export interface AdminFile {
   experience: ExperienceLogRec[]
   reviews: ReviewRecordRec[]
   homework: HomeworkRec[]
+  learningThreads: LearningThreadRec[]
+  transitions: PlacementTransitionRec[]
 }
 
 export const EMPTY_ADMIN: AdminFile = {
@@ -548,6 +601,8 @@ export const EMPTY_ADMIN: AdminFile = {
   experience: [],
   reviews: [],
   homework: [],
+  learningThreads: [],
+  transitions: [],
 }
 
 const adminKey = (pid: string) => `timetable.admin.v1.${pid}`

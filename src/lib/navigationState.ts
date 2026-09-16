@@ -66,6 +66,13 @@ export function parseRouteSafe(hash: string): ParsedRoute {
         if (!id || parts.length !== 3) return { ok: true, route: { name: 'pgce', section: 'lessons' }, notice }
         return { ok: true, route: { name: 'pgce', lessonId: id } }
       }
+      if (parts[1] === 'cycle') {
+        // E01: #/pgce/cycle/<threadId> — "This teaching cycle"
+        const id = recordId(parts[2])
+        if (id === null) return { ok: false, reason: 'malformed' }
+        if (!id || parts.length !== 3) return { ok: true, route: { name: 'pgce', section: 'lessons' }, notice }
+        return { ok: true, route: { name: 'pgce', threadId: id } }
+      }
       if (parts[1] === 'packs') {
         const id = recordId(parts[2])
         if (id === null) return { ok: false, reason: 'malformed' }
@@ -85,6 +92,7 @@ export function parseRouteSafe(hash: string): ParsedRoute {
       if (id === null || !/^[\w-]{1,100}$/.test(id)) return { ok: false, reason: 'malformed' }
       if (parts.length === 2) return { ok: true, route: { name: 'placement', id } }
       if (parts[2] === 'journey' && (parts[3] === 'out' || parts[3] === 'back') && parts.length === 4) return { ok: true, route: { name: 'placement', id, leg: parts[3] } }
+      if (parts[2] === 'prepare' && parts.length === 3) return { ok: true, route: { name: 'placement', id, prepare: true } }
       return { ok: true, route: { name: 'placement', id }, notice: 'That placement page does not exist — showing the placement.' }
     }
     case 'find':

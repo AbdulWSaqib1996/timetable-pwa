@@ -96,7 +96,11 @@ export function PlacementJourneyPage({ placement, school, leg, settings, coords,
   const origin = originOptions.find((o) => o.id === originId && o.coords) ?? null
   const originSelect = useRef<HTMLSelectElement>(null)
 
-  const destination = leg === 'out' ? (schoolCoords ? { coords: schoolCoords, label: school?.name || 'School' } : null) : home ? { coords: home, label: 'Home' } : null
+  // E04: the return leg goes to THIS placement's saved return destination when it
+  // has one (temporary accommodation, say); otherwise home, and the page says which.
+  const returnPlace = placement.returnPlace ? { coords: { lat: placement.returnPlace.lat, lng: placement.returnPlace.lng }, label: placement.returnPlace.label } : null
+  const destination = leg === 'out' ? (schoolCoords ? { coords: schoolCoords, label: school?.name || 'School' } : null) : returnPlace ?? (home ? { coords: home, label: 'Home' } : null)
+  const returnNote = leg === 'back' ? (returnPlace ? `Return destination set for ${placement.code}: ${returnPlace.label}` : 'Going to your saved home address — the fallback when a placement has no return destination of its own') : null
   const intent = leg === 'out' && arriveByFuture && arriveByMs !== null ? ({ kind: 'arrive-by', arriveByMs, timeZone: courseZone(), eventKey: `placement:${placement.id}:out` } as const) : ({ kind: 'leave-now' } as const)
   const journey = useJourney({
     origin,
@@ -141,7 +145,7 @@ export function PlacementJourneyPage({ placement, school, leg, settings, coords,
       </div>
     )
   }
-  if (leg === 'back' && !home) {
+  if (leg === 'back' && !home && !returnPlace) {
     return (
       <div className="page journey-home-page">
         {back}
@@ -206,6 +210,7 @@ export function PlacementJourneyPage({ placement, school, leg, settings, coords,
         }
       />
 
+      {returnNote ? <p className="filter-hint journey-return-note">{returnNote}</p> : null}
       <div className="ui-card travel-od" aria-label={leg === 'out' ? 'Journey to school' : 'Journey home from school'}>
         <p className="travel-od-title">
           <span className="travel-od-tile" aria-hidden="true">{leg === 'out' ? <IconSchool /> : <IconHome />}</span>

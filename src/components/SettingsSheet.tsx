@@ -104,6 +104,8 @@ export function buildFeedUrl(base: string, settings: Settings, calendarName?: st
     url.searchParams.set('spec', specialisms.join(','))
   }
   if (settings.filters?.showSelfStudy === false) url.searchParams.set('selfstudy', '0')
+  // Student Rep meetings leave the subscribed feed too unless the learner is a rep (owner, 16 Sep 2026).
+  if (settings.studentRep !== true) url.searchParams.set('rep', '0')
   if (settings.keyDatesSheetId) {
     if (settings.keyDatesSheetId !== settings.sheetId) url.searchParams.set('kdid', settings.keyDatesSheetId)
     if (settings.keyDatesGid) url.searchParams.set('kdgid', settings.keyDatesGid)
@@ -920,6 +922,21 @@ export function SettingsSheet({
           <button type="button" className="btn-secondary" onClick={onRechooseSpecialisms}>
             Choose specialisms again
           </button>
+        </section>
+
+        <section className="filter-section" id="student-rep">
+          <div className="section-head">
+            <span className="ui-tile ui-tile--teal" aria-hidden="true">
+              <IconUser size={20} />
+            </span>
+            <h3>Student rep</h3>
+            <span className={`notif-state${settings.studentRep ? '' : ' off'}`}>{settings.studentRep ? 'shown' : 'hidden'}</span>
+          </div>
+          <label className="toggle-row">
+            <input type="checkbox" checked={settings.studentRep === true} onChange={(e) => onUpdateSettings({ studentRep: e.target.checked ? true : undefined })} />
+            <span>I am a student rep — show Student Rep meetings</span>
+          </label>
+          <p className="filter-hint">Student Rep meetings are optional and never count towards attendance. When this is off they are hidden from your schedule, Today and reminders altogether.</p>
         </section>
 
 

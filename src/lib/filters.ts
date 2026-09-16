@@ -1,3 +1,4 @@
+import { isStudentRepTitle } from '../../shared/eligibility.js'
 import { zonedTodayISO } from '../../shared/calendar-time.js'
 import { expandGroupOptions, sessionInMembership } from '../../shared/membership.js'
 import type { Filters, Session, Settings } from '../types'
@@ -80,7 +81,8 @@ export function membershipOf(settings: Settings): { specialisms: string[]; group
  */
 export function selectCourseSessions(sessions: Session[], settings: Settings): Session[] {
   const membership = membershipOf(settings)
-  return sessions.filter((s) => sessionInMembership(s, membership))
+  // Student Rep meetings exist only for a learner who says they are a rep (owner, 16 Sep 2026).
+  return sessions.filter((s) => sessionInMembership(s, membership) && (settings.studentRep === true || !isStudentRepTitle(s.title)))
 }
 
 /** Should this course session produce reminders/leave alerts? Optional and

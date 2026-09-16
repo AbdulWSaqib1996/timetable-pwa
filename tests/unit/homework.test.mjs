@@ -81,9 +81,9 @@ test('lookups: homework due in one occurrence, homework a lesson set, outstandin
   assert.deepEqual(sortHomework(list).map((h) => h.id), ['c', 'a', 'b'])
 })
 
-test('contract: homework is an optional collection, validated on the wire, at schema version 9', () => {
+test('contract: homework is an optional collection, validated on the wire, from schema version 9', () => {
   assert.ok(collections.includes('homework'))
-  assert.equal(ADMIN_SCHEMA_VERSION, 9)
+  assert.ok(ADMIN_SCHEMA_VERSION >= 9, 'homework arrived at schema version 9; later passes may bump it')
   const empty = Object.fromEntries(collections.map((k) => [k, []]))
   const payload = (homework) => ({ store: { activeId: 'p1', profiles: [{ id: 'p1', name: 'one', settings: { demo: true, sheetId: '', gid: null } }] }, admin: { p1: { ...empty, homework } } })
   const ok = { id: 'h1', title: 'Fractions worksheet', details: 'q1-8', lessonId: 'l1', dueSessionRef: 'event:course:m2', dueTitle: 'Maths 2', dueISO: '2026-09-22', setISO: '2026-09-15', status: 'todo', at: 1 }

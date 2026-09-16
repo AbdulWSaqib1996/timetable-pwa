@@ -12,11 +12,12 @@ export type Route =
   | { name: 'schedule' }
   | { name: 'tasks' }
   /** PGCE file: the landing, one of its four destinations, a records tab (optionally one record), a lesson workbench or the review packs (U01/U05) */
-  | { name: 'pgce'; section?: PgceSection; tab?: PgceTab; recordId?: string; lessonId?: string; packs?: boolean; packId?: string }
+  | { name: 'pgce'; section?: PgceSection; tab?: PgceTab; recordId?: string; lessonId?: string; packs?: boolean; packId?: string; threadId?: string }
   | { name: 'settings'; section?: string }
   | { name: 'session'; key: string }
   | { name: 'homeJourney' }
-  | { name: 'placement'; id?: string; leg?: 'out' | 'back' }
+  /** E04: `prepare` is the transition checklist for moving INTO this placement */
+  | { name: 'placement'; id?: string; leg?: 'out' | 'back'; prepare?: boolean }
   /** local Find anything search (R4 / NF-01) */
   | { name: 'find' }
   /** untrusted hash that could not be opened (R1 / TT-08) */
@@ -34,6 +35,7 @@ export function routeHash(route: Route): string {
       return '#/tasks'
     case 'pgce':
       if (route.lessonId) return `#/pgce/lesson/${encodeURIComponent(route.lessonId)}`
+      if (route.threadId) return `#/pgce/cycle/${encodeURIComponent(route.threadId)}`
       if (route.tab) return `#/pgce/records/${route.tab}${route.recordId ? `/${encodeURIComponent(route.recordId)}` : ''}`
       if (route.packs || route.packId) return `#/pgce/packs${route.packId ? `/${encodeURIComponent(route.packId)}` : ''}`
       return route.section ? `#/pgce/${route.section}` : '#/pgce'
@@ -44,7 +46,7 @@ export function routeHash(route: Route): string {
     case 'homeJourney':
       return '#/home'
     case 'placement':
-      return route.id ? `#/placement/${encodeURIComponent(route.id)}${route.leg ? `/journey/${route.leg}` : ''}` : '#/placement'
+      return route.id ? `#/placement/${encodeURIComponent(route.id)}${route.leg ? `/journey/${route.leg}` : route.prepare ? '/prepare' : ''}` : '#/placement'
     case 'find':
       return '#/find'
     case 'invalid':
