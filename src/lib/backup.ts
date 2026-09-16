@@ -5,6 +5,7 @@ import { preparePhotos, type PhotoExport } from './photos'
 import { prepareWallet, type WalletExport } from './wallet'
 import { restoreWithRecovery } from './recovery'
 import { deviceSettings } from '../../shared/merge.js'
+import { restoreReferencedMissing } from '../../shared/dataCentre.js'
 export interface Backup {
   version: number; exportedAt?: string; store: ProfileStore; meta?: Record<string, MetaMap>; admin?: Record<string, unknown>
   cache?: Record<string, CachedData>; changes?: Record<string, SessionChange[]>; photos?: PhotoExport[]; wallet?: WalletExport[]
@@ -71,6 +72,8 @@ export interface RestoreImpact {
   }[]
   /** profiles on this device that the backup does not mention — kept untouched */
   unrelatedKept: string[]
+  /** E05: file identities the backup's records reference that are in neither the backup nor this device — those records will read "missing" */
+  referencedMissing: { count: number; uids: string[] }
 }
 
 /**
@@ -108,7 +111,9 @@ export function restoreImpact(data: Backup, local: ProfileStore | null, localMet
     }
   })
   const incoming = new Set(data.store.profiles.map((p) => p.id))
-  return { exportedAt, version: data.version, profiles, unrelatedKept: (local?.profiles ?? []).filter((p) => !incoming.has(p.id)).map((p) => p.name) }
+  const backupUids = new Set([...(data.photos ?? []), ...(data.wallet ?? [])].map((f) => f.uid).filter((u): u is string => typeof u === 'string'))
+  const referencedMissing = restoreReferencedMissing(data.admin as Record<string, unknown> | undefined, backupUids, existingAttachmentUids)
+  return { exportedAt, version: data.version, profiles, unrelatedKept: (local?.profiles ?? []).filter((p) => !incoming.has(p.id)).map((p) => p.name), referencedMissing }
 }
 
 export function backupPreview(data: Backup): string {

@@ -203,7 +203,17 @@ interface BackupBookkeeping {
   lastNudgeAt?: number
   /** bounded history of successful GENERATIONS with their explicit scope (FA-06) */
   /** kind 'cloud' only appears in history written before Pass 58 (cloud backups removed) */
-  history?: { at: number; profiles: string[]; all: boolean; kind: 'file' | 'cloud' }[]
+  /** E05: `files` says whether the generation carried photo/document bytes; `attachments` lists the uids it contained (newest entries only) */
+  history?: { at: number; profiles: string[]; all: boolean; kind: 'file' | 'cloud'; files?: boolean; attachments?: string[] }[]
+}
+export type BackupHistoryEntry = NonNullable<BackupBookkeeping['history']>[number]
+
+/** Recorded backup generations on this device, newest first (never proof a file was kept). */
+export function backupHistory(): BackupHistoryEntry[] {
+  const state = readJSON<BackupBookkeeping>(BACKUP_KEY)
+  const history = state?.history ?? []
+  if (history.length === 0 && state?.lastBackupAt) return [{ at: state.lastBackupAt, profiles: [], all: true, kind: 'file' }]
+  return history
 }
 
 /** When a backup file was last GENERATED on this device (never proof it was kept). */
@@ -218,10 +228,12 @@ export function lastBackupAt(): number | null {
  * covers only the profiles it included; a new profile is not covered by an
  * earlier "everything" export because it did not exist in it.
  */
-export function markBackedUp(scope: { profiles: string[]; all: boolean; kind?: 'file' | 'cloud' }): void {
+export function markBackedUp(scope: { profiles: string[]; all: boolean; kind?: 'file' | 'cloud'; files?: boolean; attachments?: string[] }): void {
   const state = readJSON<BackupBookkeeping>(BACKUP_KEY) ?? {}
-  const entry = { at: Date.now(), profiles: [...scope.profiles], all: scope.all, kind: scope.kind ?? 'file' }
-  writeJSON(BACKUP_KEY, { ...state, lastBackupAt: entry.at, history: [entry, ...(state.history ?? [])].slice(0, 20) })
+  const entry: BackupHistoryEntry = { at: Date.now(), profiles: [...scope.profiles], all: scope.all, kind: scope.kind ?? 'file', ...(scope.files !== undefined ? { files: scope.files } : {}), ...(scope.attachments ? { attachments: scope.attachments.slice(0, 5000) } : {}) }
+  // Only the newest three generations keep their attachment lists; older entries keep the scope and the files flag.
+  const older = (state.history ?? []).map((h, i) => (i >= 2 && h.attachments ? { ...h, attachments: undefined } : h))
+  writeJSON(BACKUP_KEY, { ...state, lastBackupAt: entry.at, history: [entry, ...older].slice(0, 20) })
   try {
     window.dispatchEvent(new Event(BACKUP_GENERATED_EVENT))
   } catch {

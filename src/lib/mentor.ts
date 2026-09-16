@@ -53,7 +53,7 @@ function failure(res: { status: number; body: { error?: string } }, fallback: st
 
 export interface MentorSpace { spaceId: string; ownerToken: string }
 export interface MentorSummary { id: string; name: string; createdAt: number; revokedAt: number | null; lastSeenAt: number | null }
-export interface MentorListing { mentors: MentorSummary[]; invites: { code: string; label: string; expiresAt: number }[]; packs: { id: string; title: string; sharedAt: number; mentorIds: string[]; attachments: number; unsharedAt?: number | null }[]; closedAt?: number | null }
+export interface MentorListing { mentors: MentorSummary[]; invites: { code: string; label: string; expiresAt: number }[]; packs: { id: string; title: string; sharedAt: number; mentorIds: string[]; attachments: number; unsharedAt?: number | null; attachmentsExpireAt?: number | null }[]; closedAt?: number | null }
 export interface InboxItem { spaceId: string; mentorId: string; mentorName: string; feedbackId: string; at: number; sig: string; packId: string; packTitle: string; text: string }
 
 /** Mint the space on first use (idempotent for the same token). */

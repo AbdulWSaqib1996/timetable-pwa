@@ -201,7 +201,8 @@ export class MentorStore {
         const packs = []
         for (const id of packIds) {
           const p = await tx.get(`pack:${id}`)
-          if (p) packs.push({ id: p.id, title: p.title, revision: p.revision, sharedAt: p.sharedAt, mentorIds: p.mentorIds, attachments: p.attachments.length, unsharedAt: p.unsharedAt ?? null })
+          // E05: the portal stops serving a share's attachments after the KV TTL — the client shows that date rather than guessing.
+          if (p) packs.push({ id: p.id, title: p.title, revision: p.revision, sharedAt: p.sharedAt, mentorIds: p.mentorIds, attachments: p.attachments.length, unsharedAt: p.unsharedAt ?? null, attachmentsExpireAt: p.attachments.length ? p.sharedAt + MENTOR_ATTACHMENT_TTL_S * 1000 : null })
         }
         return json({ mentors, invites, packs, closedAt: owner?.closedAt ?? null })
       }
