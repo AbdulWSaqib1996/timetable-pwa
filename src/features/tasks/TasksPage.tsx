@@ -27,6 +27,11 @@ interface Props {
   onOpenMeeting: (meetingId: string) => void
   onAddTask: () => void
   onOpenSettings: () => void
+  /** HW-03: homework whose due session changed or vanished, by projected session id */
+  attention?: Record<string, string>
+  /** HW-02: a removed homework record the learner can put back */
+  undoHomework?: { title: string } | null
+  onUndoHomework?: () => void
 }
 
 function formatDate(dateISO: string): string {
@@ -78,6 +83,9 @@ export function TasksPage({
   onSetTaskStatus,
   onToggleAction,
   onOpenMeeting,
+  attention,
+  undoHomework,
+  onUndoHomework,
   onAddTask,
   onOpenSettings,
 }: Props) {
@@ -158,6 +166,7 @@ export function TasksPage({
                 {soon && days > 1 ? ` · ${weekday(k.dateISO)}` : ''}
               </span>
               <span className="badge badge-source">{k.id.startsWith('hw-') ? 'Homework' : record ? 'Your task' : 'Key date'}</span>
+              {attention?.[k.id] ? <span className="tag tag--amber">Needs review</span> : null}
             </span>
             <span className="change-title task-card-title">{k.title}</span>
             <span className="change-meta">
@@ -202,6 +211,14 @@ export function TasksPage({
         }
       />
 
+      {undoHomework && onUndoHomework && (
+        <StatusMessage tone="success">
+          <span>
+            Removed homework “{undoHomework.title}”.{' '}
+            <button type="button" className="travel-link" onClick={onUndoHomework}>Undo</button>
+          </span>
+        </StatusMessage>
+      )}
       {undoTask && (
         <StatusMessage tone="info">
           <span>

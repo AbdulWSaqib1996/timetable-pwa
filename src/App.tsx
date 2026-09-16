@@ -79,8 +79,9 @@ import { subscribePush } from './lib/push'
 import { EMPTY_ADMIN, loadAdminFile, saveAdminFile } from './lib/admin'
 import type { AdminFile, CommitmentRec, PlanChildRec, TaskRecord } from './lib/admin'
 import { duplicateTask, migrateCustomKeyDates, overlayTaskMeta, taskEventKey, taskToSession } from './lib/tasks'
-import { homeworkIdOf, homeworkToSession, overlayHomeworkMeta } from './lib/homework'
-import { homeworkForSession } from '../shared/homework.js'
+import { homeworkIdOf, homeworkSessionId, homeworkToSession, overlayHomeworkMeta } from './lib/homework'
+import { followSession, homeworkForSession, keepDate, resolveDue, resolveSource } from '../shared/homework.js'
+import { HomeworkDetailPage } from './features/tasks/HomeworkDetailPage'
 import type { HomeworkRec } from './lib/admin'
 import { applyPlacementExceptions } from './lib/placement'
 import { availableOrigins } from './lib/origins'
@@ -194,6 +195,7 @@ export default function App() {
   // A study block just added from a Plan-week suggestion — Undo removes it (NF-03).
   const [planUndo, setPlanUndo] = useState<PlanChildRec | null>(null)
   const [taskUndo, setTaskUndo] = useState<TaskRecord | null>(null)
+  const [homeworkUndo, setHomeworkUndo] = useState<HomeworkRec | null>(null)
   // Personal-event editor (P5-06): null closed; commitment null = create.
   const [commitmentEdit, setCommitmentEdit] = useState<{ commitment: CommitmentRec | null; dateISO: string; startTime?: string; endTime?: string; kind?: CommitmentRec['kind'] } | null>(null)
   const [commitmentUndo, setCommitmentUndo] = useState<CommitmentRec | null>(null)
@@ -802,7 +804,8 @@ export default function App() {
   // Today strip, Tasks screen).
   const allKeyDates = useMemo(() => {
     const custom = adminFile.tasks.map(taskToSession)
-    const hw = (adminFile.homework ?? []).map(homeworkToSession)
+    // HW-03: the effective due date comes from the resolver (last confirmed), never a guess.
+    const hw = (adminFile.homework ?? []).map((h) => homeworkToSession(h, courseSessions))
     // A timetable row the learner marked as a deadline (16 Sep 2026) becomes a key
     // date everywhere: highlighted first on its day, on Tasks, completed not attended.
     const flagged = courseSessions.filter((s) => !s.isKeyDate && metaMap[sessionKey(s)]?.deadlineOnly).map((s) => ({ ...s, isKeyDate: true }))
@@ -838,6 +841,28 @@ export default function App() {
       return
     }
     handleMeta(session, { status: next })
+  }
+  // HW-05: homework can only be due in a real teaching occurrence — never a row marked as a deadline.
+  const homeworkTargets = useMemo(() => courseSessions.filter((s) => !metaMap[sessionKey(s)]?.deadlineOnly), [courseSessions, metaMap])
+  // HW-03: homework whose due session moved, was retitled or vanished — a question for the learner, shown wherever the item is.
+  const homeworkAttention = useMemo(() => {
+    const out: Record<string, string> = {}
+    for (const h of adminFile.homework ?? []) {
+      const due = resolveDue(h, courseSessions, sessionKey)
+      if (due.state === 'changed') out[homeworkSessionId(h)] = due.change?.moved ? `${due.change.fromTitle} moved to ${due.change.toISO}` : `${due.change?.fromTitle ?? ''} was retitled`
+      else if (due.state === 'missing') out[homeworkSessionId(h)] = 'the session it was due in is no longer in the timetable'
+    }
+    return out
+  }, [adminFile.homework, courseSessions])
+  function removeHomework(h: HomeworkRec) {
+    updateAdmin((prev) => ({ ...prev, homework: (prev.homework ?? []).filter((x) => x.id !== h.id) }))
+    setHomeworkUndo(h)
+  }
+  function undoRemoveHomework() {
+    if (!homeworkUndo) return
+    const back = { ...homeworkUndo, at: Date.now() }
+    updateAdmin((prev) => ({ ...prev, homework: [...(prev.homework ?? []).filter((x) => x.id !== back.id), back] }))
+    setHomeworkUndo(null)
   }
   function setHomeworkStatus(hw: HomeworkRec, next: 'todo' | 'doing' | 'done') {
     if (hw.status === next) return
@@ -1564,6 +1589,37 @@ export default function App() {
             transitions: adminFile.transitions ?? [],
           }}
         />
+      ) : route.name === 'homework' ? (
+        (() => {
+          const hw = (adminFile.homework ?? []).find((h) => h.id === route.id)
+          if (!hw)
+            return (
+              <div className="page">
+                <button type="button" className="page-back" onClick={() => goBackOr({ name: 'tasks' })}>‹ Tasks</button>
+                <PageHeader title="Homework not found" subtitle="It may have been removed on another device." />
+                {homeworkUndo && homeworkUndo.id === route.id ? (
+                  <div className="btn-row"><button type="button" className="btn-primary" onClick={undoRemoveHomework}>Undo removal</button></div>
+                ) : null}
+              </div>
+            )
+          return (
+            <HomeworkDetailPage
+              homework={hw}
+              admin={adminFile}
+              sessions={homeworkTargets}
+              todayISO={todayISO}
+              onUpdateAdmin={updateAdmin}
+              onSetStatus={(next) => setHomeworkStatus(hw, next)}
+              onOpenSession={openSession}
+              onOpenLesson={(lessonId) => navigate({ name: 'pgce', lessonId })}
+              onRemove={() => {
+                removeHomework(hw)
+                navigate({ name: 'tasks' }, { replace: true })
+              }}
+              onBack={() => goBackOr({ name: 'tasks' })}
+            />
+          )
+        })()
       ) : route.name === 'tasks' ? (
         <TasksPage
           profileName={active.name}
@@ -1578,7 +1634,14 @@ export default function App() {
             saveTask({ ...t, at: Date.now() })
             setTaskUndo(null)
           }}
-          onSelect={openSession}
+          onSelect={(k) => {
+            const hwId = homeworkIdOf(k)
+            if (hwId) navigate({ name: 'homework', id: hwId })
+            else openSession(k)
+          }}
+          attention={homeworkAttention}
+          undoHomework={homeworkUndo}
+          onUndoHomework={undoRemoveHomework}
           onSetStatus={(kd, status) => setKeyDateStatus(kd, status ?? 'todo')}
           onEditTask={(t) => setTaskEdit({ task: t })}
           onSetTaskStatus={setTaskStatus}
@@ -1862,11 +1925,26 @@ export default function App() {
             const hw = hwId ? (adminFile.homework ?? []).find((h) => h.id === hwId) : null
             if (!hw) return undefined
             const lesson = hw.lessonId ? adminFile.lessons.find((l) => l.id === hw.lessonId) : undefined
+            // HW-04: the source occurrence first (or its saved snapshot), the lesson plan separately.
+            const source = resolveSource(hw, courseSessions, sessionKey)
+            const due = resolveDue(hw, courseSessions, sessionKey)
+            const setIn = source.session ? `${source.session.title} · ${source.session.dateISO}` : source.snapshot ? `${source.snapshot.title} · ${source.snapshot.dateISO}` : lesson ? `${lesson.subject || 'Lesson'}${lesson.dateISO ? ` · ${lesson.dateISO}` : ''}` : undefined
+            const changeNote = due.state === 'changed' && due.change
+              ? `${due.change.fromTitle}${due.change.moved ? ` moved: ${due.change.fromISO} → ${due.change.toISO}` : ''}${due.change.retitled ? `${due.change.moved ? ' and' : ''} is now called “${due.change.toTitle}”` : ''}. The deadline stays ${due.effectiveISO} until you decide.`
+              : due.state === 'missing' ? `The session this was due in is no longer in the timetable. The deadline stays ${due.effectiveISO}; open the homework to choose another session or keep the date.` : undefined
             return {
               details: hw.details,
-              setIn: lesson ? `${lesson.subject || 'Lesson'}${lesson.dateISO ? ` · ${lesson.dateISO}` : ''}` : undefined,
-              dueIn: hw.dueTitle,
+              setIn,
+              sourceMissing: source.state === 'missing',
+              dueIn: due.confirmed?.title ?? hw.dueTitle,
+              dueState: due.state,
+              changeNote,
               onOpenLesson: lesson ? () => navigate({ name: 'pgce', lessonId: lesson.id }) : undefined,
+              onOpenSource: source.session ? () => openSession(source.session!) : undefined,
+              onOpenDue: due.session ? () => openSession(due.session!) : undefined,
+              onOpenHomework: () => navigate({ name: 'homework', id: hw.id }),
+              onFollow: due.state === 'changed' && due.session ? () => updateAdmin((prev) => ({ ...prev, homework: (prev.homework ?? []).map((h) => (h.id === hw.id ? (followSession(h, due.session!, Date.now()) as HomeworkRec) : h)) })) : undefined,
+              onKeep: due.state === 'changed' || due.state === 'missing' ? () => updateAdmin((prev) => ({ ...prev, homework: (prev.homework ?? []).map((h) => (h.id === hw.id ? (keepDate(h, Date.now()) as HomeworkRec) : h)) })) : undefined,
             }
           })()}
           homeworkDue={homeworkForSession(adminFile.homework ?? [], sessionKey(selected))}
@@ -1874,11 +1952,15 @@ export default function App() {
             const hw = (adminFile.homework ?? []).find((h) => h.id === id)
             if (hw) setHomeworkStatus(hw, hw.status === 'done' ? 'todo' : 'done')
           }}
-          courseSessions={courseSessions}
+          courseSessions={homeworkTargets}
           homeworkAll={adminFile.homework ?? []}
           homeworkLesson={adminFile.lessons.find((l) => l.sessionRef === sessionKey(selected)) ?? null}
           onUpdateAdmin={updateAdmin}
           todayISO={todayISO}
+          onOpenHomework={(id) => navigate({ name: 'homework', id })}
+          onRemoveHomework={removeHomework}
+          homeworkUndo={homeworkUndo}
+          onUndoHomework={undoRemoveHomework}
           coords={coords}
           locationEnabled={locationEnabled}
           travelMode={travelMode}
@@ -1988,11 +2070,17 @@ export default function App() {
           lessonId={route.name === 'pgce' && route.lessonId ? route.lessonId : workbench!.lessonId}
           initialStage={route.name === 'pgce' && route.lessonId ? routeWorkbenchStage : workbench?.stage}
           admin={adminFile}
-          sessions={courseSessions}
+          sessions={homeworkTargets}
           placementOptions={placementOptions}
           todayISO={todayISO}
           onUpdateAdmin={updateAdmin}
           onAddRehearsalBlock={addRehearsalBlock}
+          profileId={active.id}
+          onOpenHomework={(id) => {
+            if (openSheet === 'workbench') setOpenSheet('none')
+            navigate({ name: 'homework', id })
+          }}
+          onRemoveHomework={removeHomework}
           onOpenThread={(threadId) => {
             if (openSheet === 'workbench') setOpenSheet('none')
             navigate({ name: 'pgce', threadId })

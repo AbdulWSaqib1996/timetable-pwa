@@ -4,7 +4,7 @@ import { HomeworkPanel } from './HomeworkPanel'
 import { LESSON_TEMPLATES, activateCycle, nextAttempt, provenanceLabel, withPlanRevision } from '../../shared/practice.js'
 import { THREAD_STAGE_LABEL, makeThread, threadOfLesson, threadSteps } from '../../shared/threads.js'
 import { newAdminId } from '../lib/admin'
-import type { AdminFile, LearningThreadRec, Lesson, LessonStage, Observation, PracticeCycleRec } from '../lib/admin'
+import type { AdminFile, HomeworkRec, LearningThreadRec, Lesson, LessonStage, Observation, PracticeCycleRec } from '../lib/admin'
 import { TEACHERS_STANDARDS } from '../lib/standards'
 import { sessionKey } from '../lib/diff'
 import type { Session } from '../types'
@@ -22,6 +22,10 @@ interface Props {
   initialStage?: LessonStage
   /** E01: open "This teaching cycle" for the thread this lesson belongs to */
   onOpenThread?: (threadId: string) => void
+  /** HW-02/HW-05: homework drafts per profile; open a record's own page */
+  profileId?: string
+  onOpenHomework?: (id: string) => void
+  onRemoveHomework?: (h: HomeworkRec) => void
   onClose: () => void
 }
 
@@ -51,7 +55,7 @@ const fmt = (iso: string) => {
  * identity without copying outcomes. The quick retrospective lesson form in
  * the PGCE file is untouched.
  */
-export function LessonWorkbench({ lessonId: initialId, admin, sessions, placementOptions, todayISO, onUpdateAdmin, onAddRehearsalBlock, initialStage, onOpenThread, onClose }: Props) {
+export function LessonWorkbench({ lessonId: initialId, admin, sessions, placementOptions, todayISO, onUpdateAdmin, onAddRehearsalBlock, initialStage, onOpenThread, profileId, onOpenHomework, onRemoveHomework, onClose }: Props) {
   const [lessonId, setLessonId] = useState(initialId)
   const lesson = admin.lessons.find((l) => l.id === lessonId)
   const [stage, setStage] = useState<LessonStage>(initialStage ?? lesson?.stage ?? 'plan')
@@ -299,7 +303,7 @@ export function LessonWorkbench({ lessonId: initialId, admin, sessions, placemen
           )}
         </div>
         <p className="filter-hint">Works offline. Teaching a lesson never records attendance or a judgement — those are yours to enter separately.</p>
-        <HomeworkPanel lesson={lesson} sessions={sessions} homework={admin.homework ?? []} todayISO={todayISO} onUpdateAdmin={onUpdateAdmin} label="Homework set in this lesson" />
+        <HomeworkPanel lesson={lesson} sessions={sessions} homework={admin.homework ?? []} todayISO={todayISO} onUpdateAdmin={onUpdateAdmin} label="Homework set in this lesson" profileId={profileId} onOpenHomework={onOpenHomework} onRemove={onRemoveHomework} />
       </div>
 
       <div id="wb-panel-review" role="tabpanel" aria-labelledby="wb-tab-review" hidden={stage !== 'review'}>

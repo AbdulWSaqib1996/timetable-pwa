@@ -1,6 +1,6 @@
 # Placement & homework review — phased implementation plan
 
-**Source:** [PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md](PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md) (baseline `3429667`). **Planned:** 16 September 2026, after Passes 83–85 (audit Batch D) shipped. **Status:** Batch 1 shipped as Pass 86 (16 September 2026); Batches 2–4 are planned only. Each batch below becomes one release pass under the runbook in `AGENTS.md` (branch, both validation gates, workers first when `shared/` or a worker changes, PLAN.md record, What's new entry).
+**Source:** [PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md](PLACEMENT_HOMEWORK_REVIEW_2026-09-15.md) (baseline `3429667`). **Planned:** 16 September 2026, after Passes 83–85 (audit Batch D) shipped. **Status:** Batches 1 and 2 shipped as Passes 86 and 87 (16 September 2026); Batches 3–4 are planned only. Each batch below becomes one release pass under the runbook in `AGENTS.md` (branch, both validation gates, workers first when `shared/` or a worker changes, PLAN.md record, What's new entry).
 
 ## 1. What the review found, checked against the code as of `0283fe6`
 
@@ -59,6 +59,8 @@ The review's findings were re-read against the current tree. Everything it repor
 **Size**: L (five defects across the flow, the resolver and the contract).
 
 ### Batch 2 — complete the homework lifecycle (Pass 87) — HW-01, HW-02, HW-03, HW-04, HW-05
+
+> **Status (16 September 2026): implemented as Pass 87** — see PLAN.md. Deviations: the resolver (`resolveDue`) has four states — fixed, current, changed, missing — with "ambiguous" folded into current (session keys are unique after projection); a task may still be absorbed by the sheet key date it duplicates (Pass 74), while learner-owned records are never collapsed against each other and homework is never collapsed at all; the create form on the session/lesson stays visible (the compact-card layout is Batch 3); Remove's Undo lives on the Tasks screen and the session's homework card rather than a toast.
 
 **In**
 - **HW-03** `HomeworkRec` gains `dueMode`, `dueSnapshot { dateISO, start, title, sessionRef, at }` and `dueHistory[]`; `shared/homework.js` gains `resolveDue(homework, sessions)` → `{ state: 'current' | 'changed' | 'cancelled' | 'missing' | 'ambiguous', effectiveISO, effectiveStart, ... }` using the existing identity utilities. Every consumer reads the resolver. A changed target shows "Maths 2 moved: Tue 22 → Wed 23" with **Follow this session** / **Keep the original date**; until reviewed the last confirmed deadline stands with an attention state everywhere. Fixed-date homework never moves.

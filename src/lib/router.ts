@@ -15,6 +15,8 @@ export type Route =
   | { name: 'pgce'; section?: PgceSection; tab?: PgceTab; recordId?: string; lessonId?: string; packs?: boolean; packId?: string; threadId?: string }
   | { name: 'settings'; section?: string }
   | { name: 'session'; key: string }
+  /** HW-02: one piece of homework, editable on its own record */
+  | { name: 'homework'; id: string }
   | { name: 'homeJourney' }
   /** E04: `prepare` is the transition checklist for moving INTO this placement */
   | { name: 'placement'; id?: string; leg?: 'out' | 'back'; prepare?: boolean }
@@ -43,6 +45,8 @@ export function routeHash(route: Route): string {
       return route.section ? `#/settings/${route.section}` : '#/settings'
     case 'session':
       return `#/session/${encodeURIComponent(route.key)}`
+    case 'homework':
+      return `#/homework/${encodeURIComponent(route.id)}`
     case 'homeJourney':
       return '#/home'
     case 'placement':

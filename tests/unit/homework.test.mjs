@@ -45,7 +45,11 @@ test('later occurrences of the lesson only: same family, strictly later, never a
 test('makeHomework: the chosen occurrence sets the due date and is remembered by key; a plain date is allowed; nonsense is refused', () => {
   const lesson = { id: 'l1' }
   const target = { key: 'event:course:m2', session: TIMETABLE.find((x) => x.id === 'm2') }
-  const hw = makeHomework({ id: 'h1', title: '  Fractions worksheet  ', details: ' q1-8 ', lesson, sourceRef: 'event:course:m1', target, todayISO: '2026-09-15', now: 5 })
+  const made = makeHomework({ id: 'h1', title: '  Fractions worksheet  ', details: ' q1-8 ', lesson, sourceRef: 'event:course:m1', target, todayISO: '2026-09-15', now: 5 })
+  // Pass 87 added the explicit due intent and its snapshot; the original shape is unchanged underneath.
+  assert.equal(made.dueMode, 'session')
+  assert.equal(made.dueSnapshot.dateISO, '2026-09-22')
+  const { dueMode: _m, dueSnapshot: _s, ...hw } = made
   assert.deepEqual(hw, {
     id: 'h1',
     title: 'Fractions worksheet',
@@ -65,7 +69,8 @@ test('makeHomework: the chosen occurrence sets the due date and is remembered by
   assert.equal(plain.details, undefined)
   assert.throws(() => makeHomework({ id: 'h3', title: '   ', target, todayISO: '2026-09-15', now: 7 }), /title/)
   assert.throws(() => makeHomework({ id: 'h4', title: 'x', target: null, dueISO: 'soon', todayISO: '2026-09-15', now: 7 }), /due date/)
-  assert.equal(makeHomework({ id: 'h5', title: 'y'.repeat(400), target, todayISO: '2026-09-15', now: 8 }).title.length, HOMEWORK_TITLE_MAX)
+  // Pass 87 (HW-05): over-limit words are refused with the count, never cut.
+  assert.throws(() => makeHomework({ id: 'h5', title: 'y'.repeat(400), target, todayISO: '2026-09-15', now: 8 }), new RegExp(`200 characters over the ${HOMEWORK_TITLE_MAX}-character limit`))
 })
 
 test('lookups: homework due in one occurrence, homework a lesson set, outstanding before completed', () => {

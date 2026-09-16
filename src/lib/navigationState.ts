@@ -107,6 +107,12 @@ export function parseRouteSafe(hash: string): ParsedRoute {
       // instead of an empty page.
       return { ok: true, route: { name: 'settings' }, notice: 'That settings section does not exist — showing all settings.' }
     }
+    case 'homework': {
+      const id = recordId(parts[1])
+      if (id === null) return { ok: false, reason: 'malformed' }
+      if (!id || parts.length !== 2) return { ok: true, route: { name: 'tasks' }, notice: 'That homework page does not exist — showing Tasks.' }
+      return { ok: true, route: { name: 'homework', id } }
+    }
     case 'session': {
       if (!parts[1]) return { ok: true, route: { name: 'today' } }
       if (parts[1].length > MAX_SESSION_KEY_LENGTH * 3) return { ok: false, reason: 'oversized' }

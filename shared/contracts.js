@@ -15,7 +15,7 @@ export const optionalCollections = ['tasks', 'exceptions', 'plans', 'commitments
  *  authenticated reviewer state needs the (future) portal. */
 export const clientSourceTypes = ['personal-reflection', 'learner-entered']
 /** AdminFile schema version written by this client; unknown newer fields are preserved, never dropped. */
-export const ADMIN_SCHEMA_VERSION = 11
+export const ADMIN_SCHEMA_VERSION = 12
 export function assert(condition, message) { if (!condition) throw new Error(message) }
 export function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 export function safeURL(value) {
@@ -304,6 +304,10 @@ export function validatePayload(data) {
               if (item.completedISO !== undefined) assert(validDate(item.completedISO), 'Invalid homework completion date.')
               if (item.details !== undefined) assert(typeof item.details === 'string' && item.details.length <= HOMEWORK_DETAILS_MAX, 'Invalid homework details.')
               for (const f of ['lessonId','setSessionRef','dueSessionRef','dueTitle']) if (item[f] !== undefined) assert(typeof item[f] === 'string' && item[f].length <= 600, 'Invalid homework field: ' + f)
+              // HW-03/HW-04 (Pass 87): explicit due intent, last-confirmed snapshots, and a bounded change history.
+              if (item.dueMode !== undefined) assert(['session','date'].includes(item.dueMode), 'Invalid homework due mode.')
+              for (const f of ['dueSnapshot','sourceSnapshot']) if (item[f] !== undefined) assert(object(item[f]) && validDate(item[f].dateISO) && typeof item[f].title === 'string' && item[f].title.length <= 600 && Number.isFinite(item[f].at) && (item[f].start === undefined || item[f].start === '' || validTime(item[f].start)), 'Invalid homework snapshot: ' + f)
+              if (item.dueHistory !== undefined) assert(Array.isArray(item.dueHistory) && item.dueHistory.length <= 100 && item.dueHistory.every((h) => object(h) && Number.isFinite(h.at) && validDate(h.fromISO) && validDate(h.toISO) && ['follow','keep','edit'].includes(h.reason)), 'Invalid homework history.')
             }
             if (key === 'exceptions') assert(['holiday','inset','part-day','cancelled','hours'].includes(item.kind), 'Invalid placement exception.')
             if (key === 'exceptions' && item.loggedMins !== undefined) assert(Number.isInteger(item.loggedMins) && item.loggedMins >= 0 && item.loggedMins <= 1440, 'Invalid logged minutes.')

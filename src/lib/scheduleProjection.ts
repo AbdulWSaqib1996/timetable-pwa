@@ -60,11 +60,16 @@ export function equivalentKeyDates(a: Session, b: Session): boolean {
 export function dedupeKeyDates(items: Session[]): Session[] {
   const out: Session[] = []
   for (const s of dedupeByKey(items)) {
-    if (out.some((kept) => equivalentKeyDates(kept, s))) continue
+    // HW-01 (Pass 87): learner-owned records are collapsed by IDENTITY only. Two homework
+    // records with the same title and date are two pieces of work; a task may still be
+    // absorbed by the sheet row it duplicates (Pass 74), never by another learner record.
+    if (out.some((kept) => equivalentKeyDates(kept, s) && !(isLearnerOwned(kept) && isLearnerOwned(s)) && !isHomework(kept) && !isHomework(s))) continue
     out.push(s)
   }
   return out
 }
+const isHomework = (s: Session) => s.id.startsWith('hw-')
+const isLearnerOwned = (s: Session) => isHomework(s) || s.id.startsWith('custom-')
 
 /**
  * B09: a course row is the key date itself (and so not repeated) only when it

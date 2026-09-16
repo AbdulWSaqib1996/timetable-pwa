@@ -26,7 +26,7 @@ import type { OriginOption } from '../lib/origins'
 import { weatherEmoji, weatherForHourAt } from '../lib/weather'
 import type { HourWeather } from '../lib/weather'
 import type { Session, SessionMeta } from '../types'
-import { IconAlert, IconBook, IconCalendar, IconCamera, IconCheck, IconChevronLeft, IconClock, IconClose, IconHome, IconNote, IconPin, IconSchool, PageHeader, SegmentedControl } from './ui'
+import { IconAlert, IconBook, IconCalendar, IconCamera, IconCheck, IconChevronLeft, IconClock, IconClose, IconHome, IconNote, IconPin, IconSchool, PageHeader, SegmentedControl, StatusMessage } from './ui'
 import { CopyButton } from './CopyButton'
 import { RouteMap } from './RouteMap'
 import { StaticMap } from './StaticMap'
@@ -67,8 +67,26 @@ interface Props {
    * always agree. Without it the status falls back to session metadata.
    */
   onStatus?: (next: 'todo' | 'doing' | 'done') => void
-  /** this key date IS a piece of homework: where it came from and where it is due */
-  homework?: { details?: string; setIn?: string; dueIn?: string; onOpenLesson?: () => void }
+  /** this key date IS a piece of homework: where it came from, where it is due, and whether the due session changed (HW-03/HW-04) */
+  homework?: {
+    details?: string
+    setIn?: string
+    sourceMissing?: boolean
+    dueIn?: string
+    dueState?: 'fixed' | 'current' | 'changed' | 'missing'
+    changeNote?: string
+    onOpenLesson?: () => void
+    onOpenSource?: () => void
+    onOpenDue?: () => void
+    onOpenHomework?: () => void
+    onFollow?: () => void
+    onKeep?: () => void
+  }
+  /** HW-02: open a homework record's own page / remove it with Undo */
+  onOpenHomework?: (id: string) => void
+  onRemoveHomework?: (h: HomeworkRec) => void
+  homeworkUndo?: HomeworkRec | null
+  onUndoHomework?: () => void
   /** homework due IN this teaching session */
   homeworkDue?: { id: string; title: string; details?: string; status: 'todo' | 'doing' | 'done'; dueTitle?: string }[]
   onToggleHomework?: (id: string) => void
@@ -157,6 +175,10 @@ export function SessionDetail({
   homeworkLesson,
   onUpdateAdmin,
   todayISO,
+  onOpenHomework,
+  onRemoveHomework,
+  homeworkUndo,
+  onUndoHomework,
   onClose,
   onOpenHomeJourney,
 }: Props) {
@@ -461,14 +483,24 @@ export function SessionDetail({
             <>
               {homework.details && <p className="detail-note-text">{homework.details}</p>}
               <p className="filter-hint">
-                Homework{homework.setIn ? ` set in ${homework.setIn}` : ''}
+                Homework{homework.setIn ? ` set in ${homework.setIn}` : ''}{homework.sourceMissing ? ' (source no longer in the timetable)' : ''}
                 {homework.dueIn ? ` · due in ${homework.dueIn}` : ''}. Marking it done here is the same tick as on Tasks and on the session it is due in.
               </p>
-              {homework.onOpenLesson && (
-                <div className="btn-row">
-                  <button type="button" className="btn-today-reset" onClick={homework.onOpenLesson}>Open the lesson that set it</button>
+              {(homework.dueState === 'changed' || homework.dueState === 'missing') && (
+                <div className="callout callout--amber" role="group" aria-label="Due session changed">
+                  <p>{homework.changeNote}</p>
+                  <div className="btn-row">
+                    {homework.onFollow && <button type="button" className="btn-primary" onClick={homework.onFollow}>Follow this session</button>}
+                    {homework.onKeep && <button type="button" className="btn-today-reset" onClick={homework.onKeep}>Keep the original date</button>}
+                  </div>
                 </div>
               )}
+              <div className="btn-row">
+                {homework.onOpenHomework && <button type="button" className="btn-primary" onClick={homework.onOpenHomework}>Open homework</button>}
+                {homework.onOpenSource && <button type="button" className="btn-today-reset" onClick={homework.onOpenSource}>Open source session</button>}
+                {homework.onOpenDue && <button type="button" className="btn-today-reset" onClick={homework.onOpenDue}>Open due session</button>}
+                {homework.onOpenLesson && <button type="button" className="btn-today-reset" onClick={homework.onOpenLesson}>Open lesson plan</button>}
+              </div>
             </>
           ) : (
             <>
@@ -769,11 +801,17 @@ export function SessionDetail({
                             {h.details && <span className="filter-hint"> — {h.details}</span>}
                           </span>
                         </label>
+                        {onOpenHomework && <button type="button" className="travel-link" aria-label={`Open homework: ${h.title}`} onClick={() => onOpenHomework(h.id)}>Open</button>}
                       </li>
                     ))}
                   </ul>
                   <p className="filter-hint">Set in an earlier session and scheduled against this one. The same tick shows on Tasks and on the Schedule.</p>
                 </>
+              )}
+              {homeworkUndo && onUndoHomework && (
+                <StatusMessage tone="success">
+                  <span>Removed “{homeworkUndo.title}”. <button type="button" className="travel-link" onClick={onUndoHomework}>Undo</button></span>
+                </StatusMessage>
               )}
               {canSetHomework && (
                 <HomeworkPanel
@@ -784,6 +822,9 @@ export function SessionDetail({
                   todayISO={todayISO!}
                   onUpdateAdmin={onUpdateAdmin!}
                   label="Homework set in this session"
+                  profileId={profileId}
+                  onOpenHomework={onOpenHomework}
+                  onRemove={onRemoveHomework}
                 />
               )}
             </section>
