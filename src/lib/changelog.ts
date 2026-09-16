@@ -7,6 +7,17 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 21,
+    dateISO: '2026-09-16',
+    title: 'Homework you can edit, reschedule and trust',
+    items: [
+      'Every piece of homework has its own page (open it from the session, the due session, Tasks or search): edit the words, change the due session or date, see where it was set and where it is due, mark it done, remove it with Undo — all on the same record',
+      'When the session homework is due in moves or is renamed, the deadline stays where you last confirmed it and the item is marked Needs review; you choose Follow this session or Keep the original date. A date you typed yourself never moves',
+      'Two pieces of homework with the same title and date stay separate everywhere, each with its own tick',
+      'Adding homework: a searchable chooser over the whole timetable (subject, date, tutor, group) that never offers a row marked as a deadline; over-length text is refused with a count rather than cut; an optional “use this due session for the next item”; what you typed survives a reload as a draft for that session',
+    ],
+  },
+  {
     version: 20,
     dateISO: '2026-09-16',
     title: 'Placement setup you can trust',

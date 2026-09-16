@@ -6247,3 +6247,9 @@ body { font-size: 16px; line-height: 1.45; }
 .data-card-state { font-size: 14px; font-weight: 600; line-height: 1.4; color: #4b5563; }
 .data-card-state--ready { color: #0f766e; }
 .data-card-state--amber { color: #b45309; }
+
+/* ---- HW-02/HW-05 homework (Pass 87) ---- */
+.homework-row .requirement-confirm { display: flex; gap: 10px; }
+.homework-row-details { display: block; }
+.homework-details { white-space: pre-wrap; }
+.due-chooser { display: grid; gap: 8px; }

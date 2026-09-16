@@ -147,7 +147,14 @@ export interface HomeworkRec {
   /** the later occurrence it is due in (session key) */
   dueSessionRef?: string
   dueTitle?: string
+  /** HW-03 (Pass 87): last confirmed due date — every consumer reads the resolver, never this alone */
   dueISO: string
+  /** explicit due intent: follow a session (on the learner's say-so when it moves) or a fixed date; absent = session when a ref exists */
+  dueMode?: 'session' | 'date'
+  dueSnapshot?: { dateISO: string; start?: string; title: string; at: number }
+  /** HW-04: what the source occurrence looked like, for when it leaves the timetable */
+  sourceSnapshot?: { dateISO: string; start?: string; title: string; at: number }
+  dueHistory?: { at: number; fromISO: string; toISO: string; reason: 'follow' | 'keep' | 'edit' }[]
   status: 'todo' | 'doing' | 'done'
   completedISO?: string
   at: number

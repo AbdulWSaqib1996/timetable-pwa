@@ -1,5 +1,7 @@
 import type { HomeworkRec } from './admin'
 import type { MetaMap, Session } from '../types'
+import { resolveDue } from '../../shared/homework.js'
+import { sessionKey } from './diff'
 
 /**
  * Homework on the existing pipelines (owner request, 15 September 2026).
@@ -14,14 +16,16 @@ export const homeworkSessionId = (h: Pick<HomeworkRec, 'id'>) => `hw-${h.id}`
 /** The record id behind a projected session, or null for anything else. */
 export const homeworkIdOf = (session: Pick<Session, 'id'>): string | null => (session.id.startsWith('hw-') ? session.id.slice('hw-'.length) : null)
 
-export function homeworkToSession(h: HomeworkRec): Session {
+/** The effective due date comes from the resolver (HW-03): the last confirmed date, never a guess. */
+export function homeworkToSession(h: HomeworkRec, sessions: Session[] = []): Session {
+  const due = resolveDue(h, sessions, sessionKey)
   return {
     id: homeworkSessionId(h),
     calendarUid: homeworkSessionId(h),
     eventKey: homeworkEventKey(h),
     title: `Homework: ${h.title}`,
     day: '',
-    dateISO: h.dueISO,
+    dateISO: due.effectiveISO,
     start: '',
     end: '',
     room: '',
