@@ -1632,7 +1632,7 @@ Automated checks + results: `tests/placement-batch3.spec.ts` (5: the four sectio
 
 Known limits: placement-scoped creation of new records (preselecting the placement on a new lesson or meeting from the workspace) is deferred to Batch 4; the review sheet counts blocks from the timetable's tags and cannot know about a placement whose blocks have not been imported yet; real-device keyboard verification remains a manual step.
 
-Released 16 September 2026: merge `__MERGE__`, CI run __CI__ success, `deploy.sh verify` seven PASS.
+Released 16 September 2026: merge `df943f5`, CI run 35086178126 success, `deploy.sh verify` seven PASS (app only — no worker deploy).
 
 ### Next workstream — PGCE / QTS student-experience audit (planned 11 September 2026)
 
