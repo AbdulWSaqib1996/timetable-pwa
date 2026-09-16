@@ -216,7 +216,15 @@ test('HW-05: validation instead of truncation, a searchable chooser that exclude
   await panel.getByLabel('Homework set in this session search').fill('Lee')
   await expect(due.locator('option').filter({ hasText: 'Maths' })).toHaveCount(0)
   await expect(due.locator('option').filter({ hasText: 'English 1' })).toHaveCount(1)
+  // The matches are visible as a list, not only inside the closed select; picking one selects it.
+  const results = panel.getByRole('list', { name: 'Matching sessions' })
+  await expect(results.getByRole('button')).toHaveCount(1)
+  await results.getByRole('button', { name: /English 1 · Wed 23 Sept 13:00 · Dr Lee/ }).click()
+  await expect(due).toHaveValue('event:e1')
+  await panel.getByLabel('Homework set in this session search').fill('zzz')
+  await expect(results).toContainText('No session matches “zzz”.')
   await panel.getByLabel('Homework set in this session search').fill('')
+  await expect(results).toHaveCount(0)
   // Keep the due target for the next item, on request.
   await due.selectOption((await due.locator('optgroup[label="Later occurrences of this lesson"] option').first().getAttribute('value'))!)
   await panel.getByRole('checkbox', { name: 'Use this due session for the next item too' }).check()

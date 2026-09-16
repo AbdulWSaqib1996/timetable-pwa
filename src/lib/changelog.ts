@@ -7,6 +7,15 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 23,
+    dateISO: '2026-09-16',
+    title: 'Homework editor fits the screen; session search shows its matches',
+    items: [
+      'The homework editor no longer stretches past the screen on a phone (which made the page zoom), and the four session sections fit the strip',
+      'Typing in “Find a session” now lists the matching sessions underneath — tap one to choose it — and says when nothing matches',
+    ],
+  },
+  {
     version: 22,
     dateISO: '2026-09-16',
     title: 'Placements you can edit in place; homework where you expect it',
