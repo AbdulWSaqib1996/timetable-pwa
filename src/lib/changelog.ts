@@ -7,6 +7,16 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 18,
+    dateISO: '2026-09-16',
+    title: 'A weekly review, and assignments from brief to feedback',
+    items: [
+      'Workload & support has a Weekly review: this week planned, logged and still open; next week fixed (sessions, placement travel, commitments, protected time) and free; and the planner’s proposals as a diff — moved, added, untouched, kept — that you accept one by one or as a batch. Undo reverses only that batch, the same proposals are never added twice, and a timetable change says why they were recalculated',
+      'Academic work now carries the whole assignment: a summary (due date from your key dates, your word target, stage, sources, next task), a versioned outline, draft references (a wallet document or a link), a submission record you enter yourself with an optional receipt file — never institution-verified; a resubmission adds to the history — feedback references and your own source list',
+      'Changing an assignment’s deadline updates its summary without adding a second pin to the Schedule; a receipt is kept by its stable document identity so it survives backup and restore, and says so when the file is missing on this device',
+    ],
+  },
+  {
     version: 17,
     dateISO: '2026-09-16',
     title: 'Teaching cycles, preparing for your next placement, student rep meetings',

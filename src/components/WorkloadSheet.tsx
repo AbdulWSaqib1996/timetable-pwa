@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Dialog, Field, IconClose, tabKeys } from './ui'
 import { formatMins, planWorkload } from '../../shared/workload.js'
+import { applyChanges, basisHash, nextWeekFixed, reviewWeeks, thisWeekSummary, undoBatch, weeklyReview } from '../../shared/weeklyReview.js'
+import { isPlacementTitle } from '../../shared/eligibility.js'
 import type { WorkloadProposal } from '../../shared/workload.js'
 import type { PlanBusyInterval } from '../../shared/planWeek.js'
 import { newAdminId } from '../lib/admin'
-import type { AdminFile, ContactRec, CourseQuestionRec, ProtectedWindowRec } from '../lib/admin'
+import type { AdminFile, ContactRec, CourseQuestionRec, ProtectedWindowRec, WeeklyReviewRec } from '../lib/admin'
 import type { Settings } from '../types'
 
 interface Props {
@@ -39,7 +41,8 @@ const fmt = (iso: string) => {
  * questions — no wellbeing score, no streaks, nothing sent to anyone.
  */
 export function WorkloadSheet({ admin, busy, deadlines, settings, todayISO, lastBatch, onUpdateAdmin, onAccept, onUndo, onClose }: Props) {
-  const [tab, setTab] = useState<'plan' | 'protected' | 'support'>('plan')
+  const [tab, setTab] = useState<'plan' | 'review' | 'protected' | 'support'>('plan')
+  const [selected, setSelected] = useState<string[] | null>(null)
   const [win, setWin] = useState({ day: '1', start: '18:00', end: '20:00', label: '' })
   const [contact, setContact] = useState({ name: '', role: '', contact: '' })
   const [question, setQuestion] = useState({ text: '', askedTo: '' })
@@ -57,6 +60,48 @@ export function WorkloadSheet({ admin, busy, deadlines, settings, todayISO, last
       }),
     [todayISO, busy, deadlines, admin.protected, admin.tasks, admin.plans, settings.planRangeStart, settings.planRangeEnd, settings.quietFrom, settings.quietTo]
   )
+  // E02 weekly review: this week, next week's fixed time and free slots, and the diff of proposals against existing blocks.
+  const weeks = reviewWeeks(todayISO)
+  const review = (admin.weeklyReviews ?? []).find((r) => r.weekISO === weeks.fromISO) ?? null
+  const planOptions = { start: settings.planRangeStart, end: settings.planRangeEnd, quietFrom: settings.quietFrom, quietTo: settings.quietTo }
+  const thisWeek = useMemo(() => thisWeekSummary({ todayISO, tasks: admin.tasks, plans: admin.plans }), [todayISO, admin.tasks, admin.plans])
+  const fixed = useMemo(
+    () => nextWeekFixed({ todayISO, busy, protectedWindows: admin.protected, options: planOptions, travel: { bufferMins: settings.arrivalBufferMins ?? 10, isPlacement: isPlacementTitle } }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [todayISO, busy, admin.protected, settings.planRangeStart, settings.planRangeEnd, settings.quietFrom, settings.quietTo, settings.arrivalBufferMins]
+  )
+  const nextWeek = useMemo(
+    () => weeklyReview({ todayISO, busy, protectedWindows: admin.protected, deadlines, tasks: admin.tasks, plans: admin.plans, options: planOptions }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [todayISO, busy, admin.protected, deadlines, admin.tasks, admin.plans, settings.planRangeStart, settings.planRangeEnd, settings.quietFrom, settings.quietTo]
+  )
+  const diff = nextWeek
+  const currentBasis = basisHash(busy)
+  const basisChanged = !!review?.basisHash && review.basisHash !== currentBasis
+  const chosenKeys = selected ?? diff.actionable.map((c) => c.key)
+  const lastReviewBatch = review?.batches[review.batches.length - 1] ?? null
+  const upsertReview = (prev: AdminFile, fn: (r: WeeklyReviewRec) => WeeklyReviewRec): AdminFile => {
+    const list = prev.weeklyReviews ?? []
+    const current = list.find((r) => r.weekISO === weeks.fromISO) ?? { id: newAdminId(), weekISO: weeks.fromISO, proposalRevision: 1, batches: [], at: Date.now() }
+    const next = fn(current)
+    return { ...prev, weeklyReviews: list.some((r) => r.id === current.id) ? list.map((r) => (r.id === current.id ? next : r)) : [...list, next] }
+  }
+  const acceptChanges = () => {
+    const now = Date.now()
+    const { batch, added, removedIds } = applyChanges({ changes: diff.changes, selectedKeys: chosenKeys, makeId: newAdminId, now })
+    if (added.length === 0) return
+    // The same selection accepted twice is a no-op: the diff already shows it as untouched, and the hash guards the edge.
+    if (lastReviewBatch && lastReviewBatch.changesHash === batch.changesHash && lastReviewBatch.addedIds.every((id) => admin.plans.some((p) => p.id === id))) return
+    const drop = new Set(removedIds)
+    onUpdateAdmin((prev) => upsertReview({ ...prev, plans: [...prev.plans.filter((p) => !drop.has(p.id)), ...added] }, (r) => ({ ...r, batches: [...r.batches, batch], basisHash: currentBasis, proposalRevision: r.proposalRevision + 1, at: now })))
+    setSelected(null)
+  }
+  const undoLast = () => {
+    if (!lastReviewBatch) return
+    onUpdateAdmin((prev) => upsertReview({ ...prev, plans: undoBatch(prev.plans, lastReviewBatch) }, (r) => ({ ...r, batches: r.batches.filter((b) => b.id !== lastReviewBatch.id), at: Date.now() })))
+  }
+  const setReflection = (reflection: string) => onUpdateAdmin((prev) => upsertReview(prev, (r) => ({ ...r, reflection, at: Date.now() })))
+  const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
   const agenda = admin.supportNotes.find((n) => n.id === 'agenda')
   const setAgenda = (text: string) => onUpdateAdmin((prev) => ({ ...prev, supportNotes: prev.supportNotes.some((n) => n.id === 'agenda') ? prev.supportNotes.map((n) => (n.id === 'agenda' ? { ...n, text, at: Date.now() } : n)) : [...prev.supportNotes, { id: 'agenda', text, at: Date.now() }] }))
 
@@ -67,10 +112,76 @@ export function WorkloadSheet({ admin, busy, deadlines, settings, todayISO, last
         <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}><IconClose /></button>
       </div>
       <div className="segmented" role="tablist" aria-label="Workload sections">
-        {([['plan', 'Next two weeks'], ['protected', `Protected time (${admin.protected.length})`], ['support', 'Support']] as const).map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} className={`segment${tab === id ? ' segment-on' : ''}`} onClick={() => setTab(id)} onKeyDown={tabKeys(['plan', 'protected', 'support'] as const, tab, setTab)}>{label}</button>
+        {([['plan', 'Next two weeks'], ['review', 'Weekly review'], ['protected', `Protected time (${admin.protected.length})`], ['support', 'Support']] as const).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} className={`segment${tab === id ? ' segment-on' : ''}`} onClick={() => setTab(id)} onKeyDown={tabKeys(['plan', 'review', 'protected', 'support'] as const, tab, setTab)}>{label}</button>
         ))}
       </div>
+
+      {tab === 'review' && (
+        <div className="workload-review">
+          <h3 className="subheading">This week · {fmt(weeks.fromISO)} – {fmt(weeks.toISO)}</h3>
+          <dl className="kv workload-summary" aria-label="This week">
+            <div><dt>Planned</dt><dd>{formatMins(thisWeek.plannedMins)} in {thisWeek.blocks.length} block{thisWeek.blocks.length === 1 ? '' : 's'}</dd></div>
+            <div><dt>Logged</dt><dd>{formatMins(thisWeek.loggedMins)} ticked done</dd></div>
+            <div><dt>Still open</dt><dd>{thisWeek.openCount} task{thisWeek.openCount === 1 ? '' : 's'}{thisWeek.openTasks.some((t) => t.remaining === null) ? ' · effort unknown for some (not guessed)' : ''}</dd></div>
+          </dl>
+          {thisWeek.openTasks.length > 0 && (
+            <ul className="workspace-list" aria-label="Open tasks">
+              {thisWeek.openTasks.map((t) => (
+                <li key={t.id} className="workspace-row"><span>{t.title}{t.dueISO ? <span className="filter-hint"> · due {fmt(t.dueISO)}</span> : null}</span><span className={`tag${t.overdue ? ' tag--amber' : ''}`}>{t.remaining === null ? 'effort unknown' : `${formatMins(t.remaining)} left`}</span></li>
+              ))}
+            </ul>
+          )}
+          <Field label="Your reflection on the week" hint="Yours only — never scored, never sent.">
+            <textarea className="placement-input" rows={2} aria-label="Weekly reflection" defaultValue={review?.reflection ?? ''} onBlur={(e) => { if (e.target.value !== (review?.reflection ?? '')) setReflection(e.target.value) }} />
+          </Field>
+
+          <h3 className="subheading">Next week · {fmt(weeks.nextFromISO)} – {fmt(weeks.nextToISO)}</h3>
+          <dl className="kv workload-summary" aria-label="Next week">
+            <div><dt>Fixed</dt><dd>{formatMins(fixed.days.reduce((n, d) => n + d.fixedMins, 0))} of sessions, placement travel, commitments and protected time</dd></div>
+            <div><dt>Free</dt><dd>{formatMins(fixed.freeMins)} in {fixed.free.length} slot{fixed.free.length === 1 ? '' : 's'}</dd></div>
+            <div><dt>Proposed</dt><dd>{formatMins(nextWeek.proposals.reduce((n, p) => n + p.effortMins, 0))}{nextWeek.unallocated > 0 ? ` · ${formatMins(nextWeek.unallocated)} still unallocated` : ''}</dd></div>
+          </dl>
+          <ul className="workspace-list" aria-label="Fixed commitments next week">
+            {fixed.days.map((day) => (
+              <li key={day.d} className="workspace-row review-day">
+                <span><strong>{fmt(day.d)}</strong></span>
+                <span className="filter-hint">{day.fixed.length ? day.fixed.map((f) => `${hhmm(f.from)}–${hhmm(f.to)} ${f.label}`).join(' · ') : 'nothing fixed'}</span>
+              </li>
+            ))}
+          </ul>
+          {basisChanged && <p className="filter-hint" role="status">Your timetable or commitments changed since you last accepted proposals — they were recalculated; this is the new diff.</p>}
+          {nextWeek.unknown.length > 0 && <p className="filter-hint">Effort unknown, so not planned: {nextWeek.unknown.map((u) => u.title).join(' · ')}.</p>}
+          <h4 className="subheading">Changes to next week's study blocks</h4>
+          {diff.changes.length === 0 ? (
+            <p className="filter-hint">Nothing to change — no remaining estimated effort lands next week.</p>
+          ) : (
+            <ul className="workspace-list" aria-label="Proposed changes">
+              {diff.changes.map((c) => (
+                <li key={c.key} className="workspace-row proposal-row" data-kind={c.kind}>
+                  {c.kind === 'added' || c.kind === 'moved' ? (
+                    <label className="cycle-obs">
+                      <input type="checkbox" checked={chosenKeys.includes(c.key)} onChange={(e) => setSelected(e.target.checked ? [...chosenKeys, c.key] : chosenKeys.filter((k) => k !== c.key))} aria-label={`${c.kind === 'added' ? 'Add' : 'Move'}: ${c.proposal!.title} ${fmt(c.proposal!.dateISO)} ${c.proposal!.startTime}`} />
+                      <span>
+                        <span className={`tag ${c.kind === 'added' ? 'tag--teal' : 'tag--amber'}`}>{c.kind === 'added' ? '+ added' : '→ moved'}</span> {c.kind === 'moved' ? `${fmt(c.block!.dateISO)} ${c.block!.startTime} → ` : ''}{fmt(c.proposal!.dateISO)} {c.proposal!.startTime}–{c.proposal!.endTime} · {c.proposal!.title}
+                      </span>
+                    </label>
+                  ) : (
+                    <span><span className={`tag${c.kind === 'clash' ? ' tag--amber' : ''}`}>{c.kind === 'clash' ? 'clashes — no free slot found' : 'untouched'}</span> {fmt(c.block!.dateISO)} {c.block!.startTime}–{c.block!.endTime} · {c.block!.title}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="btn-row">
+            <button type="button" className="btn-primary" disabled={chosenKeys.filter((k) => diff.actionable.some((c) => c.key === k)).length === 0} onClick={acceptChanges}>
+              Accept {chosenKeys.filter((k) => diff.actionable.some((c) => c.key === k)).length} of {diff.actionable.length} change{diff.actionable.length === 1 ? '' : 's'}
+            </button>
+            {lastReviewBatch && <button type="button" className="btn-today-reset" onClick={undoLast}>Undo last accepted batch ({lastReviewBatch.addedIds.length})</button>}
+          </div>
+          <p className="filter-hint">Existing blocks are untouched unless a session or commitment now sits on top of one — then a move is offered and only happens if you tick it. Travel is an assumption from your arrival buffer. Nothing here rates you.</p>
+        </div>
+      )}
 
       {tab === 'plan' && (
         <div className="workload-plan">
