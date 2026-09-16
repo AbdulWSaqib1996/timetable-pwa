@@ -81,7 +81,10 @@ export function BackupSheet({ store, onClose }: { store: ProfileStore; onClose: 
       const name = `my-timetable-backup-${stamp}${scope === 'active' && active ? `-${active.name.replace(/[^\w-]+/g, '_').slice(0, 30)}` : ''}${encrypt ? '.encrypted' : ''}.json`
       const text = encrypt ? await sealBackup(json, pass) : json
       downloadFile(name, text, 'application/json')
-      markBackedUp({ profiles: scope === 'active' && active ? [active.id] : store.profiles.map((p) => p.id), all: scope === 'all' })
+      // E05: record exactly which file identities this generation carried, so the data centre can answer "bytes in backup?" per file.
+      const carried = validateBackup(json)
+      const attachments = [...(carried.photos ?? []), ...(carried.wallet ?? [])].map((f) => f.uid).filter((u): u is string => typeof u === 'string')
+      markBackedUp({ profiles: scope === 'active' && active ? [active.id] : store.profiles.map((p) => p.id), all: scope === 'all', files: (carried.photos?.length ?? 0) + (carried.wallet?.length ?? 0) > 0, attachments })
       setDone({ name, size: sizeOf(text), encrypted: encrypt })
     } catch (e) {
       reportPersistenceFailure('Backup export failed: ' + String(e))
@@ -292,6 +295,12 @@ export function RestoreSheet({ text, passphrase, onClose, onRestored }: { text: 
               <li>
                 <span>Backup created</span>
                 <span className="notif-state">{impact.exportedAt ? new Date(impact.exportedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'unknown (older format)'} · version {impact.version}</span>
+              </li>
+              <li>
+                <span>Files the records refer to</span>
+                <span className={`notif-state${impact.referencedMissing.count > 0 ? ' warn' : ''}`}>
+                  {impact.referencedMissing.count === 0 ? 'every referenced file is in this backup or already on this device' : `${impact.referencedMissing.count} referenced file${impact.referencedMissing.count === 1 ? ' is' : 's are'} in neither this backup nor this device — those records will read “missing” until you relink or restore a backup that has them`}
+                </span>
               </li>
             </ul>
           )}

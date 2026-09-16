@@ -89,6 +89,7 @@ interface Props {
 
 import { DEFAULT_ICS_FEED_BASE, DEFAULT_PUSH_BASE } from '../lib/config'
 import { MentorAccessSection } from './MentorAccessSection'
+import { DataCentre } from './DataCentre'
 import type { AdminFile } from '../lib/admin'
 import { activeCourse, courseZone } from '../lib/course'
 import { downloadFile } from '../lib/files'
@@ -1685,6 +1686,8 @@ export function SettingsSheet({
       )}
       {section === 'data' && (
         <>
+        {/* E05: the data & sharing centre — four confirmed states, the per-file table, relink, the recovery guide. */}
+        {admin && onUpdateAdmin && <DataCentre store={store} admin={admin} settings={settings} online={online} syncState={syncState} syncDetail={syncDetail} onUpdateAdmin={onUpdateAdmin} />}
         {/* V3 order: save/sync/backup state → Back up / Restore → sync → storage & advanced. */}
         <section className="filter-section" id="data-health">
           <div className="section-head">

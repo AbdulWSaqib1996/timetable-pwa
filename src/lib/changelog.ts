@@ -7,6 +7,17 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 19,
+    dateISO: '2026-09-16',
+    title: 'One honest view of where your data is',
+    items: [
+      'Settings → Data & devices opens with a Data & sharing centre: On this device, Synced to my devices, Backed up and Shared with mentors — each from a confirmed result (a saved change, the server’s acknowledged sync time, a backup you generated here, a share the mentor service acknowledged), never from a button press',
+      'Review details lists every photo and document: where it is, whether a backup generated here carried its bytes, which shared pack revision includes it and when the portal copy expires. A file a record refers to but this device does not have is listed as missing and can be relinked',
+      'The restore preview now says which referenced files are in neither the backup nor this device before you restore; a records-only backup is never described as containing files',
+      'Download a plain-language recovery guide to keep with your backup — it names what exists and how to get it back, and contains no code, token or key',
+    ],
+  },
+  {
     version: 18,
     dateISO: '2026-09-16',
     title: 'A weekly review, and assignments from brief to feedback',

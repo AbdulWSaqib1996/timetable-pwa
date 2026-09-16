@@ -96,6 +96,8 @@ Before planning, each P1/P2 finding was checked against `main`:
 
 ### Batch D3 — data confidence (Pass 85) — E05
 
+> **Status (16 September 2026): implemented as Pass 85** — see PLAN.md. Deviations: the centre sits at the top of the existing Data & devices settings section rather than as a new screen; "backed up" is a generation recorded on this device with the exact attachment identities it carried (the app still cannot see whether the file was kept, and says so); the restore preview extends the existing impact plan with the referenced-but-absent file count rather than a separate isolated sandbox; the portal expiry is computed from the acknowledged share time using the worker's attachment TTL, and the worker listing now returns it too.
+
 **In**: the data & sharing centre — On this device / Synced / Backed up / Shared with mentors from confirmed receipts, per-record/file table (where stored, bytes in backup?, share revision, remote expiry), restore preview (adds/replaces/missing) before applying, relink for missing files, a plain-language recovery guide that never includes secrets.
 **Out**: cloud providers (Pass 58 decision stands).
 **Gate**: an offline upload is never "backed up"; text-only export never claims files; expired mentor attachments obvious; remapped local ids keep links via uid.
