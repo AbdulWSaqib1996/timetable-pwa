@@ -695,10 +695,12 @@ export default function App() {
     return id
   }
 
-  // Onboarding commits ONLY after the validated preview (P4-09): membership
-  // choices ride along, so the separate specialism picker never re-asks.
+  // Onboarding commits ONLY after the validated review (P4-09): membership
+  // and the optional guided-setup choices ride along, so the separate specialism picker never re-asks.
   function handleSetupComplete(result: SetupResult) {
     const s: Settings = {
+      // optional guided-setup choices (reminders, travel, key dates) — Pass 91
+      ...result.extras,
       sheetUrl: result.url,
       sheetId: result.sheetId,
       gid: result.gid,

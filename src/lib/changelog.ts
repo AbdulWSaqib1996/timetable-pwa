@@ -7,6 +7,17 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 26,
+    dateISO: '2026-09-24',
+    title: 'A guided setup that walks you through it',
+    items: [
+      'Setting up a timetable is now a step-by-step guide with a progress bar: connect your sheet, choose the sessions that are yours, then optionally pick reminders, how you travel and your deadlines — skip anything and change it later in Settings',
+      'While you paste your link, the app tells you straight away whether it is a Google Sheet and whether a tab is chosen; a tick-as-you-go list shows how to get the link, and a Paste button fills it in for you',
+      'Choosing your specialism or group shows how many sessions are yours and what is coming up, as you tap',
+      'Before saving you see everything on one Review page, with Change beside each choice; nothing is saved until you press Save this timetable',
+    ],
+  },
+  {
     version: 25,
     dateISO: '2026-09-24',
     title: 'An illustrated guide to the whole app',

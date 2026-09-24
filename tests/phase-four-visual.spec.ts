@@ -222,7 +222,7 @@ test('source failure keeps a usable page: error banner, no blank screen', async 
   await shot(page, 'today-source-failure-390')
 })
 
-test('onboarding walks Connect → Personalise → Preview against a synthetic sheet', async ({ page, context }) => {
+test('guided onboarding walks Welcome → Connect → Sessions → optional steps → Review against a synthetic sheet', async ({ page, context }) => {
   // Serve a deterministic GViz payload for the wizard (still no real network).
   await context.route('**/docs.google.com/**', (route) =>
     route.fulfill({
@@ -247,21 +247,52 @@ test('onboarding walks Connect → Personalise → Preview against a synthetic s
   await page.clock.install({ time: new Date('2026-09-07T07:15:00Z') })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('./')
+  await expect(page.getByRole('heading', { name: 'My Timetable' })).toBeVisible()
+  await shot(page, 'onboarding-welcome-390')
+  await page.getByRole('button', { name: 'Let’s get started' }).click()
+  await expect(page.getByText('Step 1 of 6', { exact: false })).toBeVisible()
+  // Live link recognition before any network request.
+  const link = page.getByPlaceholder(/spreadsheets/)
+  await link.fill('not a link')
+  await expect(page.locator('#connect-status')).toContainText('Not a Google Sheets link')
+  await link.fill('https://docs.google.com/spreadsheets/d/SYNTHETICSHEETID1234567890/edit#gid=0')
+  await expect(page.locator('#connect-status')).toContainText('tab recognised')
   await shot(page, 'onboarding-connect-390')
-  await page.getByPlaceholder(/spreadsheets/).fill('https://docs.google.com/spreadsheets/d/SYNTHETICSHEETID1234567890/edit#gid=0')
   await page.getByRole('button', { name: 'Connect timetable' }).click()
-  await expect(page.getByText('Step 2 of 3', { exact: false })).toBeVisible()
-  await shot(page, 'onboarding-personalise-390')
-  // Choose group 2, preview, and confirm nothing was saved until the end.
+  await expect(page.getByText('Step 2 of 6', { exact: false })).toBeVisible()
+  await expect(page.getByText(/Connected — 2 sessions found/)).toBeVisible()
+  // Choosing a group updates the live count.
   await page.getByRole('button', { name: '2', exact: true }).click()
-  await page.getByRole('button', { name: 'Preview timetable' }).click()
-  await expect(page.getByText('Step 3 of 3', { exact: false })).toBeVisible()
+  await expect(page.locator('.guided-live')).toContainText('2 sessions for you')
+  await shot(page, 'onboarding-sessions-390')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  // Optional steps: skip reminders, choose a travel mode, skip deadlines.
+  await expect(page.getByText('Step 3 of 6', { exact: false })).toBeVisible()
+  await shot(page, 'onboarding-reminders-390')
+  await page.getByRole('button', { name: 'Skip for now' }).click()
+  await expect(page.getByText('Step 4 of 6', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: 'Public transport' }).click()
+  await shot(page, 'onboarding-travel-390')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByText('Step 5 of 6', { exact: false })).toBeVisible()
+  await page.getByPlaceholder(/spreadsheets/).fill('https://docs.google.com/spreadsheets/d/SYNTHETICSHEETID1234567890/edit#gid=77')
+  await expect(page.getByText('Key dates tab recognised')).toBeVisible()
+  await shot(page, 'onboarding-deadlines-390')
+  await page.getByPlaceholder(/spreadsheets/).fill('')
+  await page.getByRole('button', { name: 'Skip for now' }).click()
+  await expect(page.getByText('Step 6 of 6', { exact: false })).toBeVisible()
   await expect(page.getByText(/rows? needs? attention/)).toBeVisible() // repair info for the invalid date
-  await shot(page, 'onboarding-preview-390')
-  // Back preserves choices.
-  await page.getByRole('button', { name: '‹ Back' }).click()
+  await expect(page.locator('.guided-summary')).toContainText('Public transport')
+  await expect(page.getByRole('progressbar', { name: 'Setup progress' })).toHaveAttribute('aria-valuenow', '6')
+  await shot(page, 'onboarding-review-390')
+  // Change from the review keeps choices; nothing is saved until the end.
+  await page.getByRole('button', { name: 'Change sessions' }).click()
   await expect(page.getByRole('button', { name: '2', exact: true })).toHaveClass(/chip-on/)
-  await page.getByRole('button', { name: 'Preview timetable' }).click()
+  expect(await page.evaluate(() => localStorage.getItem('timetable.store.v2'))).toBeNull()
+  for (let i = 0; i < 4; i++) await page.locator('.guided-nav .btn-primary, .guided-nav .btn-secondary').click()
   await page.getByRole('button', { name: 'Save this timetable' }).click()
   await expect(page.locator('.page-today')).toBeVisible()
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('timetable.store.v2') ?? '{}'))
+  const profile = saved.profiles.find((p: { id: string }) => p.id === saved.activeId)
+  expect(profile.settings).toMatchObject({ myGroups: ['2'], travelMode: 'transit', specialismsChosen: true })
 })
