@@ -311,3 +311,107 @@ test('snapshot publishing: republishes when ANY section changes, skips only pure
   assert.equal(await publishAnalyticsSnapshot(env), false)
   assert.equal(JSON.parse(env.PUSH.rows.get('astats:latest')).snapshotId, 'c')
 })
+
+/* ---- Pass 92: KV write economy and the snapshot-job heartbeat ---- */
+
+test('cron: a healthy sheet never spends a KV delete on an absent failure marker; an existing streak is cleared', async () => {
+  const gviz =
+    'google.visualization.Query.setResponse(' +
+    JSON.stringify({
+      status: 'ok',
+      table: {
+        cols: [],
+        rows: [
+          ['Title', 'Date', 'Start', 'End', 'Room', 'Groups'],
+          ['Maths 1', '14/01/2026', '09:00', '11:00', 'Room 1', ''],
+        ].map((r) => ({ c: r.map((v) => ({ v })) })),
+      },
+    }) +
+    ');'
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (input) => {
+    const url = typeof input === 'string' ? input : input.url
+    if (url.includes('docs.google.com')) return new Response(gviz)
+    return new Response('{}', { status: 404 })
+  }
+  try {
+    const run = async (entries) => {
+      const kv = fakeKV({
+        'sub:test': JSON.stringify({ subscription: { endpoint: 'https://push.invalid/x' }, config: { sheetId: 'SHEETID', gid: '0' } }),
+        ...entries,
+      })
+      const deletes = []
+      const del = kv.delete.bind(kv)
+      kv.delete = async (key) => {
+        deletes.push(key)
+        return del(key)
+      }
+      const waits = []
+      await worker.scheduled({}, { PUSH: kv }, { waitUntil: (p) => waits.push(p) })
+      await Promise.all(waits)
+      return { kv, deletes }
+    }
+    const healthy = await run({})
+    assert.ok(healthy.kv.rows.has('snap:SHEETID|0') || [...healthy.kv.rows.keys()].some((k) => k.startsWith('snap:')), 'the sheet was not fetched — the test would pass vacuously')
+    assert.deepEqual(healthy.deletes.filter((k) => k.startsWith('fail:')), [], 'deleted a failure marker that did not exist')
+    const recovering = await run({ 'fail:SHEETID|0': '3' })
+    assert.deepEqual(recovering.deletes.filter((k) => k.startsWith('fail:')), ['fail:SHEETID|0'])
+    assert.equal(recovering.kv.rows.has('fail:SHEETID|0'), false)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
+test('snapshot job: every successful run records a heartbeat (even when unchanged); a failed run does not', async () => {
+  const { publishAnalyticsSnapshot } = await import('../../workers/push/worker.js')
+  const heartbeats = []
+  let fail = false
+  const snapshot = { schemaVersion: 2, snapshotId: 'a', generatedAt: 't1', metrics: {}, daily: [], features: [], cohorts: [] }
+  const env = {
+    PUSH: fakeKV({}),
+    ANALYTICS: {
+      idFromName: (n) => n,
+      get: () => ({
+        fetch: async (req) => {
+          const path = new URL(req.url).pathname
+          if (path === '/v2/checked') {
+            heartbeats.push((await req.json()).at)
+            return Response.json({ ok: true })
+          }
+          return fail ? new Response('x', { status: 500 }) : Response.json(snapshot)
+        },
+      }),
+    },
+  }
+  assert.equal(await publishAnalyticsSnapshot(env), true)
+  assert.equal(await publishAnalyticsSnapshot(env), false) // unchanged: no KV write…
+  assert.equal(heartbeats.length, 2) // …but the run is still recorded
+  assert.ok(heartbeats.every((at) => !Number.isNaN(Date.parse(at))))
+  fail = true
+  assert.equal(await publishAnalyticsSnapshot(env), false)
+  assert.equal(heartbeats.length, 2, 'a failed aggregation must not look fresh')
+})
+
+test('/stats/v2 serves checkedAt from the heartbeat, and the plain snapshot when the heartbeat is unavailable', async () => {
+  const snapshot = { schemaVersion: 2, snapshotId: 'a', generatedAt: '2026-09-24T16:40:34.000Z' }
+  let heartbeat = { checkedAt: '2026-09-24T18:50:02.000Z' }
+  const env = {
+    PUSH: fakeKV({ statskey: 'k3y', 'astats:latest': JSON.stringify(snapshot) }),
+    ANALYTICS: {
+      idFromName: (n) => n,
+      get: () => ({ fetch: async () => (heartbeat ? Response.json(heartbeat) : new Response('x', { status: 500 })) }),
+    },
+  }
+  const get = () =>
+    worker.fetch(
+      new Request('https://push.test/stats/v2', { headers: { authorization: 'Bearer k3y', 'cf-connecting-ip': `10.9.0.${++ipCounter}` } }),
+      env
+    )
+  const withBeat = await (await get()).json()
+  assert.equal(withBeat.checkedAt, '2026-09-24T18:50:02.000Z')
+  assert.equal(withBeat.generatedAt, snapshot.generatedAt, 'publish time is preserved separately')
+  heartbeat = null
+  const without = await (await get()).json()
+  assert.equal('checkedAt' in without, false)
+  assert.equal(without.snapshotId, 'a')
+})

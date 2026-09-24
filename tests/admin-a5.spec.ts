@@ -20,13 +20,28 @@ test('reliability: sources carry denominators and thresholds; a stale aggregate 
   await mockStats(context, { v2: () => ({ status: 200, body: staleV2() }) })
   await unlockAt(page, 'reliability')
   await expect(page.getByRole('heading', { name: 'Reliability' })).toBeVisible()
-  await expect(page.getByText(/Stale aggregate: the v2 snapshot is 4[45] min old \(threshold 30 min\)/)).toBeVisible()
+  await expect(page.getByText(/Stale aggregate: the snapshot job last succeeded 4[45] min ago \(threshold 30 min\)/)).toBeVisible()
   await expect(page.getByText(/source: worker ingestion · 1\/144 attempts/)).toBeVisible()
   await expect(page.getByText(/alert above 2%/)).toBeVisible()
   await expect(page.getByText(/offline failures are unobserved, not zero/)).toBeVisible()
   await expect(page.getByRole('table', { name: /Reason counts per UTC day/ })).toBeVisible()
   // Never a green "healthy" service claim.
   await expect(page.getByText(/healthy/i)).toHaveCount(0)
+})
+
+test('reliability: unchanged numbers with a fresh job heartbeat are not stale (Pass 92)', async ({ page, context }) => {
+  // generatedAt only moves when the numbers change; checkedAt is the last successful job run.
+  const quietV2 = () => ({
+    ...v2Fixture(),
+    generatedAt: new Date(Date.now() - 120 * 60_000).toISOString(),
+    checkedAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+  })
+  await mockStats(context, { v2: () => ({ status: 200, body: quietV2() }) })
+  await unlockAt(page, 'reliability')
+  await expect(page.getByRole('heading', { name: 'Reliability' })).toBeVisible()
+  await expect(page.getByText(/Stale aggregate/)).toHaveCount(0)
+  await expect(page.getByText(/stale \(>30 min\)/)).toHaveCount(0)
+  await expect(page.getByText(/no changes since, last checked/)).toBeVisible()
 })
 
 test('reliability: below the denominator minimum the rate is suppressed instead of shown as 0%', async ({ page, context }) => {

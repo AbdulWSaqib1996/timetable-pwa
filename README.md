@@ -35,7 +35,7 @@ deployed (automatic and manual).
 
 ## Background push (optional)
 
-`workers/push` is a Cloudflare Worker (free plan) that sends session and key-date reminders
+`workers/push` is a Cloudflare Worker (it fits the free plan at cohort scale; this deployment runs on Workers Paid) that sends session and key-date reminders
 even when the app is closed. Deploy:
 
 ```bash

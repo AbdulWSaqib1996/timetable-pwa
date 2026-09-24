@@ -2,7 +2,7 @@
 
 Everything needed to deploy My Timetable — the automatic paths, the manual
 equivalents, first-time setup from a clean account, verification, and rollback.
-All hosting is on free tiers; there are no paid services anywhere.
+GitHub Pages and Vercel run on free tiers; Cloudflare is on the paid Workers plan (owner, 24 Sep 2026).
 
 > **Automating this?** [`AGENTS.md`](AGENTS.md) is the runbook for AI agents
 > (ChatGPT/Codex, Claude, CI bots): the same steps as this document, expressed
@@ -27,7 +27,7 @@ All hosting is on free tiers; there are no paid services anywhere.
 ## 2. Prerequisites
 
 - Node 20+ and npm.
-- Accounts: GitHub (repo + Pages), Vercel (Hobby), Cloudflare (Workers free plan).
+- Accounts: GitHub (repo + Pages), Vercel (Hobby), Cloudflare (Workers Paid).
 - CLIs (all run via `npx`, no global installs needed):
   - `wrangler` — authenticate once with `npx wrangler login` (browser OAuth; no
     secrets pass through the terminal).
@@ -186,20 +186,31 @@ a subscribed device. `npm run test:e2e` locally reproduces the CI gate.
 
 ## 9. Operating notes
 
-- **Free-tier budget**: the binding constraint is Cloudflare KV's ~1,000
-  writes/day (account-wide). The app is engineered around it — pings ≤2
+- **Cloudflare budget (Workers Paid)**: there is no daily KV write cap on this
+  plan — the included allowance is 1M KV writes, 10M KV reads and 10M requests
+  per month, with metered overage beyond. Stay frugal anyway: KV *writes and
+  deletes* are the cost driver (a delete is billed as a write), so never write
+  or delete unconditionally inside the 10-minute cron — read first, and only
+  write on a real change. The app is engineered this way: pings ≤2
   writes/device/day, config/sync writes only on real changes, the feed writes
-  history at most ~once/day per sheet, and rate-limiting is in-memory. Worst
-  case at ~30 active users is a few hundred writes/day. Requests (100k/day) and
-  KV reads (100k/day) have huge headroom.
+  history at most ~once/day per sheet, sheet-health `fail:` markers are deleted
+  only when present (Pass 92; the old unconditional delete cost ~144
+  writes/day per sheet), snapshots republish only on change, and rate-limiting
+  is in-memory. Typical load is a few hundred writes/day (~20k/month).
+  Durable Object storage (analytics rows, the job heartbeat) is separate from KV.
 - The cron runs every 10 minutes; briefing 07:00, week-ahead Sun 18:00, Friday
   digest 16:00 (all Europe/London via the worker's own clock handling).
 - The admin dashboard (`/analytics.html`, a Vite entry under
   `src/admin-analytics/`) holds the owner key in memory only (no cache, no
   persisted key; 15-min idle lock). It reads `/stats` (legacy receipt-day) and
   `/stats/v2` (the snapshot the cron publishes to `astats:latest` every 10 min —
-  skipped when unchanged; failed aggregation keeps the last snapshot and shows
-  as stale after 30 min). Worker-side acceptance counters feed the Reliability
+  the KV write is skipped when unchanged, so `generatedAt` means "numbers last
+  changed". Every successful run also records a heartbeat in the
+  `AnalyticsStore` (`meta:checkedAt`, no KV write), served as `checkedAt`; the
+  dashboard's freshness and its "stale after 30 min" warning follow
+  `checkedAt`, so a quiet spell with no new data is not reported as stale. A
+  failed aggregation records no heartbeat, keeps the last snapshot, and shows as
+  stale). Worker-side acceptance counters feed the Reliability
   section; a refused v2 attempt costs one Durable Object request, nothing in KV.
 - Analytics retention: last-seen recording is on (≤1 KV write/token/week); the
   first-seen expiry job is dormant until `analytics:retention-policy` is set.

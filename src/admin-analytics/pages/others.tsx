@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ACTION_CATALOGUE } from '../../../shared/analytics-contracts.js'
+import { freshnessISO } from '../lib/client'
 import type { StatsV2 } from '../lib/client'
 import { buildCsv, downloadCsv } from '../lib/csv'
 import type { CsvRow } from '../lib/csv'
@@ -115,13 +116,13 @@ export function Reliability({ v2 }: { v2: StatsV2 }) {
       </StatePanel>
     )
   }
-  const ageMin = Math.round((Date.now() - Date.parse(v2.generatedAt)) / 60_000)
+  const ageMin = Math.round((Date.now() - Date.parse(freshnessISO(v2))) / 60_000)
   const stale = ageMin > rel.thresholds.staleAfterMinutes
   const lcd = rel.lastCompleteDay
   const sync = v2.features.find((f) => f.id === 'sync_outcome')
   const unknownBuild = v2.builds?.list.find((b) => b.buildId === 'unknown')
   const issues: string[] = []
-  if (stale) issues.push(`Stale aggregate: the v2 snapshot is ${ageMin} min old (threshold ${rel.thresholds.staleAfterMinutes} min).`)
+  if (stale) issues.push(`Stale aggregate: the snapshot job last succeeded ${ageMin} min ago (threshold ${rel.thresholds.staleAfterMinutes} min).`)
   if (lcd.status === 'alert') issues.push(`Schema rejections above ${rel.thresholds.rejectRatePct}% on ${lcd.date} (${lcd.refused}/${lcd.attempts}).`)
   if (unknownBuild && unknownBuild.tokens > 0) issues.push(`${unknownBuild.tokens} active token(s) report no build id (unknown build coverage).`)
   if (!v2.completeness.scanComplete) issues.push('Storage scan incomplete — totals are lower bounds.')
@@ -147,7 +148,7 @@ export function Reliability({ v2 }: { v2: StatsV2 }) {
         <Kpi
           value={stale ? `${ageMin} min` : `${ageMin} min`}
           label="Aggregate freshness"
-          support={`source: snapshot job · stale after ${rel.thresholds.staleAfterMinutes} min · last accepted batch ${rel.lastAcceptedAt ? new Date(rel.lastAcceptedAt).toLocaleString('en-GB') : 'none yet'}`}
+          support={`source: snapshot job heartbeat${v2.checkedAt ? '' : ' (publish time — worker predates the heartbeat)'} · stale after ${rel.thresholds.staleAfterMinutes} min · last accepted batch ${rel.lastAcceptedAt ? new Date(rel.lastAcceptedAt).toLocaleString('en-GB') : 'none yet'}`}
         />
         <Kpi
           value={lcd.ratePct === null ? '—' : `${lcd.ratePct}%`}

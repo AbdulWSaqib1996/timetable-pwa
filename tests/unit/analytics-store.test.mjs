@@ -264,3 +264,14 @@ test('the snapshot carries setup coverage, return frequency and a tokens-ever co
   assert.equal(snap.metrics.newTokensWindow.value, 2)
   assert.equal(snap.metrics.activeTokens7.value, 2)
 })
+
+test('heartbeat: /v2/checked stores a valid time and reads it back; junk is refused', async () => {
+  const { store, records } = makeStore()
+  const empty = await (await store.fetch(new Request('https://analytics/v2/checked'))).json()
+  assert.equal(empty.checkedAt, null)
+  assert.equal((await post(store, '/v2/checked', { at: 'not a date' })).status, 400)
+  assert.equal(records.has('meta:checkedAt'), false)
+  assert.equal((await post(store, '/v2/checked', { at: '2026-09-24T18:50:02.000Z' })).status, 200)
+  const read = await (await store.fetch(new Request('https://analytics/v2/checked'))).json()
+  assert.equal(read.checkedAt, '2026-09-24T18:50:02.000Z')
+})

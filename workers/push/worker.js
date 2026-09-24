@@ -614,7 +614,10 @@ async function runScheduled(env) {
       let identityChanged = false
       let failCount = 0
       if (sessions.length > 0) {
-        await env.PUSH.delete(`fail:${key}`)
+        // Clear a failure streak only when one exists: a KV delete is billed
+        // as a write, and an unconditional delete here cost one write per
+        // healthy sheet per run (~144/day each) for nothing.
+        if (await env.PUSH.get(`fail:${key}`)) await env.PUSH.delete(`fail:${key}`)
         const old = await env.PUSH.get(snapKey(id, gid), 'json')
         sessions = reconcileEvents(sessions, old ?? [])
         identityChanged = !!old && old.some(s => !s.eventKey || !s.calendarUid)
@@ -1168,9 +1171,16 @@ export async function publishAnalyticsSnapshot(env) {
       const { generatedAt: _g, snapshotId: _s, ...rest } = x ?? {}
       return JSON.stringify(rest)
     }
-    if (previous && essence(previous) === essence(snapshot)) return false
-    await env.PUSH.put('astats:latest', JSON.stringify(snapshot))
-    return true
+    const unchanged = !!previous && essence(previous) === essence(snapshot)
+    if (!unchanged) await env.PUSH.put('astats:latest', JSON.stringify(snapshot))
+    // Freshness heartbeat: the published copy only changes when the data
+    // does, so its generatedAt freezes during quiet spells. Record that this
+    // run checked the data — in DO storage, never a KV write — so /stats/v2
+    // can report real job freshness (checkedAt) instead of a false "stale".
+    await stub
+      .fetch(new Request('https://analytics/v2/checked', { method: 'POST', body: JSON.stringify({ at: new Date().toISOString() }), headers: { 'content-type': 'application/json' } }))
+      .catch(() => {})
+    return !unchanged
   } catch {
     // Keep the previous snapshot on any failure; never publish a partial one.
     return false
@@ -1523,7 +1533,17 @@ export default {
       // (ADM-17). Absent snapshot = aggregation not run yet, a typed 503.
       const snapshot = await env.PUSH.get('astats:latest', 'json')
       if (!snapshot) return noStore({ error: 'aggregate unavailable' }, 503)
-      return noStore(snapshot)
+      // Last successful job run (see publishAnalyticsSnapshot); best effort —
+      // without it the dashboard falls back to generatedAt.
+      let checkedAt = null
+      try {
+        const res = await env.ANALYTICS.get(env.ANALYTICS.idFromName('analytics-v2')).fetch(new Request('https://analytics/v2/checked'))
+        const body = res.ok ? await res.json() : null
+        if (typeof body?.checkedAt === 'string' && !Number.isNaN(Date.parse(body.checkedAt))) checkedAt = body.checkedAt
+      } catch {
+        /* heartbeat unavailable */
+      }
+      return noStore(checkedAt ? { ...snapshot, checkedAt } : snapshot)
     }
     if (request.method === 'POST' && url.pathname === '/ping') {
       // ADM-16 (bounds): a ping is tiny — anything oversized or non-JSON is

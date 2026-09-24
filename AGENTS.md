@@ -49,6 +49,7 @@ a new commit. `all` runs everything in order.
 - **Never delete KV records you did not create in the current task.** Real-user data lives beside operational keys (`sub:`, `sync:`, `aping:`, `adev:`, `snap:` — full prefix map in DEPLOYMENT.md §6). A deleted user ping/subscription cannot be restored.
 - **Never test against production analytics or push subscriptions.** If a test must ping, use a device id starting `ffffffff` and delete exactly that id afterwards.
 - **Never set `analytics:retention-policy` in KV unless the owner explicitly asks** — it activates a dormant job that deletes `adev:` first-seen rows (scoped, grace-period-gated, ≤200/run) and changes what “tokens ever recorded” means.
+- The admin dashboard's freshness comes from `checkedAt` on `/stats/v2` (the snapshot job's heartbeat, `meta:checkedAt` in the `AnalyticsStore`), not `generatedAt`, which only moves when the numbers change. A "stale" dashboard means the job itself stopped succeeding.
 - The `AnalyticsStore` Durable Object (`day:`/`dp:`/`seen:`/`rel:`/`meta:` rows) is analytics-owned; never reach into SyncStore/GroupStore storage from it or vice versa. `/stats` and `/stats/v2` are `Authorization: Bearer` only — do not reintroduce a query-string credential.
 - Never commit secrets; the only secret (`statskey`) lives in KV. Rotate with
   `npx wrangler kv key put --namespace-id <id-from-wrangler.toml> --remote statskey <new>` — only when asked.
@@ -59,7 +60,7 @@ a new commit. `all` runs everything in order.
 - Log every substantive change in `PLAN.md` (same commit) — it is the running record.
 - CI must stay green; `npm run test:e2e` locally reproduces the gate.
 - Rollback: app = `git revert` + push; workers = a compatible rollback or forward fix. Never restore the legacy broadcasting `/test` handler; retain its 410 response (see DEPLOYMENT.md).
-- KV budget: stay frugal with KV **writes** (~1,000/day account cap); prefer read-only checks.
+- KV budget: Cloudflare is on Workers Paid (no daily cap; 1M KV writes/month included, metered beyond). Stay frugal with KV **writes and deletes** (a delete is billed as a write): never write or delete unconditionally in the cron — read first and write only on a real change. Prefer read-only checks.
 
 ## Quick health check (read-only, always safe)
 

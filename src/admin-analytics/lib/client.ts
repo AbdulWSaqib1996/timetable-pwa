@@ -73,7 +73,10 @@ export interface StatsV2Ratio extends StatsV2Count {
 export interface StatsV2 {
   schemaVersion: 2
   snapshotId: string
+  /** when the published numbers last CHANGED (the copy is only republished on change) */
   generatedAt: string
+  /** last successful snapshot-job run, changed or not; absent on older workers */
+  checkedAt?: string
   observedThrough: string | null
   period: { from: string; to: string; timezone: 'UTC'; includesPartialToday: boolean }
   source: string
@@ -125,4 +128,9 @@ export async function fetchV2Stats(key: string, signal?: AbortSignal): Promise<S
   const body = await request('/stats/v2?section=overview', key, signal)
   if (!validateStatsV2(body)) throw new StatsError({ kind: 'invalid' })
   return body as StatsV2
+}
+
+/** Job freshness: the last successful run, falling back to the last publish. */
+export function freshnessISO(v2: StatsV2): string {
+  return v2.checkedAt ?? v2.generatedAt
 }

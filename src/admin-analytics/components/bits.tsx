@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { freshnessISO } from '../lib/client'
 import type { StatsV2 } from '../lib/client'
 import { IconAlert, IconClock, IconRefresh } from './icons'
 
@@ -61,13 +62,19 @@ export function StatusStrip({
   refreshing: boolean
 }) {
   const generated = v2 ? new Date(v2.generatedAt) : null
-  const stale = generated !== null && Date.now() - generated.getTime() > STALE_AFTER_MS
+  // Staleness follows the job heartbeat: numbers that simply haven't changed are not stale.
+  const checked = v2 ? new Date(freshnessISO(v2)) : null
+  const stale = checked !== null && Date.now() - checked.getTime() > STALE_AFTER_MS
   return (
     <div className="status-strip">
       <span className={`dot${stale ? ' stale' : ''}`} aria-hidden="true" />
       <span>
         {generated
-          ? `Aggregated ${generated.toLocaleString('en-GB')} (loaded snapshot — not proof clients reported now)`
+          ? `Aggregated ${generated.toLocaleString('en-GB')}${
+              v2?.checkedAt && checked && checked.getTime() > generated.getTime()
+                ? ` · no changes since, last checked ${checked.toLocaleString('en-GB')}`
+                : ''
+            } (loaded snapshot — not proof clients reported now)`
           : 'No snapshot loaded'}
       </span>
       {stale && <span className="badge warn">stale (&gt;30 min)</span>}

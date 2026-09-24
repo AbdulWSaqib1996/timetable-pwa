@@ -116,6 +116,19 @@ export class AnalyticsStore {
       return this.aggregate()
     }
 
+    // Job heartbeat (worker-only): the time of the last successful snapshot
+    // run, whether or not the published copy changed.
+    if (url.pathname === '/v2/checked') {
+      if (request.method === 'POST') {
+        const body = await request.json().catch(() => null)
+        const at = typeof body?.at === 'string' && !Number.isNaN(Date.parse(body.at)) ? body.at : null
+        if (!at) return json({ error: 'invalid time' }, 400)
+        await this.state.storage.put('meta:checkedAt', at)
+        return json({ ok: true })
+      }
+      return json({ checkedAt: (await this.state.storage.get('meta:checkedAt')) ?? null })
+    }
+
     return json({ error: 'not found' }, 404)
   }
 
