@@ -93,6 +93,7 @@ import { DataCentre } from './DataCentre'
 import type { AdminFile } from '../lib/admin'
 import { activeCourse, courseZone } from '../lib/course'
 import { downloadFile } from '../lib/files'
+import { USER_GUIDE_HTML, USER_GUIDE_PDF } from '../lib/guide'
 
 /** Build the subscribable feed URL for a deployed ics-feed worker. */
 export function buildFeedUrl(base: string, settings: Settings, calendarName?: string): string {
@@ -167,6 +168,7 @@ const SEARCH_ENTRIES: { section: SettingsSection; anchor: SettingsAnchor; title:
   { section: 'data', anchor: 'data-advanced', title: 'Storage & advanced', keywords: ['storage', 'quota', 'space', 'drafts', 'sources', 'photos', 'documents', 'advanced'] },
   { section: 'appearance', anchor: 'theme', title: 'Theme', keywords: ['theme', 'dark', 'light', 'appearance', 'colour', 'color', 'system'] },
   { section: 'appearance', anchor: 'density', title: 'Density', keywords: ['density', 'compact', 'comfortable', 'spacing', 'appearance', 'size'] },
+  { section: 'help', anchor: 'user-guide', title: 'Illustrated user guide', keywords: ['guide', 'help', 'how to', 'manual', 'tutorial', 'start', 'getting started', 'pdf', 'instructions'] },
   { section: 'help', anchor: 'whats-new', title: "What's new", keywords: ['new', 'changelog', 'version', 'update', 'release'] },
   { section: 'help', anchor: 'install', title: 'Install the app', keywords: ['install', 'home screen', 'app', 'ios', 'android', 'add to'] },
 ]
@@ -220,6 +222,7 @@ export type SettingsAnchor =
   | 'theme'
   | 'density'
   | 'whats-new'
+  | 'user-guide'
   | 'install'
 
 function focusAnchor(anchor: SettingsAnchor) {
@@ -2019,6 +2022,25 @@ export function SettingsSheet({
       )}
       {section === 'help' && (
         <>
+        <section className="filter-section" id="user-guide">
+          <div className="section-head">
+            <span className="ui-tile ui-tile--info" aria-hidden="true">
+              <IconBook size={20} />
+            </span>
+            <h3 tabIndex={-1}>Illustrated user guide</h3>
+          </div>
+          <p className="filter-hint">
+            Step-by-step pictures of every part of the app — setup, sessions and homework, placements,
+            PGCE records, planning, backup and mentor access. Opens in a new tab and needs a connection.
+          </p>
+          <a className="btn-secondary btn-link" href={USER_GUIDE_HTML} target="_blank" rel="noopener">
+            Open the guide ↗
+          </a>
+          <a className="btn-secondary btn-link" href={USER_GUIDE_PDF} target="_blank" rel="noopener" download>
+            <IconDownload /> Download PDF (7 MB)
+          </a>
+        </section>
+
         <section className="filter-section" id="whats-new">
           <div className="section-head">
             <span className="ui-tile ui-tile--info" aria-hidden="true">

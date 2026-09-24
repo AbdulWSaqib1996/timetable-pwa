@@ -90,12 +90,15 @@ export default defineConfig({
         // App shell is precached; sheet data also gets a NetworkFirst cache so a fetch
         // still succeeds offline, and periodic background sync (sw-periodic.js) keeps it warm.
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        // The illustrated user guide (public/guide/, ~17 MB) is read online and
+        // never precached — it would bloat every install for a one-off read.
+        globIgnores: ['guide/**'],
         navigateFallback: `${base}index.html`,
         // The learner SPA fallback must NEVER swallow the admin dashboard:
         // an installed app's service worker controls the whole origin, and
         // without this denylist a navigation to analytics.html would render
         // learner Today instead (ADM-19). Registration strategy unchanged.
-        navigateFallbackDenylist: [/analytics/, /mentor/],
+        navigateFallbackDenylist: [/analytics/, /mentor/, /\/guide\//],
         importScripts: ['sw-periodic.js', 'sw-push.js'],
         runtimeCaching: [
           {

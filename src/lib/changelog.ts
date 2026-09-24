@@ -7,6 +7,15 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 25,
+    dateISO: '2026-09-24',
+    title: 'An illustrated guide to the whole app',
+    items: [
+      'New to the app, or looking for a feature? Settings → Help & privacy now opens an illustrated user guide — 43 step-by-step walkthroughs with phone and desktop pictures, from connecting your timetable to placements, homework, PGCE records, backup and mentor access',
+      'Prefer to read offline or print it? Download the same guide as a PDF from the same place, or from the link on the first setup screen',
+    ],
+  },
+  {
     version: 24,
     dateISO: '2026-09-16',
     title: 'Homework you can plan; a preparation list for every session',

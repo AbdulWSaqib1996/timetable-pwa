@@ -7,6 +7,7 @@ import { parseSheetUrl } from '../lib/sheetUrl'
 import { sessionInMembership } from '../../shared/membership.js'
 import type { Session } from '../types'
 import { activeCourse } from '../lib/course'
+import { USER_GUIDE_HTML, USER_GUIDE_PDF } from '../lib/guide'
 import { IconBell, IconDownload, IconPin, IconRefresh, IconSchedule, IconSchool } from './ui'
 
 export interface SetupResult {
@@ -296,6 +297,17 @@ export function SetupScreen({ defaultName, onComplete, onDemo, onCancel }: Props
         <button type="button" className="btn-ghost" onClick={onDemo} disabled={busy}>
           Or try it with demo data
         </button>
+        <p className="setup-footer setup-guide">
+          New here? See how everything works in the{' '}
+          <a href={USER_GUIDE_HTML} target="_blank" rel="noopener">
+            illustrated user guide
+          </a>{' '}
+          (or{' '}
+          <a href={USER_GUIDE_PDF} target="_blank" rel="noopener" download>
+            download the PDF
+          </a>
+          ).
+        </p>
         {onCancel && (
           <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>
             Cancel
