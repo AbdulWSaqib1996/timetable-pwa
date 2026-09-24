@@ -32,6 +32,7 @@ import { WhatsNewBanner } from '../../components/WhatsNewBanner'
 import type { NextStep } from '../../../shared/practice.js'
 import type { AttendanceAnswer } from '../../components/AttendancePrompt'
 import type { MetaMap, Session, SessionChange, Settings } from '../../types'
+import { bankHolidayOn } from '../../../shared/bankHolidays.js'
 
 interface Props {
   profileName: string
@@ -352,7 +353,8 @@ export function TodayPage({
         }
         subtitle={
           <>
-            {longDate(todayISO)} · {profileName}
+            {longDate(todayISO)}
+            {bankHolidayOn(todayISO) && <> · <span className="badge badge-bank-holiday">{bankHolidayOn(todayISO)}</span></>} · {profileName}
             {demo ? ' · demo data' : fetchedAt ? ` · updated ${formatAge(fetchedAt)}` : ''}
             {clock.zoneDiffers && <span className="badge" title={`Course time ${clock.courseZone}; your device is on ${clock.deviceZone}`}> · course time {clock.hhmm}</span>}
           </>

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { shiftMonthISO } from '../../shared/calendar-time.js'
 import type { Session } from '../types'
 import { IconNote, IconSun } from './ui'
+import { bankHolidayOn } from '../../shared/bankHolidays.js'
 
 interface Props {
   sessions: Session[]
@@ -102,6 +103,11 @@ export function MonthView({ sessions, todayISO, anchorISO, onNavigate, keyDateDa
               onClick={() => onPickDay(dateISO)}
             >
               <span className="month-daynum">{Number(dateISO.slice(-2))}</span>
+              {bankHolidayOn(dateISO) && (
+                <span className="month-bank-holiday" title={bankHolidayOn(dateISO) ?? undefined}>
+                  BH<span className="sr-only"> — {bankHolidayOn(dateISO)}</span>
+                </span>
+              )}
               {keyDateDays?.has(dateISO) && (
                 <span className="month-keydate" aria-label="Key date">
                   <IconNote size={10} />

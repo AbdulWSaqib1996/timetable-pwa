@@ -8,6 +8,7 @@ import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import { shareWeekImage } from '../lib/weekImage'
 import type { Session } from '../types'
 import { SessionCard } from './SessionCard'
+import { bankHolidayOn } from '../../shared/bankHolidays.js'
 import { Dialog, IconChevronLeft, IconChevronRight, IconClose, IconShare } from './ui'
 
 interface Props {
@@ -275,6 +276,7 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
               <h2 className="day-header day-header-flat">
                 <span>{fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
                 {dateISO === todayISO && <span className="badge badge-today">Today</span>}
+                {bankHolidayOn(dateISO) && <span className="badge badge-bank-holiday">{bankHolidayOn(dateISO)}</span>}
               </h2>
               {(keyDatesByDay.get(dateISO) ?? []).map((kd) => (
                 <SessionCard key={kd.id} session={kd} onSelect={onSelect} />
@@ -327,6 +329,11 @@ export function WeekView({ sessions, keyDates = [], todayISO, anchorISO, onNavig
             <span className="week-col-head-day">
               {fromISO(dateISO).toLocaleDateString('en-GB', { weekday: 'short' })} <strong>{fromISO(dateISO).getDate()}</strong>
             </span>
+            {bankHolidayOn(dateISO) && (
+              <span className="week-bank-holiday" title={bankHolidayOn(dateISO) ?? undefined}>
+                Bank holiday
+              </span>
+            )}
             {(() => {
               const pins = keyDatesByDay.get(dateISO) ?? []
               const open = expandedPins === dateISO

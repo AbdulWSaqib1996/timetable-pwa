@@ -8,6 +8,8 @@ export { AnalyticsStore } from './analytics-store.js'
 export { MentorStore } from './mentor-store.js'
 import { isSpaceId as mentorSpaceOk } from '../../shared/mentor.js'
 import { MAX_BATCH_BYTES, validateBatch } from '../../shared/analytics-contracts.js'
+import { parsePlacementRange } from '../../shared/placementRange.js'
+import { bankHolidayOn } from '../../shared/bankHolidays.js'
 /**
  * timetable-push worker — background Web Push for My Timetable.
  *
@@ -154,22 +156,6 @@ const placementTagOf = (t) => {
   const m = (t || '').match(/SE ?\d[a-z]?/i)
   return m ? m[0].replace(/\s/g, '').toUpperCase() : 'PLACEMENT'
 }
-const PLACEMENT_MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
-function parsePlacementRange(title) {
-  const m = (title || '').match(
-    /\((\d{1,2})(?:st|nd|rd|th)?(?:\s+([A-Za-z]+))?\s*[-–—]\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})\)/
-  )
-  if (!m) return null
-  const [, d1, m1name, d2, m2name, year] = m
-  const mo2 = PLACEMENT_MONTHS[m2name.slice(0, 3).toLowerCase()]
-  if (mo2 === undefined) return null
-  const mo1 = m1name !== undefined ? PLACEMENT_MONTHS[m1name.slice(0, 3).toLowerCase()] : mo2
-  if (mo1 === undefined) return null
-  const iso = (y, mo, d) => `${y}-${pad(mo + 1)}-${pad(d)}`
-  const from = iso(+year, mo1, +d1)
-  const to = iso(+year, mo2, +d2)
-  return from <= to ? { from, to } : null
-}
 /**
  * Same expansion the app does: marker rows like "SE1a begins (28th Sept - 2nd Oct 2026)"
  * become one placement day per weekday in the span, so background reminders/briefings/
@@ -198,7 +184,8 @@ function expandPlacements(sessions) {
       const alreadyMarked = sessions.some(
         (x) => x.dateISO === dateISO && isPlacementTitle(x.title) && placementTagOf(x.title) === tag
       )
-      if (dow !== 0 && dow !== 6 && !alreadyMarked) {
+      // Bank holidays are never school days (England and Wales).
+      if (dow !== 0 && dow !== 6 && !alreadyMarked && !bankHolidayOn(dateISO)) {
         out.push({
           title: `${tag} placement day`,
           dateISO,

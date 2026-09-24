@@ -18,8 +18,9 @@ import { buildICSCalendar } from '../../shared/calendar-time.js'
 import { parseTimetable } from '../../shared/timetable.js'
 import { isStudentRepTitle } from '../../shared/eligibility.js'
 import { reconcileEvents, eventKey } from '../../shared/identity.js'
+import { parsePlacementRange } from '../../shared/placementRange.js'
+import { bankHolidayOn } from '../../shared/bankHolidays.js'
 const parseSessions = table => parseTimetable(table).sessions
-const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 }
 const pad = n => String(n).padStart(2,'0')
 
 /* ---------- placement (school experience) expansion, matching the app ---------- */
@@ -27,21 +28,6 @@ const isPlacementTitle = (t) => /school experience|placement|\bSE ?\d[a-z]?\b/i.
 const placementTagOf = (t) => {
   const m = (t || '').match(/SE ?\d[a-z]?/i)
   return m ? m[0].replace(/\s/g, '').toUpperCase() : 'PLACEMENT'
-}
-function parsePlacementRange(title) {
-  const m = (title || '').match(
-    /\((\d{1,2})(?:st|nd|rd|th)?(?:\s+([A-Za-z]+))?\s*[-\u2013\u2014]\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})\)/
-  )
-  if (!m) return null
-  const [, d1, m1name, d2, m2name, year] = m
-  const mo2 = MONTHS[m2name.slice(0, 3).toLowerCase()]
-  if (mo2 === undefined) return null
-  const mo1 = m1name !== undefined ? MONTHS[m1name.slice(0, 3).toLowerCase()] : mo2
-  if (mo1 === undefined) return null
-  const iso = (y, mo, d) => `${y}-${pad(mo + 1)}-${pad(d)}`
-  const from = iso(+year, mo1, +d1)
-  const to = iso(+year, mo2, +d2)
-  return from <= to ? { from, to } : null
 }
 /**
  * Marker rows like "SE1a begins (28th Sept - 2nd Oct 2026)" become one event per
@@ -78,7 +64,8 @@ function expandPlacements(sessions, plcMap) {
       const alreadyMarked = sessions.some(
         (x) => x.dateISO === dateISO && isPlacementTitle(x.title) && placementTagOf(x.title) === tag
       )
-      if (dow !== 0 && dow !== 6 && !alreadyMarked) {
+      // Bank holidays are never school days (England and Wales).
+      if (dow !== 0 && dow !== 6 && !alreadyMarked && !bankHolidayOn(dateISO)) {
         out.push({
           id: `plc-${tag}-${dateISO}`,
           title: `${tag} placement day`,

@@ -6325,3 +6325,9 @@ body { font-size: 16px; line-height: 1.45; }
 .guided-card .setup-error p:last-child { margin: 0; }
 .guided-nav .btn-ghost, .guided-summary .btn-ghost { width: auto; margin-top: 0; padding: 8px 12px; }
 .guided-card .btn-ghost.guided-wide { margin-top: 0; }
+
+/* Bank holidays (England and Wales, Pass 93): a day label, never a session or a task. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.badge-bank-holiday { background: var(--attention-bg); color: var(--attention-text); font-weight: 600; }
+.week-bank-holiday { display: block; margin-top: 2px; font-size: 10px; font-weight: 700; line-height: 1.2; color: var(--attention-text); background: var(--attention-bg); border-radius: var(--radius-badge); padding: 1px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.month-bank-holiday { display: inline-block; margin-left: 3px; vertical-align: 1px; font-size: 9px; font-weight: 800; letter-spacing: 0.02em; color: var(--attention-text); background: var(--attention-bg); border-radius: 4px; padding: 0 3px; line-height: 1.5; }

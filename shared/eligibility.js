@@ -1,3 +1,4 @@
+import { insideDeclaredSpan, placementWindows } from './placementRange.js'
 /**
  * Attendance/evidence eligibility (P3-06), shared so Stats, Settings
  * summaries, CSV exports and the printed binder all agree on one definition
@@ -78,9 +79,11 @@ export function attendanceSummary(sessions, metaOf, todayISO, nowMinutes = null)
  */
 export function placementDaySummary(sessions, metaOf) {
   const byTag = new Map()
+  const windows = placementWindows(sessions, isPlacementTitle, placementTagOf)
   for (const s of sessions) {
     if (s.isKeyDate || !isPlacementTitle(s.title)) continue
     const tag = s.placementTag ?? placementTagOf(s.title)
+    if (!insideDeclaredSpan(windows, tag, s.dateISO)) continue
     const e = byTag.get(tag) ?? { total: new Set(), attended: new Set(), real: new Set() }
     e.total.add(s.dateISO)
     const m = metaOf(s)

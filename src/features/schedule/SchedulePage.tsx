@@ -15,6 +15,7 @@ import type { Filters, MetaMap, Session, SessionMeta, Settings, ViewMode } from 
 import { DayList } from './DayList'
 import { SessionPanel } from './SessionPanel'
 import { WeekStrip } from './WeekStrip'
+import { bankHolidayOn } from '../../../shared/bankHolidays.js'
 import type { SchoolDayInfo } from './DayList'
 
 interface Props {
@@ -190,6 +191,7 @@ export function SchedulePage({
         <h2>
           {longDay(anchorISO)}
           {anchorISO === todayISO && <span className="badge badge-today">Today</span>}
+          {bankHolidayOn(anchorISO) && <span className="badge badge-bank-holiday">{bankHolidayOn(anchorISO)}</span>}
         </h2>
         <p className="day-summary">{daySummary}</p>
       </div>

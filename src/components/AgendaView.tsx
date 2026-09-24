@@ -5,6 +5,7 @@ import { isPlacementSession, placementTag, toMinutes, weekNumber } from '../lib/
 import { cachedWeatherForHour, weatherForHour } from '../lib/weather'
 import type { MetaMap, Session } from '../types'
 import { SessionCard } from './SessionCard'
+import { bankHolidayOn } from '../../shared/bankHolidays.js'
 import { IconSchool } from './ui'
 
 interface Props {
@@ -206,6 +207,11 @@ export function AgendaView({
                 <span className="week-badge">Wk {weekNumber(dateISO, termStartISO)}</span>
               )}
               {isToday && <span className="badge badge-today">Today</span>}
+              {bankHolidayOn(dateISO) && (
+                <span className="badge badge-bank-holiday" title={bankHolidayOn(dateISO) ?? undefined}>
+                  Bank holiday
+                </span>
+              )}
             </h2>
             {(() => {
               // Placement mode: an all-placement day collapses into one calm block.

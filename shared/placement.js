@@ -1,4 +1,5 @@
 import { isPlacementTitle, placementTagOf } from './eligibility.js'
+import { insideDeclaredSpan, placementWindows } from './placementRange.js'
 
 /**
  * Placement plan vs logged experience (P5-03) — runtime-neutral core.
@@ -98,9 +99,11 @@ const daySpan = (start, end, fallback) => {
  */
 export function computePlacementBlocks(sessions, exceptions, settings, metaOf, placements = []) {
   const byTagDate = new Map()
+  const windows = placementWindows(sessions, isPlacementTitle, placementTagOf)
   for (const s of sessions ?? []) {
     if (s.isKeyDate || !isPlacementTitle(s.title)) continue
     const tag = placementTagOf(s.title)
+    if (!insideDeclaredSpan(windows, tag, s.dateISO)) continue
     if (!byTagDate.has(tag)) byTagDate.set(tag, new Map())
     const dates = byTagDate.get(tag)
     dates.set(s.dateISO, [...(dates.get(s.dateISO) ?? []), s])

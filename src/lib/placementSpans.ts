@@ -1,36 +1,20 @@
 import type { Session } from '../types'
 import { isPlacementSession, placementTag } from './format'
+import { parsePlacementRange } from '../../shared/placementRange.js'
+import { bankHolidayOn } from '../../shared/bankHolidays.js'
 
 /**
  * Sheets mark placements as single rows like "SE1a begins (28th Sept - 2nd Oct 2026)" —
  * one row on the first day, nothing on the days between. Parse the range out of the
- * title and synthesize a placement day for every weekday in the span so the block
+ * title (shared/placementRange.js — the workers use the same parser) and synthesize a
+ * placement day for every weekday in the span, except bank holidays, so the block
  * actually appears in the timetable.
  */
 
-const MONTHS: Record<string, number> = {
-  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
-}
+export { parsePlacementRange }
 
 const iso = (y: number, m: number, d: number) =>
   `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-
-/** "(28th Sept - 2nd Oct 2026)" / "(8th-12th March 2027)" → { from, to } ISO dates. */
-export function parsePlacementRange(title: string): { from: string; to: string } | null {
-  const m = title.match(
-    /\((\d{1,2})(?:st|nd|rd|th)?(?:\s+([A-Za-z]+))?\s*[-–—]\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})\)/
-  )
-  if (!m) return null
-  const [, d1, m1name, d2, m2name, year] = m
-  const mo2 = MONTHS[m2name.slice(0, 3).toLowerCase()]
-  if (mo2 === undefined) return null
-  const mo1 = m1name !== undefined ? MONTHS[m1name.slice(0, 3).toLowerCase()] : mo2
-  if (mo1 === undefined) return null
-  const from = iso(Number(year), mo1, Number(d1))
-  const to = iso(Number(year), mo2, Number(d2))
-  return from <= to ? { from, to } : null
-}
 
 export function expandPlacementSpans(sessions: Session[]): Session[] {
   const out = [...sessions]
@@ -55,7 +39,7 @@ export function expandPlacementSpans(sessions: Session[]): Session[] {
       const alreadyMarked = sessions.some(
         (x) => x.dateISO === dateISO && isPlacementSession(x) && placementTag(x.title) === tag
       )
-      if (dow !== 0 && dow !== 6 && !alreadyMarked) {
+      if (dow !== 0 && dow !== 6 && !alreadyMarked && !bankHolidayOn(dateISO)) {
         out.push({
           id: `plc-${tag}-${dateISO}`,
           title: `${tag} placement day`,

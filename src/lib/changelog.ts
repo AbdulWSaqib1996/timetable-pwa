@@ -7,6 +7,16 @@ export interface WhatsNewEntry { version: number; dateISO: string; title: string
 
 export const WHATSNEW_ENTRIES: WhatsNewEntry[] = [
   {
+    version: 27,
+    dateISO: '2026-09-24',
+    title: 'Placement dates read correctly; bank holidays shown',
+    items: [
+      'Placements whose dates are written with day names — like “SE3 (Mon 12th April - Friday 2nd July 2027)” — now fill every school day in between, so SE3 shows its full 58 days instead of a handful',
+      'Only days inside a placement’s dates count as placement days: a briefing, tutorial or upload before or after the block stays a normal event',
+      'Bank holidays (England and Wales) are labelled on Today, in the week and month views and in the list, and are never counted as placement days',
+    ],
+  },
+  {
     version: 26,
     dateISO: '2026-09-24',
     title: 'A guided setup that walks you through it',
